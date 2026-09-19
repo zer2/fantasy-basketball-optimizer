@@ -33,7 +33,7 @@ export class HTTPError extends Error {
  *  unchanged when it is not shaped that way. HTTPError messages are displayed verbatim in
  *  on-screen status lines (e.g. "Connect failed: ..."), so the extracted text should be the
  *  human-readable sentence, not the JSON envelope around it. */
-function readErrorDetail(body: string): string {
+export function readErrorDetail(body: string): string {
     try {
         const parsed = JSON.parse(body)
         return typeof parsed?.detail === 'string' ? parsed.detail : body
@@ -349,6 +349,8 @@ export interface PlatformConnectResponse {
     n_drafters: number
     n_picks: number
     available_modes: string[]
+    /** Whether this LEAGUE drafts by auction. Null when the platform does not report it. */
+    is_auction_draft: boolean | null
 }
 
 export interface DraftStateResponse {

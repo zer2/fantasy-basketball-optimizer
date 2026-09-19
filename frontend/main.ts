@@ -12,6 +12,7 @@ import { runSeasonInit, refreshSeasonRostersFromPlatform, clearLivePlatformRoste
 import { fetchConfig } from './api/client.js'
 import { fetchCurrentUser, setSignedInUser } from './api/auth.js'
 import { buildTableHeader } from './table/player_table.js'
+import { showFailureInTable } from './table/failure_message.js'
 import { applyLayout } from './layout.js'
 import { resetDraftBoard } from './data_entry/draft_board.js'
 import { resetAuctionEntry } from './data_entry/auction_entry.js'
@@ -68,6 +69,7 @@ function makeApplyChain(label: string) {
             .catch(err => {
                 if (err.name === 'AbortError') return
                 console.error(`${label} failed:`, err)
+                showFailureInTable(err)
             })
     }
 }
@@ -104,7 +106,10 @@ function handleSeatChanged({ evaluate = true } = {}): void {
     if (!evaluate) return
     runModeEval()
         .then(() => applyLayout())
-        .catch(err => console.error('Seat change evaluate failed:', err))
+        .catch(err => {
+            console.error('Seat change evaluate failed:', err)
+            showFailureInTable(err)
+        })
 }
 // Wrapped rather than passed directly: the listener would hand the Event in as the options bag.
 renderSeatSelector().addEventListener('change', () => handleSeatChanged())
@@ -162,13 +167,19 @@ function syncForPlatformSwitch(): void {
     if (mode === 'Season Mode') return   // season handled by refreshSeasonRostersIfLive
     if (platform !== 'Enter your own data' && !isPlatformConnected()) {
         clearSeatOptions()
-        showDefaultRankings().catch(err => console.error('Default rankings failed:', err))
+        showDefaultRankings().catch(err => {
+            console.error('Default rankings failed:', err)
+            showFailureInTable(err)
+        })
     } else {
         refreshSeatOptions()
         buildTableHeader()
         runModeEval()
             .then(() => applyLayout())
-            .catch(err => console.error('Platform-switch evaluate failed:', err))
+            .catch(err => {
+                console.error('Platform-switch evaluate failed:', err)
+                showFailureInTable(err)
+            })
     }
 }
 getPlatformSelectElement().addEventListener('change', () => {
@@ -204,8 +215,8 @@ document.getElementById('ls-team-names')!.addEventListener('input', () => {
     // With a live platform the identities come FROM the league, so this fires as a step of
     // CONNECTING — and the connect flow runs its own evaluate once the session has been patched
     // with the platform config that evaluate depends on. Evaluating here too raced it, and lost
-    // in the worst way: this one runs first, while platformConnected is still false (the flag is
-    // set on the line after the names are written), so it took the not-connected branch and
+    // in the worst way: this one runs first, while the connection is not yet recorded (it is
+    // recorded on the line after the names are written), so it took the not-connected branch and
     // painted default rankings, leaving the real evaluate to be aborted. That is the "first
     // Connect does nothing, second one works" behaviour — by the second click the seat is
     // already one of the league's teams, so nothing changes here and only the real evaluate runs.
@@ -250,6 +261,7 @@ const applyPlayerStats = async (signal?: AbortSignal, keepsPlayerPool = false) =
                 return
             }
             console.error('Player stats apply failed:', err)
+            showFailureInTable(err)
         })
 }
 
@@ -371,9 +383,13 @@ waitForSeasons()
         if (String(err).includes('data_id') && markUploadedSourcesExpired()) {
             return runModeEval()
                 .then(() => applyLayout())
-                .catch(retryErr => console.error('Initial load failed after dropping expired uploads:', retryErr))
+                .catch(retryErr => {
+                    console.error('Initial load failed after dropping expired uploads:', retryErr)
+                    showFailureInTable(retryErr)
+                })
         }
         console.error('Initial load failed:', err)
+        showFailureInTable(err)
     })
 
 })()

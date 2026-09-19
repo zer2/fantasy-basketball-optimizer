@@ -146,7 +146,7 @@ def calculate_scores_from_coefficients(player_means: pd.DataFrame
                                         , counting_stats: list[str]
                                         , ratio_stats: list[str]
                                         , categories: list[str]
-                                        , n_starters: int) -> pd.DataFrame:
+                                        , n_active: int) -> pd.DataFrame:
 
     counting_mean    = coefficients.loc[counting_stats, 'Mean of Means']
     counting_var_m   = coefficients.loc[counting_stats, 'Variance of Means']
@@ -168,14 +168,14 @@ def calculate_scores_from_coefficients(player_means: pd.DataFrame
             player_volume  = player_means.loc[:, volume_statistic]
             # Team-denominator correction (the unpublished revision of the G-score paper):
             # the paper's equation 4 approximates a team's attempt volume as
-            # n_starters * V-bar regardless of who the player is. Without that
+            # n_active * V-bar regardless of who the player is. Without that
             # approximation, a team fielding player p attempts
-            # (n_starters - 1) * V-bar + V_p, so p's percentage impact is the original
-            # numerator times n_starters * V-bar / ((n_starters - 1) * V-bar + V_p) --
+            # (n_active - 1) * V-bar + V_p, so p's percentage impact is the original
+            # numerator times n_active * V-bar / ((n_active - 1) * V-bar + V_p) --
             # a player's own volume slightly dampens their own percentage impact.
             team_volume_correction = (
-                n_starters * volume_average
-                / ((n_starters - 1) * volume_average + player_volume)
+                n_active * volume_average
+                / ((n_active - 1) * volume_average + player_volume)
             )
             num_r = (
                 player_volume / volume_average
@@ -245,7 +245,7 @@ def process_player_data(player_stats_v2: pd.DataFrame
                         , chi: float
                         , scoring_format: str
                         , n_drafters: int
-                        , n_starters: int
+                        , n_active: int
                         , sport_params: dict
                         , categories: list[str]
                         , sport: str = 'NBA'
@@ -261,7 +261,7 @@ def process_player_data(player_stats_v2: pd.DataFrame
 
     counting_stats = get_counting_stats(sport_params, categories)
     ratio_stats    = get_ratio_stats(sport_params, categories)
-    n_players      = n_drafters * n_starters
+    n_players      = n_drafters * n_active
     player_means   = player_stats_v2
 
     if weekly_df is not None:
@@ -282,9 +282,9 @@ def process_player_data(player_stats_v2: pd.DataFrame
 
     g_first = calculate_scores_from_coefficients(player_means, coeff_first, sport_params, 1, 1,
                                                   counting_stats, ratio_stats, categories,
-                                                  n_starters)
+                                                  n_active)
     representative_player_set = (
-        g_first.sum(axis=1).sort_values(ascending=False).index[:n_starters * n_drafters]
+        g_first.sum(axis=1).sort_values(ascending=False).index[:n_active * n_drafters]
     )
 
     if weekly_df is not None:
@@ -326,10 +326,10 @@ def process_player_data(player_stats_v2: pd.DataFrame
 
     g_scores = calculate_scores_from_coefficients(player_means, coefficients, sport_params, 1, 1,
                                                    counting_stats, ratio_stats, categories,
-                                                   n_starters)
+                                                   n_active)
     x_scores = calculate_scores_from_coefficients(player_means, coefficients, sport_params, 0, 1,
                                                    counting_stats, ratio_stats, categories,
-                                                   n_starters)
+                                                   n_active)
 
     replacement_games_rate = (1 - player_means['Games Played %'] / 100) * psi
     g_scores = games_played_adjustment(g_scores, replacement_games_rate, representative_player_set,
@@ -447,7 +447,7 @@ def process_player_data(player_stats_v2: pd.DataFrame
             total_value = g_scores.loc[representative_player_set].sum(axis=1).sort_values(ascending=False)
             relative_value = total_value - total_value.min()
             helper_df = pd.DataFrame({
-                'Round': [i // n_drafters for i in range(n_drafters * n_starters)],
+                'Round': [i // n_drafters for i in range(n_drafters * n_active)],
                 'Value': relative_value,
             })
             average_round_value = helper_df.groupby('Round')['Value'].mean()
@@ -467,6 +467,20 @@ def process_player_data(player_stats_v2: pd.DataFrame
             )
             for position in base_position_list
         })
+
+    # The replacement player gets a position row too, eligible for every base slot.
+    #
+    # He already has X- and G-score rows (above) but was left out of `positions`, which is built
+    # from player_means and joined inwards — so a roster holding him crashed the position-aware
+    # solve on a lookup he had no row for. He stands for a drafted player who did not resolve to
+    # anyone in the pool, and such a player HAS taken a roster spot, so the least-wrong assumption
+    # is that he can fill any of them; his -1 scores already make him worthless to field.
+    #
+    # Added here, after every statistical pool has been sliced out of players_and_positions, so he
+    # cannot skew a position mean or a covariance estimate. He is kept out of the candidate list
+    # explicitly in algorithm_agents (he used to be excluded only as a side effect of missing from
+    # this table, which would have made him draftable the moment he was added).
+    positions = pd.concat([positions, pd.Series({RP_PLAYER_ID: list(base_position_list)})])
 
     info = {
         'G-scores':            g_scores,

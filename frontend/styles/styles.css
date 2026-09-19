@@ -1072,6 +1072,14 @@ tr {
     font-size: 0.85rem;
 }
 
+/* A failure in the table's place, distinct from the informational messages that share it. */
+.table-message-error {
+    color: #e06c6c;
+    line-height: 1.5;
+    max-width: 62ch;
+    margin: 0 auto;
+}
+
 /* 1. Top-Left Corner */
 #hscoretable > thead > tr:first-child > :first-child {
   border-top-left-radius: 12px;

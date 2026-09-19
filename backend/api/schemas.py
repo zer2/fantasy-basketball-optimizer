@@ -6,7 +6,7 @@ in backend.models (this module imports from it, never the reverse).
 
 from __future__ import annotations
 from typing import Optional
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 from backend.models import ComboParam
 
@@ -28,7 +28,12 @@ class UploadResponse(BaseModel):
 
 class LeagueSettings(BaseModel):
     sport: str
-    n_drafters: int
+    # At least two, because a league with one drafter has no opponents — and the whole model is
+    # built on the distribution of a matchup. Below two it does not score badly, it fails deep in
+    # the pipeline on an empty opponent set. The sidebar input already enforces the same floor;
+    # the platform path is what could smuggle a smaller number in, from a draft room that has
+    # only one team in it so far.
+    n_drafters: int = Field(ge=2)
     n_picks: int
     scoring_format: str
     # How much of the Head-to-Head objective is winning the majority of categories, the rest
@@ -145,7 +150,7 @@ class SessionResponse(BaseModel):
 # ── /sessions/{id} PATCH ──────────────────────────────────────────────────────
 
 class PatchLeague(BaseModel):
-    n_drafters: Optional[int] = None
+    n_drafters: Optional[int] = Field(default=None, ge=2)   # see LeagueSettings.n_drafters
     n_picks: Optional[int] = None
     scoring_format: Optional[str] = None
     # Omitted = unchanged, like every field here. The resulting format/weight pair is validated
@@ -233,6 +238,9 @@ class ConnectResponse(BaseModel):
     n_drafters: int
     n_picks: int
     available_modes: list[str]
+    # Whether this LEAGUE drafts by auction, as opposed to which modes the PLATFORM supports.
+    # None when the platform does not report it, which means "no opinion" rather than "no".
+    is_auction_draft: Optional[bool] = None
 
 
 class DraftStateResponse(BaseModel):

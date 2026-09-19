@@ -136,8 +136,14 @@ def _build_player_registry(v0_with_names: pd.DataFrame) -> dict:
     return registry
 
 
-def _count_starters(slot_counts: dict, n_picks: int) -> int:
-    """Starters fielded per scoring period: the slot total when a structure is set, else every pick."""
+def _count_active(slot_counts: dict, n_picks: int) -> int:
+    """How many players are active at once: the slot total when a structure is set, else every pick.
+
+    Active rather than "starting", because there is nothing for them to start ahead of -- the
+    default structure is thirteen slots for thirteen picks, so every player a drafter holds is
+    fielded. The distinction that does exist is the injured-list slot, which holds a player who
+    cannot be fielded at all, and that is what this count leaves out.
+    """
     return sum(slot_counts.values()) if slot_counts else n_picks
 
 
@@ -282,7 +288,7 @@ def build_scoring_info(session: Session) -> None:
     n_drafters  = current_settings['n_drafters']
     n_picks     = current_settings['n_picks']
     slot_counts = current_settings['slot_counts']
-    n_starters  = _count_starters(slot_counts, n_picks)
+    n_active  = _count_active(slot_counts, n_picks)
 
     # The pool must be able to fill every roster; otherwise the whole model is ill-posed (there is
     # no replacement-level player to anchor auction values, and managers could not complete teams).
@@ -307,7 +313,7 @@ def build_scoring_info(session: Session) -> None:
         chi               = current_settings['chi'],
         scoring_format    = scoring_format,
         n_drafters        = n_drafters,
-        n_starters        = n_starters,
+        n_active        = n_active,
         sport_params      = sport_params,
         categories        = effective_categories,
         sport             = sport,
@@ -372,14 +378,14 @@ def build_session_agent(session: Session) -> None:
     scoring_format = current_settings['scoring_format']
     n_picks     = current_settings['n_picks']
     slot_counts = current_settings['slot_counts']
-    n_starters  = _count_starters(slot_counts, n_picks)
+    n_active  = _count_active(slot_counts, n_picks)
     n_drafters  = current_settings['n_drafters']
     _, effective_tiebreaker = derive_effective_objective(session)
 
     session.agent = HAgent(
         info           = session.info,   # step-4 output (unchanged on a from_step==5 patch)
         pick_pool_size = current_settings['pick_pool_size'],
-        n_picks        = n_starters,
+        n_picks        = n_active,
         n_drafters     = n_drafters,
         dynamic        = current_settings['n_iterations'] > 0,
         scoring_format = scoring_format,

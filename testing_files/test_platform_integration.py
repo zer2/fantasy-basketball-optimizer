@@ -7,7 +7,7 @@ from backend.platform_integration.helpers import (
     deduplicate_team_names, build_platform_player_id_lookup,
 )
 from backend.platform_integration.integrations.fantrax import FantraxIntegration
-from backend.platform_integration.integrations.yahoo import YahooIntegration
+from backend.platform_integration.integrations.yahoo import YahooIntegration, _pad_with_open_seats
 from backend.platform_integration.integrations.espn import ESPNIntegration
 from backend.platform_integration.base import PlatformConfig
 from backend.player_identity import RP_PLAYER_ID, make_player_identity
@@ -111,6 +111,7 @@ def test_get_draft_results_maps_ids_and_excludes_injured_in_season(monkeypatch):
         platform='Retrieve from Fantrax', league_id='LID', division_id=None,
         teams_dict={'Team One': 't1', 'Team Two': 't2'},
         player_name_column='FANTRAX_ID',
+        seat_names=['Team One', 'Team Two'],
     )
     state = integration.get_draft_results(config, 'Season Mode', _PLAYER_ID_LOOKUP)
 
@@ -127,6 +128,7 @@ def test_get_draft_results_keeps_injured_in_draft_mode(monkeypatch):
     config = PlatformConfig(
         platform='Retrieve from Fantrax', league_id='LID', division_id=None,
         teams_dict={'T': 't1'}, player_name_column='FANTRAX_ID',
+        seat_names=['T'],
     )
     state = integration.get_draft_results(config, 'Draft Mode', _PLAYER_ID_LOOKUP)
 
@@ -148,6 +150,7 @@ def test_yahoo_assignments_from_draft_groups_by_team_with_costs():
         platform='Retrieve from Yahoo', league_id='123', division_id=None,
         teams_dict={'Team One': '1', 'Team Two': '2'},
         player_name_column='YAHOO_PLAYER_ID',
+        seat_names=['Team One', 'Team Two'],
     )
     player_id_lookup = {100: _JOKIC_ID, 200: _HARDEN_ID}
     draft = [
@@ -159,6 +162,40 @@ def test_yahoo_assignments_from_draft_groups_by_team_with_costs():
 
     assert assignments == {'Team One': [_JOKIC_ID, RP_PLAYER_ID], 'Team Two': [_HARDEN_ID]}
     assert costs == {'Team One': [50.0, 5.0], 'Team Two': [30.0]}
+
+
+def test_yahoo_open_seats_pad_the_joined_teams():
+    """A room that is still filling still has every one of its seats."""
+    assert _pad_with_open_seats(['Zach', 'Burak'], 5) == [
+        'Zach', 'Burak', 'Open seat 3', 'Open seat 4', 'Open seat 5']
+    # Nothing to pad once the room is full, and never fewer seats than teams.
+    assert _pad_with_open_seats(['Zach', 'Burak'], 2) == ['Zach', 'Burak']
+    assert _pad_with_open_seats(['Zach', 'Burak'], 1) == ['Zach', 'Burak']
+
+
+def test_yahoo_open_seat_label_never_collides_with_a_real_team_name():
+    """Someone calling their team 'Open seat 3' must not merge two seats into one."""
+    seats = _pad_with_open_seats(['Open seat 3'], 3)
+    assert seats == ['Open seat 3', 'Open seat 2', 'Open seat 3 (2)']
+    assert len(set(seats)) == 3
+
+
+def test_yahoo_unfilled_seats_appear_on_the_board_with_empty_rosters():
+    """An empty seat is a drafter with no picks, not a team missing from the league.
+
+    A board that omits seats is what produced the KeyError-turned-500 when the seat being
+    evaluated for was not among its keys.
+    """
+    config = PlatformConfig(
+        platform='Retrieve from Yahoo', league_id='123', division_id=None,
+        teams_dict={'Team One': '1'},
+        player_name_column='YAHOO_PLAYER_ID',
+        seat_names=['Team One', 'Open seat 2', 'Open seat 3'],
+    )
+    draft = [_FakeDraftObj('nba.p.100', 'nba.l.123.t.1')]
+    assignments, _ = YahooIntegration()._assignments_from_draft(draft, config, {100: _JOKIC_ID})
+
+    assert assignments == {'Team One': [_JOKIC_ID], 'Open seat 2': [], 'Open seat 3': []}
 
 
 def test_yahoo_build_auth_url():
@@ -199,6 +236,7 @@ def test_espn_get_draft_results_maps_rosters(monkeypatch):
         platform='Retrieve from ESPN', league_id='abc:1::2024', division_id=None,
         teams_dict={'Team One': '1', 'Team Two': '2'},
         player_name_column='ESPN_NAME',
+        seat_names=['Team One', 'Team Two'],
     )
     player_id_lookup = {'Nikola Jokic': _JOKIC_ID, 'James Harden': _HARDEN_ID}
     state = integration.get_draft_results(config, 'Season Mode', player_id_lookup)
