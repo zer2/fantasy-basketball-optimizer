@@ -226,8 +226,10 @@ Draft or Season Mode); a patch that omits it leaves it unchanged.
 Valid position types (base positions and flex slot categories) are defined server-side per
 sport — for NBA: `PG`, `SG`, `SF`, `PF`, `C`, `G`, `F`, `Util`. The backend derives slot
 IDs (e.g. `"C2"`, `"Util3"`) from these counts, and also stores flex eligibility rules
-(e.g. G slots accept PG/SG) as sport-level config. `n_starters` is derived as
-`sum(slot_counts.values())`; bench spots = `n_picks - n_starters`.
+(e.g. G slots accept PG/SG) as sport-level config. `n_active` — how many players a drafter
+fields at once — is derived as `sum(slot_counts.values())`; bench spots = `n_picks - n_active`.
+Injured-list slots are not part of either: a player on one is not active and was not drafted
+into it.
 
 `data_source.type` — one of `"projections"`, `"historical"`, or `"csv"`.
 - `"projections"`: blends ESPN, DARKO, and optionally custom uploads using `blend_weights`.

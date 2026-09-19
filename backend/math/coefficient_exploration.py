@@ -27,7 +27,7 @@ def compute_season_coefficients(
     weekly_df: pd.DataFrame
     , sport_params: dict
     , n_drafters: int
-    , n_starters: int
+    , n_active: int
 ) -> dict:
     """Compute coefficients and correlation matrix for one season.
 
@@ -36,7 +36,7 @@ def compute_season_coefficients(
                      row per player per week, as returned by get_weekly_box_scores.
         sport_params:      Full sport_params dict for the sport (e.g. NBA entry from parameters.yaml).
         n_drafters:  Number of drafters in the representative league.
-        n_starters:  Number of picks per drafter.
+        n_active:  Number of picks per drafter.
 
     Returns:
         Dict with keys:
@@ -89,9 +89,9 @@ def compute_season_coefficients(
         , counting_stats = all_counting_stats
         , ratio_stats    = all_ratio_stats
         , categories     = all_categories
-        , n_starters     = n_starters
+        , n_active     = n_active
     )
-    n_players = n_drafters * n_starters
+    n_players = n_drafters * n_active
     representative_player_set = (
         first_order_scores.sum(axis=1).nlargest(n_players).index.tolist()
     )
@@ -138,7 +138,7 @@ def compute_season_coefficients(
 def explore_all_seasons(
     sport_params: dict
     , n_drafters: int
-    , n_starters: int
+    , n_active: int
     , seasons: list[str] | None = None
 ) -> dict[str, dict]:
     """Run coefficient exploration across all (or specified) historical seasons.
@@ -146,7 +146,7 @@ def explore_all_seasons(
     Args:
         sport_params:     Full sport_params dict for the sport.
         n_drafters: Number of drafters in the representative league.
-        n_starters: Number of picks per drafter.
+        n_active: Number of picks per drafter.
         seasons:    Explicit list of season strings to run. If None, all
                     available seasons from Snowflake are used.
 
@@ -161,7 +161,7 @@ def explore_all_seasons(
             get_weekly_box_scores(season, sport_params)
             , sport_params
             , n_drafters
-            , n_starters
+            , n_active
         )
         for season in seasons
     }
@@ -210,7 +210,7 @@ if __name__ == '__main__':
     output_dir = Path(__file__).parents[2] / 'coefficient_exploration_output'
     output_dir.mkdir(exist_ok=True)
 
-    results = explore_all_seasons(sport_params, n_drafters=12, n_starters=13)
+    results = explore_all_seasons(sport_params, n_drafters=12, n_active=13)
     tables  = tabulate_results(results)
 
     tables['tau_sigma_ratio'].to_csv(output_dir / 'tau_sigma_ratio.csv')
