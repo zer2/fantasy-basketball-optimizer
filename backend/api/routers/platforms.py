@@ -7,6 +7,7 @@ The {platform} path segment is the exact platform label the frontend sends
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Depends, status, Response
+from requests.exceptions import HTTPError
 
 from backend.infra.auth import current_user_key
 from backend.state.session import Session
@@ -108,6 +109,16 @@ def get_draft_state_route(mode: str, session: Session = Depends(require_session)
             selections = integration.get_draft_results(config, mode, session.platform_player_id_lookup)
     except HTTPException:
         raise
+    except HTTPError as error:
+        # Yahoo answered with a status rather than data. 401 is the one the user can act on:
+        # the token has expired or been revoked, and reconnecting fixes it. Anything else is
+        # the league being unreachable right now, which is worth saying differently.
+        response = getattr(error, 'response', None)
+        if response is not None and response.status_code == 401:
+            raise fail(401, 'Not authenticated with Yahoo; reconnect the league to refresh '
+                            'your access.')
+        raise fail(502, f'{config.platform} could not be reached right now '
+                        f'({getattr(response, "status_code", "no response")}).')
     except Exception:
         raise fail(502, 'Failed to fetch the live draft state.')
 

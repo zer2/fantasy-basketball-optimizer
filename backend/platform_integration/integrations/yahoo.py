@@ -45,6 +45,8 @@ from backend.platform_integration.base import (
 )
 from backend.infra.secret_config import get_secret
 from backend.platform_integration.helpers import deduplicate_team_names
+from yfpy.exceptions import YahooFantasySportsDataNotFound
+
 from backend.player_identity import RP_PLAYER_ID
 
 
@@ -137,6 +139,10 @@ class YahooIntegration(PlatformIntegration):
         # The registry spreads the creds bag into this param: get_integration(
         # 'Retrieve from Yahoo', {'auth_dir': ...}) -> YahooIntegration(auth_dir=...).
         self._auth_dir = auth_dir
+        # Resolved lazily and kept: the league -> season map costs one call per season, and
+        # every request for a league needs it.
+        self._games = None
+        self._game_id_by_league: dict[str, Optional[int]] = {}
 
     # ── Platform metadata ──────────────────────────────────────────────────────
 
@@ -261,10 +267,58 @@ class YahooIntegration(PlatformIntegration):
             json.dump({'consumer_key': client_id, 'consumer_secret': client_secret}, private_file)
 
     def _make_query(self, league_id: str = '') -> YahooFantasySportsQuery:
-        """Build a yfpy query bound to this integration's auth_dir."""
+        """Build a yfpy query bound to this integration's auth_dir, for the league's own season.
+
+        A Yahoo league is addressed as `<game key>.l.<league id>`, and the game key is the
+        SEASON. Without one yfpy fills in whatever season is current, so every call for a league
+        from any other season asks for a league key that does not exist -- Yahoo answers "there
+        was a temporary problem with the server" and yfpy raises data-not-found, which reads
+        from here as "the draft has not started". Measured: league 56576 under the current
+        default returned nothing, and under its own key returned its ten teams.
+        """
         if self._auth_dir is None:
             raise RuntimeError('Yahoo integration has no auth_dir; authenticate first (exchange_auth_code).')
-        return YahooFantasySportsQuery(auth_dir=self._auth_dir, league_id=league_id, game_code=_GAME_CODE)
+        return YahooFantasySportsQuery(auth_dir=self._auth_dir, league_id=league_id,
+                                       game_code=_GAME_CODE, game_id=self._game_id_for(league_id))
+
+    def _user_games(self) -> list:
+        """The seasons this account has played, newest first, fetched once per integration."""
+        if self._games is None:
+            games = self._bare_query().get_user_games()
+            self._games = sorted(games, key=lambda game: int(game.season), reverse=True)
+        return self._games
+
+    def _leagues_in(self, game) -> list:
+        """The account's leagues in one season. `get_user_leagues_by_game_key` needs the NUMERIC
+        key -- passing the game CODE ('nba') matches nothing and returns no data."""
+        try:
+            leagues = self._bare_query().get_user_leagues_by_game_key(game_key=str(game.game_key))
+        except YahooFantasySportsDataNotFound:
+            return []
+        if leagues and isinstance(leagues[0], dict):
+            # yfpy sometimes returns a list of dicts rather than League objects.
+            leagues = [entry['league'] for entry in leagues]
+        return leagues
+
+    def _game_id_for(self, league_id: str) -> Optional[int]:
+        """Which season's game key holds this league, or None when it is not one of the user's.
+
+        None is the right answer for a league the account cannot see in its own list -- a mock
+        draft room, most of all, which Yahoo does not publish as a league. yfpy then falls back
+        to the current season, which is where a mock lives anyway.
+        """
+        if not league_id:
+            return None
+        if league_id not in self._game_id_by_league:
+            for game in self._user_games():
+                for league in self._leagues_in(game):
+                    self._game_id_by_league.setdefault(str(league.league_id), int(game.game_id))
+            self._game_id_by_league.setdefault(league_id, None)
+        return self._game_id_by_league[league_id]
+
+    def _bare_query(self) -> YahooFantasySportsQuery:
+        """A query for account-level calls, which belong to no league and so need no season."""
+        return YahooFantasySportsQuery(auth_dir=self._auth_dir, league_id='', game_code=_GAME_CODE)
 
     # ── Connection ─────────────────────────────────────────────────────────────
 
@@ -272,21 +326,22 @@ class YahooIntegration(PlatformIntegration):
         """The user's NBA leagues as [{'id', 'name', 'season'}], reverse-chronological.
 
         Yahoo-specific (NOT in the ABC): the connect flow needs a league-pick step for
-        auth-based platforms. Returns [] when the user has no leagues (yfpy errors there).
+        auth-based platforms.
+
+        Every season the account has played, newest first, because a league is only addressable
+        under its own season's game key and the picker is where that key is learned. Returns []
+        when the user genuinely has no leagues, which yfpy reports as data-not-found. Anything
+        else -- an expired token, a rate limit, a network drop -- is raised: an empty dropdown
+        saying "(no leagues found)" is the same picture for a new account and a dead token, and
+        only the second is fixed by reconnecting.
         """
-        try:
-            query = self._make_query(league_id='')
-            leagues = query.get_user_leagues_by_game_key(game_key=_GAME_CODE)
-            if leagues and isinstance(leagues[0], dict):
-                # yfpy sometimes returns a list of dicts rather than League objects.
-                leagues = [entry['league'] for entry in leagues]
-            leagues = sorted(leagues, key=lambda league: league.season, reverse=True)
-        except Exception:
-            return []
-        return [
-            {'id': league.league_id, 'name': league.name.decode('UTF-8'), 'season': league.season}
-            for league in leagues
-        ]
+        listed = []
+        for game in self._user_games():
+            for league in self._leagues_in(game):
+                self._game_id_by_league.setdefault(str(league.league_id), int(game.game_id))
+                name = league.name.decode('UTF-8') if isinstance(league.name, bytes) else league.name
+                listed.append({'id': league.league_id, 'name': name, 'season': league.season})
+        return listed
 
     def list_divisions(self, league_id: str) -> list[dict]:
         """Yahoo has no divisions."""
@@ -451,8 +506,9 @@ class YahooIntegration(PlatformIntegration):
         query = self._make_query(config.league_id)
         try:
             draft_results = query.get_league_draft_results()
-        except Exception:
-            # yfpy errors before the draft starts (and after it shuts API access off).
+        except YahooFantasySportsDataNotFound:
+            # Yahoo answered, and what it said was that there are no draft results. That is what
+            # a room looks like before the draft starts, so an empty board is the truth.
             return self._empty_board(config, 'Draft has not started yet')
 
         if draft_results and getattr(draft_results[0], 'cost', None) is not None:
@@ -477,7 +533,7 @@ class YahooIntegration(PlatformIntegration):
         query = self._make_query(config.league_id)
         try:
             draft_results = query.get_league_draft_results()
-        except Exception:
+        except YahooFantasySportsDataNotFound:
             return self._empty_board(config, 'Auction has not started', with_costs=True)
 
         if draft_results and getattr(draft_results[0], 'cost', None) is None:
