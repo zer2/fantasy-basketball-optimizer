@@ -45,7 +45,7 @@ The overall H-score on the left side of the display is both the metric that H-sc
       allowfullscreen>
     </iframe>
 
-    <video controls preload="metadata" width="100%">
+    <video controls preload="metadata" width="100%" poster="../videos/gradient-descent-poster.jpg">
       <source src="../videos/gradient-descent.mp4" type="video/mp4">
     </video>
 
@@ -79,7 +79,7 @@ Most of the time, the algorithm punts one or two categories, reflected by low H-
 
     ![A Normal distribution curve](img/normal.png)
 
-    <video controls preload="metadata" width="100%">
+    <video controls preload="metadata" width="100%" poster="../videos/punting-poster.jpg">
       <source src="../videos/punting.mp4" type="video/mp4">
     </video>
     /// caption
@@ -189,7 +189,7 @@ Category weights for future picks, for a team considering Daniels after taking G
 
 The category weightings displayed in the first row are based on H-scoring's internal model of how drafting works. It assumes that the drafter will use those weights exactly for candidates going forward, and it also assumes that those weights will have a certain influence on the aggregate statistics of future picks. Category weights show what the algorithm is thinking in terms of which categories it wants to punt. 
 
-<video controls preload="metadata" width="100%">
+<video controls preload="metadata" width="100%" poster="../videos/category-weights-poster.jpg">
   <source src="../videos/category-weights.mp4" type="video/mp4">
 </video>
 
@@ -234,7 +234,7 @@ Roster assignments for the same example — Giannis slots in at Power Forward an
 
 The algorithm also has some leeway in how it arranges players already taken in terms of position, freeing up different positions to take with future draft picks. The roster assignment row shows what the algorithm is thinking in this regard. In the example above, it is choosing to categorize Daniels as a SF, likely because it does not want to take more SFs in general.
 
-<video controls preload="metadata" width="100%">
+<video controls preload="metadata" width="100%" poster="../videos/roster-assignment-poster.jpg">
   <source src="../videos/roster-assignment.mp4" type="video/mp4">
 </video>
 
@@ -442,7 +442,7 @@ The strength of the applied prediction is controlled by the $C$ (confidence) par
 
 Testing confirms that the prediction adjustment improves the performance of H-scoring against other H-scoring drafters, while degrading performance slightly against pure G-score drafters. Setting C to zero turns the prediction off entirely: every other drafter is treated as a neutral picker with no strategic tendencies.
 
-<video controls preload="metadata" width="100%">
+<video controls preload="metadata" width="100%" poster="../videos/self-play-poster.jpg">
   <source src="../videos/self-play.mp4" type="video/mp4">
 </video>
 
@@ -459,7 +459,7 @@ Punting is less common in Rotisserie, so gradient descent does not start at a pu
 
     Normally, multi-start gradient descent would perform gradient descent on each starting point. In this case, that is relatively unnecessary, because the strength of the simple punting strategy is highly indicative of which punt has the best optimal point. It also accounts for punting multiple categories natively, because once in the direction of one punt, the algorithm can see promising punts to pair it with. In testing, this procedure found essentially the same solutions as starting with many random points and performing gradient descent from all of them. 
 
-    <video controls preload="metadata" width="100%">
+    <video controls preload="metadata" width="100%" poster="../videos/seed-menu-poster.jpg">
       <source src="../videos/seed-menu.mp4" type="video/mp4">
     </video>
 
