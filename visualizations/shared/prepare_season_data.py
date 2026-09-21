@@ -46,6 +46,13 @@ from backend.services.session_management import build_session             # noqa
 SEASON = '2025-26'
 SPORT = 'NBA'
 STATISTIC = 'Points'
+
+# What the percentage act needs, alongside the counting statistic the rest of the scene plots.
+# A team's field goal percentage is its made shots over its attempts, which is an
+# ATTEMPT-WEIGHTED average of its players' percentages rather than a plain one -- so both
+# columns have to travel, not the percentage each player shot. Per-game averages, as STATISTIC
+# is, so the two are in the same unit.
+SHOOTING_STATISTICS = ('Field Goals Made', 'Field Goal Attempts')
 # The key each pool entry carries its plotted value under: a player's MEAN WEEKLY total,
 # not their per-game average, so both scenes share one unit and one axis.
 WEEKLY_AVERAGE_KEY = 'weekly_average'
@@ -56,6 +63,18 @@ WEEKLY_AVERAGE_KEY = 'weekly_average'
 SIMULATION_COUNT = 10000
 TEAM_SIZE = 13
 RANDOM_SEED = 4242            # fixed so every render of the scene shows the same draws
+
+# The weekly simulation draws on a seed of its own. The G-score scene shows this simulation's
+# measured spread beside the spread predicted from the other two, and those are two ways of
+# saying one number: 136.0 measured against 135.7 predicted. On 4242 the measurement came out
+# at 136.6, which on screen rounds to 137 against a predicted 136 and reads as the claim
+# failing rather than as a rounding boundary, so the draw was taken again. Every seed is an
+# equally valid draw and this one is no nearer the truth, only nearer a whole number.
+#
+# Separate from RANDOM_SEED on purpose: choosing it must not also reshuffle the averages
+# simulation, whose spread is one of the two numbers being predicted FROM, nor the fixed
+# matchup, whose draw is the one the narration names players out of.
+WEEKLY_RANDOM_SEED = 4247
 
 # Square side of the written headshot. A roster face occupies about 100 pixels of a 1080p
 # frame, so this is a modest oversample -- 256 was two and a half times the display size
@@ -107,7 +126,12 @@ def build_default_session_request(season: str, sport: str) -> SessionRequest:
     )
 
 
-def select_drafted_pool(session, season_statistics: pd.DataFrame, statistic: str) -> list[dict]:
+def select_drafted_pool(
+    session
+    , season_statistics: pd.DataFrame
+    , statistic: str
+    , shooting_statistics: tuple[str, ...]
+) -> list[dict]:
     """The players a standard league drafts, best G-score first, with the plotted statistic.
 
     Membership comes from the session's G-scores; the value carried alongside is the player's
@@ -116,8 +140,20 @@ def select_drafted_pool(session, season_statistics: pd.DataFrame, statistic: str
     which is the wrong unit for a scene whose whole point is that team totals are real
     basketball numbers.
 
-    Returns [{player_id, name, <statistic>}] of exactly n_drafters * n_picks players.
+    `shooting_statistics` ride along for the percentage act, which needs made shots and
+    attempts per player rather than a percentage: percentages cannot be averaged across players
+    without their volumes, which is the whole thing that act exists to say.
+
+    Returns [{player_id, name, <statistic>, <shooting_statistics>}] of exactly
+    n_drafters * n_picks players.
     """
+    missing = [column for column in shooting_statistics
+               if column not in season_statistics.columns]
+    if missing:
+        raise SystemExit(
+            f'the season statistics table has no {missing} column(s). The percentage act is '
+            f'built on made shots and attempts per player, and cannot be filled in from a '
+            f'percentage -- check the column names against parameters.yaml.')
     g_scores = session.agent.info['G-scores']
     pool_size = session.current_settings['n_drafters'] * session.current_settings['n_picks']
     drafted_ids = g_scores['Total'].sort_values(ascending=False).head(pool_size).index
@@ -134,6 +170,8 @@ def select_drafted_pool(session, season_statistics: pd.DataFrame, statistic: str
             'player_id': int(player_id),
             'name':      registry[int(player_id)].name,
             statistic:   float(season_statistics.loc[player_id, statistic]),
+            **{column: round(float(season_statistics.loc[player_id, column]), 4)
+               for column in shooting_statistics},
         }
         for player_id in drafted_ids
     ]
@@ -301,7 +339,7 @@ def main() -> None:
     )
 
     season_statistics = get_specified_historical_stats(SEASON, load_all_params()[SPORT])
-    pool = select_drafted_pool(session, season_statistics, STATISTIC)
+    pool = select_drafted_pool(session, season_statistics, STATISTIC, SHOOTING_STATISTICS)
 
     # Both scenes work in WEEKLY units so their axes can be read against each other. A per-game
     # average and a weekly total differ by however many games fell in the week, so plotting one
@@ -339,7 +377,7 @@ def main() -> None:
 
     # ── The same draft, played out in real weeks rather than in weekly averages ──────
     weekly_rosters, weekly_totals = simulate_weekly_team_differentials(
-        weekly_values, SIMULATION_COUNT, TEAM_SIZE, RANDOM_SEED)
+        weekly_values, SIMULATION_COUNT, TEAM_SIZE, WEEKLY_RANDOM_SEED)
     weekly_differentials = weekly_totals[:, 0] - weekly_totals[:, 1]
     week_counts = [len(weeks) for weeks in weekly_values]
     print(f'Weekly: {min(week_counts)}-{max(week_counts)} weeks per player, '
@@ -353,7 +391,7 @@ def main() -> None:
         'statistic':        STATISTIC,
         'value_key':        WEEKLY_AVERAGE_KEY,
         'team_size':        TEAM_SIZE,
-        'random_seed':      RANDOM_SEED,
+        'random_seed':      WEEKLY_RANDOM_SEED,
         'pool':             pool,
         'weekly_values':    [[round(value, 2) for value in weeks] for weeks in weekly_values],
         'simulation_rosters': weekly_rosters.tolist(),

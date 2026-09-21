@@ -1,4 +1,4 @@
-"""Check every narration file for the two faults that keep reaching the rendered audio.
+"""Check every narration file for the faults that reach the rendered audio, or the bill.
 
 Run before rendering; it costs nothing and catches what listening for would cost a render:
 
@@ -9,63 +9,29 @@ concatenates them with nothing in between, so a literal that ends without a spac
 that starts without a space produces "theirH-score" -- which the voice reads as a single nonsense
 word and a listener hears as a glitch.
 
-**Forced pauses.** gTTS sends at most a hundred characters per request, and a pause that falls
-BETWEEN two requests runs about three quarters of a second -- against roughly a quarter for one
-inside a request. That is exactly what a comma is for, so it sounds right wherever the writer put
-one, and wrong wherever the character limit put one instead.
+**Lines nothing says.** A key in narration.py that no scene reads is a line that will be voiced,
+paid for, and never heard. A key a scene reads that narration.py does not have is a KeyError part
+way through a render, after the earlier lines have already been bought.
 
-This reports the second kind, and the words each will fall after, asked of gTTS itself rather
-than guessed. To clear one: put a comma or a full stop where the break wants to be, close enough
-to the start of the sentence that the text before it fits in a hundred characters. Then the pause
-lands on punctuation and reads as a pause rather than as a fault.
+**Renders left behind.** Editing a line does not re-render the scene, and a finished .mp4 looks
+exactly as finished whether or not it still says what narration.py says. So each scene's most
+recent subtitle track is read back and matched against its lines: anything a render does not
+speak is a render that needs making again before the scene is judged or shipped.
+
+This used to also report the pauses gTTS forced mid-phrase, by asking gTTS where it would split
+a line into hundred-character requests. Alistair takes a whole line in one request and puts no
+seams in it, so there is nothing left for that check to find; it went when the voice did.
 """
 
 from __future__ import annotations
 
+import importlib.util
 import re
 import sys
 from pathlib import Path
 
-from gtts import gTTS
-
-GTTS_CHUNK_LIMIT = gTTS.GOOGLE_TTS_MAX_CHARS
-
-# Words that begin a phrase rather than end one. A break landing just before one of these reads
-# as a phrase boundary; one landing after leaves a preposition stranded, which is what makes a
-# break audible as a fault rather than as a pause.
-PHRASE_OPENERS = frozenset('''
-    a an the and or but nor so yet for of to in on at by with from into onto over under
-    that which who whom whose when where while because since although though if unless
-    as than about after before between during against across through toward towards
-'''.split())
-
-
-def forced_seam_words(text: str, language: str) -> list[str]:
-    """The words gTTS will pause after despite the writer not asking it to.
-
-    gTTS tokenises at punctuation, then merges adjacent tokens into one request of at most a
-    hundred characters. A pause inside a request comes out natural; a pause BETWEEN requests is
-    two files' padding back to back and runs about three quarters of a second. That is fine where
-    the writer put a comma and wrong where the character limit put one, so this reports the
-    second kind -- asked of gTTS itself rather than guessed at.
-    """
-    forced = []
-    position = 0
-    for piece in gTTS(text, lang=language)._tokenize(text)[:-1]:
-        stripped = piece.strip().rstrip('.,;:!?')
-        if not stripped:
-            continue
-        found = text.find(stripped, position)
-        if found == -1:
-            continue
-        position = found + len(stripped)
-        following = text[position:].lstrip()[:1]
-        if following not in '.,;:!?()-':
-            forced.append(' '.join(stripped.split()[-3:]))
-    return forced
-
-
-_NARRATION_DIRECTORY = Path(__file__).resolve().parent.parent
+_VISUALIZATIONS = Path(__file__).resolve().parent.parent
+_RENDERS = _VISUALIZATIONS / 'media' / 'videos'
 
 
 def find_joined_words(source: str) -> list[tuple[int, str]]:
@@ -87,51 +53,100 @@ def find_joined_words(source: str) -> list[tuple[int, str]]:
     return faults
 
 
-def find_forced_pauses(source: str) -> list[tuple[str, str]]:
-    """Every pause gTTS will impose mid-phrase, and the words it will fall after."""
-    found = []
-    for key, line in read_lines(source):
-        for words in forced_seam_words(line, 'en'):
-            found.append((key, words))
-    return found
+def narration_keys(folder: Path) -> set[str]:
+    """Every key narration.py defines, read by importing it rather than by parsing it."""
+    spec = importlib.util.spec_from_file_location('narration', folder / 'narration.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return set(module.NARRATION)
 
 
-def read_lines(source: str) -> list[tuple[str, str]]:
-    """Each narration key and the whole line it will be spoken as, literals already joined."""
-    lines = []
-    key = None
-    literals: list[str] = []
-    for raw in source.splitlines():
-        stripped = raw.strip()
-        named = re.match(r"^'([a-z_]+)':$", stripped)
-        if named:
-            if key is not None and literals:
-                lines.append((key, ' '.join(''.join(literals).split())))
-            key, literals = named.group(1), []
+def keys_the_scene_reads(folder: Path) -> tuple[set[str], set[str]]:
+    """What the scene files ask NARRATION for, and every name they mention at all.
+
+    Two sets, because the two questions want different strictness. A key subscripted by name is
+    definitely wanted, and one that is not defined will stop the render -- so that set is matched
+    exactly. But a scene may reach its lines indirectly, as self-play does, listing the keys of
+    its repeating beats in a tuple and looping over them; those never appear as a subscript. So
+    "nothing says this line" is answered against every quoted name in the file, which is loose in
+    the harmless direction: it can miss a line gone unused, and it will not invent one.
+
+    The prep scripts are skipped: they build the data a scene draws and never speak.
+    """
+    subscripted, mentioned = set(), set()
+    for path in sorted(folder.glob('*.py')):
+        if path.name == 'narration.py' or path.name.startswith('prepare_'):
             continue
-        if key is not None and stripped.startswith("'"):
-            literals.extend(re.findall(r"'([^']*)'", stripped))
-    if key is not None and literals:
-        lines.append((key, ' '.join(''.join(literals).split())))
-    return lines
+        source = path.read_text(encoding='utf-8')
+        subscripted.update(re.findall(r"NARRATION\['([a-z_0-9]+)'\]", source))
+        mentioned.update(re.findall(r"'([a-z_0-9]+)'", source))
+    return subscripted, mentioned
+
+
+def lines_the_render_does_not_say(folder: Path) -> tuple[list[str], str]:
+    """Which of this scene's lines its newest render does not speak, and which render that was.
+
+    Manim files a render under its module name, so the subtitle track is found by looking for a
+    directory named after one of the scene files rather than by keeping a table of class names
+    in step by hand. The newest .srt under it is the render being judged.
+
+    Whitespace is collapsed on both sides before comparing: narration.py wraps its lines across
+    source lines and the subtitle track wraps them across cues, and neither break is spoken.
+    """
+    candidates = [path.stem for path in sorted(folder.glob('*.py'))
+                  if path.name != 'narration.py' and not path.name.startswith('prepare_')]
+    subtitles = [found
+                 for name in candidates
+                 for found in (_RENDERS / name).glob('*/*.srt')]
+    if not subtitles:
+        return [], ''
+
+    newest = max(subtitles, key=lambda path: path.stat().st_mtime)
+    heard = ' '.join(' '.join(
+        line for line in newest.read_text(encoding='utf-8').splitlines()
+        if line.strip() and '-->' not in line and not line.strip().isdigit()).split())
+
+    spec = importlib.util.spec_from_file_location('narration', folder / 'narration.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    unsaid = [key for key, value in module.NARRATION.items()
+              if ' '.join(str(value).split()) not in heard]
+    return unsaid, newest.stem
 
 
 def main() -> int:
-    joined_total = 0
-    for path in sorted(_NARRATION_DIRECTORY.glob('*/narration.py')):
-        source = path.read_text(encoding='utf-8')
+    faults = 0
+    for folder in sorted(_VISUALIZATIONS.glob('[1-8]_*')):
+        source = (folder / 'narration.py').read_text(encoding='utf-8')
         joined = find_joined_words(source)
-        forced = find_forced_pauses(source)
-        joined_total += len(joined)
-        print(f'{path.parent.name}')
+        written = narration_keys(folder)
+        subscripted, mentioned = keys_the_scene_reads(folder)
+        unread = sorted(written - subscripted - mentioned)
+        missing = sorted(subscripted - written)
+
+        print(folder.name)
         for line_number, sample in joined:
             print(f'   JOINED at line {line_number}: "{sample}"')
-        for key, words in forced:
-            print(f'   forced pause in {key}, after "...{words}" '
-                  f'-- put a comma or full stop at that break')
-        if not joined and not forced:
+        for key in missing:
+            print(f'   MISSING: the scene reads {key!r}, narration.py does not define it '
+                  f'-- the render will stop there')
+        for key in unread:
+            print(f'   UNREAD: narration.py defines {key!r} and no scene says it '
+                  f'-- it would be voiced and paid for unheard')
+
+        # Reported but NOT counted as a fault: a scene mid-edit is expected to be ahead of its
+        # render, and failing the check for that would make it useless during the edit it is
+        # most wanted for. It is the last thing to settle before a scene is judged, not a
+        # reason to refuse to look at it.
+        unsaid, render = lines_the_render_does_not_say(folder)
+        if unsaid:
+            print(f'   BEHIND: the {render} render does not say {", ".join(map(repr, unsaid))} '
+                  f'-- re-render before judging this scene')
+
+        faults += len(joined) + len(missing) + len(unread)
+        if not (joined or missing or unread or unsaid):
             print('   clean')
-    return 1 if joined_total else 0
+    return 1 if faults else 0
 
 
 if __name__ == '__main__':

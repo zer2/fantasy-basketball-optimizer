@@ -29,17 +29,18 @@ from math import erf
 import numpy as np
 from manim import (
     Scene, VGroup, Line, Polygon, Text, DecimalNumber, ValueTracker,
-    FadeIn, always_redraw,
+    Create, FadeIn, always_redraw,
     DOWN, RIGHT,
     YELLOW, WHITE, GREY_B, GREEN_B, RED_C,
 )
 from manim_voiceover import VoiceoverScene
-from manim_voiceover.services.gtts import GTTSService
 
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from shared.narration_timing import seconds_until_phrase, wait_until_phrase   # noqa: E402
+from shared.narration_voice import NarrationVoice   # noqa: E402
 from narration import NARRATION
 
 
@@ -51,6 +52,12 @@ CATEGORY_NAMES = [
 CATEGORY_COUNT = 9
 EFFORT_BUDGET = 9.0
 OPPONENT_EFFORT = 1.0     # what the opponent puts into every category, so parity is a coin flip
+
+# The opening, before a word is said: the panels name themselves, then the curves draw
+# themselves, then the frame settles. Silence that buys a picture arriving at a readable pace.
+TITLES_FADE_SECONDS = 0.7
+CURVES_DRAW_SECONDS = 2.6
+SHADING_FADE_SECONDS = 1.1     # the yellow regions arriving, all nine together
 
 # The order categories are abandoned in. Free Throw % first is not arbitrary -- it is the punt
 # the algorithm reaches for most often, and the one fantasy players will recognise.
@@ -67,10 +74,8 @@ CURVE_HEIGHT = 0.95       # height of a bell at its peak
 CURVE_SPAN = 2.8          # how many standard deviations either side of centre are drawn
 _SHADE_RESOLUTION = 120   # points along a shaded region's curved edge
 
-_SCORE_SAMPLES = 2000     # resolution of the precomputed best-so-far ratchet
 
-
-def weights_at(progress: float) -> np.ndarray:
+def weights_at(progress: float, reallocated: float) -> np.ndarray:
     """The nine efforts once `progress` categories have been drained.
 
     Draining is continuous and one at a time: the category currently being emptied gives its
@@ -79,21 +84,38 @@ def weights_at(progress: float) -> np.ndarray:
     optimum genuinely splits the contested budget evenly, because at a maximum every contested
     category must have the same marginal value, and a Normal density hits a given value at only
     one point on a given side of the threshold.
+
+    `reallocated` is how much of the freed effort has actually been handed over, none of it
+    through all of it. A punt is two things at once -- giving a category up costs you, and
+    spending what it freed pays you back -- and at one, which is what every punt but the first
+    uses, they happen together and this is the plain redistribution above. Held at zero, the
+    contested categories stay exactly where they were and the freed effort sits unspent, which
+    is the half of the trade the first punt stops to show on its own.
     """
-    weights = np.full(CATEGORY_COUNT, EFFORT_BUDGET / CATEGORY_COUNT)
+    weights = np.zeros(CATEGORY_COUNT)
     abandoned = int(progress)
     fraction = progress - abandoned
 
-    for position in range(abandoned):
-        weights[ABANDON_ORDER[position]] = 0.0
-    if abandoned < len(ABANDON_ORDER):
+    emptied = list(ABANDON_ORDER[:abandoned])
+    # Only a category part-way through being given up is draining. At a whole number of punts
+    # nothing is mid-drain, and the next category on the list is still an ordinary contested one
+    # -- which is what keeps the weights continuous across the moment a punt completes.
+    draining = None
+    if fraction > 0.0 and abandoned < len(ABANDON_ORDER):
         draining = ABANDON_ORDER[abandoned]
-        weights[draining] = (EFFORT_BUDGET / (CATEGORY_COUNT - abandoned)) * (1.0 - fraction)
 
-    emptied = ABANDON_ORDER[:abandoned + 1]
-    contested = [i for i in range(CATEGORY_COUNT) if i not in emptied]
-    if contested:
-        weights[contested] = (EFFORT_BUDGET - weights[emptied].sum()) / len(contested)
+    contested = [index for index in range(CATEGORY_COUNT)
+                 if index not in emptied and index != draining]
+
+    if draining is not None:
+        # It falls from the level it stood at when this punt started, not from parity: by the
+        # third punt the categories still being contested are each carrying more than a ninth.
+        start_level = EFFORT_BUDGET / (CATEGORY_COUNT - len(emptied))
+        weights[draining] = start_level * (1.0 - fraction)
+
+    parity = EFFORT_BUDGET / CATEGORY_COUNT
+    shared = (EFFORT_BUDGET - weights.sum()) / len(contested)
+    weights[contested] = parity + reallocated * (shared - parity)
     return weights
 
 
@@ -111,13 +133,18 @@ class PuntingSearch(VoiceoverScene):
 
     def setup(self) -> None:
         self.progress = ValueTracker(0.0)
+        # How much of the freed effort has been handed to the categories still being contested.
+        # Starts at none of it, which is what the first punt walks up from -- and which changes
+        # nothing before then, since at parity there is no freed effort to hand over. Every punt
+        # after the first leaves it at one, where draining and reallocating happen together.
+        self.reallocation = ValueTracker(0.0)
 
-        # The best-so-far readout ratchets, so it needs the whole path's history. Sampling it
-        # once here keeps the per-frame cost to a lookup: recomputing a running maximum from
-        # scratch every frame would redo the same work thousands of times.
-        self._sampled_progress = np.linspace(0.0, len(ABANDON_ORDER), _SCORE_SAMPLES)
-        sampled_scores = np.array([categories_won(weights_at(p)) for p in self._sampled_progress])
-        self._best_so_far = np.maximum.accumulate(sampled_scores)
+        # The best-so-far readout ratchets, and it keeps a running maximum of what the scene has
+        # actually reached rather than a table sampled over `progress`. A table cannot describe
+        # this path any more: the first punt moves through states that share a `progress` with
+        # states of a quite different score, and reading a best-so-far off progress alone would
+        # post a number during the drain that had not been reached yet.
+        self._best_seen = 0.0
 
     # ── Geometry ──────────────────────────────────────────────────────────────────────
 
@@ -157,6 +184,10 @@ class PuntingSearch(VoiceoverScene):
 
     # ── One category ──────────────────────────────────────────────────────────────────
 
+    def current_weights(self) -> np.ndarray:
+        """Every category's effort right now, at the current point of the drain and the trade."""
+        return weights_at(self.progress.get_value(), self.reallocation.get_value())
+
     def current_weight(self, category_index: int) -> float:
         """The effort in one category right now.
 
@@ -164,7 +195,7 @@ class PuntingSearch(VoiceoverScene):
         single category on its own -- CategoryGradient does -- can override where one weight
         comes from without touching the drawing code or the drain path.
         """
-        return float(weights_at(self.progress.get_value())[category_index])
+        return float(self.current_weights()[category_index])
 
     def _build_shading(self, category_index: int) -> VGroup:
         """The three regions that say what this category is worth, and the bar dividing them.
@@ -206,19 +237,29 @@ class PuntingSearch(VoiceoverScene):
     # ── Readout ───────────────────────────────────────────────────────────────────────
 
     def _build_score_readout(self) -> VGroup:
-        progress = self.progress.get_value()
-        current = categories_won(weights_at(progress))
-        best = float(np.interp(progress, self._sampled_progress, self._best_so_far))
+        current = categories_won(self.current_weights())
+        # Ratcheted as the scene plays. Frames are rendered forwards in time, so a maximum kept
+        # here is the maximum over everything actually shown -- which is what "best so far"
+        # claims to be, and which a table indexed by progress alone can no longer give.
+        self._best_seen = max(self._best_seen, current)
+        best = self._best_seen
 
         # Laid out across rather than stacked: the grid of bells already reaches well down the
         # frame, and a stacked readout leaves no room beneath it.
         current_value = DecimalNumber(current, num_decimal_places=3, font_size=50,
                                       color=YELLOW if current >= best - 1e-9 else GREY_B)
+        # What is actually on the table. It sits at the full budget while every category is
+        # contested, falls as one is given up, and climbs back as what it freed is handed to the
+        # others -- which is the whole of the first punt's argument, in one number. Without it
+        # the drain and the payback look like the same kind of move, because both are curves
+        # sliding sideways.
+        invested = float(self.current_weights().sum())
         readout = VGroup(
             Text('categories won', font_size=19, color=GREY_B),
             current_value,
             Text(f'best so far  {best:.3f}', font_size=19, color=GREY_B),
-            Text(f'punted  {int(progress)}', font_size=19, color=GREY_B),
+            Text(f'total investment  {invested:.2f}', font_size=19,
+                 color=GREY_B if invested >= EFFORT_BUDGET - 1e-6 else RED_C),
         )
         readout.arrange(RIGHT, buff=0.45)
         readout.move_to([0.0, -2.95, 0.0])
@@ -226,23 +267,75 @@ class PuntingSearch(VoiceoverScene):
 
     # ── The scene ─────────────────────────────────────────────────────────────────────
 
+    def play_first_punt_in_two_halves(self, tracker) -> None:
+        """Give the category up, and only then spend what giving it up freed.
+
+        Every later punt does both at once, which is what a punt IS -- but done that way the
+        first time, the two halves cancel on screen before either has been seen. The one curve
+        slides right while the other eight slide left, the score barely moves, and the argument
+        the line is making ("we lose expected value... meanwhile, we can reallocate") has no
+        picture to point at.
+
+        So the first punt waits. The abandoned category drains on its own, and the score falls,
+        which is the cost with nothing yet paid back. On "Meanwhile" the other eight take up
+        what it left, and the score passes where it started. The readout says the same thing in
+        a second way, since it only shows yellow while standing at its best: it goes grey as the
+        category is given up and comes back yellow once the trade has been made.
+        """
+        to_meanwhile = seconds_until_phrase(tracker, 'Meanwhile')
+        self.play(self.progress.animate.set_value(1.0),
+                  run_time=max(2.4, to_meanwhile - SETTLE_AFTER_A_PUNT))
+
+        wait_until_phrase(self, tracker, 'Meanwhile')
+        self.play(self.reallocation.animate.set_value(1.0),
+                  run_time=max(2.4, tracker.get_remaining_duration() - SETTLE_AFTER_A_PUNT))
+
     def construct(self) -> None:
-        self.set_speech_service(GTTSService())
+        self.set_speech_service(NarrationVoice())
         titles = VGroup(*[
             Text(name, font_size=16, color=GREY_B).move_to(
                 self._panel_centre(index) + np.array([0.0, CURVE_HEIGHT * 1.36, 0.0]))
             for index, name in enumerate(CATEGORY_NAMES)
         ])
         bells = VGroup(*[self._build_bell(index) for index in range(CATEGORY_COUNT)])
-        shading = VGroup(*[
+
+        # The shading redraws itself off the weights, and an always_redraw mobject repaints over
+        # a fade. So it arrives as a still copy -- which is exactly what the live one would be
+        # drawing while nothing is moving yet -- and hands over once it is up.
+        arriving_shading = VGroup(*[
+            self._build_shading(index) for index in range(CATEGORY_COUNT)
+        ])
+        live_shading = VGroup(*[
             always_redraw(lambda index=index: self._build_shading(index))
             for index in range(CATEGORY_COUNT)
         ])
 
-        with self.voiceover(text=NARRATION['opening']):
-            self.play(FadeIn(titles), FadeIn(bells), run_time=1.0)
-            self.add(shading)
-            self.wait(1.4)
+        # Drawn, not dropped in. Nine curves appearing in a single frame is a jump cut, and the
+        # scene opens on it -- so the panels name themselves and the curves draw themselves in.
+        #
+        # All nine at once, though, rather than one after another. The panels are nine views of
+        # the same fact, equivalent to each other in every way the scene is about; drawing them
+        # in sequence puts an order on them that says the ninth follows from the first.
+        #
+        # All of it happens UNDER the opening line rather than before it. Drawing in silence and
+        # then starting to speak cost four seconds at the top of the scene, which is a long time
+        # to look at a picture nobody is talking about; and the first sentence is about punting
+        # being a consequence of two things, not about the panels, so it does not need them
+        # finished to make sense. By the second sentence, which is about the distributions, they
+        # are there to be pointed at.
+
+        # The yellow arrives on the clause that names it, finishing just as the words land. It
+        # used to be added the instant the curves finished, which put it on screen through two
+        # sentences that were about something else, and by the time it was called "the yellow
+        # shaded region" it had been sitting there long enough to stop being new.
+        with self.voiceover(text=NARRATION['opening']) as tracker:
+            self.play(FadeIn(titles), run_time=TITLES_FADE_SECONDS)
+            self.play(Create(bells, lag_ratio=0.0), run_time=CURVES_DRAW_SECONDS)
+            wait_until_phrase(self, tracker, 'The yellow shaded region',
+                              lead_seconds=SHADING_FADE_SECONDS)
+            self.play(FadeIn(arriving_shading, lag_ratio=0.0), run_time=SHADING_FADE_SECONDS)
+            self.remove(arriving_shading)
+            self.add(live_shading)
 
         with self.voiceover(text=NARRATION['score']):
             self.add(always_redraw(self._build_score_readout))
@@ -263,11 +356,17 @@ class PuntingSearch(VoiceoverScene):
             # fixed two seconds of motion followed by twenty seconds of still frame would be
             # describing something that had already finished happening.
             with self.voiceover(text=line) as tracker:
-                self.play(self.progress.animate.set_value(abandoned + 1.0),
-                          run_time=max(2.4, tracker.duration - SETTLE_AFTER_A_PUNT))
+                if abandoned == 0:
+                    self.play_first_punt_in_two_halves(tracker)
+                else:
+                    self.play(self.progress.animate.set_value(abandoned + 1.0),
+                              run_time=max(2.4, tracker.duration - SETTLE_AFTER_A_PUNT))
                 self.wait(SETTLE_AFTER_A_PUNT)
 
         # Walk back to the best the search found and rest there.
+        # Straight back to three as the closing line starts. The fourth punt has just been shown
+        # to cost more than it pays, so leaving it standing while the conclusion is spoken would
+        # keep the wrong answer on screen through the sentence explaining the right one.
         with self.voiceover(text=NARRATION['settle']):
             self.play(self.progress.animate.set_value(3.0), run_time=1.2)
             self.wait(3.0)

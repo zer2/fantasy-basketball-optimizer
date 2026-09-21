@@ -5,11 +5,20 @@ animation plays INSIDE its line: rewriting a line retimes its own beat rather th
 desynchronising everything after it. A beat whose line is short waits for the animation, and one
 whose line is long holds the last frame until the sentence finishes.
 
-The voice is gTTS, so what is written here is what is spoken -- spell out anything a reader would
-say differently from how it is written ('sigma', 'twenty-six'). A lone capital letter is read
-as a word rather than as a letter, so the team on the left is written 'team Ay': measured, 'A'
-adds a tenth of a second to the line and 'Ay' adds two tenths, which is the difference between a
-swallowed schwa and the letter being said.
+The voice is Alistair, from ElevenLabs, so what is written here is what is spoken -- spell out
+anything a reader would say differently from how it is written ('sigma', 'twenty-six'). The
+teams are numbered rather than lettered because a lone capital letter cannot be made to read as
+one: every spelling of it comes out as a word instead.
+
+Every line is billed by the character, and a line edited by one word is a new line at full
+price. `python visualizations/shared/narration_budget.py` says what a render would spend before
+it spends it.
+
+Players named here have to be players this scene actually deals -- the rosters are real and the
+faces are on screen while the line is spoken. Week numbers are the season's own weeks, and
+nothing checks them: the prepared data keeps each player's weekly totals as a bare list of
+numbers with no record of which week each came from. A week number is illustration, and only
+has to be a week the season had.
 """
 
 # ── The spoken track ─────────────────────────────────────────────────────────────────
@@ -24,13 +33,18 @@ NARRATION = {
         'by one thing: which players were on which team. But that is not true, because players '
         'do not have the same stats every week.',
     'fixed_matchup_result':
-        'This simulation randomizes each player\'s performance by sampling from weeks of '
-        'a real season. The result is another bell curve. Instead of winning every time, as '
-        'their roster might suggest, team Ay wins just a majority of the time. Their margin '
-        'is determined by how spread out the distribution is.',
+        'This simulation takes two teams, and randomizes the performances of each player '
+        'on each team by independently sampling from weeks of a real season. The idea is to roughly simulate'
+        ' the spectrum of possibilities for how players could perform on any given week. The result is another bell curve, '
+        'this time centered at how much more team 1 tends to score on average.',
+    'fixed_matchup_win_rate':
+        'Instead of winning every time, as their roster total might suggest, team 1 wins just a '
+        'majority of the time. Their margin is determined by how spread out the distribution is; '
+        'if the distribution was tighter, less of it would be below zero.',
     'both_vary':
         'Now let\'s add this mechanism back to the original Z-score simulation. We know neither which '
-        'players will be on which team nor how players will perform in any given week.',
+        'players will be on which team nor how players will perform in any given week. Players are chosen '
+        'randomly and then their weeks are chosen randomly as well. ',
     'both_vary_result':
         'The result is again a bell curve, this time, quite wide. It is wide because it incorporates both '
         'sources of variance.',
@@ -47,5 +61,8 @@ NARRATION = {
     'the_question':
         'When distributions are added together, their standard deviations squared are added together. So the new '
         'standard deviation is the square root of the two original standard deviations squared, like the length of a hypotenuse.',
+    'g_scores' :
+        'Subbing in this new standard deviation to Z-scores, we get G-scores. They work a bit better than Z-scores in simple simulations, '
+        'though they are still massive simplifications; there is no perfect way to make static scores for a dynamic game.'
 
 }

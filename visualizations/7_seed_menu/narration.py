@@ -5,8 +5,8 @@ animation plays INSIDE its line: rewriting a line retimes its own beat rather th
 desynchronising everything after it. A beat whose line is short waits for the animation, and one
 whose line is long holds the last frame until the sentence finishes.
 
-The voice is gTTS, so what is written here is what is spoken -- spell out anything a reader would
-say differently from how it is written ('sigma', 'twenty-six').
+The voice reads what is written here literally, so spell out anything a reader would say
+differently from how it is written ('sigma', 'twenty-six').
 """
 
 NARRATION = {

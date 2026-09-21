@@ -209,6 +209,9 @@ def main() -> None:
     data_path.parent.mkdir(parents=True, exist_ok=True)
     data_path.write_text(json.dumps({
         'season':         SEASON,
+        # How many seats the drafting context is: the field the passes optimise against is the
+        # league's own size, so the scene can mark where that cut falls rather than assume it.
+        'context_size':   session.current_settings['n_drafters'],
         'categories':     categories,
         'player_names':   [session.player_registry[player].name
                            if player in session.player_registry else str(player)

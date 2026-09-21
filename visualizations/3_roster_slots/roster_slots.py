@@ -30,10 +30,10 @@ from manim import (
 
 
 from manim_voiceover import VoiceoverScene
-from manim_voiceover.services.gtts import GTTSService
 
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from shared.narration_voice import NarrationVoice   # noqa: E402
 from narration import NARRATION
 
 
@@ -51,6 +51,12 @@ PORTRAIT_CENTRE_X    = -6.60
 PORTRAIT_DIAMETER    = 0.38
 
 SLOT_HEADER_Y  = 2.88
+# The closing summary: the slots the rest of the draft will be spent on, gathered into one
+# row large enough to read as a list rather than as marks on a board.
+SUMMARY_CENTRE = [0.0, 0.0, 0.0]
+SUMMARY_SCALE  = 2.1           # as large as it goes, before the width below overrules it
+SUMMARY_GAP    = 0.55
+SUMMARY_WIDTH  = 11.2          # leaves a margin either side whatever the slot list turns out to be
 READOUT_CENTRE = (-5.30, 3.22, 0.0)
 
 CELL_NUMBER_FONT   = 12
@@ -316,24 +322,36 @@ class RosterSlotAssignment(VoiceoverScene):
     # ── Act two: where the value actually is ──────────────────────────────────────────
 
     def play_act_two_future_rewards(self) -> None:
+        # The rows arrive on the line that announces them. A cell is a shaded rectangle with a
+        # number in it, and the two halves are split across the two lines: the rectangles come
+        # with "below the line are picks", which is about the picks existing, and their values
+        # with "some position slots are worth more", which is about what they are worth. The
+        # shading already says which slots are better, so the numbers land on a claim the
+        # picture has just made rather than introducing one.
+        self.future_cells = {}
+        future_rows = []
+        for future_index in range(self.future_pick_count):
+            row_index = self.drafted_count + future_index
+            row_cells = VGroup(*[
+                self._build_future_cell(row_index, column_index)
+                for column_index in range(self.slot_count)
+            ])
+            for column_index in range(self.slot_count):
+                self.future_cells[(row_index, column_index)] = row_cells[column_index]
+            future_rows.append(row_cells)
+
         with self.voiceover(text=NARRATION['future_picks']):
             self.play(Create(self.half_divider), run_time=0.6)
-
-        with self.voiceover(text=NARRATION['future_rows']):
-            self.future_cells = {}
-            for future_index in range(self.future_pick_count):
-                row_index = self.drafted_count + future_index
-                row_cells = VGroup(*[
-                    self._build_future_cell(row_index, column_index)
-                    for column_index in range(self.slot_count)
-                ])
-                for column_index in range(self.slot_count):
-                    self.future_cells[(row_index, column_index)] = row_cells[column_index]
+            for future_index, row_cells in enumerate(future_rows):
                 self.play(
                     FadeIn(self.future_row_labels[future_index], shift=RIGHT * 0.2),
-                    FadeIn(row_cells),
+                    FadeIn(VGroup(*[cell[0] for cell in row_cells])),
                     run_time=0.42 if future_index < 2 else 0.22,
                 )
+
+        with self.voiceover(text=NARRATION['future_rows']):
+            self.play(FadeIn(VGroup(*[cell[1] for row in future_rows for cell in row]),
+                             lag_ratio=0.02), run_time=1.3)
             self.wait(0.8)
 
         best_column = int(np.argmax(self.future_pick_row))
@@ -410,6 +428,51 @@ class RosterSlotAssignment(VoiceoverScene):
                 run_time=0.6,
             )
 
+        # The same rule read the other way round: one player standing in two slots. Shown on the
+        # player the last beat just sorted out, so the viewer is already looking at that row, and
+        # marked ACROSS it -- where the clash above was marked down a column. The axis of the
+        # crossing is what says which rule is being broken.
+        #
+        # The board is a perfect matching, so the second slot this player reaches for is one
+        # somebody else is standing in. That somebody dims rather than leaves: taking their
+        # marker off the board would read as the slot having been freed, which would make the
+        # doubling legal instead of illegal.
+        with self.voiceover(text=NARRATION['clash_two']):
+            duplicate = self._build_marker(offending_row, contested_column)
+            self.play(
+                Create(duplicate),
+                self.markers[occupied_row].animate.set_stroke(opacity=0.25),
+                run_time=0.45,
+            )
+            self.play(
+                duplicate.animate.set_stroke(RED_D),
+                self.markers[offending_row].animate.set_stroke(RED_D),
+                run_time=0.35,
+            )
+
+            doubling = VGroup(*[
+                Line(self._cell_centre(offending_row, column)
+                     + np.array([-0.3, -0.16 * sign, 0.0]),
+                     self._cell_centre(offending_row, column)
+                     + np.array([0.3, 0.16 * sign, 0.0]),
+                     color=RED_D, stroke_width=4)
+                for column in (legal_column, contested_column) for sign in (-1, 1)
+            ])
+            self.play(Create(doubling), run_time=0.45)
+            self.wait(0.5)
+
+            # The board goes back to legal, as it does above: a rule stated and then left broken
+            # on screen reads as the rule not holding. It laps about four tenths of a second into
+            # the next line rather than finishing inside this one -- the crossed cells need long
+            # enough to be read, and this line is a short one. The next beat simply starts that
+            # much later, which costs nothing, where a shorter hold would cost the point.
+            self.play(FadeOut(doubling), FadeOut(duplicate), run_time=0.35)
+            self.play(
+                self.markers[offending_row].animate.set_stroke(YELLOW),
+                self.markers[occupied_row].animate.set_stroke(YELLOW, opacity=1.0),
+                run_time=0.4,
+            )
+
     # ── Act four: the assignment a person would guess ─────────────────────────────────
 
     def _build_total_readout(self) -> VGroup:
@@ -484,10 +547,38 @@ class RosterSlotAssignment(VoiceoverScene):
                                      for row in range(self.drafted_count)})
             self.play(*[Indicate(self.slot_headers[column], color=RED_D, scale_factor=1.2)
                         for column in closed_columns], run_time=1.4)
-            self.wait(1.0)
+            self.wait(0.6)
+            self.play_future_slot_summary()
+
+    def play_future_slot_summary(self) -> None:
+        """Collect the slots the future picks will fill, and stand them on their own.
+
+        This is the thing the whole assignment was FOR. Spread across a thirteen by thirteen
+        board the answer is there but not readable; gathered into one row it is a list of the
+        positions the rest of the draft will be spent on, and what is missing from that list --
+        there is no centre in it at all -- is what the line means by a tilt away from big men.
+
+        The board goes rather than dimming behind it. Dimming would mean setting an opacity on
+        the headshots, and an ImageMobject's per-pixel alpha does not survive that: the circular
+        portraits square off into grey blocks.
+        """
+        future_columns = sorted(self.optimal_assignment[self.drafted_count:])
+        gathered = VGroup(*[self.slot_headers[column].copy() for column in future_columns])
+        self.add(gathered)
+
+        # Scaled to whichever is smaller, the size that reads best or the width that fits.
+        # Eight slots at full size ran to within a third of a unit of both frame edges, and a
+        # different draft could deal nine.
+        summary = gathered.copy().arrange(RIGHT, buff=SUMMARY_GAP)
+        summary.scale(min(SUMMARY_SCALE, SUMMARY_WIDTH / summary.width))
+        summary.move_to(SUMMARY_CENTRE)
+
+        board = Group(*[mobject for mobject in self.mobjects if mobject is not gathered])
+        self.play(FadeOut(board), Transform(gathered, summary), run_time=1.5)
+        self.wait(2.2)
 
     def construct(self) -> None:
-        self.set_speech_service(GTTSService())
+        self.set_speech_service(NarrationVoice())
         self.build_grid_frame()
         self.play_act_one_eligibility()
         self.play_act_two_future_rewards()

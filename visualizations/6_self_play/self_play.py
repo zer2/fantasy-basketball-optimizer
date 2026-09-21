@@ -28,18 +28,18 @@ from pathlib import Path
 
 import numpy as np
 from manim import (
-    VGroup, Rectangle, Text, DecimalNumber,
+    VGroup, Rectangle, Line, Text, DecimalNumber,
     FadeIn, FadeOut,
     RIGHT, LEFT, UP,
     YELLOW, WHITE, GREY_B, GREY_D, GREY_E,
     rgb_to_color,
 )
 from manim_voiceover import VoiceoverScene
-from manim_voiceover.services.gtts import GTTSService
 from manim_voiceover.modify_audio import get_duration
 
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from shared.narration_voice import NarrationVoice   # noqa: E402
 from narration import NARRATION
 
 
@@ -63,16 +63,7 @@ INTENSITY_CAP           = 110   # where the app's ramp stops getting stronger
 # The lines that play over the passes. Their measured lengths, divided by the number of passes,
 # set ONE rate for the whole run: the board moves at a steady speed and finishes exactly when
 # the narration does, instead of speeding up and slowing down beat by beat.
-PASS_NARRATION_KEYS = ('why_self_play', 're_estimation', 'early_passes', 'late_passes')
-
-# What counts as a category given up, when picking out the builds the opening board has already
-# settled into. Which categories a neutral field abandons, and who abandons them, is a
-# measurement -- so the groups are read off the board rather than named here.
-PUNTED_WIN_RATE = 0.35
-PUNT_GROUPS_MARKED = 2      # how many builds to show
-SMALLEST_PUNT_GROUP = 3     # fewer players than this is a quirk, not a build
-GROUP_OVERLAP_LIMIT = 0.5   # two categories punted by mostly the same players are one build
-DIMMED_OPACITY = 0.18       # what the rest of the board fades to while a build is shown
+PASS_NARRATION_KEYS = ('early_passes', 're_estimation', 'late_passes')
 
 _DATA_PATH = Path(__file__).resolve().parent.parent / 'data' / 'self_play.json'
 
@@ -111,6 +102,7 @@ class SelfPlayLoop(VoiceoverScene):
         self.categories = self.measured['categories']
         self.player_names = self.measured['player_names']
         self.opening_rates = np.array(self.measured['opening_rates'], dtype=float)
+        self.context_size = self.measured['context_size']
         # Which slot each player currently occupies. Everything on a row is positioned from
         # this, so a re-sort is a change to one list and a move for everything keyed off it.
         self.slot_of_player = [0] * len(self.player_names)
@@ -174,52 +166,30 @@ class SelfPlayLoop(VoiceoverScene):
             for player_index in range(len(self.player_names))
         ])
 
-    def punt_groups(self) -> list[list[int]]:
-        """The builds on the opening board: players who give up the same category.
-
-        Largest first, and a category whose group is mostly the players of one already chosen is
-        skipped -- on this board Free Throw % and Threes are abandoned by the same seven players,
-        which is one build with two names, not two builds.
-        """
-        rates = self.opening_rates
-        by_category = sorted(
-            ([player for player in range(len(self.player_names))
-              if rates[player][category] < PUNTED_WIN_RATE]
-             for category in range(len(self.categories))),
-            key=len, reverse=True)
-
-        groups: list[list[int]] = []
-        for members in by_category:
-            if len(members) < SMALLEST_PUNT_GROUP:
-                continue
-            if any(len(set(members) & set(chosen)) > GROUP_OVERLAP_LIMIT * len(members)
-                   for chosen in groups):
-                continue
-            groups.append(members)
-            if len(groups) == PUNT_GROUPS_MARKED:
-                break
-        return groups
-
-    def fade_to_group(self, group: list[int], opacity: float) -> list:
-        """Animations that push every row EXCEPT this build into the background."""
-        changes = []
-        for player_index in range(len(self.player_names)):
-            if player_index in group:
-                continue
-            changes.append(self.names[player_index].animate.set_opacity(opacity))
-            for category_index in range(len(self.categories)):
-                changes.append(self.at_row(self.grid, player_index, category_index)
-                               .animate.set_opacity(opacity))
-                changes.append(self.at_row(self.readouts, player_index, category_index)
-                               .animate.set_opacity(opacity))
-        return changes
-
     def build_names(self) -> VGroup:
         return VGroup(*[
             Text(name, font_size=13, color=GREY_B)
             .move_to(self.name_position(self.slot_of_player[player_index]), aligned_edge=RIGHT)
             for player_index, name in enumerate(self.player_names)
         ])
+
+    def build_context_marker(self) -> VGroup:
+        """Where the drafting context stops, marked at the right edge of the board.
+
+        The rows below the mark are in the universe the passes solve, but outside the seats the
+        field is made of -- so a player crossing this line is a change in who the algorithm
+        thinks it is drafting against, which is the thing the re-sorting is for. Drawn at a slot
+        boundary rather than against a player: the line stays put and the players move through
+        it.
+        """
+        boundary = (self.cell_position(self.context_size - 1, 0)[1]
+                    + self.cell_position(self.context_size, 0)[1]) / 2
+        right_edge = self.cell_position(0, len(self.categories) - 1)[0] + CELL_WIDTH / 2
+        rule = Line([right_edge - 0.1, boundary, 0], [right_edge + 0.55, boundary, 0],
+                    color=GREY_B, stroke_width=2)
+        caption = (Text(f'top {self.context_size}', font_size=14, color=GREY_B)
+                   .next_to(rule, RIGHT, buff=0.12))
+        return VGroup(rule, caption)
 
     def build_headers(self) -> VGroup:
         return VGroup(*[
@@ -296,7 +266,7 @@ class SelfPlayLoop(VoiceoverScene):
     # ── The scene ─────────────────────────────────────────────────────────────────────
 
     def construct(self) -> None:
-        self.set_speech_service(GTTSService())
+        self.set_speech_service(NarrationVoice())
         self.grid = self.build_grid()
         self.readouts = self.build_readouts()
         self.outlines = self.build_row_outlines()
@@ -316,21 +286,19 @@ class SelfPlayLoop(VoiceoverScene):
         outline_legend = Text('outlined: re-solved this pass', font_size=17, color=YELLOW)
         outline_legend.next_to(legend, UP, aligned_edge=LEFT, buff=0.24)
 
-        # The whole board at once. It is the state Level 0 already reached before any pass
-        # runs, so there is nothing to build up to -- revealing it a row at a time only made the
-        # viewer wait to see a thing that was already true.
+        # The board goes up before a word is said about it: the opening line describes what is
+        # on it, and describing a thing that is not there yet asks the viewer to wait for the
+        # subject of the sentence.
         #
-        # Then the columns the line is about. "Certain punting profiles consistently seem
-        # optimal in this context" is a claim about this board, and these are the categories it
-        # is true of, picked out of the board rather than asserted here.
+        # Nothing is pointed out on it either. Which categories the field gives up is legible
+        # from the board itself -- whole columns of single digits -- and marking them told the
+        # viewer something they had already read.
+        context_marker = self.build_context_marker()
+        self.play(FadeIn(self.grid), FadeIn(self.readouts), FadeIn(self.names),
+                  FadeIn(headers), FadeIn(self.pass_readout), FadeIn(legend),
+                  FadeIn(context_marker), run_time=1.2)
         with self.voiceover(text=NARRATION['opening']):
-            self.play(FadeIn(self.grid), FadeIn(self.readouts), FadeIn(self.names),
-                      FadeIn(headers), FadeIn(self.pass_readout), FadeIn(legend), run_time=1.2)
             self.wait(1.0)
-            for group in self.punt_groups():
-                self.play(*self.fade_to_group(group, DIMMED_OPACITY), run_time=0.7)
-                self.wait(1.5)
-                self.play(*self.fade_to_group(group, 1.0), run_time=0.5)
         self.add(self.outlines)
         self.add_narration_key(outline_legend)
 
@@ -355,4 +323,5 @@ class SelfPlayLoop(VoiceoverScene):
             self.wait(2.4)
         self.play(FadeOut(self.grid), FadeOut(self.readouts), FadeOut(self.names),
                   FadeOut(headers), FadeOut(self.outlines), FadeOut(self.pass_readout),
-                  FadeOut(legend), FadeOut(outline_legend), run_time=0.9)
+                  FadeOut(legend), FadeOut(outline_legend), FadeOut(context_marker),
+                  run_time=0.9)

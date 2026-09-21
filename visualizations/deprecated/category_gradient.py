@@ -63,7 +63,7 @@ class CategoryGradient(PuntingSearch):
         super().setup()
         # The swept category moves on its own, off the drain path the parent scene walks. While
         # this holds a value that category ignores `progress` entirely.
-        self.swept_effort = ValueTracker(float(weights_at(0.0)[SWEPT_CATEGORY]))
+        self.swept_effort = ValueTracker(float(weights_at(0.0, 1.0)[SWEPT_CATEGORY]))
         self.sweeping = False
 
     def current_weight(self, category_index: int) -> float:
@@ -97,7 +97,7 @@ class CategoryGradient(PuntingSearch):
     # ── Nine marginals, side by side ──────────────────────────────────────────────────
 
     def _build_summary_bars(self) -> VGroup:
-        weights = weights_at(PUNT_OPTIMUM)
+        weights = weights_at(PUNT_OPTIMUM, 1.0)
         contested = marginal_value(float(weights[weights > 0][0]))
 
         bars, labels = VGroup(), VGroup()

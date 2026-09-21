@@ -14,6 +14,51 @@ on screen is measured by a prep script against the real algorithm — no scene i
 | 7 | `7_seed_menu/` | `seed_menu.py`, `SeedMenu` | H-score page, multi-starting |
 | 8 | `8_gradient_descent/` | `gradient_descent.py`, `GradientDescent` | H-score page, replacing the YouTube embed |
 
+## Sign-off
+
+Signed off means Zach has watched that render and called it done. A scene that is signed off does
+not get touched again without asking — including by a change that only means to improve it.
+
+| # | scene | signed off | length | notes |
+|---|---|---|---|---|
+| 1 | z-score | **yes**\* | 137s | \*blessed conditional on the last three fixes — percentage-statistic label, one more second on the final frame, rewritten simulation line — all now in and verified |
+| 2 | g-score | **yes** | 125s | worked examples cut from the two simulation lines |
+| 3 | roster slots | **yes** | 102s | |
+| 4 | plane story | **yes** | 47s | |
+| 5 | punting | **yes** | 83s | |
+| 6 | self-play | **yes** | 74s | |
+| 7 | seed menu | **yes** | 27s | surface drawn with `HOLD_DRAWN_ASSIGNMENT`, which takes the notches out; the opening holds the axes for 0.9s and draws the surface under the line |
+| 8 | gradient descent | **yes** | 44s | |
+
+All eight exist at both 480p15 (drafts) and 1080p60 (`media/videos/<scene>/1080p60/`). Total
+run time 10.6 minutes, 77 MB, 93% of it speaking, with no silence longer than 4.5s. Every render
+says what its `narration.py` says — `check_narration.py` reads each scene's subtitle track back
+and reports any line the render has fallen behind on.
+
+## Publishing
+
+`media/` is entirely untracked, renders included, so a finished video reaches the docs by being
+copied into `docs/videos/` — that is the tracked copy and the one MkDocs serves:
+
+```
+cp visualizations/media/videos/z_score/1080p60/TeamDifferentialFull.mp4 docs/videos/z-scores.mp4
+```
+
+The pages embed them as raw HTML `<video>` tags. MkDocs rewrites relative paths in Markdown
+image syntax but NOT inside raw HTML, so those tags say `../videos/<name>.mp4` explicitly, which
+is what resolves from a page served at `/gscores/` or `/hscores/`.
+
+Re-rendering a scene does not update the docs. Copy it across again.
+
+## Render times
+
+The full 1080p60 pass takes about **two hours** on this machine, serially — roughly 11x the
+finished run time. Per scene, slowest first: gradient descent 27m, g-score 24m, seed menu 19m,
+z-score 17m, self-play 12m, punting 11m, roster slots 3m, plane story 1m. The two surface
+scenes cost the most per second of video: a 56x56 shaded mesh is expensive per pixel, and that
+is the part that scales with resolution. Render them one at a time — manim-voiceover's cache is
+an unlocked read-modify-write file and concurrent renders have corrupted it.
+
 ## Narration
 
 **Every animation's spoken track lives in one file: `<folder>/narration.py`.** That is the only
@@ -23,7 +68,7 @@ its line — a longer line holds its own beat rather than pushing everything aft
 Most lines are still placeholders (they start with the word "Placeholder"), written to say what
 that beat is for. Rewrite them and re-render; nothing else needs touching.
 
-The voice is gTTS, so the text is read literally — write "sigma", not "σ".
+The voice reads the text literally — write "sigma", not "σ".
 
 ## Rendering
 

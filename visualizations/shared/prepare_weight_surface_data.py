@@ -19,9 +19,11 @@ The plane is two category weights, each as a percentage of what that category is
 balanced build: zero is the category given up entirely, a hundred is the balanced weight, and the
 axis runs past a hundred so that the balanced build is an interior point rather than a corner --
 otherwise a summit there could not be told from the edge of the picture. Z is the H-score the
-shipped objective gives that build. The pair of categories is not chosen by hand: every pairing
-is searched for a slice with three summits, one at balanced weights and one for each category
-given up on its own, since that is the shape that shows what a starting point decides.
+shipped objective gives that build. Nothing here is chosen by hand: every candidate, every pair
+of categories and every setting of the OTHER seven weights is searched for a surface where a
+punt summit beats the balanced one, since that is the shape that shows what a starting point
+decides. The ones that have it are then traced, and the slice whose climb walks furthest without
+doubling back is kept.
 
     python visualizations/prepare_weight_surface_data.py
 """
@@ -54,12 +56,85 @@ GRID_STEPS = 31
 WEIGHT_RANGE = (0.0, 1.5)
 PUNT_SEED_FACTOR = _PUNT_SEED_FACTOR   # the depth of the menu's gentle punt, as the app ships it
 
-# What counts as the three summits: one with both categories at about their balanced weights, and
-# one for each category given up while the OTHER is still near its balanced weight. Without that
-# second condition a ridge running diagonally would qualify, and the point is that the two punts
-# are alternatives rather than things to combine.
+# What counts as the shape the scene argues for: a summit with both categories at about their
+# balanced weights, and at least one more with a category given up while the OTHER is still near
+# its balanced weight. That second condition is what stops a ridge running diagonally from
+# qualifying -- a punt gives ONE category up, not both shaded down together.
+#
+# A punt in EACH category was demanded here at one point, which rules out most of the field: a
+# candidate usually has one category worth giving up rather than two. Measured on the first pick,
+# 33 of Jokic's 36 pairings have a single punt peak and no second one -- including pairs where
+# the punt plainly beats the balanced build.
 BALANCED_WEIGHTS  = (0.85, 1.35)
 SUMMIT_MERGE_WEIGHT = 0.16     # summits closer than this on both axes are one broad hilltop
+
+# How many three-summit slices are traced before one is kept. The shape of a surface is cheap to
+# measure and says nothing about where a descent ends on it: the plane is a two-dimensional cut
+# through a nine-dimensional landscape, and the real descent moves in all nine, so its path is a
+# PROJECTION that can drift off the slice it is drawn on. Whether it drifts is a property of the
+# particular slice, and the only way to find out is to run it. So several are run and the one
+# whose climb finishes nearest its own summit is kept.
+MENU_SLICES_TO_TRACE = 16
+# At most this many cuts from any one candidate-and-anchor. Sorted by advantage alone the
+# shortlist filled with the same surface over and over -- six of eight were one player at one
+# anchor, differing only in which category sat on the second axis, and behaving identically
+# because the anchor was doing the work. A shortlist of near-duplicates tests one surface eight
+# times and calls it a search.
+CUTS_PER_CANDIDATE = 2
+
+# What makes a climb worth watching, rather than merely correct. A descent that starts next to
+# the summit has nowhere to go: it shuffles about on the flat top, doubles back on itself, and
+# shows none of the walking uphill the scene is there to show. So a slice is kept for the LENGTH
+# of the journey its chosen seed makes, once the journey ends somewhere near the right peak.
+# Judged against the climb this scene ships today, which walks 11.2 points, lands 7.2 from the
+# summit and wanders 6.29 times the straight line between the two. The complaint it has to beat
+# is the doubling back, so the wander bound is the tight one: anything under about two and a
+# half is a different picture from that. The landing bound is looser, because a ball that stops
+# fifteen points short of a broad summit still plainly climbed it.
+LANDING_TOLERANCE = 15.0       # percentage points from the summit still counted as arriving
+WANDER_TOLERANCE = 2.5         # path length over straight-line distance; above this it meanders
+
+# Draw the winning slice with the roster assignment held still, which smooths away the notches
+# the re-solving leaves down the hillside. This changes only what is DRAWN -- the pairing and its
+# climbs are chosen on the honest surface either way, and cannot be chosen on a held one, because
+# holding removes the balanced summit that punt_advantage weighs the punt against. See
+# measure_slice for what holding costs in height.
+HOLD_DRAWN_ASSIGNMENT = True
+
+
+def anchor_menu(neutral, index_a, index_b):
+    """The cuts worth trying: the balanced build, and one gentle punt in each other category.
+
+    The seven weights that are not on the plane have to be held at something, and the balanced
+    build is one choice among many rather than a privileged one. Every seed the app's own menu
+    offers is an equally real build to cut through, and each gives a different surface with
+    different summits and a different climb over it -- which turns a few dozen candidate
+    pictures into a few thousand, and is the difference between taking whatever the field
+    happens to offer and choosing.
+
+    The punt is labelled by the category it gives up, for the log: a record that says which cut
+    produced a picture is the difference between a result and a coincidence.
+    """
+    cuts = [('balanced', np.asarray(neutral, dtype=float))]
+    for index in range(len(neutral)):
+        if index in (index_a, index_b):
+            continue
+        anchor = np.asarray(neutral, dtype=float).copy()
+        anchor[index] *= PUNT_SEED_FACTOR
+        cuts.append((index, anchor))
+    return cuts
+
+# How many times the seed-menu slice is re-cut through its own answer. The seven weights that are
+# not on the plane have to be held at SOMETHING, and holding them at the balanced build -- the
+# obvious choice -- puts the cut somewhere the algorithm leaves on its first step: the descent
+# moves all nine weights, so its path is a shadow and its end is not a point of the picture. Held
+# instead at the values the descent settles on, the endpoint lies IN the plane and the ball lands
+# on a real summit of the surface it is drawn on.
+#
+# That is circular -- the cut depends on the climb, and the climb's seed is built on the cut -- so
+# it is iterated. Both cuts are judged and the better kept, since the balanced cut sometimes
+# gives the longer climb even when the re-cut one lands closer.
+ANCHOR_PASSES = 2
 PUNTED_MAX_WEIGHT = 0.72
 KEPT_MIN_WEIGHT   = 0.78
 
@@ -163,26 +238,37 @@ def run_bootstrap_watching(agent, n_iterations, tracked_players, forced_seeds=No
 class WeightPlane:
     """The shipped objective over two category weights, for one candidate in one captured context."""
 
-    def __init__(self, agent, context, neutral, index_a, index_b):
+    def __init__(self, agent, context, neutral, index_a, index_b, anchor=None):
         self.agent = agent
         self.context = context
         self.neutral = neutral
         self.index_a = index_a
         self.index_b = index_b
+        # Where the seven weights that are not on the plane are held. The balanced build unless a
+        # caller says otherwise, which is the cut that contains no part of any descent.
+        self.anchor = neutral if anchor is None else np.asarray(anchor, dtype=float)
 
     def weights_at(self, coordinates: np.ndarray) -> np.ndarray:
-        """Plane coordinates to full weight vectors, renormalised as the solver keeps them."""
-        weights = np.tile(self.neutral, (len(coordinates), 1))
-        weights[:, self.index_a] *= np.clip(coordinates[:, 0], 0.0, None)
-        weights[:, self.index_b] *= np.clip(coordinates[:, 1], 0.0, None)
+        """Plane coordinates to full weight vectors, renormalised as the solver keeps them.
+
+        The two plane categories are set as multiples of their BALANCED weights however the cut
+        is anchored, so the axes keep meaning what they are labelled with: nothing at zero, the
+        balanced weight at a hundred. Only the other seven follow the anchor.
+        """
+        weights = np.tile(self.anchor, (len(coordinates), 1))
+        weights[:, self.index_a] = (self.neutral[self.index_a]
+                                    * np.clip(coordinates[:, 0], 0.0, None))
+        weights[:, self.index_b] = (self.neutral[self.index_b]
+                                    * np.clip(coordinates[:, 1], 0.0, None))
         weights = np.clip(weights, 1e-6, None)
         return weights / weights.sum(axis=1, keepdims=True)
 
-    def score(self, coordinates: np.ndarray) -> np.ndarray:
+    def score(self, coordinates: np.ndarray, keep_positions: bool = False) -> np.ndarray:
         """What the objective says about builds that lie IN the plane."""
-        return self.score_weights(self.weights_at(coordinates))
+        return self.score_weights(self.weights_at(coordinates), keep_positions)
 
-    def score_weights(self, weight_vectors: np.ndarray) -> np.ndarray:
+    def score_weights(self, weight_vectors: np.ndarray,
+                      keep_positions: bool = False) -> np.ndarray:
         """What the objective says about any builds at all, in this candidate's context.
 
         A descent moves all nine weights, so where it ENDS is not a point of this plane and its
@@ -205,11 +291,18 @@ class WeightPlane:
                         for key, frame in value.items()}
             return value
 
-        # The position machinery caches per batch and the captured cache is sized to the solve it
-        # came from; the shipped seed-scoring path clears exactly these before re-batching.
-        self.agent._candidate_priority = None
-        self.agent._position_rosters_cache = None
-        self.agent._current_batch_index = None
+        # The position machinery caches per batch and the captured cache is sized to the solve
+        # it came from; the shipped seed-scoring path clears exactly these before re-batching,
+        # which makes every point re-solve its own roster assignment from its own weights.
+        #
+        # `keep_positions` leaves the cache alone instead, so a caller that has already filled it
+        # gets every point scored against ONE assignment. The objective is a max over matchings,
+        # so re-solving is what creases it; holding the matching still is how to see the surface
+        # underneath those creases.
+        if not keep_positions:
+            self.agent._candidate_priority = None
+            self.agent._position_rosters_cache = None
+            self.agent._current_batch_index = None
         # diff_means and diff_vars are deliberately NOT tiled: the objective reshapes them as one
         # field shared by every candidate, which is exactly what a surface over weights wants, and
         # a tiled copy fails the reshape outright.
@@ -260,19 +353,25 @@ def local_maxima(surface: np.ndarray, axis: np.ndarray):
             if surface[i, j] >= surface[max(0, i - 1):i + 2, max(0, j - 1):j + 2].max()]
 
 
-def three_summit_prominence(maxima):
-    """How far the LOWER punt summit stands above the balanced one, or None if the shape is absent."""
+def punt_advantage(maxima):
+    """How far the best punt summit stands above the balanced one, or None if the shape is absent.
+
+    Positive is what the scene needs: the surface has a balanced build and at least one punt,
+    and the punt is the better of the two. That makes the balanced start the one that would get
+    stuck, which is what the narration says the seed menu is for.
+
+    A punt summit is one category given up while the OTHER stays near its balanced weight. Both
+    shaded down together is a diagonal ridge rather than a punt, and does not count.
+    """
     low, high = BALANCED_WEIGHTS
     balanced = [peak for peak in maxima if low <= peak[0] <= high and low <= peak[1] <= high]
-    punt_a = [peak for peak in maxima
-              if peak[0] <= PUNTED_MAX_WEIGHT and KEPT_MIN_WEIGHT <= peak[1] <= high]
-    punt_b = [peak for peak in maxima
-              if peak[1] <= PUNTED_MAX_WEIGHT and KEPT_MIN_WEIGHT <= peak[0] <= high]
-    if not (balanced and punt_a and punt_b):
+    punts = [peak for peak in maxima
+             if (peak[0] <= PUNTED_MAX_WEIGHT and KEPT_MIN_WEIGHT <= peak[1] <= high)
+             or (peak[1] <= PUNTED_MAX_WEIGHT and KEPT_MIN_WEIGHT <= peak[0] <= high)]
+    if not (balanced and punts):
         return None
-    return min(max(punt_a, key=lambda peak: peak[2])[2],
-               max(punt_b, key=lambda peak: peak[2])[2]) - max(balanced,
-                                                               key=lambda peak: peak[2])[2]
+    return (max(punts, key=lambda peak: peak[2])[2]
+            - max(balanced, key=lambda peak: peak[2])[2])
 
 
 def merge_summits(maxima, tolerance: float):
@@ -317,32 +416,46 @@ def search_slices(agent, solved, neutral, categories, player_names):
     same grid. Which player's weights make which shape is a fact about the field rather than
     something to assert, so both are searched for and neither is chosen by hand.
     """
-    three_summit, single_summit = None, None
+    three_summits, single_summit = [], None
     for player, (context, _) in solved.items():
         best_three = None
         for index_a, index_b in itertools.combinations(range(len(categories)), 2):
-            plane = WeightPlane(agent, context, neutral, index_a, index_b)
-            surface = plane.score(search_grid()).reshape(SEARCH_STEPS, SEARCH_STEPS)
-            maxima = local_maxima(surface, search_axis())
+            for cut, anchor in anchor_menu(neutral, index_a, index_b):
+                plane = WeightPlane(agent, context, neutral, index_a, index_b, anchor)
+                surface = plane.score(search_grid()).reshape(SEARCH_STEPS, SEARCH_STEPS)
+                maxima = local_maxima(surface, search_axis())
 
-            prominence = three_summit_prominence(maxima)
-            if prominence is not None and (best_three is None or prominence > best_three[0]):
-                best_three = (prominence, index_a, index_b)
+                # Every pairing AND every cut is shortlisted, not just each player's best
+                # pairing at the balanced cut: which surface a descent stays on has nothing to
+                # do with how prominent its summits are, and the old sweep threw away almost
+                # every candidate before the question that matters was asked of it.
+                #
+                # A positive advantage is the shape the scene argues for: the best build on the
+                # surface is a punt, and the balanced start is the one that would get stuck. On
+                # a surface whose highest point is the balanced build, the scene's sentence is
+                # simply false.
+                prominence = punt_advantage(maxima)
+                if prominence is not None and prominence > 0:
+                    three_summits.append((prominence, player, index_a, index_b, cut, anchor))
+                if prominence is not None and (best_three is None or prominence > best_three[0]):
+                    best_three = (prominence, index_a, index_b)
 
-            relief = single_summit_relief(maxima, surface)
-            if relief is not None and (single_summit is None or relief > single_summit[0]):
-                single_summit = (relief, player, index_a, index_b)
+                # The one-hill slice is measured at the balanced cut only. Its scene is signed
+                # off, and its surface has to come back identical from every run.
+                if cut != 'balanced':
+                    continue
+                relief = single_summit_relief(maxima, surface)
+                if relief is not None and (single_summit is None or relief > single_summit[0]):
+                    single_summit = (relief, player, index_a, index_b)
 
         if best_three is None:
             print(f'   {player_names[player]:24} no three-summit slice')
             continue
         prominence, index_a, index_b = best_three
-        print(f'   {player_names[player]:24} {categories[index_a]} against '
+        print(f'   {player_names[player]:24} best pairing {categories[index_a]} against '
               f'{categories[index_b]}, the lower punt {prominence:+.5f} above balanced')
-        if three_summit is None or prominence > three_summit[0]:
-            three_summit = (prominence, player, index_a, index_b)
 
-    if three_summit is None:
+    if not three_summits:
         raise RuntimeError(
             'No three-summit slice for any of the tracked candidates. The surfaces may genuinely '
             'have fewer basins, in which case the scene should say so rather than be handed a '
@@ -352,7 +465,49 @@ def search_slices(agent, solved, neutral, categories, player_names):
             'No slice with a single interior summit. Every surface measured here is either '
             'multi-basin or still climbing at the edge of the plane, and the gradient-descent '
             'scene needs one hill with a top on it.')
-    return three_summit[1:], single_summit[1:]
+    three_summits.sort(key=lambda entry: -entry[0])
+
+    # Best first, but never more than a couple from the same candidate at the same anchor.
+    spread, seen = [], {}
+    for entry in three_summits:
+        _, player, _, _, cut, _ = entry
+        taken = seen.get((player, cut), 0)
+        if taken >= CUTS_PER_CANDIDATE:
+            continue
+        seen[(player, cut)] = taken + 1
+        spread.append(entry)
+        if len(spread) == MENU_SLICES_TO_TRACE:
+            break
+
+    print(f'   {len(three_summits)} cuts where the best peak is a punt; tracing {len(spread)} '
+          f'of them, spread across {len(seen)} candidate-and-anchor pairs')
+    return [entry[1:] for entry in spread], single_summit[1:]
+
+
+def climb_shape(climbs, axis, surface) -> tuple[dict, dict]:
+    """The climb the scene will trace, and the three numbers that say whether it is worth watching.
+
+    The scene climbs whichever seed scores best where it stands, so that is the one measured.
+
+    `landing` is how far it stops from the surface's own highest point, `journey` how far it had
+    to come, and `wander` how much further it travelled than the straight line between the two --
+    one means it walked directly there, and a large number means it doubled back. All in the
+    percentage units the axes are labelled in, so they are things a viewer could read off the
+    picture rather than internal quantities.
+    """
+    chosen = max(climbs, key=lambda climb: climb['start_score'])
+    path = np.array(chosen['path'])
+
+    peak = np.unravel_index(np.argmax(surface), surface.shape)
+    summit = np.array([as_percent(axis[peak[0]]), as_percent(axis[peak[1]])])
+
+    straight = float(np.hypot(*(path[-1] - path[0])))
+    travelled = float(np.hypot(*np.diff(path, axis=0).T).sum())
+    return chosen, {
+        'landing': float(np.hypot(*(path[-1] - summit)))
+        , 'journey': float(np.hypot(*(path[0] - summit)))
+        , 'wander':  travelled / straight if straight > 1e-6 else float('inf')
+    }
 
 
 def as_percent(weight: float) -> float:
@@ -371,12 +526,53 @@ def search_grid() -> np.ndarray:
 
 # ── Measuring and writing one slice ──────────────────────────────────────────────────
 
-def measure_slice(agent, context, neutral, index_a, index_b):
-    """The chosen pairing, re-measured on the fine grid the scene actually draws."""
-    plane = WeightPlane(agent, context, neutral, index_a, index_b)
+def rescore_held(agent, plane, axis):
+    """The same plane, every point scored against ONE roster assignment instead of its own.
+
+    The first pass at the balanced build fills the position cache with a single assignment. After
+    that nothing counts as active, so there is nothing left to re-solve and every later point
+    reuses what is cached. Both hooks live on the agent instance; the algorithm is not touched.
+    """
+    grid = np.array([[a, b] for a in axis for b in axis])
+    plane.score(np.tile([1.0, 1.0], (len(grid), 1)))
+    count_active = agent._active_candidate_count
+    agent._active_candidate_count = lambda iteration, n_candidates: 0
+    agent._candidate_priority = np.array([0])
+    try:
+        return plane.score(grid, keep_positions=True).reshape(GRID_STEPS, GRID_STEPS)
+    finally:
+        agent._active_candidate_count = count_active
+
+
+def measure_slice(agent, context, neutral, index_a, index_b, anchor=None,
+                  hold_assignment=False):
+    """The chosen pairing, re-measured on the fine grid the scene actually draws.
+
+    The objective re-solves the roster assignment from the weights on every call, so its value is
+    a max over matchings: smooth while one matching wins, notched where the winner changes. Those
+    notches are the creases down the hillside.
+
+    `hold_assignment` scores the whole grid against ONE matching, taken at the balanced build, so
+    the surface underneath the notches shows through. On the cut the scene ships -- Scottie
+    Barnes, Threes against Turnovers -- holding it drops the creasing from 104x to 27x along the
+    rows and from 30x to 7x along the columns, and moves the surface by at most 0.00331 against a
+    relief of 0.02330. That is 14% of the relief, so this is not a free cosmetic pass: it is a
+    visible change of heights, and the reason it is still honest is that both summits stay in the
+    same cells and in the same order.
+
+    Holding cannot be used for the SEARCH, only for the final drawing. Held still, some cuts lose
+    their balanced summit altogether and read as two punts, and punt_advantage needs a balanced
+    summit to weigh the punt against. So the pairing and its climbs are chosen on the honest
+    surface, and only the winner is redrawn -- with main() checking first that the plane still
+    scores as it did when it was chosen.
+    """
+    plane = WeightPlane(agent, context, neutral, index_a, index_b, anchor)
     axis = np.linspace(*WEIGHT_RANGE, GRID_STEPS)
-    surface = plane.score(
-        np.array([[a, b] for a in axis for b in axis])).reshape(GRID_STEPS, GRID_STEPS)
+    if hold_assignment:
+        surface = rescore_held(agent, plane, axis)
+    else:
+        surface = plane.score(
+            np.array([[a, b] for a in axis for b in axis])).reshape(GRID_STEPS, GRID_STEPS)
     peaks = [{'a': as_percent(weight_a), 'b': as_percent(weight_b), 'score': round(score, 6)}
              for weight_a, weight_b, score
              in merge_summits(local_maxima(surface, axis), SUMMIT_MERGE_WEIGHT)]
@@ -404,7 +600,7 @@ def trace_from_seed(agent
     """
     seed = plane.weights_at(np.array([start]))[0]
     rerun = run_bootstrap_watching(agent, n_iterations, [tracked], forced_seeds={tracked: seed})
-    trajectory = rerun[tracked][1]
+    rerun_context, trajectory = rerun[tracked]
 
     path = [project_onto_plane(weights, neutral, index_a, index_b) for weights in trajectory]
     trimmed = [path[0]]
@@ -412,7 +608,13 @@ def trace_from_seed(agent
         if abs(point[0] - trimmed[-1][0]) > 1e-4 or abs(point[1] - trimmed[-1][1]) > 1e-4:
             trimmed.append(point)
     start_score, end_score = plane.score_weights(np.array([trajectory[0], trajectory[-1]]))
-    entry = {'label': label
+    # The context this run finished in, kept for the same reason the final weights are. The
+    # descent moves the FLEX SHARES as well as the category weights -- the solver returns
+    # gradients for both -- so a surface drawn at some other run's shares is cut through a
+    # different place again, in a dimension the plane does not show and cannot show.
+    entry = {'_final_weights': np.asarray(trajectory[-1], dtype=float)
+             , '_context': rerun_context
+             , 'label': label
              , 'path': [[as_percent(value) for value in point] for point in trimmed]
              , 'start_score': round(float(start_score), 6)
              , 'score': round(float(end_score), 6)}
@@ -421,6 +623,17 @@ def trace_from_seed(agent
           f'(slice reads {interpolate_grid(surface, axis, trimmed[-1]):.5f})  '
           f'over {len(trimmed) - 1} real iterations')
     return entry
+
+
+def without_working(climbs):
+    """The climbs as the scenes read them, with the nine-weight endpoints left behind.
+
+    The endpoints are what the cut is re-anchored on; they are working, not something a scene
+    has any use for, and writing them would put a nine-number vector in a file whose whole
+    contents are otherwise plane coordinates.
+    """
+    return [{key: value for key, value in climb.items() if not key.startswith('_')}
+            for climb in climbs]
 
 
 def write_measurements(filename: str, payload: dict) -> None:
@@ -452,21 +665,118 @@ def main() -> None:
     print(f'   {len(solved)} of them were solved during it')
 
     print('Searching every candidate and category pairing...')
-    menu_slice, simple_slice = search_slices(agent, solved, neutral, categories, player_names)
+    menu_slices, simple_slice = search_slices(agent, solved, neutral, categories, player_names)
 
     # ── The seed menu: three starts on a surface with three summits ───────────────────
-    tracked, index_a, index_b = menu_slice
+    # Each shortlisted slice is traced in full and kept only if its climb lands nearer its own
+    # summit than the best so far. Prominence alone picked a surface whose climb stopped fifteen
+    # percentage points from the visible peak, which reads as the algorithm giving up early.
+    print(f'\nTracing {len(menu_slices)} shortlisted slices to see where each climb lands...')
+    best_menu = None
+    for tracked, index_a, index_b, cut, found_anchor in menu_slices:
+        category_a, category_b = categories[index_a], categories[index_b]
+        held = 'balanced' if cut == 'balanced' else f'punting {categories[cut]}'
+        print(f'\n   {player_names[tracked]}: {category_a} against {category_b}, '
+              f'others held {held}')
+
+        anchor, context, best_pass = found_anchor, solved[tracked][0], None
+        for attempt in range(ANCHOR_PASSES):
+            plane, axis, surface = measure_slice(
+                agent, context, neutral, index_a, index_b, anchor)
+
+            # The shape is re-checked on the fine grid the scene actually draws rather than
+            # trusted from the coarse search: a punt that beats the balanced build by a hair at
+            # fifteen steps can lose to it at thirty-one, and then the picture argues the
+            # opposite of the narration.
+            drawn = punt_advantage(merge_summits(local_maxima(surface, axis),
+                                                 SUMMIT_MERGE_WEIGHT))
+            if drawn is None or drawn <= 0:
+                # Two quite different failures, worth telling apart: the surface may have lost
+                # one of the two summits entirely, or it may still have both with the balanced
+                # one on top. Only the second is "the punt is not worth it".
+                reason = ('no balanced summit and punt summit to compare'
+                          if drawn is None else
+                          f'the balanced summit wins by {-drawn:.5f}')
+                print(f'      cut {attempt + 1}: {reason} -- dropped')
+                break
+
+            climbs = [
+                trace_from_seed(agent, n_iterations, tracked, plane, start, label,
+                                neutral, index_a, index_b, axis, surface)
+                for label, start in ((f'punt {category_a}', [PUNT_SEED_FACTOR, 1.0])
+                                     , (f'punt {category_b}', [1.0, PUNT_SEED_FACTOR])
+                                     , ('balanced', [1.0, 1.0]))
+            ]
+            chosen, shape = climb_shape(climbs, axis, surface)
+            arrives = shape['landing'] <= LANDING_TOLERANCE
+            direct = shape['wander'] <= WANDER_TOLERANCE
+            print(f'      cut {attempt + 1}: climbs {chosen["label"]!r:22} '
+                  f'starts {shape["journey"]:5.1f} from the summit, lands {shape["landing"]:5.1f} '
+                  f'away, wanders x{shape["wander"]:.2f}'
+                  f'{"" if arrives and direct else "   -- rejected"}')
+
+            # Kept for the JOURNEY, once it arrives and goes more or less straight there. A
+            # climb that starts beside the summit is correct and dull; the scene needs one that
+            # visibly walks uphill.
+            if arrives and direct and (best_pass is None or shape['journey'] > best_pass[0]):
+                best_pass = (shape['journey'], shape, plane, axis, surface, climbs)
+            # The next cut goes through this climb's own endpoint, in every dimension the
+            # plane does not draw: the seven other category weights via the anchor, and the flex
+            # shares via the context the climb itself finished in.
+            anchor, context = chosen['_final_weights'], chosen['_context']
+
+        if best_pass is None:
+            print('      nothing usable from this pairing')
+            continue
+        journey, shape, plane, axis, surface, climbs = best_pass
+        if best_menu is None or journey > best_menu[0]:
+            best_menu = (journey, shape, tracked, index_a, index_b, plane, axis, surface, climbs)
+
+    if best_menu is None:
+        raise RuntimeError(
+            'No shortlisted slice produced a climb that both arrives near its summit and goes '
+            'more or less straight there. Widen MENU_SLICES_TO_TRACE or loosen LANDING_TOLERANCE '
+            'and WANDER_TOLERANCE -- but loosening them means shipping a scene whose ball either '
+            'stops short of the peak or doubles back on the way, which is what they are for.')
+
+    journey, shape, tracked, index_a, index_b, plane, axis, surface, climbs = best_menu
     category_a, category_b = categories[index_a], categories[index_b]
-    print(f'\nSeed menu -- {player_names[tracked]}: {category_a} against {category_b}')
-    plane, axis, surface = measure_slice(
-        agent, solved[tracked][0], neutral, index_a, index_b)
-    climbs = [
-        trace_from_seed(agent, n_iterations, tracked, plane, start, label,
-                        neutral, index_a, index_b, axis, surface)
-        for label, start in ((f'punt {category_a}', [PUNT_SEED_FACTOR, 1.0])
-                             , (f'punt {category_b}', [1.0, PUNT_SEED_FACTOR])
-                             , ('balanced', [1.0, 1.0]))
-    ]
+    print(f'\nSeed menu -- {player_names[tracked]}: {category_a} against {category_b}; '
+          f'the climb walks {journey:.1f} points to within {shape["landing"]:.1f} of the summit, '
+          f'wandering x{shape["wander"]:.2f}')
+
+    # Redrawn with the roster assignment held, which takes the notches out of the hillside. The
+    # pairing and its climbs were chosen above on the honest surface and are not re-chosen here;
+    # only the heights being drawn change. See measure_slice for what that costs.
+    if HOLD_DRAWN_ASSIGNMENT:
+        honest = surface
+        # This plane was measured many bootstrap runs ago -- every later pairing in the menu ran
+        # its own passes through the same agent. Scoring it again unheld has to reproduce what
+        # was measured back then, exactly. If it does not, the agent has moved underneath the
+        # plane, and the held surface would be cut through a different place than the climbs were
+        # traced in: the drawn ball would descend a hill that is not the one drawn under it.
+        # That mismatch is what every earlier version of this scene got wrong, so it is checked
+        # rather than assumed.
+        redrawn = plane.score(
+            np.array([[a, b] for a in axis for b in axis])).reshape(GRID_STEPS, GRID_STEPS)
+        drift = float(np.abs(redrawn - honest).max())
+        if drift > 0.0:
+            raise RuntimeError(
+                f'The chosen plane no longer scores as it did when it was measured: rescoring it '
+                f'unheld moves the surface by {drift:.6f}. The agent has changed underneath it, '
+                f'so holding the assignment now would draw a hill the climbs were never traced '
+                f'on. Measure and hold the surface inside the search loop instead of here.')
+
+        surface = rescore_held(agent, plane, axis)
+        moved = float(np.abs(surface - honest).max())
+        relief = float(honest.max() - honest.min())
+        print(f'   held still: the plane still scores as measured (drift {drift:.6f}); holding '
+              f'moved the surface by at most {moved:.5f} against a span of {relief:.5f} '
+              f'({moved / relief:.0%} of the relief)')
+        for weight_a, weight_b, score in merge_summits(local_maxima(surface, axis)
+                                                       , SUMMIT_MERGE_WEIGHT):
+            print(f'      ({as_percent(weight_a):5.1f}%, {as_percent(weight_b):5.1f}%)  '
+                  f'{score:.5f}')
     write_measurements('weight_surface.json', {
         'season':     SEASON
         , 'candidate':  player_names[tracked]
@@ -474,7 +784,7 @@ def main() -> None:
         , 'category_b': category_b
         , 'axis':       [as_percent(value) for value in axis]
         , 'surface':    np.round(surface, 6).tolist()
-        , 'climbs':     climbs
+        , 'climbs':     without_working(climbs)
     })
 
     # ── Gradient descent: one start on a surface with one hill ────────────────────────
@@ -484,9 +794,9 @@ def main() -> None:
     plane, axis, surface = measure_slice(
         agent, solved[tracked][0], neutral, index_a, index_b)
     middle = [sum(WEIGHT_RANGE) / 2] * 2
-    climbs = [trace_from_seed(agent, n_iterations, tracked, plane, middle,
-                              'the middle of the surface', neutral, index_a, index_b,
-                              axis, surface)]
+    climbs = without_working([
+        trace_from_seed(agent, n_iterations, tracked, plane, middle,
+                        'the middle of the surface', neutral, index_a, index_b, axis, surface)])
     write_measurements('weight_surface_simple.json', {
         'season':     SEASON
         , 'candidate':  player_names[tracked]

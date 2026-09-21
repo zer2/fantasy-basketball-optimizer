@@ -12,7 +12,7 @@ say differently from how it is written ('sigma', 'twenty-six').
 NARRATION = {
     'opening':
         'Punting is a natural consequence of two things: the structure of fantasy basketball, and the central limit theorem. '
-        'These distributions are expected win differentials between two teams, approximated as bell curves through the CLT. '
+        'These distributions are expected category differentials between two teams, approximated as bell curves through the CLT. '
         'The yellow shaded region is where the differential favors you, and you win.',
     'score':
         'Add up the area of all the yellow regions to get the expected number of categories you win. With parity across '
@@ -25,10 +25,12 @@ NARRATION = {
     'abandon_again':
         'Give up a second category, and the score goes up again.',
     'abandon_third':
-        'And a third, which is still an improvement.',
+        'And a third, and it goes up further.',
     'abandon_too_far':
         'This does not continue forever. At the fourth category, there is not enough to gain from the other categories to make '
-        'the punt worth it. They are already far to the right, ',
+        'the punt worth it. They are already too far to the right, where the distributions are thin.',
     'settle':
-        'So punting is not just a practical decision. There is mathematical rigor behind it.',
+        'The key to punting is that divesting from a single category can only cost so much, while small edges across many even categories '
+        'are extremely valuable. The optimal balance of punting depends on the context; it was punting three categories in this example, '
+        'but could be different in a different situation.'
 }

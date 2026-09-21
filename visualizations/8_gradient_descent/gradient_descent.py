@@ -13,12 +13,12 @@ from pathlib import Path
 
 from manim import FadeIn, WHITE, YELLOW
 from manim_voiceover import VoiceoverScene
-from manim_voiceover.services.gtts import GTTSService
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from shared.weight_surface_base import (                              # noqa: E402
     WeightSurfaceScene, CAMERA_DRIFT,
 )
+from shared.narration_voice import NarrationVoice   # noqa: E402
 from narration import NARRATION                                       # noqa: E402
 
 
@@ -33,7 +33,7 @@ class GradientDescent(VoiceoverScene, WeightSurfaceScene):
     data_filename = 'weight_surface_simple.json'
 
     def construct(self) -> None:
-        self.set_speech_service(GTTSService())
+        self.set_speech_service(NarrationVoice())
         with self.voiceover(text=NARRATION['surface']) as tracker:
             axes = self.introduce_surface(tracker.duration)
         self.begin_ambient_camera_rotation(rate=CAMERA_DRIFT)

@@ -17,7 +17,7 @@ from pathlib import Path
 import numpy as np
 from manim import (
     Scene, Group, VGroup, ImageMobject, Rectangle, Circle, Line, Text, MathTex,
-    DecimalNumber, ValueTracker,
+    ValueTracker,
     FadeIn, FadeOut, Create, Write, Transform, always_redraw,
     DOWN, RIGHT, UP,
     BLUE_D, BLUE_B, RED_D, RED_B, YELLOW, WHITE, GREY_B, GREY_E, BLACK,
@@ -39,16 +39,32 @@ HISTOGRAM_BASELINE_Y           = -2.45
 
 # Montage pacing, in two gears. The point lands within a few hundred draws; everything after is
 # confirmation, and ninety-five percent of the draws go by in a handful of seconds.
+#
+# Re-timed for a voice that reads about a fifth faster than the one these were set against.
+# The montage is the longest stretch in the scene that no sentence is describing while it runs,
+# so it is the stretch that decides whether the scene feels like it is waiting. Both gears keep
+# their shape -- fast start, faster finish -- at roughly half the wall-clock.
 MONTAGE_EARLY_SIMULATIONS    = 500
-MONTAGE_EARLY_CHUNKS         = 8
-MONTAGE_EARLY_FIRST_RUN_TIME = 0.80   # seconds per chunk at the start, easing down to...
-MONTAGE_EARLY_LAST_RUN_TIME  = 0.42   # ...this by the end of the early gear
+MONTAGE_EARLY_CHUNKS         = 7
+MONTAGE_EARLY_FIRST_RUN_TIME = 0.52   # seconds per chunk at the start, easing down to...
+MONTAGE_EARLY_LAST_RUN_TIME  = 0.24   # ...this by the end of the early gear
 MONTAGE_LATE_CHUNKS          = 7
-MONTAGE_LATE_DURATION        = 3.4    # seconds for every draw after the early gear, all told
+MONTAGE_LATE_DURATION        = 1.6    # seconds for every draw after the early gear, all told
+
+# What the montage spends after its last draw lands: the rosters going and the chart taking
+# their width, or -- for a scene that keeps its rosters -- just the arithmetic being cleared.
+DISMISSAL_SECONDS    = 1.6
+READOUT_FADE_SECONDS = 0.5
 
 TEAM_COLOURS       = (BLUE_D, RED_D)
 TEAM_LIGHT_COLOURS = (BLUE_B, RED_B)
-TEAM_LABELS        = ('Team A', 'Team B')
+# Numbered, not lettered. A bare capital letter in running text is read by gTTS as the article
+# "a", and every spelling that forces the letter sound ("Ay", "Aye", "eigh") comes out as "eye"
+# instead -- measured against a reference the voice cannot misread, a run of spelled-out letters.
+# A digit has no such problem: "team 1 wins the week" and "team one wins the week" are the same
+# audio to within a spectral distance of 0.003. The screen and the narration agree either way,
+# so the tie is broken by what can be said.
+TEAM_LABELS        = ('Team 1', 'Team 2')
 
 _DATA_DIR     = Path(__file__).resolve().parent.parent / 'data'
 _HEADSHOT_DIR = Path(__file__).resolve().parent.parent / 'assets' / 'headshots'
@@ -83,9 +99,19 @@ class DifferentialSceneBase(Scene):
     differential_limit = 90      # the axis runs from -limit to +limit
     bin_width          = 5
     axis_tick_step     = 30
-    total_caption      = 'Points per game'
-    axis_caption       = 'Team A minus Team B'
-    spread_caption     = 'standard deviation: {spread:.0f} points per game'
+    axis_caption       = 'Team 1 minus Team 2'
+    spread_caption     = 'σ = {spread:.0f} points per game'
+    # What to write against the two spread markers, low side then high, or None to leave them
+    # bare. The caption above the curve names sigma while it is up, but it goes when the bars go
+    # and the markers stay standing through the algebra -- so a scene that keeps them past that
+    # point wants them saying what they are on their own.
+    spread_marker_labels = None
+    # How far the montage may be COMPRESSED to fit the line it plays under, as a fraction of its
+    # natural pace. At 1.0 it is never sped up: a budget shorter than its own pace is ignored and
+    # the act overruns, which shows as silence at the end of that line while the dealing finishes.
+    # Below 1.0 it fits itself to the speech instead, down to this floor and no further, because
+    # past some point the early draws stop being readable and the sync is not worth it.
+    montage_minimum_stretch = 1.0
     # Whether the rosters leave once the dealing is finished, handing their width to the chart
     # for the curve and the algebra that follow.
     dismiss_rosters_after_montage = True
@@ -131,16 +157,6 @@ class DifferentialSceneBase(Scene):
             Text(label, font_size=26, color=colour, weight='BOLD')
             .move_to([side * ROSTER_CENTRE_X, ROSTER_TOP_Y + 0.72, 0])
             for label, colour, side in zip(TEAM_LABELS, TEAM_COLOURS, (-1, 1))
-        ])
-
-        self.team_total_numbers = VGroup(*[
-            DecimalNumber(0, num_decimal_places=self.decimal_places, font_size=34, color=colour)
-            .move_to([side * ROSTER_CENTRE_X, ROSTER_TOP_Y - 6 * ROSTER_ROW_GAP - 0.78, 0])
-            for colour, side in zip(TEAM_COLOURS, (-1, 1))
-        ])
-        self.team_total_captions = VGroup(*[
-            Text(self.total_caption, font_size=15, color=GREY_B).next_to(number, DOWN, buff=0.10)
-            for number in self.team_total_numbers
         ])
 
         # Faded in as a snapshot, then handed over to an always_redraw copy: the axis has to be
@@ -248,6 +264,24 @@ class DifferentialSceneBase(Scene):
         """
         return HISTOGRAM_HEIGHT / max(4.0, counts.max() * 1.12)
 
+    def win_rate_for_left_team(self) -> float:
+        """How often the left team came out ahead, across every simulation drawn so far."""
+        shown = int(self.simulations_shown.get_value())
+        drawn = self.differentials[:shown]
+        return float((drawn > 0).mean()) if len(drawn) else 0.0
+
+    def bars_above_zero(self) -> VGroup:
+        """The bars on the winning side, as a group that can be coloured on its own.
+
+        Rebuilt from the frozen bars rather than tracked as they are added: a bar's bin is what
+        decides which side it is on, and the bin is recoverable from where it stands.
+        """
+        winning = VGroup()
+        for bar in self.frozen_bars:
+            if bar.get_center()[0] > self._x_of_differential(0.0):
+                winning.add(bar)
+        return winning
+
     def _build_bars(self) -> VGroup:
         """The histogram as it stands, one rectangle per non-empty bin."""
         counts = self._counts_after(self.simulations_shown.get_value())
@@ -286,66 +320,65 @@ class DifferentialSceneBase(Scene):
 
     # ── Readouts ──────────────────────────────────────────────────────────────────────
 
-    def _differential_readout(self, simulation_index: int) -> Text:
-        """The one-line arithmetic above the histogram for a given simulation."""
+    def _differential_readout(self, simulation_index: int) -> VGroup:
+        """The one-line arithmetic above the histogram for a given simulation.
+
+        Each total is coloured to the roster it came from, in the same shade that roster's
+        headshots are ringed in. The totals used to be written a second time underneath the
+        rosters, in a pair of numbers that arrived a beat BEFORE this line did and said exactly
+        what it says -- so the colour does that job here, where the subtraction is, and the two
+        numbers are attached to their teams without a second copy of them on the board.
+
+        Built from separate pieces rather than as one string so the colours can be applied to
+        the numbers and not to the arithmetic between them.
+        """
         left_total, right_total = self.prepared['totals'][simulation_index]
         places = self.decimal_places
-        readout = Text(
-            f'{left_total:.{places}f}  -  {right_total:.{places}f}  '
-            f'=  {left_total - right_total:+.{places}f}',
-            font_size=30, color=WHITE,
-        )
+        readout = VGroup(
+            Text(f'{left_total:.{places}f}', font_size=30, color=TEAM_LIGHT_COLOURS[0]),
+            Text('-', font_size=30, color=GREY_B),
+            Text(f'{right_total:.{places}f}', font_size=30, color=TEAM_LIGHT_COLOURS[1]),
+            Text('=', font_size=30, color=GREY_B),
+            Text(f'{left_total - right_total:+.{places}f}', font_size=30, color=WHITE),
+        ).arrange(RIGHT, buff=0.26)
         readout.move_to([0, ROSTER_TOP_Y + 0.72, 0])
         return readout
-
-    def _set_team_totals(self, simulation_index: int) -> None:
-        for side_index, number in enumerate(self.team_total_numbers):
-            number.set_value(self.prepared['totals'][simulation_index][side_index])
 
     # ── Act one: one draw, slowly enough to read ──────────────────────────────────────
 
     def play_act_one_single_draw(self) -> None:
         images = self._roster_images_for(0)
-        drawn = self.prepared['rosters'][0]
-        running_totals = [0.0, 0.0]
-        contributions = self.contribution_values(0)
 
-        self.add(self.team_total_numbers, self.team_total_captions)
-        self.play(FadeIn(self.team_total_captions), run_time=0.4)
-
-        # Deal the two rosters a slot at a time, the totals climbing as each player lands, so the
-        # viewer sees that the team total is nothing more than thirteen players added up.
+        # Deal the two rosters a slot at a time. Nothing is counted while they land: a pair of
+        # running totals used to climb under the rosters here, and they said the same thing the
+        # subtraction above the histogram says a moment later, only sooner and twice.
         for slot_index in range(self.team_size):
-            animations = []
-            for side_index in range(2):
-                image = images[side_index * self.team_size + slot_index]
-                running_totals[side_index] += contributions[side_index * self.team_size + slot_index]
-                animations.append(FadeIn(image, scale=0.6))
+            animations = [
+                FadeIn(images[side_index * self.team_size + slot_index], scale=0.6)
+                for side_index in range(2)
+            ]
             self.play(*animations, run_time=0.34 if slot_index < 3 else 0.16)
-            for side_index, number in enumerate(self.team_total_numbers):
-                number.set_value(running_totals[side_index])
 
         self._roster_images = images
-        self.wait(0.4)
-
-        readout = self._differential_readout(0)
-        self.play(Write(readout), run_time=0.9)
-        self.differential_readout = readout
         self.wait(0.6)
 
-        # The first bar falls out of the arithmetic: same number, now a position on the axis.
+    def drop_first_bar(self) -> None:
+        """The first bar falls out of the arithmetic: same number, now a position on the axis.
+
+        Separate from dealing the teams because it is where the SIMULATION starts, and a scene
+        may want to say so before it does. Must run before act two, which assumes a histogram
+        to add to.
+
+        The arithmetic arrives here too, rather than at the end of the dealing. Written there it
+        sat at the top of the frame through the whole pause before the simulation began, posting
+        a result for a histogram that did not exist yet -- and the number only means anything as
+        the thing the first bar is a picture of.
+        """
+        self.differential_readout = self._differential_readout(0)
         self.start_live_histogram()
+        self.play(Write(self.differential_readout), run_time=0.9)
         self.play(self.simulations_shown.animate.set_value(1), run_time=0.8)
         self.wait(0.8)
-
-    def contribution_values(self, simulation_index: int) -> np.ndarray:
-        """What each drafted player contributes in this simulation, left team first.
-
-        Overridden where a player's contribution is not a fixed season average. Used only to
-        make act one's totals climb in step with the faces being dealt; the totals themselves
-        always come from the prepared data, so the two can never disagree at the end.
-        """
-        raise NotImplementedError
 
     # ── Act two: a few more draws, quicker each time ───────────────────────────────────
 
@@ -359,7 +392,6 @@ class DifferentialSceneBase(Scene):
                 run_time=pace,
             )
             self._roster_images = replacement
-            self._set_team_totals(simulation_index)
 
             new_readout = self._differential_readout(simulation_index)
             self.play(Transform(self.differential_readout, new_readout), run_time=pace * 0.6)
@@ -369,12 +401,31 @@ class DifferentialSceneBase(Scene):
 
     # ── Act three: the montage ────────────────────────────────────────────────────────
 
-    def play_act_three_montage(self, through_simulation: int | None = None) -> None:
+    def play_act_three_montage(
+        self
+        , through_simulation: int | None = None
+        , seconds_available: float | None = None
+        , finish_the_frame: bool = True
+    ) -> None:
         """Fill the histogram out to every draw the prepared data holds.
 
         The rosters keep dealing but stop being animated one headshot at a time: past a few draws
         the faces are no longer the point, and animating twenty-six images per draw is what would
         make this act cost more to render than the rest of the scene combined.
+
+        `seconds_available` stretches the whole act to fill a stated time, for a scene whose line
+        names the moment the dealing should end -- "the result is another bell curve" wants the
+        dealing finished and the rosters gone as it is said, not half a sentence earlier. The
+        two gears keep their shape and their ratio; only the clock changes.
+
+        It never speeds the montage UP. The pace it runs at otherwise is the fastest the early
+        draws stay readable at, so a budget shorter than that is taken as no budget at all and
+        the act simply overruns, which is visible, rather than blurring, which is not.
+
+        `finish_the_frame` is what clears the rosters away at the end. A scene that wants the
+        dealing to run under one line and the rosters to leave under the NEXT one turns it off
+        here and clears them itself, which is the only way to put a line break in the middle of
+        a montage: an animation cannot span two voiceover blocks, but two montages can.
         """
         # Defaulting to the data's own length rather than a literal: the count lives in one place,
         # so raising it in prepare_season_data.py cannot leave the scene playing a fraction of the
@@ -383,7 +434,20 @@ class DifferentialSceneBase(Scene):
             through_simulation = len(self.differentials)
         start = int(self.simulations_shown.get_value())
 
-        for checkpoint, run_time in self._montage_schedule(start, through_simulation):
+        schedule = self._montage_schedule(start, through_simulation)
+        if seconds_available is not None:
+            # What the act spends outside the drawing: the beat after the last draw lands, and
+            # the rosters leaving. Both are fixed, so only the draws take up the slack.
+            fixed = 0.3
+            if finish_the_frame:
+                fixed += (DISMISSAL_SECONDS if self.dismiss_rosters_after_montage
+                          else READOUT_FADE_SECONDS)
+            drawing = sum(run_time for _, run_time in schedule)
+            stretch = (max(self.montage_minimum_stretch, (seconds_available - fixed) / drawing)
+                       if drawing else 1.0)
+            schedule = [(checkpoint, run_time * stretch) for checkpoint, run_time in schedule]
+
+        for checkpoint, run_time in schedule:
             simulation_index = checkpoint - 1
 
             # An instant swap, not an animated one: this reads as dealing at speed, and costs
@@ -391,16 +455,17 @@ class DifferentialSceneBase(Scene):
             self.remove(self._roster_images)
             self._roster_images = self._roster_images_for(simulation_index)
             self.add(self._roster_images)
-            self._set_team_totals(simulation_index)
             self.differential_readout.become(self._differential_readout(simulation_index))
 
             self.play(self.simulations_shown.animate.set_value(checkpoint), run_time=run_time)
 
         self.wait(0.3)
+        if not finish_the_frame:
+            return
         if self.dismiss_rosters_after_montage:
             self.dismiss_rosters()
         else:
-            self.play(FadeOut(self.differential_readout), run_time=0.5)
+            self.play(FadeOut(self.differential_readout), run_time=READOUT_FADE_SECONDS)
 
     def dismiss_rosters(self) -> None:
         """Clear the rosters and give the freed width to the histogram.
@@ -413,13 +478,12 @@ class DifferentialSceneBase(Scene):
         self.play(
             FadeOut(self._roster_images, scale=0.8),
             FadeOut(self.team_name_labels),
-            FadeOut(self.team_total_numbers),
-            FadeOut(self.team_total_captions),
             FadeOut(self.differential_readout),
-            run_time=0.7,
+            run_time=DISMISSAL_SECONDS * 0.44,
         )
         self._roster_images = Group()
-        self.play(self.axis_width.animate.set_value(HISTOGRAM_WIDTH_ALONE), run_time=0.9)
+        self.play(self.axis_width.animate.set_value(HISTOGRAM_WIDTH_ALONE),
+                  run_time=DISMISSAL_SECONDS * 0.56)
 
     def _montage_schedule(self, start: int, through_simulation: int) -> list[tuple[int, float]]:
         """[(simulations completed, seconds to get there)] for the montage, in two gears.
@@ -451,6 +515,16 @@ class DifferentialSceneBase(Scene):
 
     # ── Act four: the shape it was always going to be ─────────────────────────────────
 
+    def curve_height_at(self, differential: float) -> float:
+        """The fitted curve at a differential, in the bar-height units it is drawn in.
+
+        Only meaningful once act four has fitted it, which is also the only point at which
+        anything has a curve to ask about.
+        """
+        density = np.exp(-0.5 * ((differential - self.curve_mean) / self.curve_spread) ** 2) / (
+            self.curve_spread * np.sqrt(2 * np.pi))
+        return self.curve_simulations * self.bin_width * density * self.curve_height_scale
+
     def play_act_four_normal_curve(self) -> None:
         completed = int(self.simulations_shown.get_value())
         sample = self.differentials[:completed]
@@ -464,15 +538,17 @@ class DifferentialSceneBase(Scene):
         self.remove(self.histogram)
         self.add(self.frozen_bars)
 
-        def bar_height_of(differential: float) -> float:
-            """The Normal curve in bar-height units: expected count for a bin at this point."""
-            density = np.exp(-0.5 * ((differential - mean) / standard_deviation) ** 2) / (
-                standard_deviation * np.sqrt(2 * np.pi))
-            return completed * self.bin_width * density * height_scale
+        # Kept on the scene rather than closed over here: what the curve is worth at a given
+        # differential is the quantity the rest of the scene is about, and a scene that wants to
+        # shade a slice of it should read the same curve rather than fit its own.
+        self.curve_mean = mean
+        self.curve_spread = standard_deviation
+        self.curve_height_scale = height_scale
+        self.curve_simulations = completed
 
         curve_points = [
             [self._x_of_differential(differential),
-             HISTOGRAM_BASELINE_Y + bar_height_of(differential),
+             HISTOGRAM_BASELINE_Y + self.curve_height_at(differential),
              0]
             for differential in np.linspace(
                 -self.differential_limit, self.differential_limit, 240)
@@ -481,7 +557,7 @@ class DifferentialSceneBase(Scene):
             Line(start, end, color=WHITE, stroke_width=4)
             for start, end in zip(curve_points, curve_points[1:])
         ])
-        self.curve_peak_y = HISTOGRAM_BASELINE_Y + bar_height_of(mean)
+        self.curve_peak_y = HISTOGRAM_BASELINE_Y + self.curve_height_at(mean)
         self.play(Create(self.normal_curve), run_time=1.6)
 
         self.spread_label = Text(
@@ -500,9 +576,37 @@ class DifferentialSceneBase(Scene):
             for sign in (-1, 1)
         ])
         self.play(Create(self.spread_markers), run_time=0.8)
+
+        # Written at the top of each marker rather than under the axis, where the tick numbers
+        # already are: two more labels down there would read as more of the same scale instead
+        # of as a name for the line above them.
+        if self.spread_marker_labels is not None:
+            self.spread_marker_names = VGroup(*[
+                Text(label, font_size=24, color=GREY_B).next_to(marker, UP, buff=0.12)
+                for label, marker in zip(self.spread_marker_labels, self.spread_markers)
+            ])
+            self.play(FadeIn(self.spread_marker_names), run_time=0.5)
         self.wait(1.2)
 
     # ── Act five: the height of the curve at nothing-to-choose-between-them ───────────
+
+    def clear_for_the_formula(self) -> None:
+        """Take the bars away, leaving the curve the algebra is about.
+
+        Split out of act five so a scene can put a line between this and the formula. The
+        sentence that introduces the formula arrives several seconds after the one about the
+        height in the middle, and writing it the moment the bars left showed the answer while
+        the question was still being asked.
+
+        The spread markers stay. They are the width the formula is about, so keeping them
+        standing while the bars go leaves sigma visible on the picture the algebra describes.
+        """
+        self.play(
+            FadeOut(self.frozen_bars),
+            FadeOut(self.spread_label),
+            FadeOut(self.simulation_counter),
+            run_time=0.9,
+        )
 
     def play_act_five_density_at_zero(self) -> None:
         """Clear everything but the curve, and read its peak off the formula.
@@ -513,14 +617,6 @@ class DifferentialSceneBase(Scene):
         the spread is the number worth knowing: the tighter the distribution, the more a small
         edge moves the odds.
         """
-        # The spread markers stay. They are the width the formula is about, so keeping them
-        # standing while the bars go leaves sigma visible on the picture the algebra describes.
-        self.play(
-            FadeOut(self.frozen_bars),
-            FadeOut(self.spread_label),
-            FadeOut(self.simulation_counter),
-            run_time=0.9,
-        )
         self.wait(0.3)
 
         # Written with mu already zero rather than carried through and cancelled, because both
@@ -556,14 +652,6 @@ class DifferentialSceneBase(Scene):
         # Kept so a scene can carry on from it. The Z-score scene takes this expression apart
         # again to reach the formula; the others end here.
         self.density_equation = equation
-        self.wait(2.0)
-
-    # ── The whole thing ───────────────────────────────────────────────────────────────
-
-    def play_all_acts(self) -> None:
-        self.build_static_frame()
-        self.play_act_one_single_draw()
-        self.play_act_two_repeated_draws()
-        self.play_act_three_montage()
-        self.play_act_four_normal_curve()
-        self.play_act_five_density_at_zero()
+        # Short, because act six opens by fading all of this out. Two seconds of holding a
+        # frame that is about to be cleared is two seconds the narration has to cover.
+        self.wait(0.8)

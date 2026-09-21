@@ -6,11 +6,12 @@ worth in a balanced build, and the height is what the shipped objective says the
 The axes run past a hundred, so the balanced build is a point inside the picture rather than a
 corner of it.
 
-The menu scene uses a slice with three summits, because that is what makes a menu worth having:
-the balanced build is a local maximum, so is cutting Turnovers to sixty percent, and so -- worth
-far more than either -- is cutting Assists to forty. Between them are valleys, which is why the
-best build gives up one category and keeps the other. The descent scene uses the simplest slice
-the search could find instead: one hill, with its top inside the picture.
+The menu scene uses a slice with two summits, because that is what makes a menu worth having:
+one build keeps both categories near balanced, and the other -- worth more -- cuts Threes to
+thirty percent while holding Turnovers high. A valley lies between them, which is why the best
+build gives up one category and keeps the other, and why where a descent STARTS decides which of
+the two it finds. The descent scene uses the simplest slice the search could find instead: one
+hill, with its top inside the picture.
 
 This module is the surface itself -- how it is loaded, drawn, labelled and climbed. The two
 scenes built on it live beside their own narration, in 8_gradient_descent and 7_seed_menu.
@@ -46,7 +47,13 @@ from manim import (
 Z_FLOOR_MARGIN = 0.0004
 Z_CEILING_MARGIN = 0.0006
 
-SURFACE_RESOLUTION = 24
+# Both surface scenes draw at this. It is finer than the 31-step grid the surfaces are
+# MEASURED on, deliberately: these objectives have creases in them -- the roster assignment
+# switching as the weights cross -- and a fold landing between mesh vertices is drawn as a
+# facet edge and reads as a notch punched into the hillside, where a finer mesh ramps across
+# it and reads as a fold. The two scenes sit on the same page and are read against each
+# other, so they are drawn at the same fineness.
+SURFACE_RESOLUTION = 56
 
 # The camera stands where both categories have been given up and looks back along the two weight
 # axes, so they radiate from the near corner and the balanced build is the far one. Everything
@@ -92,6 +99,10 @@ class WeightSurfaceScene(ThreeDScene):
     one hill on it, and the menu only means anything on a surface with several, so the prep
     script measures both and each scene names the one it needs.
     """
+
+    # How finely the mesh is drawn, which is separate from how finely the surface was
+    # MEASURED. See SURFACE_RESOLUTION for why it is finer than the data.
+    surface_resolution = SURFACE_RESOLUTION
 
     data_filename = None
 
@@ -149,7 +160,7 @@ class WeightSurfaceScene(ThreeDScene):
             lambda u, v: axes.c2p(u, v, self.height_at(u, v))
             , u_range = [0, self.axis_top]
             , v_range = [0, self.axis_top]
-            , resolution = (SURFACE_RESOLUTION, SURFACE_RESOLUTION)
+            , resolution = (self.surface_resolution, self.surface_resolution)
             , fill_opacity = 0.9
             , stroke_width = 0.5
             , stroke_color = GREY_B
@@ -251,6 +262,20 @@ class WeightSurfaceScene(ThreeDScene):
         ])
         return trail
 
+    def introduce_axes(self, seconds_available: float) -> ThreeDAxes:
+        """The camera, the axes and their labels -- the frame, before anything is plotted in it.
+
+        Separate from the surface because the two scenes want them at different moments. Gradient
+        descent draws everything inside its opening line. The seed menu holds the axes up first,
+        for about a second, so that the line has a frame to start against rather than opening on
+        an empty screen -- and then draws the surface itself under the words, where the wait for
+        it is spent listening instead of watching a silent picture assemble.
+        """
+        self.set_camera_orientation(phi=CAMERA_PHI * DEGREES, theta=CAMERA_THETA * DEGREES)
+        axes = self.build_axes()
+        self.play(Create(axes), FadeIn(self.build_axis_labels(axes)), run_time=seconds_available)
+        return axes
+
     def introduce_surface(self, seconds_available: float) -> ThreeDAxes:
         """Everything both scenes open on: the camera, the axes, the surface and its posts.
 
@@ -262,14 +287,11 @@ class WeightSurfaceScene(ThreeDScene):
         The steps are stretched to fill the line covering them, so the introduction is still
         being drawn while it is still being described.
         """
-        self.set_camera_orientation(phi=CAMERA_PHI * DEGREES, theta=CAMERA_THETA * DEGREES)
-        axes = self.build_axes()
-        surface = self.build_surface(axes)
         # Four steps, weighted by how much there is to watch in each.
         shares = (0.22, 0.46, 0.14, 0.18)
         durations = [max(0.5, seconds_available * share) for share in shares]
-        self.play(Create(axes), FadeIn(self.build_axis_labels(axes)), run_time=durations[0])
-        self.play(Create(surface), run_time=durations[1])
+        axes = self.introduce_axes(durations[0])
+        self.play(Create(self.build_surface(axes)), run_time=durations[1])
         self.play(Create(self.build_corner_posts(axes)), run_time=durations[2])
         self.play(FadeIn(self.build_caption()), run_time=durations[3])
         return axes

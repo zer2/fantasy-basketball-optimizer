@@ -34,10 +34,11 @@ from manim import (
     WHITE, GREY_A, GREY_B, GREY_D,
 )
 from manim_voiceover import VoiceoverScene
-from manim_voiceover.services.gtts import GTTSService
 
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from shared.narration_timing import wait_until_phrase   # noqa: E402
+from shared.narration_voice import NarrationVoice   # noqa: E402
 from narration import NARRATION
 
 
@@ -152,20 +153,36 @@ class PlaneStory(VoiceoverScene):
             Dot(self._at(player), radius=PLAYER_DOT_RADIUS, color=WHITE)
             for player in experiment['players']
         ])
+        # Drawn the same as everyone else. These are the players already off the board, but
+        # nothing has said so yet when the pool first appears -- greying them from the start
+        # answers the question the dividing line is about to ask, and the line then arrives to
+        # explain a distinction the picture had already made.
         taken = VGroup(*[
-            Dot(self._at(player), radius=PLAYER_DOT_RADIUS, color=GREY_D)
+            Dot(self._at(player), radius=PLAYER_DOT_RADIUS, color=WHITE)
             for player in experiment['taken']
         ])
         return VGroup(taken, survivors)
 
-    def play_act_one_pool(self) -> None:
+    def introduce_pool(self) -> None:
+        """Axes and players, before a word is said about them.
+
+        The opening clause is about what a dot IS, so the dots have to be standing there for it
+        to be about anything. Drawn under the line, the first seven words played to an empty
+        pair of axes.
+        """
         self.axes = self._build_axes()
         self.play(Create(self.axes), run_time=1.0)
 
         self.pool = self._build_pool(0)
         self.play(FadeIn(self.pool), run_time=1.0)
-        self.wait(0.9)
 
+    def play_act_one_pool(self) -> None:
+        """The line that divides the pool, and the players it has already taken out of it.
+
+        Runs on the clause that introduces it rather than at the top of the beat: the dividing
+        line is the second thing the sentence says, and arriving early it dimmed half the pool
+        while the voice was still describing the whole of it.
+        """
         # The bar is dashed and colourless on purpose: the two solid coloured lines coming next
         # are score levels a strategy chose, and this one is a fact about the draft that no
         # strategy gets a say in.
@@ -284,10 +301,14 @@ class PlaneStory(VoiceoverScene):
         self.wait(6.0)
 
     def construct(self) -> None:
-        self.set_speech_service(GTTSService())
+        self.set_speech_service(NarrationVoice())
+        self.introduce_pool()
+        with self.voiceover(text=NARRATION['pool']) as tracker:
+            wait_until_phrase(self, tracker, 'We assume that players with above average stats')
+            self.play_act_one_pool()
+
         for line, act in (
-            (NARRATION['pool'],        self.play_act_one_pool)
-            , (NARRATION['score_lines'], self.play_act_two_score_lines)
+            (NARRATION['score_lines'], self.play_act_two_score_lines)
             , (NARRATION['experiments'], self.play_act_three_experiments)
             , (NARRATION['densities'],   self.play_act_four_pick_densities)
         ):
