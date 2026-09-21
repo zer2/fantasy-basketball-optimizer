@@ -48,6 +48,9 @@ The overall H-score on the left side of the display is both the metric that H-sc
     <video controls preload="metadata" width="100%" poster="../videos/gradient-descent-poster.jpg">
       <source src="../videos/gradient-descent.mp4" type="video/mp4">
     </video>
+    /// caption
+    PLACEHOLDER: what the gradient descent video shows
+    ///
 
     Adam performs gradient descent with additional logic around how to scale the step size in each direction. 
     
@@ -82,6 +85,9 @@ Most of the time, the algorithm punts one or two categories, reflected by low H-
     <video controls preload="metadata" width="100%" poster="../videos/punting-poster.jpg">
       <source src="../videos/punting.mp4" type="video/mp4">
     </video>
+    /// caption
+    PLACEHOLDER: what the punting video shows
+    ///
     /// caption
     A Normal distribution, from Wikipedia
     ///
@@ -192,6 +198,9 @@ The category weightings displayed in the first row are based on H-scoring's inte
 <video controls preload="metadata" width="100%" poster="../videos/category-weights-poster.jpg">
   <source src="../videos/category-weights.mp4" type="video/mp4">
 </video>
+/// caption
+PLACEHOLDER: what the category weights video shows
+///
 
 ??? note "How does H-scoring pick category weights for future picks?"
     The heart of the algorithm is its treatment of future draft picks. Essentially, it assumes that it will be able to choose from a small slate of available players whose statistical profiles are random, conditioned on the scores being similar in terms of total G-score. It assumes that it will choose the best player available based on its choice of category weights. Using some mathematical estimations, it can calculate the expected deviation from the average for each category based on the category weights. 
@@ -237,6 +246,9 @@ The algorithm also has some leeway in how it arranges players already taken in t
 <video controls preload="metadata" width="100%" poster="../videos/roster-assignment-poster.jpg">
   <source src="../videos/roster-assignment.mp4" type="video/mp4">
 </video>
+/// caption
+PLACEHOLDER: what the roster assignment video shows
+///
 
 ??? note "How does H-scoring decide how to assign positions to players already drafted?"
 
@@ -445,6 +457,9 @@ Testing confirms that the prediction adjustment improves the performance of H-sc
 <video controls preload="metadata" width="100%" poster="../videos/self-play-poster.jpg">
   <source src="../videos/self-play.mp4" type="video/mp4">
 </video>
+/// caption
+PLACEHOLDER: what the self-play video shows
+///
 
 ### Gradient descent optimizes locally
 
@@ -462,6 +477,9 @@ Punting is less common in Rotisserie, so gradient descent does not start at a pu
     <video controls preload="metadata" width="100%" poster="../videos/seed-menu-poster.jpg">
       <source src="../videos/seed-menu.mp4" type="video/mp4">
     </video>
+    /// caption
+    PLACEHOLDER: what the seed menu video shows
+    ///
 
 ### Constant categorical variance
 
