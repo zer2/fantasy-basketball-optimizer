@@ -36,9 +36,23 @@ NARRATION = {
         'paths. It keeps a single column of probabilities, one for each height, and every '
         'category translates that column into the next one in a single pass.',
     'tipping':
-        'This also answers a more useful question. A category only decides the matchup when the '
-        'other eight leave you exactly level. The chance of landing there is called the tipping '
+        'This also answers a more useful question. A category only decides the matchup when '
+        'everything else leaves you exactly level. How often that happens is called the tipping '
         'point probability, and it is what tells the algorithm how much a category is worth.',
+    'backward':
+        'To get it, the algorithm runs the walk a second time, from the other end. The same nine '
+        'categories, taken in the opposite order.',
+    'the_cut':
+        'Now pick a category, and cut the walk open there. On the left is everything before it, '
+        'carried forward. On the right is everything after it, carried back.',
+    'convolution':
+        'For this category to be the one that decides the matchup, the two halves have to meet '
+        'level. So pair every height on the left with the opposite height on the right, multiply, '
+        'and add them up. That sum is the tipping point.',
+    'slide':
+        'And now the reason for running the walk twice. Moving the cut to a different category '
+        'does not need either walk to be run again. The two sweeps are already done, and every '
+        'category is just a different place to cut them open.',
     'punting':
         'Categories you are already certain to win, or certain to lose, almost never tip the '
         'result. That is why Most Categories scoring punts hardest of the three formats.',

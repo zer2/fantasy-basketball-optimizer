@@ -35,10 +35,10 @@ from pathlib import Path
 
 import numpy as np
 from manim import (
-    VGroup, VMobject, Line, Rectangle, Text, MathTex, Dot,
+    VGroup, VMobject, Line, DashedLine, Rectangle, Text, MathTex, Dot,
     FadeIn, FadeOut, Create, Write, Transform,
     DOWN, UP, LEFT, RIGHT,
-    BLUE_D, BLUE_B, RED_D, GREY_B, GREY_D, YELLOW, WHITE,
+    BLUE_D, BLUE_B, RED_D, GREEN_C, GREY_B, GREY_D, YELLOW, WHITE,
 )
 from manim_voiceover import VoiceoverScene
 
@@ -57,7 +57,12 @@ CATEGORIES = ('Field Goal %', 'Free Throw %', 'Threes', 'Points', 'Rebounds',
 # Stand-in win probabilities, not measured: two the team is nearly certain of, two nearly lost,
 # and five genuinely in the balance. The shape is what the last beat needs -- the certain ones
 # have to be visibly unable to tip anything.
-WIN_CHANCES = (0.93, 0.88, 0.62, 0.55, 0.50, 0.46, 0.41, 0.12, 0.07)
+# A team that has committed: five categories close to locked, four given up. Chosen because the
+# last act needs the nine tipping points to DIFFER. On a perfectly balanced team they are
+# identical by symmetry (27.34% each), and on a mildly tilted one they span only 1.15x -- nine
+# dots at the same height, which would say every category is equally decisive. This build spans
+# 1.87x, and the categories it kept are the decisive ones, which is the point.
+WIN_CHANCES = (0.95, 0.92, 0.88, 0.85, 0.82, 0.12, 0.09, 0.06, 0.04)
 MAJORITY = len(CATEGORIES) // 2 + 1
 
 # The tree is drawn only as deep as stays legible; the rest is stated rather than shown.
@@ -73,6 +78,9 @@ WALK_LEFT_X = -5.2
 WALK_RIGHT_X = 5.2
 WALK_CENTRE_Y = -0.35
 WALK_UNIT_Y = 0.30
+# Where the cut opens first, and where it slides to -- one kept category, then two abandoned.
+CUT_CATEGORY = 2
+SLIDE_TO = (5, 0)
 
 
 class MostCategories(VoiceoverScene):
@@ -249,64 +257,155 @@ class MostCategories(VoiceoverScene):
         # follows them, and leaving them underneath would show the opposite of what is said.
         self.play(FadeOut(self.sample_walks), run_time=0.5)
 
-        distribution = {0: 1.0}
-        column = self.build_column(distribution, 0)
-        self.play(FadeIn(column), run_time=0.5)
-        self.columns = VGroup(column)
+        self.forward = [{0: 1.0}]
+        for chance in WIN_CHANCES:
+            self.forward.append(self.step_distribution(self.forward[-1], chance))
 
-        for step, chance in enumerate(WIN_CHANCES, start=1):
-            nxt = {}
-            for net, probability in distribution.items():
-                nxt[net + 1] = nxt.get(net + 1, 0.0) + probability * chance
-                nxt[net - 1] = nxt.get(net - 1, 0.0) + probability * (1.0 - chance)
-            distribution = nxt
+        # The backward table, built now and drawn later: suffix[i] is what categories i onward
+        # contribute, so suffix[n] is the empty walk and suffix[0] is all nine.
+        self.backward = [None] * (len(CATEGORIES) + 1)
+        self.backward[len(CATEGORIES)] = {0: 1.0}
+        for index in range(len(CATEGORIES) - 1, -1, -1):
+            self.backward[index] = self.step_distribution(
+                self.backward[index + 1], WIN_CHANCES[index])
+
+        self.forward_columns = VGroup()
+        for step, distribution in enumerate(self.forward):
             column = self.build_column(distribution, step)
-            self.columns.add(column)
-            self.play(FadeIn(column), run_time=0.42)
-        self.final_distribution = distribution
+            self.forward_columns.add(column)
+            self.play(FadeIn(column), run_time=0.5 if step == 0 else 0.42)
 
-    def build_column(self, distribution: dict, step: int) -> VGroup:
-        """One column of the sweep: a dot per reachable height, sized by its probability."""
+    def step_distribution(self, distribution: dict, chance: float) -> dict:
+        """One category folded into a column: every height sends its mass up and down.
+
+        This is the whole dynamic programme -- and it is used for BOTH sweeps, because a walk
+        run backwards over the same independent categories obeys the same recurrence.
+        """
+        stepped = {}
+        for net, probability in distribution.items():
+            stepped[net + 1] = stepped.get(net + 1, 0.0) + probability * chance
+            stepped[net - 1] = stepped.get(net - 1, 0.0) + probability * (1.0 - chance)
+        return stepped
+
+    def build_column(self, distribution: dict, step: int, forward: bool = True) -> VGroup:
+        """One column of a sweep: a dot per reachable height, sized by its probability.
+
+        The backward sweep is drawn a little to the right of the forward one and in its own
+        colour, so the two sit side by side at the same position rather than on top of each
+        other -- the cut in the next beat needs both to be readable at once.
+        """
+        offset = 0.0 if forward else 0.13
         dots = VGroup()
         for net, probability in distribution.items():
             dots.add(Dot(
-                point=[self.walk_x(step), self.walk_y(net), 0.0],
-                radius=0.06 + 0.20 * probability ** 0.5,
-                color=BLUE_B if net > 0 else GREY_D,
-            ).set_opacity(0.35 + 0.65 * probability ** 0.5))
+                point=[self.walk_x(step) + offset, self.walk_y(net), 0.0],
+                radius=0.05 + 0.18 * probability ** 0.5,
+                color=(BLUE_B if net > 0 else GREY_D) if forward else GREEN_C,
+            ).set_opacity(0.30 + 0.60 * probability ** 0.5))
         return dots
 
-    # ── Act four: which category decides it ───────────────────────────────────────────
+    # ── Act four: two sweeps, and a cut that slides ───────────────────────────────────
 
     def play_tipping_point(self) -> None:
-        """The category is worth whatever chance the other eight have of leaving you level.
+        """How the algorithm actually values a category: one forward sweep, one backward, and a
+        gap slid along between them.
 
-        Measured over the OTHER eight rather than all nine, which is what makes the height that
-        matters zero: eight steps land on an even net, and a net of zero is four-four with the
-        ninth category holding the casting vote.
+        This is what backend/math/algorithm_helpers.py does, not a restatement of it. It builds
+        a prefix table sweeping one way and a suffix table sweeping the other, then for each
+        category convolves the prefix that stops just before it with the suffix that starts just
+        after -- `_leave_one_out_probability`, whose docstring is "P(the categories either side
+        of the excluded one contribute exactly target_points)".
+
+        The animation has to be the cheap version rather than the obvious one. Re-running an
+        eight-step walk per category would look like the same answer and teach the opposite
+        lesson: the point of the two tables is that nine categories cost two sweeps, not nine.
         """
-        with self.voiceover(text=NARRATION['tipping']) as tracker:
-            self.play(FadeOut(self.columns), run_time=0.6)
+        with self.voiceover(text=NARRATION['tipping']):
+            self.wait(1.4)
 
-            wait_until_phrase(self, tracker, 'exactly level')
-            others = {0: 1.0}
-            for chance in WIN_CHANCES[:-1]:
-                nxt = {}
-                for net, probability in others.items():
-                    nxt[net + 1] = nxt.get(net + 1, 0.0) + probability * chance
-                    nxt[net - 1] = nxt.get(net - 1, 0.0) + probability * (1.0 - chance)
-                others = nxt
+        with self.voiceover(text=NARRATION['backward']):
+            self.backward_columns = VGroup()
+            for step in range(len(CATEGORIES), -1, -1):
+                column = self.build_column(self.backward[step], step, forward=False)
+                self.backward_columns.add(column)
+                self.play(FadeIn(column), run_time=0.30)
+            self.wait(0.5)
 
-            level = Dot(point=[self.walk_x(len(CATEGORIES) - 1), self.walk_y(0), 0.0],
-                        radius=0.20, color=YELLOW)
-            readout = Text(f'{others.get(0, 0.0):.1%} of the time', font_size=26, color=YELLOW)
-            readout.next_to(level, UP, buff=0.35)
-            self.play(FadeIn(level, scale=2.0), Write(readout), run_time=1.0)
-            self.wait(1.6)
+        with self.voiceover(text=NARRATION['the_cut']) as tracker:
+            wait_until_phrase(self, tracker, 'cut the walk open')
+            self.show_cut_at(CUT_CATEGORY, first_time=True)
+            self.wait(1.0)
+
+        with self.voiceover(text=NARRATION['convolution']) as tracker:
+            wait_until_phrase(self, tracker, 'pair every height')
+            self.play_meeting(CUT_CATEGORY)
+            self.wait(1.2)
+
+        with self.voiceover(text=NARRATION['slide']):
+            for category in SLIDE_TO:
+                self.show_cut_at(category)
+                self.play_meeting(category, quickly=True)
+            self.wait(0.8)
 
         with self.voiceover(text=NARRATION['punting']):
-            # PLACEHOLDER for the beat that earns the punting claim: the nine categories with
-            # their tipping-point weights beside them, the near-certain ones visibly at nothing.
-            # Wants the real gradient from the objective, so it waits for a prep script.
+            # PLACEHOLDER for the beat that earns the punting claim: the nine tipping points
+            # listed against the categories, the kept ones visibly the decisive ones. Wants the
+            # real gradient from the objective, so it waits for a prep script.
             self.wait(2.0)
         self.wait(0.6)
+
+    def show_cut_at(self, category: int, first_time: bool = False) -> None:
+        """Open a gap where one category sits, keeping only what reaches it from either side."""
+        gap_x = (self.walk_x(category) + self.walk_x(category + 1)) / 2
+        marker = DashedLine([gap_x, self.walk_y(-9) - 0.2, 0.0],
+                            [gap_x, self.walk_y(9) + 0.2, 0.0],
+                            color=YELLOW, stroke_width=3, dash_length=0.14)
+        label = Text(CATEGORIES[category], font_size=21, color=YELLOW)
+        label.move_to([gap_x, self.walk_y(9) + 0.45, 0.0])
+
+        # Only the forward column that stops at the cut and the backward column that starts
+        # after it are wanted; everything else is what those two already contain.
+        keep_forward, keep_backward = category, category + 1
+        fades = [self.forward_columns[index].animate.set_opacity(0.12)
+                 for index in range(len(self.forward_columns)) if index != keep_forward]
+        fades += [self.backward_columns[len(CATEGORIES) - index].animate.set_opacity(0.12)
+                  for index in range(len(CATEGORIES) + 1) if index != keep_backward]
+
+        if first_time:
+            self.cut_marker, self.cut_label = marker, label
+            self.play(Create(marker), FadeIn(label), *fades, run_time=1.0)
+        else:
+            self.play(Transform(self.cut_marker, marker),
+                      Transform(self.cut_label, label), *fades, run_time=0.8)
+
+    def play_meeting(self, category: int, quickly: bool = False) -> None:
+        """Pair each height on the left with the opposite height on the right, and total it.
+
+        A height of +h before the category and -h after it sum to level, which is the only way
+        the category can be the one that decides the matchup. The arcs are those pairings and
+        the readout is their total -- the convolution, drawn.
+        """
+        before, after = self.forward[category], self.backward[category + 1]
+        arcs, total = VGroup(), 0.0
+        for height, probability in before.items():
+            partner = after.get(-height)
+            if partner is None:
+                continue
+            total += probability * partner
+            arcs.add(Line(
+                [self.walk_x(category), self.walk_y(height), 0.0],
+                [self.walk_x(category + 1), self.walk_y(-height), 0.0],
+                color=YELLOW, stroke_width=1.0 + 7.0 * (probability * partner) ** 0.5,
+            ).set_opacity(0.35 + 0.65 * (probability * partner) ** 0.5))
+
+        readout = Text(f'{CATEGORIES[category]} decides it {total:.1%} of the time',
+                       font_size=26, color=YELLOW)
+        readout.move_to([0.0, self.walk_y(-9) - 0.55, 0.0])
+
+        if quickly:
+            self.play(Transform(self.meeting_arcs, arcs),
+                      Transform(self.meeting_readout, readout), run_time=0.9)
+        else:
+            self.meeting_arcs, self.meeting_readout = arcs, readout
+            self.play(Create(arcs), run_time=1.2)
+            self.play(Write(readout), run_time=0.9)
