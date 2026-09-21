@@ -11,14 +11,16 @@ The argument in four moves:
     Two, that is a sum over every branch of a binary tree nine levels deep -- 512 leaves, each
     either a win or a loss. Drawn in full, because the size of it is the point.
 
-    Three, the tree collapses. Nothing about a branch matters except how many categories it has
-    won, so 512 leaves fold into ten running totals and each new category is one pass over them.
-    This is the dynamic programme the docs describe in prose.
+    Three, the same outcomes redrawn as a walk: a category won steps up, one lost steps down,
+    and the majority is simply finishing above the line. Two paths reaching the same height are
+    worth the same from there on, so the paths are thrown away and one column of heights is
+    carried forward instead -- each category translating that column into the next in a single
+    pass. That is the dynamic programme the docs describe in prose.
 
-    Four, the same tally answers the question worth asking: how often is THIS category the one
-    that decides the matchup? That is the tipping point probability, and it is the gradient the
-    algorithm actually steps on -- and the reason Most Categories punts hardest, since a
-    category already certain either way can never tip anything.
+    Four, the same column answers the question worth asking: how often is THIS category the one
+    that decides the matchup? It decides exactly when the other eight leave the walk level, and
+    that probability is the gradient the algorithm steps on -- and the reason Most Categories
+    punts hardest, since a category already certain either way can never tip anything.
 
 Nothing here is measured against the real objective yet. The win probabilities are stand-ins
 chosen to make the shape legible; a prep script comes once the beats are settled.
@@ -33,7 +35,7 @@ from pathlib import Path
 
 import numpy as np
 from manim import (
-    VGroup, Line, Rectangle, Text, MathTex, Dot,
+    VGroup, VMobject, Line, Rectangle, Text, MathTex, Dot,
     FadeIn, FadeOut, Create, Write, Transform,
     DOWN, UP, LEFT, RIGHT,
     BLUE_D, BLUE_B, RED_D, GREY_B, GREY_D, YELLOW, WHITE,
@@ -64,10 +66,13 @@ TREE_TOP_Y = 2.55
 TREE_LEVEL_DROP = 0.92
 TREE_HALF_WIDTH = 5.6
 
-TALLY_BASELINE_Y = -2.1
-TALLY_HEIGHT = 3.0
-TALLY_BAR_WIDTH = 0.52
-TALLY_GAP = 0.22
+# The walk the tree collapses into: one column per category, net position up for a category won
+# and down for one lost. Nine steps is odd, so the walk can never finish level -- it is above the
+# line exactly when five or more were won, which is what makes "majority" a side of the picture.
+WALK_LEFT_X = -5.2
+WALK_RIGHT_X = 5.2
+WALK_CENTRE_Y = -0.35
+WALK_UNIT_Y = 0.30
 
 
 class MostCategories(VoiceoverScene):
@@ -77,7 +82,7 @@ class MostCategories(VoiceoverScene):
         self.set_speech_service(DraftVoice())
         self.play_payoff()
         self.play_tree()
-        self.play_collapse()
+        self.play_walk()
         self.play_tipping_point()
 
     # ── Act one: the payoff is a cliff, not a slope ───────────────────────────────────
@@ -164,74 +169,144 @@ class MostCategories(VoiceoverScene):
         count = 2 ** level
         return -TREE_HALF_WIDTH + 2 * TREE_HALF_WIDTH * (index + 0.5) / count
 
-    # ── Act three: the tree collapses into a tally ────────────────────────────────────
+    # ── Act three: the tree is a walk, and the walk is one column ─────────────────────
 
-    def play_collapse(self) -> None:
-        """Fold the branches into ten bars: the chance of having won exactly k categories."""
-        with self.voiceover(text=NARRATION['dynamic']):
-            self.wait(1.2)
+    def play_walk(self) -> None:
+        """Re-draw the same 512 outcomes as a walk, then stop following paths at all.
 
-        with self.voiceover(text=NARRATION['collapse']):
-            distribution = self.won_category_distribution(WIN_CHANCES)
-            self.tally = self.build_tally(distribution)
-            self.play(FadeOut(self.tree_levels), FadeOut(self.leaf_count), run_time=0.7)
-            self.play(Create(self.tally), run_time=1.4)
-            self.wait(1.0)
-
-    def won_category_distribution(self, chances) -> np.ndarray:
-        """P(exactly k categories won), by the same one-pass recurrence the algorithm uses.
-
-        This IS the dynamic programme the scene is about, so it is written out rather than
-        imported: each category folds into the running distribution once, which is the whole
-        claim that 512 leaves were never needed.
+        A win steps up, a loss steps down, so after nine odd-numbered steps the walk finishes
+        above zero exactly when five or more categories were won. The majority stops being a
+        counting rule and becomes a side of the picture, which is what lets the next move land:
+        two paths that reach the same height are worth the same from there on, so the algorithm
+        can throw the paths away and keep one column of heights.
         """
-        distribution = np.array([1.0])
-        for chance in chances:
-            lost = np.append(distribution * (1.0 - chance), 0.0)
-            won = np.insert(distribution * chance, 0, 0.0)
-            distribution = lost + won
-        return distribution
+        with self.voiceover(text=NARRATION['dynamic']) as tracker:
+            self.play(FadeOut(self.tree_levels), FadeOut(self.leaf_count), run_time=0.6)
+            self.lattice = self.build_lattice()
+            self.play(Create(self.lattice), run_time=1.0)
 
-    def build_tally(self, distribution: np.ndarray) -> VGroup:
-        """Ten bars, one per possible number of categories won, majority ones picked out."""
-        tallest = float(distribution.max())
-        bars = VGroup()
-        span = len(distribution) * (TALLY_BAR_WIDTH + TALLY_GAP)
-        for won, probability in enumerate(distribution):
-            height = TALLY_HEIGHT * probability / tallest
-            x = -span / 2 + won * (TALLY_BAR_WIDTH + TALLY_GAP) + TALLY_BAR_WIDTH / 2
-            bar = Rectangle(
-                width=TALLY_BAR_WIDTH, height=max(height, 0.01),
-                fill_color=BLUE_D if won >= MAJORITY else GREY_D,
-                fill_opacity=1.0, stroke_width=0,
-            ).move_to([x, TALLY_BASELINE_Y + height / 2, 0.0])
-            label = Text(str(won), font_size=20, color=GREY_B)
-            label.move_to([x, TALLY_BASELINE_Y - 0.3, 0.0])
-            bars.add(VGroup(bar, label))
-        return bars
+            wait_until_phrase(self, tracker, 'a step up')
+            self.sample_walks = VGroup()
+            for seed in (4, 11, 23):
+                self.sample_walks.add(self.build_sample_walk(seed))
+                self.play(Create(self.sample_walks[-1]), run_time=0.7)
+
+            wait_until_phrase(self, tracker, 'above where you started')
+            self.play(FadeIn(self.build_win_region()), run_time=0.8)
+            self.wait(0.8)
+
+        with self.voiceover(text=NARRATION['collapse']) as tracker:
+            wait_until_phrase(self, tracker, 'a single column')
+            self.play_column_sweep()
+            self.wait(0.8)
+
+    # The walk: ten columns (before any category, then after each of the nine) against net
+    # position, which runs from -9 to +9 but only ever reaches values of the step's own parity.
+    def walk_x(self, step: int) -> float:
+        return WALK_LEFT_X + step * (WALK_RIGHT_X - WALK_LEFT_X) / len(CATEGORIES)
+
+    def walk_y(self, net: int) -> float:
+        return WALK_CENTRE_Y + net * WALK_UNIT_Y
+
+    def build_lattice(self) -> VGroup:
+        """The axis the walk happens on: the zero line, and what each side of it means."""
+        zero = Line([WALK_LEFT_X - 0.3, self.walk_y(0), 0.0],
+                    [WALK_RIGHT_X + 0.3, self.walk_y(0), 0.0],
+                    color=GREY_B, stroke_width=2)
+        start = Text('start', font_size=20, color=GREY_B)
+        start.next_to([WALK_LEFT_X - 0.3, self.walk_y(0), 0.0], LEFT, buff=0.25)
+        return VGroup(zero, start)
+
+    def build_win_region(self) -> VGroup:
+        """Everything above the line, which is every way of taking the majority."""
+        band = Rectangle(
+            width=WALK_RIGHT_X - WALK_LEFT_X + 0.6, height=9 * WALK_UNIT_Y,
+            fill_color=BLUE_D, fill_opacity=0.12, stroke_width=0,
+        ).move_to([(WALK_LEFT_X + WALK_RIGHT_X) / 2,
+                   self.walk_y(0) + 4.5 * WALK_UNIT_Y, 0.0])
+        label = Text('majority', font_size=21, color=BLUE_B)
+        label.next_to(band, RIGHT, buff=0.15)
+        return VGroup(band, label)
+
+    def build_sample_walk(self, seed: int) -> VMobject:
+        """One way the week could go, as a path through the lattice."""
+        generator = np.random.default_rng(seed)
+        net, points = 0, [[self.walk_x(0), self.walk_y(0), 0.0]]
+        for step, chance in enumerate(WIN_CHANCES, start=1):
+            net += 1 if generator.random() < chance else -1
+            points.append([self.walk_x(step), self.walk_y(net), 0.0])
+        path = VMobject(color=GREY_D, stroke_width=2.5)
+        path.set_points_as_corners(points)
+        return path
+
+    def play_column_sweep(self) -> None:
+        """Advance the distribution one category at a time, translating column into column.
+
+        The whole point of the act is that this loop is the algorithm: one pass per category
+        over a column of ten numbers, rather than a walk over 512 paths.
+        """
+        # The paths go as the column arrives. The line being spoken is that the algorithm never
+        # follows them, and leaving them underneath would show the opposite of what is said.
+        self.play(FadeOut(self.sample_walks), run_time=0.5)
+
+        distribution = {0: 1.0}
+        column = self.build_column(distribution, 0)
+        self.play(FadeIn(column), run_time=0.5)
+        self.columns = VGroup(column)
+
+        for step, chance in enumerate(WIN_CHANCES, start=1):
+            nxt = {}
+            for net, probability in distribution.items():
+                nxt[net + 1] = nxt.get(net + 1, 0.0) + probability * chance
+                nxt[net - 1] = nxt.get(net - 1, 0.0) + probability * (1.0 - chance)
+            distribution = nxt
+            column = self.build_column(distribution, step)
+            self.columns.add(column)
+            self.play(FadeIn(column), run_time=0.42)
+        self.final_distribution = distribution
+
+    def build_column(self, distribution: dict, step: int) -> VGroup:
+        """One column of the sweep: a dot per reachable height, sized by its probability."""
+        dots = VGroup()
+        for net, probability in distribution.items():
+            dots.add(Dot(
+                point=[self.walk_x(step), self.walk_y(net), 0.0],
+                radius=0.06 + 0.20 * probability ** 0.5,
+                color=BLUE_B if net > 0 else GREY_D,
+            ).set_opacity(0.35 + 0.65 * probability ** 0.5))
+        return dots
 
     # ── Act four: which category decides it ───────────────────────────────────────────
 
     def play_tipping_point(self) -> None:
-        """The boundary bar, and what it means for a category to be worth anything."""
-        with self.voiceover(text=NARRATION['tipping']) as tracker:
-            # The tally so far counts all nine. The tipping point is a statement about the OTHER
-            # eight: this category decides the matchup exactly when they land on four, one short
-            # of the majority. So the bars are recomputed without the category being valued, and
-            # the bar that matters is four-of-eight rather than the majority bar of the nine.
-            wait_until_phrase(self, tracker, 'exactly on the boundary')
-            others = self.won_category_distribution(WIN_CHANCES[:-1])
-            without = self.build_tally(others)
-            self.play(Transform(self.tally, without), run_time=1.0)
+        """The category is worth whatever chance the other eight have of leaving you level.
 
-            decisive = self.build_tally(others)[MAJORITY - 1]
-            decisive.set_color(YELLOW)
-            self.play(FadeIn(decisive), run_time=0.6)
-            self.wait(1.4)
+        Measured over the OTHER eight rather than all nine, which is what makes the height that
+        matters zero: eight steps land on an even net, and a net of zero is four-four with the
+        ninth category holding the casting vote.
+        """
+        with self.voiceover(text=NARRATION['tipping']) as tracker:
+            self.play(FadeOut(self.columns), run_time=0.6)
+
+            wait_until_phrase(self, tracker, 'exactly level')
+            others = {0: 1.0}
+            for chance in WIN_CHANCES[:-1]:
+                nxt = {}
+                for net, probability in others.items():
+                    nxt[net + 1] = nxt.get(net + 1, 0.0) + probability * chance
+                    nxt[net - 1] = nxt.get(net - 1, 0.0) + probability * (1.0 - chance)
+                others = nxt
+
+            level = Dot(point=[self.walk_x(len(CATEGORIES) - 1), self.walk_y(0), 0.0],
+                        radius=0.20, color=YELLOW)
+            readout = Text(f'{others.get(0, 0.0):.1%} of the time', font_size=26, color=YELLOW)
+            readout.next_to(level, UP, buff=0.35)
+            self.play(FadeIn(level, scale=2.0), Write(readout), run_time=1.0)
+            self.wait(1.6)
 
         with self.voiceover(text=NARRATION['punting']):
-            # PLACEHOLDER for the beat that earns the punting claim: the nine categories listed
-            # with their tipping-point weights beside them, the near-certain ones visibly at
-            # nothing. Needs the real gradient from the objective, so it waits for a prep script.
+            # PLACEHOLDER for the beat that earns the punting claim: the nine categories with
+            # their tipping-point weights beside them, the near-certain ones visibly at nothing.
+            # Wants the real gradient from the objective, so it waits for a prep script.
             self.wait(2.0)
         self.wait(0.6)

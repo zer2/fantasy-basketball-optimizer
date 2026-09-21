@@ -27,17 +27,18 @@ NARRATION = {
         'Adding one more category doubles the tree. This is far too slow to run for every '
         'candidate player, thousands of times a draft.',
     'dynamic':
-        'But the whole tree is not necessary. All that matters about a branch is how many '
-        'categories it has won so far, not which ones.',
+        'But the whole tree is not necessary. Think of the week as a walk. Every category you '
+        'win is a step up, and every category you lose is a step down. Nine categories, nine '
+        'steps. You take the majority exactly when you finish above where you started.',
     'collapse':
-        'So the algorithm keeps a running tally instead: the probability of having won zero '
-        'categories, one category, two, and so on. Each new category updates that tally in a '
-        'single pass.',
+        'And nothing about a path matters except where it has reached. Two paths that arrive at '
+        'the same height are worth the same from there on. So the algorithm never follows the '
+        'paths. It keeps a single column of probabilities, one for each height, and every '
+        'category translates that column into the next one in a single pass.',
     'tipping':
-        'This also answers a more useful question. A category only matters when it is the one '
-        'that decides the matchup: when the other eight leave you exactly on the boundary. '
-        'The chance of that is called the tipping point probability, and it is what tells the '
-        'algorithm how much a category is worth.',
+        'This also answers a more useful question. A category only decides the matchup when the '
+        'other eight leave you exactly level. The chance of landing there is called the tipping '
+        'point probability, and it is what tells the algorithm how much a category is worth.',
     'punting':
         'Categories you are already certain to win, or certain to lose, almost never tip the '
         'result. That is why Most Categories scoring punts hardest of the three formats.',
