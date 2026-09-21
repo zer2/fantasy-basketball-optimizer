@@ -56,9 +56,24 @@ CURVE_SAMPLES = 260
 # Value in units of sigma above replacement. The replacement line sits at zero by definition:
 # it is the value of a player you can have for nothing.
 REPLACEMENT = 0.0
-STAR_VALUE = 2.2
-MARGINAL_VALUE = 0.55
 NOISE_SPREAD = 1.0
+
+# All three on one axis, which is what makes the comparison legible. Their marginal value is
+# Phi(mu/sigma) -- the share of them above the line -- so the flyer at the line keeps half of any
+# improvement, the starter about seven tenths, and the star essentially all of it.
+PLAYERS = (
+    {'name': 'star',        'value': 2.20, 'colour': BLUE_B,
+     'label_shift':  0.00, 'label_height': 2.45},
+    {'name': 'starter',     'value': 0.55, 'colour': GREEN_C,
+     'label_shift': -0.30, 'label_height': 2.05},
+    {'name': 'dollar flyer','value': 0.00, 'colour': GREY_B,
+     'label_shift': -1.95, 'label_height': 1.35},
+)
+# How far a mean is pushed to ask what the improvement is worth. Small on purpose: the claim is
+# about the MARGINAL unit, and a large shift would be answering a different question.
+NUDGE = 0.45
+# How long the nudged curve takes to settle back, once its line has finished.
+REVERT_SECONDS = 0.8
 
 # Kept small enough that a curve centred on the star still has both tails inside the axis;
 # wider and the right tail is cut off flat at the end of the line.
@@ -70,9 +85,9 @@ class Savor(VoiceoverScene):
 
     def construct(self) -> None:
         self.set_speech_service(DraftVoice())
-        self.play_the_floor()
-        self.play_two_players()
-        self.play_the_flyer()
+        self.play_three_players()
+        self.play_the_nudge()
+        self.play_concentration()
 
     # ── Shared apparatus ──────────────────────────────────────────────────────────────
 
@@ -100,7 +115,7 @@ class Savor(VoiceoverScene):
                                          / (spread * SCENE_UNITS_PER_VALUE)) ** 2)
         return xs, ys
 
-    def build_curve(self, centre: float, colour, opacity: float = 0.30) -> Polygon:
+    def build_curve(self, centre: float, colour, opacity: float = 0.26) -> Polygon:
         """The full projection distribution, floor ignored."""
         xs, ys = self.normal_points(centre, NOISE_SPREAD, -AXIS_HALF_WIDTH, AXIS_HALF_WIDTH)
         points = ([[xs[0], BASELINE_Y, 0.0]]
@@ -132,99 +147,116 @@ class Savor(VoiceoverScene):
         density = exp(-0.5 * standardised ** 2) / sqrt(2.0 * pi)
         return mean * cumulative + spread * density - spread / sqrt(2.0 * pi)
 
-    # ── Act one: there is a floor ─────────────────────────────────────────────────────
+    # -- Act one: three players, one floor --------------------------------------------
 
-    def play_the_floor(self) -> None:
-        with self.voiceover(text=NARRATION['projection_is_a_guess']):
+    def play_three_players(self) -> None:
+        """All three on the same axis from the start, because the scene is a comparison.
+
+        Drawn at once rather than one at a time: what the viewer has to hold is where each sits
+        RELATIVE to the replacement line, and that only exists once all three are up.
+        """
+        with self.voiceover(text=NARRATION['three_players']) as tracker:
             self.axis = self.build_axis()
             self.play(Create(self.axis), run_time=0.8)
-            self.curve = self.build_curve(STAR_VALUE, BLUE_D)
-            self.play(Create(self.curve), run_time=1.2)
-            self.wait(0.6)
+            self.curves, self.names = VGroup(), VGroup()
+            for player in PLAYERS:
+                self.curves.add(self.build_curve(player['value'], player['colour']))
+                label = Text(player['name'], font_size=22, color=player['colour'])
+                label.move_to([self.to_scene_x(player['value']) + player['label_shift'],
+                               BASELINE_Y + player['label_height'], 0.0])
+                self.names.add(label)
+            wait_until_phrase(self, tracker, 'A star')
+            self.play(FadeIn(self.curves), FadeIn(self.names), run_time=1.6)
+            self.wait(1.0)
 
-        with self.voiceover(text=NARRATION['the_floor']):
+        with self.voiceover(text=NARRATION['the_floor']) as tracker:
             self.replacement = self.build_replacement_line()
             self.play(Create(self.replacement), run_time=1.0)
+            wait_until_phrase(self, tracker, 'ever really yours')
+            self.lost = VGroup(*[self.build_lost_tail(player['value']) for player in PLAYERS])
+            self.play(FadeIn(self.lost), run_time=1.2)
             self.wait(1.2)
 
-        with self.voiceover(text=NARRATION['truncation']):
-            # PLACEHOLDER: the collapse itself -- the sub-replacement area sliding onto the line
-            # as a spike -- is the single most explanatory moment in the scene and wants a
-            # proper animation rather than a fade. Marked so the beat exists and can be timed.
-            lost = self.build_lost_tail(STAR_VALUE)
-            self.play(FadeIn(lost), run_time=0.8)
-            self.wait(1.4)
-            self.play(FadeOut(VGroup(self.curve, lost)), run_time=0.7)
+    # -- Act two: what one more unit of projection buys -------------------------------
 
-    # ── Act two: the same floor, two very different players ───────────────────────────
+    def play_the_nudge(self) -> None:
+        """Shift each mean by the same amount and show how much of it survives the floor.
 
-    def play_two_players(self) -> None:
-        with self.voiceover(text=NARRATION['two_players']):
-            self.star = self.build_curve(STAR_VALUE, BLUE_D)
-            self.marginal = self.build_curve(MARGINAL_VALUE, GREEN_C)
-            star_label = Text('star', font_size=22, color=BLUE_B)
-            star_label.move_to([self.to_scene_x(STAR_VALUE), BASELINE_Y + 2.25, 0.0])
-            marginal_label = Text('marginal player', font_size=22, color=GREEN_C)
-            marginal_label.move_to([self.to_scene_x(MARGINAL_VALUE) - 2.3,
-                                    BASELINE_Y + 1.75, 0.0])
-            self.play(Create(self.star), FadeIn(star_label), run_time=1.0)
-            self.play(Create(self.marginal), FadeIn(marginal_label), run_time=1.0)
-            self.labels = VGroup(star_label, marginal_label)
-            self.wait(0.6)
-
-        with self.voiceover(text=NARRATION['star_unaffected']):
-            star_lost = self.build_lost_tail(STAR_VALUE)
-            self.play(FadeIn(star_lost), run_time=0.8)
+        This is the derivative of the SAVOR value, and it is exactly the share of the player
+        above replacement -- verified against the closed form: 50.0% at the line, 70.9% for the
+        starter, 98.6% for the star. So "half their distribution" is not a loose way of speaking;
+        it is the number.
+        """
+        with self.voiceover(text=NARRATION['the_question']):
             self.wait(1.6)
 
-        with self.voiceover(text=NARRATION['marginal_shrinks']):
-            marginal_lost = self.build_lost_tail(MARGINAL_VALUE)
-            self.play(FadeIn(marginal_lost), run_time=0.8)
-            self.lost_tails = VGroup(star_lost, marginal_lost)
-            self.wait(1.8)
+        for key, index in (('the_flyer_half', 2), ('the_star_whole', 0)):
+            with self.voiceover(text=NARRATION[key]) as tracker:
+                self.play_one_nudge(index, tracker)
 
-    # ── Act three: the dollar flyer, and the subtraction ──────────────────────────────
-
-    def play_the_flyer(self) -> None:
-        with self.voiceover(text=NARRATION['the_flyer']):
-            self.play(FadeOut(VGroup(self.star, self.marginal, self.labels, self.lost_tails)),
-                      run_time=0.7)
-            flyer = self.build_curve(REPLACEMENT, GREY_B, opacity=0.22)
-            flyer_lost = self.build_lost_tail(REPLACEMENT)
-            flyer_label = Text('a one dollar flyer', font_size=22, color=GREY_B)
-            flyer_label.move_to([self.to_scene_x(REPLACEMENT) - 2.0, BASELINE_Y + 2.3, 0.0])
-            self.play(Create(flyer), FadeIn(flyer_lost), FadeIn(flyer_label), run_time=1.2)
-            self.flyer_group = VGroup(flyer, flyer_lost, flyer_label)
-            self.wait(1.4)
-
-        with self.voiceover(text=NARRATION['the_subtraction']):
-            formula = MathTex(
-                r'\mu\,\Phi\!\left(\tfrac{\mu}{\sigma}\right)'
-                r'-\tfrac{\sigma}{\sqrt{2\pi}}\left(1 - e^{-\mu^2 / 2\sigma^2}\right)',
-                font_size=44, color=WHITE,
-            ).move_to([0.0, 2.55, 0.0])
-            self.play(Write(formula), run_time=1.4)
-            self.formula = formula
+        with self.voiceover(text=NARRATION['the_general_rule']):
+            rule = Text('one more unit of projection  =  the share of you above the line',
+                        font_size=26, color=WHITE)
+            rule.move_to([0.0, 3.05, 0.0])
+            self.play(Write(rule), run_time=1.4)
+            self.rule = rule
             self.wait(1.2)
 
-        with self.voiceover(text=NARRATION['conclusion']):
-            self.play(FadeOut(VGroup(self.flyer_group, self.replacement, self.axis)),
-                      run_time=0.7)
-            # What the adjustment does to the two players, side by side: the star keeps almost
-            # all of its projection, the marginal player keeps a fraction of its edge.
-            rows = VGroup(*[
-                self.value_row(name, value)
-                for name, value in (('star', STAR_VALUE), ('marginal player', MARGINAL_VALUE))
-            ]).arrange(DOWN, buff=0.62).move_to([0.0, -0.3, 0.0])
-            self.play(FadeIn(rows), run_time=1.0)
-            self.wait(2.0)
+    def play_one_nudge(self, index: int, tracker) -> None:
+        """Move one player up a little, keeping the others where they are.
+
+        The part of the shift that lands below the line is drawn as kept back, because that is
+        the whole asymmetry: improving an outcome you were going to discard buys nothing.
+        """
+        player = PLAYERS[index]
+        shifted = self.build_curve(player['value'] + NUDGE, player['colour'])
+        arrow = Line([self.to_scene_x(player['value']), BASELINE_Y + 2.25, 0.0],
+                     [self.to_scene_x(player['value'] + NUDGE), BASELINE_Y + 2.25, 0.0],
+                     color=YELLOW, stroke_width=4)
+
+        kept = self.share_above_replacement(player['value'])
+        readout = Text(f"{player['name']}:  worth {kept:.0%} of the improvement",
+                       font_size=26, color=YELLOW)
+        readout.move_to([0.0, BASELINE_Y - 1.05, 0.0])
+
+        self.play(Transform(self.curves[index], shifted),
+                  Create(arrow), run_time=1.1)
+        self.play(Write(readout), run_time=0.9)
+
+        # Held for the rest of the line rather than reverted straight away. The sentence that
+        # names the number -- "about fifty cents" -- arrives near the END of the line, and at
+        # the animation's own pace the shifted curve and its readout were long gone by then,
+        # leaving the claim spoken over a static picture of the unshifted player.
+        self.wait(max(0.5, tracker.get_remaining_duration() - REVERT_SECONDS))
+        self.play(Transform(self.curves[index], self.build_curve(player['value'],
+                                                                 player['colour'])),
+                  FadeOut(arrow), FadeOut(readout), run_time=REVERT_SECONDS)
+
+    def share_above_replacement(self, mean: float, spread: float = NOISE_SPREAD) -> float:
+        """Phi(mu/sigma) -- and, exactly, the derivative of the SAVOR value at that mean."""
+        from math import erf, sqrt
+        return 0.5 * (1.0 + erf((mean - REPLACEMENT) / (spread * sqrt(2.0))))
+
+    # -- Act three: so the money goes to the top --------------------------------------
+
+    def play_concentration(self) -> None:
+        with self.voiceover(text=NARRATION['concentration']):
+            self.play(FadeOut(VGroup(self.curves, self.names, self.lost,
+                                     self.replacement, self.axis, self.rule)),
+                      run_time=0.8)
+            rows = VGroup(*[self.value_row(player) for player in PLAYERS])
+            rows.arrange(DOWN, buff=0.55).move_to([0.0, 0.1, 0.0])
+            self.play(FadeIn(rows), run_time=1.2)
+            self.wait(2.4)
         self.wait(0.6)
 
-    def value_row(self, name: str, projected: float) -> VGroup:
-        """Projected value against what it is worth once the floor and the flyer are applied."""
-        kept = self.savor_value(projected)
+    def value_row(self, player: dict) -> VGroup:
+        """What a player projects at, against what they are worth once the floor is applied."""
+        kept = self.savor_value(player['value'])
         return VGroup(
-            Text(f'{name}', font_size=26, color=GREY_B),
-            MathTex(rf'{projected:.2f} \;\rightarrow\; {kept:.2f}', font_size=36, color=YELLOW),
-            Text(f'keeps {kept / projected:.0%}', font_size=24, color=GREY_B),
-        ).arrange(RIGHT, buff=0.55)
+            Text(player['name'], font_size=26, color=player['colour']),
+            Text(f"{player['value']:.2f}  →  {kept:.2f}",
+                 font_size=32, color=YELLOW),
+            Text(f"{self.share_above_replacement(player['value']):.0%} per extra unit",
+                 font_size=22, color=GREY_B),
+        ).arrange(RIGHT, buff=0.5)
