@@ -45,6 +45,10 @@ The overall H-score on the left side of the display is both the metric that H-sc
       allowfullscreen>
     </iframe>
 
+    <video controls preload="metadata" width="100%">
+      <source src="../videos/gradient-descent.mp4" type="video/mp4">
+    </video>
+
     Adam performs gradient descent with additional logic around how to scale the step size in each direction. 
     
     Both gradient descent and Adam require an underlying function which has well-defined gradients. The main machinery of H-scoring is the definition of that function. 
@@ -74,6 +78,10 @@ Most of the time, the algorithm punts one or two categories, reflected by low H-
     That means that the algorithm implicitly "cares" about categories according to a Normal PDF of category strength. Normal PDFs are thick in the middle and thin on the side, so the algorithm naturally cares most about categories for which it has neutral strength.
 
     ![A Normal distribution curve](img/normal.png)
+
+    <video controls preload="metadata" width="100%">
+      <source src="../videos/punting.mp4" type="video/mp4">
+    </video>
     /// caption
     A Normal distribution, from Wikipedia
     ///
@@ -181,6 +189,10 @@ Category weights for future picks, for a team considering Daniels after taking G
 
 The category weightings displayed in the first row are based on H-scoring's internal model of how drafting works. It assumes that the drafter will use those weights exactly for candidates going forward, and it also assumes that those weights will have a certain influence on the aggregate statistics of future picks. Category weights show what the algorithm is thinking in terms of which categories it wants to punt. 
 
+<video controls preload="metadata" width="100%">
+  <source src="../videos/category-weights.mp4" type="video/mp4">
+</video>
+
 ??? note "How does H-scoring pick category weights for future picks?"
     The heart of the algorithm is its treatment of future draft picks. Essentially, it assumes that it will be able to choose from a small slate of available players whose statistical profiles are random, conditioned on the scores being similar in terms of total G-score. It assumes that it will choose the best player available based on its choice of category weights. Using some mathematical estimations, it can calculate the expected deviation from the average for each category based on the category weights. 
 
@@ -221,6 +233,10 @@ Roster assignments for the same example — Giannis slots in at Power Forward an
 ///
 
 The algorithm also has some leeway in how it arranges players already taken in terms of position, freeing up different positions to take with future draft picks. The roster assignment row shows what the algorithm is thinking in this regard. In the example above, it is choosing to categorize Daniels as a SF, likely because it does not want to take more SFs in general.
+
+<video controls preload="metadata" width="100%">
+  <source src="../videos/roster-assignment.mp4" type="video/mp4">
+</video>
 
 ??? note "How does H-scoring decide how to assign positions to players already drafted?"
 
@@ -426,6 +442,10 @@ The strength of the applied prediction is controlled by the $C$ (confidence) par
 
 Testing confirms that the prediction adjustment improves the performance of H-scoring against other H-scoring drafters, while degrading performance slightly against pure G-score drafters. Setting C to zero turns the prediction off entirely: every other drafter is treated as a neutral picker with no strategic tendencies.
 
+<video controls preload="metadata" width="100%">
+  <source src="../videos/self-play.mp4" type="video/mp4">
+</video>
+
 ### Gradient descent optimizes locally
 
 A fundamental limitation of gradient descent is that it only looks for nearby peaks, potentially missing peaks that are further away. In fantasy basketball terms, it can optimize a build but not evaluate the idea of totally switching to a new build. 
@@ -438,6 +458,10 @@ Punting is less common in Rotisserie, so gradient descent does not start at a pu
     The website checks potential punts by calculating the current objective function with one category at a time set to 50% of its neutral weight. The weight distribution that evaluates to the highest score becomes the starting point for gradient descent.
 
     Normally, multi-start gradient descent would perform gradient descent on each starting point. In this case, that is relatively unnecessary, because the strength of the simple punting strategy is highly indicative of which punt has the best optimal point. It also accounts for punting multiple categories natively, because once in the direction of one punt, the algorithm can see promising punts to pair it with. In testing, this procedure found essentially the same solutions as starting with many random points and performing gradient descent from all of them. 
+
+    <video controls preload="metadata" width="100%">
+      <source src="../videos/seed-menu.mp4" type="video/mp4">
+    </video>
 
 ### Constant categorical variance
 
