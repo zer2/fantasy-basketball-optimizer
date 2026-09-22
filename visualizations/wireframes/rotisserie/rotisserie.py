@@ -87,9 +87,6 @@ AXIS_Y = -2.9
 AXIS_LEFT_X = -6.0
 AXIS_RIGHT_X = 6.0
 CLOUD_HEIGHT = 4.2         # height of the most common total; the rest scale against it
-# The winning bar is drawn shorter, so it reads as background against the team's own curve.
-THRESHOLD_HEIGHT = 2.4
-
 # A finished season's standings: twelve teams down, nine categories across, totals on the right.
 STANDINGS_TOP_Y = 2.55
 STANDINGS_ROW_GAP = 0.40
@@ -157,7 +154,8 @@ class Rotisserie(VoiceoverScene):
         return totals[:, 0], totals[:, 1:].max(axis=1)
 
     def build_win_shaded_distribution(self, totals, bar, colour,
-                                      reference_peak: float | None = None) -> VGroup:
+                                      reference_peak: float | None = None,
+                                      show_win_shading: bool = True) -> VGroup:
         """Your season totals as a column chart, each column tinted by how often it won.
 
         The column height is how often you finish on that total. The yellow laid over it is
@@ -188,12 +186,12 @@ class Rotisserie(VoiceoverScene):
             enough = float(np.mean(bar[landed] < total)) if landed.sum() else 0.0
             height = CLOUD_HEIGHT * probabilities[offset] / reference
             centre = [self.to_scene_x(total), AXIS_Y + height / 2, 0.0]
-            columns.add(VGroup(
-                Rectangle(width=width, height=height, stroke_width=0,
-                          fill_color=colour, fill_opacity=0.50).move_to(centre),
-                Rectangle(width=width, height=height, stroke_width=0,
-                          fill_color=YELLOW, fill_opacity=enough).move_to(centre),
-            ))
+            bar_column = VGroup(Rectangle(width=width, height=height, stroke_width=0,
+                                          fill_color=colour, fill_opacity=0.50).move_to(centre))
+            if show_win_shading:
+                bar_column.add(Rectangle(width=width, height=height, stroke_width=0,
+                                         fill_color=YELLOW, fill_opacity=enough).move_to(centre))
+            columns.add(bar_column)
         return columns
 
     def peak_probability(self, totals) -> float:
@@ -201,7 +199,7 @@ class Rotisserie(VoiceoverScene):
         counts = np.bincount(totals - int(totals.min())).astype(float)
         return float(counts.max() / counts.sum())
 
-    def build_threshold_distribution(self, bar, height: float = THRESHOLD_HEIGHT,
+    def build_threshold_distribution(self, bar, reference_peak: float,
                                      opacity: float = 0.32) -> VGroup:
         """What it took to win, as its own curve, sitting behind the team's.
 
@@ -212,14 +210,17 @@ class Rotisserie(VoiceoverScene):
         """
         lowest, highest = int(bar.min()), int(bar.max())
         counts = np.bincount(bar - lowest, minlength=highest - lowest + 1).astype(float)
-        tallest = counts.max()
+        probabilities = counts / counts.sum()
+        # The SAME probability-to-height scale the team's curve uses. Both are distributions
+        # with mass one; drawn at their own peaks and different heights the bar looked like a
+        # far smaller quantity than the team, which it is not.
         width = (self.to_scene_x(1) - self.to_scene_x(0)) * 0.92
 
         columns = VGroup()
         for offset, count in enumerate(counts):
             if count <= 0:
                 continue
-            column_height = height * count / tallest
+            column_height = CLOUD_HEIGHT * probabilities[offset] / reference_peak
             columns.add(Rectangle(width=width, height=column_height, stroke_width=0,
                                   fill_color=RED_B, fill_opacity=opacity)
                         .move_to([self.to_scene_x(lowest + offset),
@@ -298,6 +299,10 @@ class Rotisserie(VoiceoverScene):
     def play_the_bar(self) -> None:
         with self.voiceover(text=NARRATION['the_bar']) as tracker:
             self.mine, self.bar = self.simulate(BALANCED_BUILD)
+            # One scale for both curves, set by whichever peaks higher -- the bar is the
+            # narrower of the two, so it is the one that sets it.
+            self.reference = max(self.peak_probability(self.mine),
+                                 self.peak_probability(self.bar))
             self.axis = self.build_axis()
             self.play(Create(self.axis), run_time=0.9)
             wait_until_phrase(self, tracker, 'cannot know exactly')
@@ -305,7 +310,7 @@ class Rotisserie(VoiceoverScene):
             # once the team's curve arrives to sit in front of it -- coming up already faint
             # would make it scenery before anyone had been told what it is.
             self.bar_line = self.build_threshold_distribution(
-                self.bar, height=CLOUD_HEIGHT, opacity=0.55)
+                self.bar, self.reference, opacity=0.55)
             bar_label = Text('what it took to win', font_size=22, color=RED_B)
             bar_label.move_to([self.to_scene_x(self.bar.mean()) + 1.6,
                                AXIS_Y + CLOUD_HEIGHT + 0.25, 0.0])
@@ -316,13 +321,16 @@ class Rotisserie(VoiceoverScene):
         with self.voiceover(text=NARRATION['simulate']) as tracker:
             # Now it goes to the back, shorter and fainter, and the team's own curve takes the
             # front of the frame.
-            receded = self.build_threshold_distribution(self.bar)
+            # It recedes by going fainter, not by shrinking: shrinking it would break the
+            # equal-area reading the shared scale exists to give.
+            receded = self.build_threshold_distribution(self.bar, self.reference)
             self.play(Transform(self.bar_line, receded),
                       self.bar_label.animate.move_to(
-                          [self.to_scene_x(self.bar.mean()) + 1.6,
-                           AXIS_Y + THRESHOLD_HEIGHT + 0.3, 0.0]),
+                          [self.to_scene_x(self.bar.mean()) + 1.9,
+                           AXIS_Y + CLOUD_HEIGHT + 0.25, 0.0]),
                       run_time=1.0)
-            self.cloud = self.build_win_shaded_distribution(self.mine, self.bar, BLUE_B)
+            self.cloud = self.build_win_shaded_distribution(self.mine, self.bar, BLUE_B,
+                                                            self.reference)
             self.play(FadeIn(self.cloud), run_time=max(1.4, tracker.duration * 0.35))
             self.wait(0.6)
 
@@ -365,7 +373,11 @@ class Rotisserie(VoiceoverScene):
         def build_panel(build, colour, heading, run):
             table = self.build_matchup_table(build, heading, colour)
             mine, bar = run
-            curve = self.build_win_shaded_distribution(mine, bar, colour, reference)
+            # No win shading here. These panels are introducing a BUILD -- what the yellow
+            # means belongs to the comparison that follows, and shown beside a table of win
+            # probabilities it reads as a second, unexplained quantity.
+            curve = self.build_win_shaded_distribution(mine, bar, colour, reference,
+                                                       show_win_shading=False)
             curve.scale(INSET_CURVE_SCALE).move_to(INSET_CURVE_CENTRE)
             return table, curve
 
@@ -438,5 +450,5 @@ class Rotisserie(VoiceoverScene):
             grid.add(Text(f'{chance:.0%}', font_size=19, color=GREY_B)
                      .move_to([2.5, row_y, 0.0]))
         legend = Text('one row per category, one column per opponent',
-                      font_size=20, color=GREY_D).move_to([0.0, -1.6, 0.0])
+                      font_size=20, color=GREY_D).move_to([0.0, -1.0, 0.0])
         return VGroup(title, grid, legend)
