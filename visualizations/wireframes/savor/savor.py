@@ -78,9 +78,11 @@ NUDGE = 0.45
 # The opening: one projection with a question mark against it, then the values a season could
 # actually return, scattered around it.
 GUESS_DOLLARS = 45
+# Offset in dollars, then where it sits. Held well clear of the projection row in the middle --
+# at half these distances the values crowded the text they are meant to be scattering around.
 POSSIBLE_OUTCOMES = (
-    (-14, -4.1,  0.55), (-8, -2.4, -0.45), (-3, -1.0,  0.30),
-    (  2,  0.9, -0.50), ( 6,  2.3,  0.45), (12,  4.0, -0.35),
+    (-14, -4.6,  1.35), (-8, -3.0, -1.30), (-3, -1.6,  1.25),
+    (  2,  1.6, -1.25), (  6,  3.0,  1.30), (12,  4.6, -1.35),
 )
 
 # The auction board the last act works on. Dollar values a drafter would recognise, against a
@@ -143,7 +145,7 @@ class Savor(VoiceoverScene):
                           color=YELLOW, stroke_width=3, dash_length=0.12)
         # Above the line it names, which is where it belongs. It sits clear of the players'
         # own labels because the tallest of those is lower than the top of this line.
-        label = Text('replacement level  ($0)', font_size=21, color=YELLOW)
+        label = Text('replacement level', font_size=21, color=YELLOW)
         label.move_to([self.to_scene_x(REPLACEMENT), BASELINE_Y + 3.38, 0.0])
         return VGroup(line, label)
 
