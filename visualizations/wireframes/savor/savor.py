@@ -73,6 +73,14 @@ PLAYERS = (
 # about the MARGINAL unit, and a large shift would be answering a different question.
 NUDGE = 0.45
 
+# The opening: one projection with a question mark against it, then the values a season could
+# actually return, scattered around it.
+GUESS_DOLLARS = 45
+POSSIBLE_OUTCOMES = (
+    (-14, -4.1,  0.55), (-8, -2.4, -0.45), (-3, -1.0,  0.30),
+    (  2,  0.9, -0.50), ( 6,  2.3,  0.45), (12,  4.0, -0.35),
+)
+
 # The auction board the last act works on. Dollar values a drafter would recognise, against a
 # one dollar replacement player, and S-sigma at the sidebar default of 10.
 PROJECTED_DOLLARS = (62, 45, 33, 24, 17, 11, 7, 4, 2, 1)
@@ -113,8 +121,10 @@ class Savor(VoiceoverScene):
         line = DashedLine([self.to_scene_x(REPLACEMENT), BASELINE_Y, 0.0],
                           [self.to_scene_x(REPLACEMENT), BASELINE_Y + 3.1, 0.0],
                           color=YELLOW, stroke_width=3, dash_length=0.12)
+        # Under the axis rather than over the line. Above, it sat in the same band as the
+        # players' own labels and collided with them.
         label = Text('replacement level', font_size=21, color=YELLOW)
-        label.next_to(line, UP, buff=0.12)
+        label.move_to([self.to_scene_x(REPLACEMENT), BASELINE_Y - 0.95, 0.0])
         return VGroup(line, label)
 
     def normal_points(self, centre: float, spread: float, low: float, high: float):
@@ -164,18 +174,43 @@ class Savor(VoiceoverScene):
         RELATIVE to the replacement line, and that only exists once all three are up.
         """
         with self.voiceover(text=NARRATION['three_players']) as tracker:
+            # A projection with a question mark against it, then the question mark replaced by
+            # what the season could actually return. The axis alone used to hold this line until
+            # eighty percent of the way through it.
+            wait_until_phrase(self, tracker, 'we do not know exactly')
+            player = Text('a player', font_size=30, color=GREY_B)
+            projection = Text(f'${GUESS_DOLLARS}', font_size=44, color=WHITE)
+            query = Text('?', font_size=52, color=YELLOW)
+            guess = VGroup(player, projection, query).arrange(RIGHT, buff=0.7)
+            guess.move_to([0.0, 0.9, 0.0])
+            self.play(FadeIn(guess), run_time=0.9)
+            self.wait(0.6)
+
+            wait_until_phrase(self, tracker, 'well above or below')
+            outcomes = VGroup(*[
+                Text(f'${GUESS_DOLLARS + offset}', font_size=30, color=GREY_B)
+                .move_to([shift, 0.9 + rise, 0.0])
+                for offset, shift, rise in POSSIBLE_OUTCOMES
+            ])
+            self.play(FadeOut(query), run_time=0.35)
+            self.play(FadeIn(outcomes, lag_ratio=0.12), run_time=1.5)
+            self.wait(0.8)
+
+            wait_until_phrase(self, tracker, 'Normally distributed')
             self.axis = self.build_axis()
+            self.play(FadeOut(VGroup(player, projection, outcomes)), run_time=0.5)
             self.play(Create(self.axis), run_time=0.8)
+
             self.curves, self.names = VGroup(), VGroup()
-            for player in PLAYERS:
-                self.curves.add(self.build_curve(player['value'], player['colour']))
-                label = Text(player['name'], font_size=22, color=player['colour'])
-                label.move_to([self.to_scene_x(player['value']) + player['label_shift'],
-                               BASELINE_Y + player['label_height'], 0.0])
+            for entry in PLAYERS:
+                self.curves.add(self.build_curve(entry['value'], entry['colour']))
+                label = Text(entry['name'], font_size=22, color=entry['colour'])
+                label.move_to([self.to_scene_x(entry['value']) + entry['label_shift'],
+                               BASELINE_Y + entry['label_height'], 0.0])
                 self.names.add(label)
             wait_until_phrase(self, tracker, 'Here are some potential distributions')
             self.play(FadeIn(self.curves), FadeIn(self.names), run_time=1.6)
-            self.wait(1.0)
+            self.wait(0.8)
 
         with self.voiceover(text=NARRATION['the_floor']) as tracker:
             wait_until_phrase(self, tracker, 'draw a line on here')
@@ -203,13 +238,6 @@ class Savor(VoiceoverScene):
             with self.voiceover(text=NARRATION[key]) as tracker:
                 self.play_one_nudge(index, tracker)
 
-        with self.voiceover(text=NARRATION['the_general_rule']):
-            rule = Text('one more unit of projection  =  the share of you above the line',
-                        font_size=26, color=WHITE)
-            rule.move_to([0.0, 3.05, 0.0])
-            self.play(Write(rule), run_time=1.4)
-            self.rule = rule
-            self.wait(1.2)
 
     def play_one_nudge(self, index: int, tracker) -> None:
         """Move one player up a little, keeping the others where they are.
@@ -261,8 +289,13 @@ class Savor(VoiceoverScene):
         come out ahead and the ones who lost most come out behind.
         """
         with self.voiceover(text=NARRATION['the_general_rule']) as tracker:
+            rule = Text('one more dollar of projection  =  the share of that player '
+                        'projected above replacement',
+                        font_size=24, color=WHITE).move_to([0.0, 3.15, 0.0])
+            self.play(Write(rule), run_time=1.2)
+            self.wait(1.0)
             self.play(FadeOut(VGroup(self.curves, self.names, self.lost,
-                                     self.replacement, self.axis, self.rule)),
+                                     self.replacement, self.axis, rule)),
                       run_time=0.7)
 
             table = self.build_value_table()

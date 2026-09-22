@@ -46,5 +46,5 @@ NARRATION = {
     'conclusion':
         'But in Rotisserie, it is the first team that wins the league more often. The team that punts heavily is too concentrated '
         'around its mean; it did not leave open the possibility of doing broadly well across all categories, which made its only '
-        'winning scenario nearly impossible.'
+        'winning scenario nearly impossible.',
 }
