@@ -10,8 +10,9 @@ Rotisserie algorithm holds categories near fifty-fifty instead of punting them.
 The scene argues it by simulation rather than by algebra, because the probability of winning a
 league is a comparison between your season total and the BEST of eleven others -- a convolution
 against an order statistic, which is not a shape anyone reads off a picture. Simulated seasons
-are: a thousand dots, and the ones above the line are the leagues you won. The fraction above
-the line IS the win probability, with nothing left to take on trust.
+is shaded instead: the column chart is how often you finish on each total, and the yellow laid
+over it is how often that total was enough to win. The visible yellow mass IS the win
+probability -- the convolution drawn rather than asserted, with nothing left to take on trust.
 
 The result it lands on is stronger than "same mean, more spread", and it is measured here rather
 than asserted:
@@ -36,7 +37,7 @@ from manim import (
     VGroup, Line, DashedLine, Rectangle, Text, Dot,
     FadeIn, FadeOut, Create, Write,
     DOWN, UP, RIGHT,
-    BLUE_B, GREEN_C, RED_B, GREY_B, GREY_D,
+    BLUE_B, GREEN_C, RED_B, GREY_B, GREY_D, YELLOW,
 )
 from manim_voiceover import VoiceoverScene
 
@@ -56,7 +57,9 @@ MAX_POINTS = TEAMS * CATEGORIES            # 108: first in every category
 AVERAGE_POINTS = (TEAMS + 1) / 2 * CATEGORIES
 AXIS_TICKS = (0, 54, MAX_POINTS)           # ends and midpoint, so the scale reads at a glance
 
-SEASONS_DRAWN = 1000
+# Nothing is drawn per season any more -- the seasons only supply the distribution and
+# the conditional win rate -- so this can be large enough to make both smooth.
+SEASONS_DRAWN = 60_000
 SIMULATION_SEED = 7
 
 # The two builds. Values are per-category strengths for the focal team; every rival draws around
@@ -71,9 +74,7 @@ ORDINALS = {1: '1st', 2: '2nd', 3: '3rd', 11: '11th', 12: '12th'}
 AXIS_Y = -2.9
 AXIS_LEFT_X = -6.0
 AXIS_RIGHT_X = 6.0
-CLOUD_TOP_Y = 2.1          # simulated seasons stack between the axis and here
-DOT_RADIUS = 0.028
-DOT_STACK_GAP = 0.055
+CLOUD_HEIGHT = 4.2         # height of the most common total; the rest scale against it
 
 
 class Rotisserie(VoiceoverScene):
@@ -129,28 +130,44 @@ class Rotisserie(VoiceoverScene):
         totals = ranks.sum(axis=2)
         return totals[:, 0], totals[:, 1:].max(axis=1)
 
-    def build_season_cloud(self, totals: np.ndarray, bar: np.ndarray, colour) -> VGroup:
-        """One dot per simulated season, stacked into a column at the total it scored.
+    def build_win_shaded_distribution(self, totals, bar, colour) -> VGroup:
+        """Your season totals as a column chart, each column tinted by how often it won.
 
-        Height carries nothing but crowding, so the cloud reads as a histogram that individual
-        seasons can still be picked out of. A season is coloured when it beat that year's bar --
-        so the coloured fraction is the probability of winning the league, counted rather than
-        derived. That is the honest way to show it: the real quantity is a convolution measured
-        against the maximum of eleven rivals, which no single curve on a page displays.
+        The column height is how often you finish on that total. The yellow laid over it is
+        P(win | total = x) -- taken from the seasons that actually landed there, so the shading
+        is a measured conditional rather than a curve fitted to look right.
+
+        That conditioning matters. Your total and the bar are NOT independent: ranks are shared,
+        so a season where you do well is one where the rivals were pushed down. Multiplying your
+        density by the rivals' CDF as if they were independent gives 6.3% here against a true
+        7.8%, wrong by a fifth. Reading the conditional off the same seasons keeps it exact --
+        the shaded mass integrates to 7.75% against 7.77% counted directly.
         """
-        dots = VGroup()
-        columns: dict[int, int] = {}
-        for total, threshold in zip(totals, bar):
-            height = columns.get(int(total), 0)
-            columns[int(total)] = height + 1
-            y = AXIS_Y + 0.12 + height * DOT_STACK_GAP
-            if y > CLOUD_TOP_Y:
+        lowest, highest = int(totals.min()), int(totals.max())
+        counts = np.bincount(totals - lowest, minlength=highest - lowest + 1).astype(float)
+        tallest = counts.max()
+        width = (self.to_scene_x(1) - self.to_scene_x(0)) * 0.92
+
+        columns = VGroup()
+        for offset, count in enumerate(counts):
+            if count <= 0:
                 continue
-            won = total > threshold
-            dots.add(Dot(point=[self.to_scene_x(total), y, 0.0], radius=DOT_RADIUS,
-                         color=colour if won else GREY_D)
-                     .set_opacity(1.0 if won else 0.4))
-        return dots
+            total = lowest + offset
+            landed = totals == total
+            enough = float(np.mean(bar[landed] < total)) if landed.sum() else 0.0
+            height = CLOUD_HEIGHT * count / tallest
+            centre = [self.to_scene_x(total), AXIS_Y + height / 2, 0.0]
+            columns.add(VGroup(
+                Rectangle(width=width, height=height, stroke_width=0,
+                          fill_color=colour, fill_opacity=0.50).move_to(centre),
+                Rectangle(width=width, height=height, stroke_width=0,
+                          fill_color=YELLOW, fill_opacity=enough).move_to(centre),
+            ))
+        return columns
+
+    def win_rate(self, totals, bar) -> float:
+        """How often the season beat that year's bar."""
+        return float(np.mean(totals > bar))
 
     # -- Act one: what a Rotisserie point is -------------------------------------------
 
@@ -219,7 +236,7 @@ class Rotisserie(VoiceoverScene):
             wait_until_phrase(self, tracker, 'lands around')
             self.bar_line = DashedLine(
                 [self.to_scene_x(self.bar.mean()), AXIS_Y, 0.0],
-                [self.to_scene_x(self.bar.mean()), CLOUD_TOP_Y + 0.4, 0.0],
+                [self.to_scene_x(self.bar.mean()), AXIS_Y + CLOUD_HEIGHT + 0.3, 0.0],
                 color=RED_B, stroke_width=3, dash_length=0.14)
             bar_label = Text('what it took to win', font_size=22, color=RED_B)
             bar_label.next_to(self.bar_line, UP, buff=0.1)
@@ -229,12 +246,12 @@ class Rotisserie(VoiceoverScene):
             self.wait(0.5)
 
         with self.voiceover(text=NARRATION['simulate']) as tracker:
-            self.cloud = self.build_season_cloud(self.mine, self.bar, BLUE_B)
+            self.cloud = self.build_win_shaded_distribution(self.mine, self.bar, BLUE_B)
             self.play(FadeIn(self.cloud), run_time=max(1.5, tracker.duration * 0.4))
             self.wait(0.6)
 
         with self.voiceover(text=NARRATION['its_hard']):
-            won = float(np.mean(self.mine > self.bar))
+            won = self.win_rate(self.mine, self.bar)
             self.win_readout = Text(f'won the league in {won:.1%} of seasons',
                                     font_size=28, color=BLUE_B)
             self.win_readout.move_to([0.0, 3.1, 0.0])
@@ -282,9 +299,9 @@ class Rotisserie(VoiceoverScene):
             clouds, self.summaries = VGroup(), []
             for build, colour in ((BALANCED_BUILD, BLUE_B), (COMMITTED_BUILD, GREEN_C)):
                 mine, bar = self.simulate(build)
-                clouds.add(self.build_season_cloud(mine, bar, colour))
+                clouds.add(self.build_win_shaded_distribution(mine, bar, colour))
                 self.summaries.append((float(mine.mean()), float(mine.std()),
-                                       float(np.mean(mine > bar))))
+                                       self.win_rate(mine, bar)))
             self.clouds = clouds
             self.play(FadeIn(clouds), run_time=1.6)
             wait_until_phrase(self, tracker, 'more points on average')

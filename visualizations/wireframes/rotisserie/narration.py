@@ -26,8 +26,9 @@ NARRATION = {
         'the other eleven teams, and that best score is itself uncertain. It usually lands around '
         'seventy five.',
     'simulate':
-        'So here are a thousand simulated seasons. Each one is a dot: where you finished, against '
-        'what it took to win that year. Every dot above the line is a season you won the league.',
+        'The blue here is how often you finish on each total. And laid over it in yellow is how '
+        'often that total was actually enough to win the league. Low scores are never enough, so '
+        'they stay blue. High ones almost always are.',
     'its_hard':
         'An average team wins about eight percent of the time. That is what winning a league '
         'looks like. You are not trying to be a bit above average. You are trying to reach up '
