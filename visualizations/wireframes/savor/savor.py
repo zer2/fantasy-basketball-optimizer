@@ -14,7 +14,7 @@ which is exactly the formula in the docs,
     mu * Phi(mu/sigma) - (sigma / sqrt(2 pi)) * (1 - exp(-mu^2 / (2 sigma^2)))
 
 The two terms are the two things drawn: a Normal truncated at the replacement line, minus a
-half-normal for the dollar flyer. The scene's job is to make the asymmetry obvious -- the cut
+half-normal for the flyer. The scene's job is to make the asymmetry obvious -- the cut
 takes almost nothing from a star and a great deal from a marginal player -- which is why money
 concentrates at the top of an auction.
 
@@ -68,7 +68,7 @@ PLAYERS = (
     # across the dashed line itself.
     {'name': 'starter',     'value': 0.55, 'colour': GREEN_C,
      'label_shift':  0.62, 'label_height': 2.28},
-    {'name': 'dollar flyer','value': 0.00, 'colour': GREY_B,
+    {'name': 'flyer',       'value': 0.00, 'colour': GREY_B,
      'label_shift': -1.95, 'label_height': 1.35},
 )
 # How far a mean is pushed to ask what the improvement is worth. Small on purpose: the claim is
@@ -87,8 +87,12 @@ POSSIBLE_OUTCOMES = (
 
 # The auction board the last act works on. Dollar values a drafter would recognise, against a
 # one dollar replacement player, and S-sigma at the sidebar default of 10.
-PROJECTED_DOLLARS = (60, 44, 32, 23, 16, 10, 7, 4, 3, 1)   # one team's $200 auction budget
-REPLACEMENT_DOLLARS = 1
+# One team's $200 budget, every figure being value ABOVE REPLACEMENT -- which is what the
+# adjustment is defined on and what the axis of the curve act is already ticked in. Replacement
+# level is zero by definition: it is what a freely available player is worth. A one dollar
+# minimum bid is a different idea altogether, and mixing the two is what made the bottom of this
+# table read as a player going to nothing and back.
+PROJECTED_DOLLARS = (60, 44, 32, 23, 16, 10, 7, 4, 3, 1)
 S_SIGMA = 10.0
 # Ticks in dollars above replacement. The curve act draws in units of S-sigma, so a tick every
 # twenty dollars is every two units, and the axis reaches forty without running past its end.
@@ -177,7 +181,7 @@ class Savor(VoiceoverScene):
     def savor_value(self, mean: float, spread: float = NOISE_SPREAD) -> float:  # noqa: D401
         """The docs' formula, written as the two expectations it actually is.
 
-        E[max(mu + noise, 0)] - E[max(noise, 0)], the second being the dollar flyer. Expanding
+        E[max(mu + noise, 0)] - E[max(noise, 0)], the second being the flyer. Expanding
         the first gives mu*Phi(mu/sigma) + sigma*phi(mu/sigma) and the second sigma/sqrt(2 pi),
         which is the published closed form.
         """
@@ -334,14 +338,11 @@ class Savor(VoiceoverScene):
 
     def build_value_table(self) -> dict:
         """Projected dollars, their SAVOR values, the scale-up, and what each player ends on."""
-        # Every column in TOTAL auction dollars. The adjustment is defined on value above
-        # replacement, so that is what gets transformed and scaled -- but the replacement dollar
-        # is added back before anything is printed. Shown without it, the middle column sat on a
-        # different baseline from its neighbours and the last row read "$1 becomes $0 becomes
-        # $1", which is not a thing that happens to a player.
-        above = [value - REPLACEMENT_DOLLARS for value in PROJECTED_DOLLARS]
-        exact_raw = [self.savor_value(margin, S_SIGMA) for margin in above]
-        scaling = sum(above) / sum(exact_raw)
+        # All three columns on one baseline: value above replacement. There is no baseline to
+        # add back, because replacement is zero -- so a player projected at replacement is worth
+        # nothing above a free one, in every column, which is the whole point of the flyer.
+        exact_raw = [self.savor_value(value, S_SIGMA) for value in PROJECTED_DOLLARS]
+        scaling = sum(PROJECTED_DOLLARS) / sum(exact_raw)
 
         # Rounded to what is actually PRINTED, and every total summed from those same rounded
         # numbers. Printing whole dollars against changes carrying a decimal made the table
@@ -349,8 +350,8 @@ class Savor(VoiceoverScene):
         # column's rows added to $205 under a total reading $206. The underlying arithmetic was
         # right -- the changes cancel exactly and both totals are 206.0 -- so the fix is to show
         # a decimal everywhere and to add up what is on screen rather than what is behind it.
-        raw = [round(value + REPLACEMENT_DOLLARS, 1) for value in exact_raw]
-        final = [round(value * scaling + REPLACEMENT_DOLLARS, 1) for value in exact_raw]
+        raw = [round(value, 1) for value in exact_raw]
+        final = [round(value * scaling, 1) for value in exact_raw]
         change = [round(end - start, 1) for end, start in zip(final, PROJECTED_DOLLARS)]
 
         def column(values, x, colour, money=True):
