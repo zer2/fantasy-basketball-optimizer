@@ -26,13 +26,11 @@ NARRATION = {
         'they stay blue. It takes a high score to have any shot.',
     'its_hard':
         'This is only a small fraction of the distribution. The left-hand side of the distribution is irrelevant; what '
-        'matters is maximizing the area on the right that has some yellow. That means you should be willing to give up '
-        'quite a bit of expected value on the left side if it leads to an increased possibility of getting to the far right '
-        'side.',
+        'matters is maximizing the area on the right that has some yellow.',
     # -- Why spread is worth having ----------------------------------------------------
     'widen':
-        'So we don\'t just care about moving the mean of our distribution up. We want a high variance too, and sometimes '
-        'it will make sense to trade off a little bit of mean for a lot of variance.',
+        'We can do that in two ways: either by increasing our expected value, which shift everything to the right, '
+        'or increasing variance, which widens the distribution. The reward for variance is a unique aspect of Rotisserie',
     # -- Where spread comes from -------------------------------------------------------
     'two_builds':
         'The way that we control variance is through the kinds of builds that we design. We can increase variance by leaving the '

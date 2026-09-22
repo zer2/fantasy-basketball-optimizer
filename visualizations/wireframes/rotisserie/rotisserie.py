@@ -36,8 +36,9 @@ import numpy as np
 from manim import (
     VGroup, Line, DashedLine, Rectangle, Text, Dot,
     FadeIn, FadeOut, Create, Write, Transform,
-    DOWN, UP, RIGHT,
-    BLUE_B, GREEN_C, RED_B, GREY_B, GREY_D, YELLOW,
+    DOWN, UP, LEFT, RIGHT,
+    BLUE_B, BLUE_D, GREEN_C, RED_B, GREY_B, GREY_D, GREY_E, YELLOW,
+    interpolate_color,
 )
 from manim_voiceover import VoiceoverScene
 
@@ -81,6 +82,12 @@ BALANCED_BUILD = ([0.0] * CATEGORIES, 1.0)
 _COMMITTED_STRENGTH = 1.8124      # Phi(0.90) x sqrt(2): beats a neutral rival 90% of the time
 COMMITTED_BUILD = ([_COMMITTED_STRENGTH] * 5 + [-_COMMITTED_STRENGTH] * 4, 1.0)
 
+# The two levers the widening act demonstrates, measured: a better team (58.5 -> 70.1 points,
+# 7.7% -> 35.0%), and a wilder one at exactly the same expectation (sigma 10.3 -> 13.8, and
+# 7.7% -> 14.5% on nothing but spread).
+RICHER_BUILD = ([0.42] * CATEGORIES, 1.0)
+WILDER_BUILD = ([0.0] * CATEGORIES, 2.6)
+
 # -- Layout ---------------------------------------------------------------------------
 
 AXIS_Y = -2.9
@@ -96,7 +103,19 @@ STANDINGS_TOTAL_X = 0.9
 # A build's own season, shown beside its table: small, above the grid, on the same vertical
 # scale as the overlay that follows so the two readings agree.
 INSET_CURVE_SCALE = 0.42
-INSET_CURVE_CENTRE = [0.0, -2.1, 0.0]
+
+# The build heat map: a row per category, a column per opponent, on a diverging scale.
+CATEGORY_NAMES = ('Field Goal %', 'Free Throw %', 'Threes', 'Points', 'Rebounds',
+                  'Assists', 'Steals', 'Blocks', 'Turnovers')
+HEAT_TOP_Y = 2.1
+HEAT_ROW_GAP = 0.44
+HEAT_LEFT_X = -1.9
+HEAT_CELL_WIDTH = 0.42
+HEAT_CELL_HEIGHT = 0.36
+HEAT_WEAK = RED_B        # losing the category
+HEAT_NEUTRAL = GREY_E    # a coin flip
+HEAT_STRONG = BLUE_D     # winning it
+INSET_CURVE_CENTRE = [0.0, -2.75, 0.0]
 
 
 class Rotisserie(VoiceoverScene):
@@ -277,6 +296,9 @@ class Rotisserie(VoiceoverScene):
         for row in range(TEAMS):
             y = STANDINGS_TOP_Y - row * STANDINGS_ROW_GAP
             leader = row == 0
+            grid.add(Text(f'Team {row + 1}', font_size=18,
+                          color=RED_B if leader else GREY_D)
+                     .move_to([STANDINGS_LEFT_X - 1.5, y, 0.0], aligned_edge=LEFT))
             for column in range(CATEGORIES):
                 points = int(board[row, column])
                 grid.add(Text(str(points), font_size=18,
@@ -345,13 +367,40 @@ class Rotisserie(VoiceoverScene):
     # -- Act three: spread is worth something the average is not -----------------------
 
     def play_widening(self) -> None:
-        """One line now, not two. The script folded the 'why_wide' beat into this one, so the
-        left tail is greyed out and the right picked out while the same sentence runs."""
+        """The two levers the line names, each done to the curve that is already on screen.
+
+        Shifting right and widening are different moves with different costs, and the scene can
+        show that they are BOTH worth something here -- which is the part that is specific to
+        Rotisserie. Measured on these builds: the shift takes the win rate from 7.7% to 35.0%,
+        and the widening takes it to 14.5% without improving the team at all.
+        """
         with self.voiceover(text=NARRATION['widen']) as tracker:
-            wait_until_phrase(self, tracker, 'a high variance too')
-            self.wait(max(0.5, tracker.get_remaining_duration() - 0.8))
+            wait_until_phrase(self, tracker, 'increasing our expected value')
+            self.play(Transform(self.cloud, self.variant_cloud(RICHER_BUILD)),
+                      Transform(self.win_readout, self.win_line(RICHER_BUILD)),
+                      run_time=1.6)
+            self.wait(0.8)
+            self.play(Transform(self.cloud, self.variant_cloud(BALANCED_BUILD)),
+                      Transform(self.win_readout, self.win_line(BALANCED_BUILD)),
+                      run_time=0.9)
+
+            wait_until_phrase(self, tracker, 'increasing variance')
+            self.play(Transform(self.cloud, self.variant_cloud(WILDER_BUILD)),
+                      Transform(self.win_readout, self.win_line(WILDER_BUILD)),
+                      run_time=1.6)
+            self.wait(max(0.6, tracker.get_remaining_duration() - 0.9))
             self.play(FadeOut(VGroup(self.cloud, self.win_readout, self.bar_line,
                                      self.bar_label, self.axis)), run_time=0.8)
+
+    def variant_cloud(self, build) -> VGroup:
+        """The same team's season under one of the two levers, on the established scale."""
+        mine, bar = self.simulate(build)
+        return self.build_win_shaded_distribution(mine, bar, BLUE_B, self.reference)
+
+    def win_line(self, build) -> Text:
+        mine, bar = self.simulate(build)
+        return Text(f'won the league in {self.win_rate(mine, bar):.1%} of seasons',
+                    font_size=28, color=BLUE_B).move_to([0.0, 3.1, 0.0])
 
     # -- Act four: two builds, each with the season it produces ------------------------
 
@@ -379,7 +428,14 @@ class Rotisserie(VoiceoverScene):
             curve = self.build_win_shaded_distribution(mine, bar, colour, reference,
                                                        show_win_shading=False)
             curve.scale(INSET_CURVE_SCALE).move_to(INSET_CURVE_CENTRE)
-            return table, curve
+            # A baseline under it, so the little curve reads as a distribution rather than as a
+            # shape floating below the grid.
+            floor = Line([-3.2, INSET_CURVE_CENTRE[1] - 0.62, 0.0],
+                         [3.2, INSET_CURVE_CENTRE[1] - 0.62, 0.0],
+                         color=GREY_D, stroke_width=2)
+            caption = Text('the season it produces', font_size=19, color=GREY_D)
+            caption.move_to([0.0, INSET_CURVE_CENTRE[1] - 0.92, 0.0])
+            return table, VGroup(curve, floor, caption)
 
         first_table, first_curve = build_panel(
             BALANCED_BUILD, BLUE_B, 'every fantasy point a coin flip', runs[0])
@@ -429,26 +485,39 @@ class Rotisserie(VoiceoverScene):
         self.wait(0.6)
 
     def build_matchup_table(self, build, heading: str, colour) -> VGroup:
-        """Chance of beating each rival in each category: nine rows, eleven opponents.
+        """Chance of beating each rival in each category, as a heat map.
 
-        A Rotisserie team plays everyone at once, so what settles a category is not one number
-        but a row of them. A table is the honest shape for that; a single bar would be the head
-        to head picture wearing Rotisserie's name.
+        A Rotisserie team plays everyone at once, so what settles a category is a row of numbers
+        rather than one. Drawn as flat squares at varying opacity it read as a grid of the same
+        colour repeated; on a diverging scale the shape of a build is legible at a glance -- a
+        balanced one is a single flat tone, a committed one splits into two blocks.
+
+        The scale is the scenes' own convention rather than a new one: red for a category being
+        lost, blue for one being won, and the neutral ground between them for a coin flip.
         """
         means, spread = build
-        title = Text(heading, font_size=26, color=colour).move_to([0.0, 2.9, 0.0])
-        grid = VGroup()
+        title = Text(heading, font_size=26, color=colour).move_to([0.0, 2.95, 0.0])
+        rows = VGroup()
         for category in range(CATEGORIES):
-            # P(this team beats a neutral rival in this category), for strengths drawn around
-            # these means against rivals drawn around zero.
             chance = 0.5 * (1.0 + erf(means[category] / sqrt(2.0 * (1.0 + spread ** 2))))
-            row_y = 1.75 - category * 0.38
+            row_y = HEAT_TOP_Y - category * HEAT_ROW_GAP
+            rows.add(Text(CATEGORY_NAMES[category], font_size=19, color=GREY_B)
+                     .move_to([HEAT_LEFT_X - 0.55, row_y, 0.0], aligned_edge=RIGHT))
             for opponent in range(TEAMS - 1):
-                grid.add(Rectangle(width=0.44, height=0.30, stroke_width=0,
-                                   fill_color=colour, fill_opacity=max(0.05, chance))
-                         .move_to([-3.6 + opponent * 0.50, row_y, 0.0]))
-            grid.add(Text(f'{chance:.0%}', font_size=19, color=GREY_B)
-                     .move_to([2.5, row_y, 0.0]))
-        legend = Text('one row per category, one column per opponent',
-                      font_size=20, color=GREY_D).move_to([0.0, -1.0, 0.0])
-        return VGroup(title, grid, legend)
+                rows.add(Rectangle(width=HEAT_CELL_WIDTH, height=HEAT_CELL_HEIGHT,
+                                   stroke_width=0, fill_opacity=1.0,
+                                   fill_color=self.heat_colour(chance))
+                         .move_to([HEAT_LEFT_X + opponent * HEAT_CELL_WIDTH, row_y, 0.0]))
+            rows.add(Text(f'{chance:.0%}', font_size=20, color=self.heat_colour(chance))
+                     .move_to([HEAT_LEFT_X + (TEAMS - 1) * HEAT_CELL_WIDTH + 0.6, row_y, 0.0]))
+
+        columns = Text('eleven opponents', font_size=19, color=GREY_D)
+        columns.move_to([HEAT_LEFT_X + (TEAMS - 2) * HEAT_CELL_WIDTH / 2,
+                         HEAT_TOP_Y + 0.45, 0.0])
+        return VGroup(title, columns, rows)
+
+    def heat_colour(self, chance: float):
+        """Red where a category is being lost, blue where it is being won, neutral at a flip."""
+        if chance >= 0.5:
+            return interpolate_color(HEAT_NEUTRAL, HEAT_STRONG, (chance - 0.5) * 2.0)
+        return interpolate_color(HEAT_NEUTRAL, HEAT_WEAK, (0.5 - chance) * 2.0)
