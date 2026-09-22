@@ -89,6 +89,10 @@ AXIS_RIGHT_X = 6.0
 CLOUD_HEIGHT = 4.2         # height of the most common total; the rest scale against it
 # The winning bar is drawn shorter, so it reads as background against the team's own curve.
 THRESHOLD_HEIGHT = 2.4
+# A build's own season, shown beside its table: small, above the grid, on the same vertical
+# scale as the overlay that follows so the two readings agree.
+INSET_CURVE_SCALE = 0.42
+INSET_CURVE_CENTRE = [0.0, -2.1, 0.0]
 
 
 class Rotisserie(VoiceoverScene):
@@ -222,34 +226,39 @@ class Rotisserie(VoiceoverScene):
     # -- Act one: what a Rotisserie point is -------------------------------------------
 
     def play_the_scale(self) -> None:
-        """Straight onto the axis. Anyone watching a Rotisserie explainer knows what Rotisserie
-        is, so the scoring is stated in one sentence rather than taught in an act."""
+        """Straight onto the axis. The script assumes its audience knows Rotisserie, so the
+        scoring is never taught -- the scale is simply put up and populated as it is referred to.
+
+        Three marks across one long sentence, rather than an axis held alone under it: the scale
+        itself, where an average team lands, and the fact that the bar sits far to the right of
+        that.
+        """
         with self.voiceover(text=NARRATION['the_scale']) as tracker:
+            # The line opens on facing everyone at once, so that is what is on screen. The axis
+            # alone held the first fourteen seconds, which is the fault this scene has now been
+            # rewritten twice to remove.
+            league = self.build_league_row()
+            self.play(FadeIn(league), run_time=1.2)
+
+            wait_until_phrase(self, tracker, 'scores 58.5 points')
             self.axis = self.build_axis()
-            self.play(Create(self.axis), run_time=1.2)
-
-            # What a category pays, shown while the line says it. Without this the axis sat
-            # alone for twelve seconds under a running sentence, which is the fault this scene
-            # has already been rewritten once to remove.
-            wait_until_phrase(self, tracker, 'twelve points')
-            paid = VGroup(
-                Text('1st in a category', font_size=24, color=GREY_B),
-                Text('12 points', font_size=26, color=BLUE_B),
-                Text('last in a category', font_size=24, color=GREY_B),
-                Text('1 point', font_size=26, color=GREY_D),
-            ).arrange_in_grid(rows=2, cols=2, buff=(0.6, 0.35))
-            paid.move_to([0.0, 1.1, 0.0])
-            self.play(FadeIn(paid), run_time=1.0)
-
-            wait_until_phrase(self, tracker, 'about fifty eight')
-            self.play(FadeOut(paid), run_time=0.5)
+            self.play(FadeOut(league), run_time=0.4)
+            self.play(Create(self.axis), run_time=1.0)
             average = DashedLine([self.to_scene_x(AVERAGE_POINTS), AXIS_Y, 0.0],
-                                 [self.to_scene_x(AVERAGE_POINTS), AXIS_Y + 1.1, 0.0],
+                                 [self.to_scene_x(AVERAGE_POINTS), AXIS_Y + 1.2, 0.0],
                                  color=GREY_B, stroke_width=2, dash_length=0.1)
             label = Text('an average team', font_size=21, color=GREY_B)
             label.next_to(average, UP, buff=0.1)
             self.play(Create(average), FadeIn(label), run_time=0.9)
             self.average_mark = VGroup(average, label)
+
+            wait_until_phrase(self, tracker, 'far above that')
+            reach = Line([self.to_scene_x(AVERAGE_POINTS) + 0.15, AXIS_Y + 0.6, 0.0],
+                         [self.to_scene_x(92), AXIS_Y + 0.6, 0.0],
+                         color=RED_B, stroke_width=3)
+            reach.add_tip(tip_length=0.22)
+            self.play(Create(reach), run_time=0.9)
+            self.reach = reach
             self.wait(0.6)
 
     # -- Act two: the bar, and how rarely anyone clears it -----------------------------
@@ -257,7 +266,7 @@ class Rotisserie(VoiceoverScene):
     def play_the_bar(self) -> None:
         with self.voiceover(text=NARRATION['the_bar']) as tracker:
             self.mine, self.bar = self.simulate(BALANCED_BUILD)
-            wait_until_phrase(self, tracker, 'lands around')
+            wait_until_phrase(self, tracker, 'think of it as a')
             # Introduced at full height and explained on its own. It only becomes background
             # once the team's curve arrives to sit in front of it -- coming up already faint
             # would make it scenery before anyone had been told what it is.
@@ -266,7 +275,7 @@ class Rotisserie(VoiceoverScene):
             bar_label = Text('what it took to win', font_size=22, color=RED_B)
             bar_label.move_to([self.to_scene_x(self.bar.mean()) + 1.6,
                                AXIS_Y + CLOUD_HEIGHT + 0.25, 0.0])
-            self.play(FadeOut(self.average_mark), run_time=0.4)
+            self.play(FadeOut(VGroup(self.average_mark, self.reach)), run_time=0.4)
             self.play(FadeIn(self.bar_line), FadeIn(bar_label), run_time=1.0)
             self.bar_label = bar_label
             self.wait(1.0)
@@ -295,63 +304,70 @@ class Rotisserie(VoiceoverScene):
     # -- Act three: spread is worth something the average is not -----------------------
 
     def play_widening(self) -> None:
-        with self.voiceover(text=NARRATION['widen']):
-            self.wait(2.0)
+        """One line now, not two. The script folded the 'why_wide' beat into this one, so the
+        left tail is greyed out and the right picked out while the same sentence runs."""
+        with self.voiceover(text=NARRATION['widen']) as tracker:
+            wait_until_phrase(self, tracker, 'a high variance too')
+            self.wait(max(0.5, tracker.get_remaining_duration() - 0.8))
+            self.play(FadeOut(VGroup(self.cloud, self.win_readout, self.bar_line,
+                                     self.bar_label, self.axis)), run_time=0.8)
 
-        with self.voiceover(text=NARRATION['why_wide']):
-            # PLACEHOLDER: the two tails want opposite treatment -- the left greyed as "losing
-            # either way", the right picked out as the part that gained. Wants the cloud redrawn
-            # at a wider spread with the mean pinned, which is a second simulation.
-            self.wait(2.4)
-
-    # -- Act four: two builds, their tables, and what they actually win ----------------
+    # -- Act four: two builds, each with the season it produces ------------------------
 
     def play_two_builds(self) -> None:
-        # The first table comes up DURING this line rather than after it. Clearing the screen
-        # and then waiting out the sentence left ten seconds of black with a voice over it,
-        # which is the same fault the old opening had.
-        table = self.build_matchup_table(BALANCED_BUILD, 'every category a coin flip', BLUE_B)
-        with self.voiceover(text=NARRATION['two_builds']) as tracker:
-            # Everything goes at once. The blue used to be taken away at the end of the previous
-            # line while the red stayed behind it, so the curve being talked about vanished and
-            # its backdrop did not.
-            self.play(FadeOut(VGroup(self.cloud, self.win_readout, self.bar_line,
-                                     self.bar_label, self.axis)), run_time=0.6)
-            self.play(FadeIn(table), run_time=1.2)
+        """Each build gets its table AND the distribution that table produces, then both are
+        laid over one axis together.
+
+        Introducing a build without showing what it lands on left the tables as assertions --
+        the whole claim is about the shape of the season each one produces, so that shape
+        belongs on screen while the build is being described.
+        """
+        runs = [self.simulate(build) for build in (BALANCED_BUILD, COMMITTED_BUILD)]
+        # A single vertical scale across every distribution the act draws, set by the tallest,
+        # so the two are comparable here and remain comparable when overlaid.
+        reference = max(self.peak_probability(mine) for mine, _ in runs)
+        self.summaries = [(float(mine.mean()), float(mine.std()), self.win_rate(mine, bar))
+                          for mine, bar in runs]
+
+        def build_panel(build, colour, heading, run):
+            table = self.build_matchup_table(build, heading, colour)
+            mine, bar = run
+            curve = self.build_win_shaded_distribution(mine, bar, colour, reference)
+            curve.scale(INSET_CURVE_SCALE).move_to(INSET_CURVE_CENTRE)
+            return table, curve
+
+        first_table, first_curve = build_panel(
+            BALANCED_BUILD, BLUE_B, 'every fantasy point a coin flip', runs[0])
+        with self.voiceover(text=NARRATION['two_builds']):
+            # Up from the first word. Anchored half way through the line instead, the first
+            # twelve seconds of it played over a black screen.
+            self.play(FadeIn(first_table), run_time=1.0)
 
         with self.voiceover(text=NARRATION['coin_flips']):
-            self.wait(2.0)
+            self.play(FadeIn(first_curve), run_time=0.9)
+            self.wait(1.2)
 
         with self.voiceover(text=NARRATION['certainties']):
-            committed = self.build_matchup_table(
-                COMMITTED_BUILD, 'five locked in, four abandoned', GREEN_C)
-            self.play(FadeOut(table), run_time=0.4)
-            self.play(FadeIn(committed), run_time=1.0)
-            self.committed_table = committed
+            second_table, second_curve = build_panel(
+                COMMITTED_BUILD, GREEN_C, 'most nearly won, the rest nearly lost', runs[1])
+            self.play(FadeOut(VGroup(first_table, first_curve)), run_time=0.4)
+            self.play(FadeIn(second_table), run_time=0.8)
+            self.play(FadeIn(second_curve), run_time=0.8)
+            self.second_panel = VGroup(second_table, second_curve)
 
-        with self.voiceover(text=NARRATION['the_result']) as tracker:
+        with self.voiceover(text=NARRATION['conclusion']) as tracker:
+            # The committed panel is cleared HERE rather than at the end of its own line, which
+            # left the rest of that sentence running over nothing.
+            self.play(FadeOut(self.second_panel), run_time=0.5)
             self.axis = self.build_axis()
-            self.play(FadeOut(self.committed_table), run_time=0.4)
             self.play(Create(self.axis), run_time=0.9)
-            clouds, self.summaries = VGroup(), []
-            runs = [self.simulate(build) for build in (BALANCED_BUILD, COMMITTED_BUILD)]
-            # Both drawn against the balanced curve's peak, so the two areas are comparable and
-            # the committed one reads as what it is: the same amount of probability, packed into
-            # a narrower range rather than spread across a wide one.
-            # Scaled to the TALLER of the two, so the narrow curve fits the frame and the wide
-            # one sits correctly short beside it. Using the wide one as the reference sent the
-            # narrow one straight off the top of the screen.
-            reference = max(self.peak_probability(mine) for mine, _ in runs)
-            for (mine, bar), colour in zip(runs, (BLUE_B, GREEN_C)):
-                clouds.add(self.build_win_shaded_distribution(mine, bar, colour, reference))
-                self.summaries.append((float(mine.mean()), float(mine.std()),
-                                       self.win_rate(mine, bar)))
-            self.clouds = clouds
-            self.play(FadeIn(clouds), run_time=1.6)
-            wait_until_phrase(self, tracker, 'more points on average')
-            self.wait(1.4)
+            clouds = VGroup(*[
+                self.build_win_shaded_distribution(mine, bar, colour, reference)
+                for (mine, bar), colour in zip(runs, (BLUE_B, GREEN_C))
+            ])
+            self.play(FadeIn(clouds), run_time=1.4)
 
-        with self.voiceover(text=NARRATION['conclusion']):
+            wait_until_phrase(self, tracker, 'too concentrated')
             rows = VGroup(*[
                 VGroup(
                     Text(name, font_size=23, color=colour),
@@ -359,13 +375,26 @@ class Rotisserie(VoiceoverScene):
                     Text(f'wins {won:.1%}', font_size=25, color=colour),
                 ).arrange(RIGHT, buff=0.45)
                 for name, colour, (mean, spread, won) in (
-                    ('every category a coin flip', BLUE_B, self.summaries[0]),
-                    ('five locked, four abandoned', GREEN_C, self.summaries[1]),
+                    ('every point a coin flip', BLUE_B, self.summaries[0]),
+                    ('most won, the rest lost', GREEN_C, self.summaries[1]),
                 )
             ]).arrange(DOWN, buff=0.4).move_to([0.0, 2.9, 0.0])
             self.play(FadeIn(rows), run_time=1.2)
-            self.wait(2.4)
+            self.wait(2.0)
         self.wait(0.6)
+
+    def build_league_row(self) -> VGroup:
+        """The twelve teams, since the opening line is about playing all of them at once."""
+        seats = VGroup(*[
+            VGroup(Dot(radius=0.17, color=BLUE_B if seat == 0 else GREY_D),
+                   Text('you' if seat == 0 else f'{seat + 1}', font_size=18,
+                        color=BLUE_B if seat == 0 else GREY_D))
+            .arrange(DOWN, buff=0.16)
+            for seat in range(TEAMS)
+        ]).arrange(RIGHT, buff=0.42)
+        caption = Text('no matchups: everyone at once, all season',
+                       font_size=24, color=GREY_B)
+        return VGroup(seats, caption).arrange(DOWN, buff=0.55).move_to([0.0, 0.3, 0.0])
 
     def build_matchup_table(self, build, heading: str, colour) -> VGroup:
         """Chance of beating each rival in each category: nine rows, eleven opponents.
