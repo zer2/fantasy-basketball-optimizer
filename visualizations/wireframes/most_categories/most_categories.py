@@ -86,7 +86,11 @@ ROTATING_WEEKS = (
     (0, 0, 1, 0, 1, 0, 0, 1, 0),   # three of nine
     (1, 1, 1, 0, 1, 1, 0, 1, 0),   # six of nine again, arrived at differently
 )
-LANDSLIDE_WEEK = (1, 1, 1, 1, 1, 1, 1, 1, 1)   # all nine, still one win
+# The pair that makes the payoff argument: a sweep and the narrowest possible majority, worth
+# exactly the same. Ending on the narrow one is the point -- it is the outcome the algorithm
+# actually plays for, and the sweep is only there to be matched by it.
+LANDSLIDE_WEEK = (1, 1, 1, 1, 1, 1, 1, 1, 1)   # all nine
+NARROW_WEEK    = (1, 0, 1, 1, 0, 1, 0, 1, 0)   # five of nine, and worth the same
 
 # What one week of the rotation gets, once the first has been shown deliberately.
 ROTATION_SECONDS = 1.5
@@ -177,6 +181,17 @@ class MostCategories(VoiceoverScene):
                       lag_ratio=0.06, run_time=1.2)
             self.verdict = self.build_verdict(LANDSLIDE_WEEK)
             self.play(FadeIn(self.verdict), run_time=0.8)
+            self.wait(1.2)
+
+            # And back down to the narrowest majority there is, which pays exactly the same.
+            # Ending on the sweep left the last thing on screen being the outcome that is NOT
+            # worth chasing.
+            self.play(FadeOut(self.week_marks), FadeOut(self.verdict), run_time=0.3)
+            self.play(*[FadeIn(mark) for mark in self.mark_week(NARROW_WEEK)],
+                      lag_ratio=0.05, run_time=0.8)
+            self.verdict = self.build_verdict(NARROW_WEEK)
+            self.play(FadeIn(self.verdict), run_time=0.7)
+
             # Held to the end of the line. The sentence runs on to say what the objective is
             # NOT, and taking the board away before that lands leaves the rest of it spoken
             # over an empty frame.
@@ -253,7 +268,12 @@ class MostCategories(VoiceoverScene):
         what scrolls past is genuinely the enumeration rather than a decorative sample.
         """
         rows = VGroup()
-        for number in range(TABLE_ROWS_BUILT):
+        # Counted DOWN from every category won. Counting up from zero opened the table on a row
+        # of nine losses, which is a strange thing to lead with when the subject is winning a
+        # majority -- the eye should start on the outcome the viewer is hoping for.
+        highest = 2 ** len(CATEGORIES) - 1
+        for index in range(TABLE_ROWS_BUILT):
+            number = highest - index
             bits = [(number >> shift) & 1 for shift in range(len(CATEGORIES) - 1, -1, -1)]
             cells = VGroup(*[
                 Rectangle(width=TABLE_CELL, height=TABLE_CELL,
