@@ -64,8 +64,10 @@ NOISE_SPREAD = 1.0
 PLAYERS = (
     {'name': 'star',        'value': 2.20, 'colour': BLUE_B,
      'label_shift':  0.00, 'label_height': 2.45},
+    # Shifted up and to the right of the replacement line: centred near it, the word ran
+    # across the dashed line itself.
     {'name': 'starter',     'value': 0.55, 'colour': GREEN_C,
-     'label_shift': -0.30, 'label_height': 2.05},
+     'label_shift':  0.62, 'label_height': 2.28},
     {'name': 'dollar flyer','value': 0.00, 'colour': GREY_B,
      'label_shift': -1.95, 'label_height': 1.35},
 )
@@ -121,10 +123,10 @@ class Savor(VoiceoverScene):
         line = DashedLine([self.to_scene_x(REPLACEMENT), BASELINE_Y, 0.0],
                           [self.to_scene_x(REPLACEMENT), BASELINE_Y + 3.1, 0.0],
                           color=YELLOW, stroke_width=3, dash_length=0.12)
-        # Under the axis rather than over the line. Above, it sat in the same band as the
-        # players' own labels and collided with them.
+        # Above the line it names, which is where it belongs. It sits clear of the players'
+        # own labels because the tallest of those is lower than the top of this line.
         label = Text('replacement level', font_size=21, color=YELLOW)
-        label.move_to([self.to_scene_x(REPLACEMENT), BASELINE_Y - 0.95, 0.0])
+        label.move_to([self.to_scene_x(REPLACEMENT), BASELINE_Y + 3.38, 0.0])
         return VGroup(line, label)
 
     def normal_points(self, centre: float, spread: float, low: float, high: float):

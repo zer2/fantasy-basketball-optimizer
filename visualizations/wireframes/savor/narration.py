@@ -12,7 +12,7 @@ differently from how it is written ('sigma', 'mu').
 
 NARRATION = {
     'three_players':
-        'When we draft players before the season, we do not know exactly how they will perform during the season. We might expect them '
+        'When we take players in an auction before a season, we do not know exactly how they will perform during the season. We might expect them '
         'to have some level of value, but they could end up well above or below that mark. If we think of players as having a Normally distributed '
         'error in their value projection, then their values are Normal distributions. Here are some potential distributions, for a star, a decent '
         'starter, and a flyer.',
