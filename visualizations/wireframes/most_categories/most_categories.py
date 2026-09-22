@@ -36,7 +36,7 @@ from pathlib import Path
 
 import numpy as np
 from manim import (
-    Group, VGroup, VMobject, Line, DashedLine, Rectangle, Text, MathTex, Dot,
+    Group, VGroup, VMobject, Line, DashedLine, Rectangle, Text, MathTex, Dot, Dot3D,
     FadeIn, FadeOut, Create, Write, Transform, linear,
     DOWN, UP, LEFT, RIGHT,
     BLUE_D, BLUE_B, RED_D, RED_B, GREEN_C, GREY_B, GREY_D, YELLOW, WHITE,
@@ -128,6 +128,9 @@ SLIDE_TO = (5, 0)
 # than leaving the backward one nudged sideways and overlapping the forward one. Flat-on
 # (phi = 0) the scene renders exactly as a 2D one, which is what every other act wants.
 WALK_BACKWARD_Z = -1.7
+# How finely each probability sphere is built. Low on purpose: there are around a hundred of
+# them per sweep and the scene renders them for the whole act.
+SPHERE_RESOLUTION = 8
 # A gentle tilt. At sixty-plus degrees the planes foreshortened into slivers and everything
 # written on them sheared with the camera; this is enough to separate the two sweeps in depth
 # while the walk still reads as a walk.
@@ -135,6 +138,7 @@ WALK_VIEW_PHI, WALK_VIEW_THETA = 34, -84
 # Readouts are pinned in SCREEN space, not on the planes: at any camera angle a line of text
 # lying on a tilted plane shears, and pinning only its orientation left the glyphs spread apart.
 READOUT_SCREEN_Y = -3.05
+CUT_LABEL_SCREEN_Y = 3.25
 FLAT_VIEW_PHI, FLAT_VIEW_THETA = 0, -90
 
 # The focus sits in the middle of the row, so the other eight fall four either side of it.
@@ -430,7 +434,7 @@ class MostCategories(VoiceoverScene, ThreeDScene):
             self.backward[index] = self.step_distribution(
                 self.backward[index + 1], WIN_CHANCES[index])
 
-        self.forward_columns = VGroup()
+        self.forward_columns = Group()
         for step, distribution in enumerate(self.forward):
             column = self.build_column(distribution, step)
             self.forward_columns.add(column)
@@ -461,14 +465,18 @@ class MostCategories(VoiceoverScene, ThreeDScene):
         readable at once, and side by side on one plane they overlapped.
         """
         depth = 0.0 if forward else WALK_BACKWARD_Z
-        dots = VGroup()
+        dots = Group()
         for net, probability in distribution.items():
-            dots.add(Dot(
+            # Spheres, not discs. Flat circles have no thickness, so rotating the camera only
+            # skewed a drawing; a sphere is the same shape from every angle and the tilt reveals
+            # that the walk was a solid all along rather than a picture of one.
+            dots.add(Dot3D(
                 point=[self.walk_x(step), self.walk_y(net), depth],
                 radius=0.05 + 0.18 * probability ** 0.5,
+                resolution=(SPHERE_RESOLUTION, SPHERE_RESOLUTION),
                 color=((above_colour or BLUE_B) if net > 0 else GREY_D)
                       if forward else GREEN_C,
-            ).set_opacity(0.30 + 0.60 * probability ** 0.5))
+            ).set_opacity(0.35 + 0.60 * probability ** 0.5))
         return dots
 
     # ── Act four: two sweeps, and a cut that slides ───────────────────────────────────
@@ -492,7 +500,7 @@ class MostCategories(VoiceoverScene, ThreeDScene):
             # would skew for no reason; the angle exists to separate the two sweeps in depth.
             self.move_camera(phi=WALK_VIEW_PHI * DEGREES,
                              theta=WALK_VIEW_THETA * DEGREES, run_time=1.6)
-            self.backward_columns = VGroup()
+            self.backward_columns = Group()
             for step in range(len(CATEGORIES), -1, -1):
                 column = self.build_column(self.backward[step], step, forward=False)
                 self.backward_columns.add(column)
@@ -643,8 +651,8 @@ class MostCategories(VoiceoverScene, ThreeDScene):
         with self.voiceover(text=NARRATION['tipping_point_probability']) as tracker:
             # The majority total goes with the walk it belongs to. Pinned in screen space, it
             # was not in the group being cleared and sat over this act as a stray number.
-            self.play(FadeOut(VGroup(self.forward_columns, self.all_paths,
-                                     self.lattice, self.win_region)),
+            self.play(FadeOut(Group(self.forward_columns, self.all_paths,
+                                    self.lattice, self.win_region)),
                       FadeOut(self.majority_readout), run_time=0.7)
             panel = self.build_tipping_panel()
             # The objective has to be ADDED, not only transformed: a Transform on a mobject the
@@ -674,8 +682,8 @@ class MostCategories(VoiceoverScene, ThreeDScene):
             # reaches for the forward sweep and the lattice again -- left cleared, the cut would
             # open on a backward sweep with nothing to meet.
             self.play(FadeOut(table), run_time=0.5)
-            self.play(FadeIn(VGroup(self.lattice, self.all_paths, self.win_region,
-                                    self.forward_columns)), run_time=0.7)
+            self.play(FadeIn(Group(self.lattice, self.all_paths, self.win_region,
+                                   self.forward_columns)), run_time=0.7)
 
     def build_tipping_panel(self) -> dict:
         """All nine categories in one row, the focus among them rather than set apart.
@@ -782,7 +790,9 @@ class MostCategories(VoiceoverScene, ThreeDScene):
         fades += [self.backward_columns[len(CATEGORIES) - index].animate.set_opacity(0.12)
                   for index in range(len(CATEGORIES) + 1) if index != keep_backward]
 
-        label.move_to([0.0, READOUT_SCREEN_Y + 1.15, 0.0])
+        # Above the frame rather than below it: the readouts already own the bottom, and at this
+        # camera angle the lower half of the screen is where the backward sweep sits.
+        label.move_to([0.0, CUT_LABEL_SCREEN_Y, 0.0])
         if first_time:
             self.cut_marker, self.cut_label = marker, label
             self.add_fixed_in_frame_mobjects(label)
