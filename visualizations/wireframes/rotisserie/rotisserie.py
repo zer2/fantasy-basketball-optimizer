@@ -89,6 +89,13 @@ AXIS_RIGHT_X = 6.0
 CLOUD_HEIGHT = 4.2         # height of the most common total; the rest scale against it
 # The winning bar is drawn shorter, so it reads as background against the team's own curve.
 THRESHOLD_HEIGHT = 2.4
+
+# A finished season's standings: twelve teams down, nine categories across, totals on the right.
+STANDINGS_TOP_Y = 2.55
+STANDINGS_ROW_GAP = 0.40
+STANDINGS_LEFT_X = -5.2
+STANDINGS_COLUMN_GAP = 0.62
+STANDINGS_TOTAL_X = 0.9
 # A build's own season, shown beside its table: small, above the grid, on the same vertical
 # scale as the overlay that follows so the two readings agree.
 INSET_CURVE_SCALE = 0.42
@@ -226,47 +233,74 @@ class Rotisserie(VoiceoverScene):
     # -- Act one: what a Rotisserie point is -------------------------------------------
 
     def play_the_scale(self) -> None:
-        """Straight onto the axis. The script assumes its audience knows Rotisserie, so the
-        scoring is never taught -- the scale is simply put up and populated as it is referred to.
+        """A finished season's standings, which is the thing the rest of the scene abstracts.
 
-        Three marks across one long sentence, rather than an axis held alone under it: the scale
-        itself, where an average team lands, and the fact that the bar sits far to the right of
-        that.
+        The act used to open on twelve labelled dots, which showed nothing: it said the league
+        had twelve teams and stopped there. A real table says what the scene needs said -- that
+        every team scores in every category, that the totals spread a long way, and that the one
+        at the top is far above the middle rather than a little above it.
         """
         with self.voiceover(text=NARRATION['the_scale']) as tracker:
-            # The line opens on facing everyone at once, so that is what is on screen. The axis
-            # alone held the first fourteen seconds, which is the fault this scene has now been
-            # rewritten twice to remove.
-            league = self.build_league_row()
-            self.play(FadeIn(league), run_time=1.2)
+            board, totals = self.simulate_one_season()
+            table = self.build_standings_table(board, totals)
+            self.play(FadeIn(table['grid']), run_time=1.4)
 
             wait_until_phrase(self, tracker, 'scores 58.5 points')
-            self.axis = self.build_axis()
-            self.play(FadeOut(league), run_time=0.4)
-            self.play(Create(self.axis), run_time=1.0)
-            average = DashedLine([self.to_scene_x(AVERAGE_POINTS), AXIS_Y, 0.0],
-                                 [self.to_scene_x(AVERAGE_POINTS), AXIS_Y + 1.2, 0.0],
-                                 color=GREY_B, stroke_width=2, dash_length=0.1)
-            label = Text('an average team', font_size=21, color=GREY_B)
-            label.next_to(average, UP, buff=0.1)
-            self.play(Create(average), FadeIn(label), run_time=0.9)
-            self.average_mark = VGroup(average, label)
+            self.play(FadeIn(table['average']), run_time=0.8)
+            self.wait(0.6)
 
             wait_until_phrase(self, tracker, 'far above that')
-            reach = Line([self.to_scene_x(AVERAGE_POINTS) + 0.15, AXIS_Y + 0.6, 0.0],
-                         [self.to_scene_x(92), AXIS_Y + 0.6, 0.0],
-                         color=RED_B, stroke_width=3)
-            reach.add_tip(tip_length=0.22)
-            self.play(Create(reach), run_time=0.9)
-            self.reach = reach
-            self.wait(0.6)
+            self.play(FadeIn(table['winner']), run_time=0.9)
+            self.wait(1.2)
+            self.play(FadeOut(VGroup(table['grid'], table['average'], table['winner'])),
+                      run_time=0.6)
+
+    def simulate_one_season(self):
+        """One finished season: every team's points in every category, sorted by total."""
+        board = self.rng.standard_normal((TEAMS, CATEGORIES))
+        ranks = board.argsort(axis=0).argsort(axis=0) + 1
+        totals = ranks.sum(axis=1)
+        order = np.argsort(-totals)
+        return ranks[order], totals[order]
+
+    def build_standings_table(self, board, totals) -> dict:
+        """Twelve teams down, nine categories across, totals on the right, best first."""
+        grid = VGroup()
+        for column in range(CATEGORIES):
+            grid.add(Text(f'C{column + 1}', font_size=17, color=GREY_D)
+                     .move_to([STANDINGS_LEFT_X + column * STANDINGS_COLUMN_GAP,
+                               STANDINGS_TOP_Y + 0.42, 0.0]))
+        grid.add(Text('total', font_size=19, color=GREY_B)
+                 .move_to([STANDINGS_TOTAL_X, STANDINGS_TOP_Y + 0.42, 0.0]))
+
+        for row in range(TEAMS):
+            y = STANDINGS_TOP_Y - row * STANDINGS_ROW_GAP
+            leader = row == 0
+            for column in range(CATEGORIES):
+                points = int(board[row, column])
+                grid.add(Text(str(points), font_size=18,
+                              color=BLUE_B if points >= TEAMS - 2 else GREY_D)
+                         .move_to([STANDINGS_LEFT_X + column * STANDINGS_COLUMN_GAP, y, 0.0]))
+            grid.add(Text(str(int(totals[row])), font_size=21,
+                          color=RED_B if leader else GREY_B)
+                     .move_to([STANDINGS_TOTAL_X, y, 0.0]))
+
+        average = VGroup(
+            Text(f'an average team scores {AVERAGE_POINTS:.1f}', font_size=22, color=GREY_B),
+        ).move_to([STANDINGS_TOTAL_X + 2.6, STANDINGS_TOP_Y - 5.5 * STANDINGS_ROW_GAP, 0.0])
+        winner = VGroup(
+            Text(f'the league is won on {int(totals[0])}', font_size=24, color=RED_B),
+        ).move_to([STANDINGS_TOTAL_X + 2.6, STANDINGS_TOP_Y, 0.0])
+        return {'grid': grid, 'average': average, 'winner': winner}
 
     # -- Act two: the bar, and how rarely anyone clears it -----------------------------
 
     def play_the_bar(self) -> None:
         with self.voiceover(text=NARRATION['the_bar']) as tracker:
             self.mine, self.bar = self.simulate(BALANCED_BUILD)
-            wait_until_phrase(self, tracker, 'think of it as a')
+            self.axis = self.build_axis()
+            self.play(Create(self.axis), run_time=0.9)
+            wait_until_phrase(self, tracker, 'cannot know exactly')
             # Introduced at full height and explained on its own. It only becomes background
             # once the team's curve arrives to sit in front of it -- coming up already faint
             # would make it scenery before anyone had been told what it is.
@@ -275,7 +309,6 @@ class Rotisserie(VoiceoverScene):
             bar_label = Text('what it took to win', font_size=22, color=RED_B)
             bar_label.move_to([self.to_scene_x(self.bar.mean()) + 1.6,
                                AXIS_Y + CLOUD_HEIGHT + 0.25, 0.0])
-            self.play(FadeOut(VGroup(self.average_mark, self.reach)), run_time=0.4)
             self.play(FadeIn(self.bar_line), FadeIn(bar_label), run_time=1.0)
             self.bar_label = bar_label
             self.wait(1.0)
@@ -382,19 +415,6 @@ class Rotisserie(VoiceoverScene):
             self.play(FadeIn(rows), run_time=1.2)
             self.wait(2.0)
         self.wait(0.6)
-
-    def build_league_row(self) -> VGroup:
-        """The twelve teams, since the opening line is about playing all of them at once."""
-        seats = VGroup(*[
-            VGroup(Dot(radius=0.17, color=BLUE_B if seat == 0 else GREY_D),
-                   Text('you' if seat == 0 else f'{seat + 1}', font_size=18,
-                        color=BLUE_B if seat == 0 else GREY_D))
-            .arrange(DOWN, buff=0.16)
-            for seat in range(TEAMS)
-        ]).arrange(RIGHT, buff=0.42)
-        caption = Text('no matchups: everyone at once, all season',
-                       font_size=24, color=GREY_B)
-        return VGroup(seats, caption).arrange(DOWN, buff=0.55).move_to([0.0, 0.3, 0.0])
 
     def build_matchup_table(self, build, heading: str, colour) -> VGroup:
         """Chance of beating each rival in each category: nine rows, eleven opponents.
