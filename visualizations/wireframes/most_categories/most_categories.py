@@ -76,9 +76,22 @@ BOARD_BOTTOM_Y = -2.6
 
 # Three weeks between the same two teams: a majority, the other way, and a landslide worth
 # exactly the same as the majority.
-FIRST_WEEK     = (1, 1, 0, 1, 1, 0, 1, 0, 1)   # six of nine
-SECOND_WEEK    = (0, 1, 0, 0, 1, 1, 0, 0, 1)   # four of nine
+# Weeks between the same two teams, cycled at the top of the scene. One is not enough to show
+# what there is a probability OF -- the same teams produce a different result every week, and
+# the majority falls either way, sometimes by one category and sometimes by three.
+ROTATING_WEEKS = (
+    (1, 1, 0, 1, 1, 0, 1, 0, 1),   # six of nine
+    (0, 1, 0, 0, 1, 1, 0, 0, 1),   # four of nine
+    (1, 0, 1, 1, 0, 1, 0, 1, 0),   # five of nine, the narrowest majority there is
+    (0, 0, 1, 0, 1, 0, 0, 1, 0),   # three of nine
+    (1, 1, 1, 0, 1, 1, 0, 1, 0),   # six of nine again, arrived at differently
+)
 LANDSLIDE_WEEK = (1, 1, 1, 1, 1, 1, 1, 1, 1)   # all nine, still one win
+
+# What one week of the rotation gets, once the first has been shown deliberately.
+ROTATION_SECONDS = 1.5
+# How long the board takes to clear once its line has finished.
+BOARD_CLEAR_SECONDS = 0.7
 
 # The table of outcomes. Only the first rows are built -- enough to scroll convincingly without
 # drawing all 512, which would cost minutes of render for no extra argument.
@@ -137,14 +150,25 @@ class MostCategories(VoiceoverScene):
         with self.voiceover(text=NARRATION['a_week']) as tracker:
             self.board = self.build_scoreboard()
             self.play(FadeIn(self.board), run_time=1.0)
-            wait_until_phrase(self, tracker, 'five out of nine')
-            self.play(*[FadeIn(mark) for mark in self.mark_week(FIRST_WEEK)],
-                      lag_ratio=0.12, run_time=2.2)
-            self.wait(0.5)
 
-            self.verdict = self.build_verdict(FIRST_WEEK)
-            self.play(FadeIn(self.verdict), run_time=0.9)
-            self.wait(0.8)
+            wait_until_phrase(self, tracker, 'five out of nine')
+            # The first week is dealt out category by category; the rest cycle, because by then
+            # the viewer knows how to read the board and what is worth showing is that the
+            # answer keeps changing.
+            self.play(*[FadeIn(mark) for mark in self.mark_week(ROTATING_WEEKS[0])],
+                      lag_ratio=0.12, run_time=2.0)
+            self.verdict = self.build_verdict(ROTATING_WEEKS[0])
+            self.play(FadeIn(self.verdict), run_time=0.7)
+
+            for week in ROTATING_WEEKS[1:]:
+                if tracker.get_remaining_duration() < ROTATION_SECONDS:
+                    break
+                self.play(FadeOut(self.week_marks), FadeOut(self.verdict), run_time=0.25)
+                self.play(*[FadeIn(mark) for mark in self.mark_week(week)],
+                          lag_ratio=0.04, run_time=0.55)
+                self.verdict = self.build_verdict(week)
+                self.play(FadeIn(self.verdict), run_time=0.35)
+                self.wait(max(0.1, ROTATION_SECONDS - 1.15))
 
         with self.voiceover(text=NARRATION['all_or_nothing']) as tracker:
             wait_until_phrase(self, tracker, 'aiming to win that majority')
@@ -153,9 +177,12 @@ class MostCategories(VoiceoverScene):
                       lag_ratio=0.06, run_time=1.2)
             self.verdict = self.build_verdict(LANDSLIDE_WEEK)
             self.play(FadeIn(self.verdict), run_time=0.8)
-            self.wait(1.4)
+            # Held to the end of the line. The sentence runs on to say what the objective is
+            # NOT, and taking the board away before that lands leaves the rest of it spoken
+            # over an empty frame.
+            self.wait(max(0.5, tracker.get_remaining_duration() - BOARD_CLEAR_SECONDS))
             self.play(FadeOut(self.board), FadeOut(self.week_marks),
-                      FadeOut(self.verdict), run_time=0.7)
+                      FadeOut(self.verdict), run_time=BOARD_CLEAR_SECONDS)
 
     def build_scoreboard(self) -> VGroup:
         """Two team headings and the nine categories between them."""
