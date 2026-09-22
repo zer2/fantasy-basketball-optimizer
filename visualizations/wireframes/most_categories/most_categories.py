@@ -36,7 +36,7 @@ from pathlib import Path
 
 import numpy as np
 from manim import (
-    VGroup, VMobject, Line, DashedLine, Rectangle, Text, MathTex, Dot,
+    Group, VGroup, VMobject, Line, DashedLine, Rectangle, Text, MathTex, Dot,
     FadeIn, FadeOut, Create, Write, Transform, linear,
     DOWN, UP, LEFT, RIGHT,
     BLUE_D, BLUE_B, RED_D, RED_B, GREEN_C, GREY_B, GREY_D, YELLOW, WHITE,
@@ -99,6 +99,19 @@ WALK_UNIT_Y = 0.30
 CUT_CATEGORY = 2
 SLIDE_TO = (5, 0)
 
+# The closing example: five categories held, four given up. Which one is taken away decides
+# whether the remaining eight are level, and that is the whole punting argument.
+# The three cases the toggle panel steps through: the other eight level, then already won,
+# then already lost. Only the first leaves the ninth category mattering at all.
+LEVEL_CASE   = (1, 1, 1, 1, 0, 0, 0, 0)
+DECIDED_WON  = (1, 1, 1, 1, 1, 1, 0, 0)
+DECIDED_LOST = (1, 1, 0, 0, 0, 0, 0, 0)
+
+CONTESTED_COUNT = 5
+PUNT_BAR_HEIGHT = 1.9
+# How many of the 256 scenarios are drawn before the table is summarised rather than continued.
+SCENARIO_ROWS_DRAWN = 14
+
 
 class MostCategories(VoiceoverScene):
     """The 512-leaf tree, its collapse into a tally, and the tipping point that falls out."""
@@ -108,6 +121,7 @@ class MostCategories(VoiceoverScene):
         self.play_a_week()
         self.play_the_table()
         self.play_walk()
+        self.play_what_tipping_means()
         self.play_tipping_point()
 
     # -- Act one: a week, and who took it ----------------------------------------------
@@ -123,26 +137,17 @@ class MostCategories(VoiceoverScene):
         with self.voiceover(text=NARRATION['a_week']) as tracker:
             self.board = self.build_scoreboard()
             self.play(FadeIn(self.board), run_time=1.0)
-            wait_until_phrase(self, tracker, 'goes to whichever team')
+            wait_until_phrase(self, tracker, 'five out of nine')
             self.play(*[FadeIn(mark) for mark in self.mark_week(FIRST_WEEK)],
                       lag_ratio=0.12, run_time=2.2)
             self.wait(0.5)
 
-        with self.voiceover(text=NARRATION['count_them']):
             self.verdict = self.build_verdict(FIRST_WEEK)
             self.play(FadeIn(self.verdict), run_time=0.9)
-            self.wait(1.0)
-
-        with self.voiceover(text=NARRATION['another_week']):
-            self.play(FadeOut(self.week_marks), FadeOut(self.verdict), run_time=0.5)
-            self.play(*[FadeIn(mark) for mark in self.mark_week(SECOND_WEEK)],
-                      lag_ratio=0.10, run_time=1.6)
-            self.verdict = self.build_verdict(SECOND_WEEK)
-            self.play(FadeIn(self.verdict), run_time=0.8)
             self.wait(0.8)
 
         with self.voiceover(text=NARRATION['all_or_nothing']) as tracker:
-            wait_until_phrase(self, tracker, 'exactly the same')
+            wait_until_phrase(self, tracker, 'aiming to win that majority')
             self.play(FadeOut(self.week_marks), FadeOut(self.verdict), run_time=0.5)
             self.play(*[FadeIn(mark) for mark in self.mark_week(LANDSLIDE_WEEK)],
                       lag_ratio=0.06, run_time=1.2)
@@ -199,7 +204,7 @@ class MostCategories(VoiceoverScene):
         with self.voiceover(text=NARRATION['the_table']) as tracker:
             self.table = self.build_outcome_table()
             self.play(FadeIn(self.table[:TABLE_VISIBLE_ROWS]), run_time=1.2)
-            wait_until_phrase(self, tracker, 'either a win for you')
+            wait_until_phrase(self, tracker, 'each of these scenarios')
             self.wait(1.0)
 
         with self.voiceover(text=NARRATION['how_many_rows']) as tracker:
@@ -250,21 +255,23 @@ class MostCategories(VoiceoverScene):
         can throw the paths away and keep one column of heights.
         """
         with self.voiceover(text=NARRATION['dynamic']) as tracker:
+            wait_until_phrase(self, tracker, 'keeping track of the distribution')
             self.lattice = self.build_lattice()
             self.play(Create(self.lattice), run_time=1.0)
-
-            wait_until_phrase(self, tracker, 'a step up')
-            self.all_paths = self.build_all_paths()
-            self.play(FadeIn(self.all_paths), run_time=1.8)
-
-            wait_until_phrase(self, tracker, 'above where you started')
-            self.play(FadeIn(self.build_win_region()), run_time=0.8)
-            self.wait(0.8)
+            self.wait(1.2)
 
         with self.voiceover(text=NARRATION['collapse']) as tracker:
-            wait_until_phrase(self, tracker, 'a single column')
+            wait_until_phrase(self, tracker, 'one level upwards')
+            self.all_paths = self.build_all_paths()
+            self.play(FadeIn(self.all_paths), run_time=1.6)
+
+            wait_until_phrase(self, tracker, 'above the middle line')
+            self.win_region = self.build_win_region()
+            self.play(FadeIn(self.win_region), run_time=0.8)
+
+            wait_until_phrase(self, tracker, 'walk forward though all')
             self.play_column_sweep()
-            self.wait(0.8)
+            self.wait(0.6)
 
     # The walk: ten columns (before any category, then after each of the nine) against net
     # position, which runs from -9 to +9 but only ever reaches values of the step's own parity.
@@ -398,12 +405,12 @@ class MostCategories(VoiceoverScene):
             self.wait(0.5)
 
         with self.voiceover(text=NARRATION['the_cut']) as tracker:
-            wait_until_phrase(self, tracker, 'cut the walk open')
+            wait_until_phrase(self, tracker, 'Take any of the categories')
             self.show_cut_at(CUT_CATEGORY, first_time=True)
             self.wait(1.0)
 
         with self.voiceover(text=NARRATION['convolution']) as tracker:
-            wait_until_phrase(self, tracker, 'pair every height')
+            wait_until_phrase(self, tracker, 'multiply the opposing numbers')
             self.play_meeting(CUT_CATEGORY)
             self.wait(1.2)
 
@@ -413,12 +420,179 @@ class MostCategories(VoiceoverScene):
                 self.play_meeting(category, quickly=True)
             self.wait(0.8)
 
-        with self.voiceover(text=NARRATION['punting']):
-            # PLACEHOLDER for the beat that earns the punting claim: the nine tipping points
-            # listed against the categories, the kept ones visibly the decisive ones. Wants the
-            # real gradient from the objective, so it waits for a prep script.
+        with self.voiceover(text=NARRATION['punting']) as tracker:
+            # Everything currently drawn, rather than a list of names that has to be kept in
+            # step by hand -- the previous list had fallen behind and the board came up on top
+            # of the scenario table and the leftover sweep.
+            self.play(FadeOut(Group(*self.mobjects)), run_time=0.7)
+            self.clear()
+            board = self.build_punt_board()
+            self.play(FadeIn(board['bars']), run_time=1.2)
+
+            wait_until_phrase(self, tracker, 'excluding one of them')
+            self.play(FadeIn(board['contested']), run_time=1.0)
+            self.wait(1.4)
+
+            wait_until_phrase(self, tracker, 'For the punted categories')
+            self.play(FadeIn(board['punted']), run_time=1.0)
             self.wait(2.0)
         self.wait(0.6)
+
+    def build_punt_board(self) -> dict:
+        """Five categories held high and four given up, and what taking one away leaves.
+
+        The two cases are the whole punting argument and they differ by one column. Drop a held
+        category and the remaining eight split four-four: level, so the one dropped decides the
+        matchup. Drop a given-up one and the rest sit five-three, already settled, so it decides
+        nothing. Same board, opposite conclusions.
+        """
+        bars = VGroup()
+        for index in range(len(CATEGORIES)):
+            held = index < CONTESTED_COUNT
+            x = -4.6 + index * 1.15
+            outline = Rectangle(width=0.78, height=PUNT_BAR_HEIGHT, stroke_width=2,
+                                stroke_color=GREY_D, fill_opacity=0.0)
+            outline.move_to([x, 0.9, 0.0])
+            filled_height = PUNT_BAR_HEIGHT * (0.88 if held else 0.12)
+            filled = Rectangle(width=0.78, height=filled_height, stroke_width=0,
+                               fill_color=BLUE_D if held else GREY_D, fill_opacity=0.9)
+            filled.move_to([x, 0.9 - PUNT_BAR_HEIGHT / 2 + filled_height / 2, 0.0])
+            bars.add(VGroup(outline, filled))
+        caption = Text(f'{CONTESTED_COUNT} held, {len(CATEGORIES) - CONTESTED_COUNT} given up',
+                       font_size=24, color=GREY_B).move_to([0.0, 2.35, 0.0])
+
+        def verdict(title, split, note, colour, y):
+            return VGroup(
+                Text(title, font_size=23, color=colour),
+                Text(split, font_size=27, color=colour),
+                Text(note, font_size=22, color=GREY_B),
+            ).arrange(RIGHT, buff=0.5).move_to([0.0, y, 0.0])
+
+        return {
+            'bars': VGroup(caption, bars),
+            'contested': verdict('take away a held category', 'the rest sit 4 - 4',
+                                 'level, so it decides the matchup', YELLOW, -1.1),
+            'punted': verdict('take away a given-up category', 'the rest sit 5 - 3',
+                              'already settled, so it decides nothing', GREY_B, -2.1),
+        }
+
+    def play_what_tipping_means(self) -> None:
+        """Why the gradient is a probability: the other eight settle it unless they are level.
+
+        Eight toggles for the other categories, the chance of taking the one in question, and
+        the objective beside them. Flip the toggles and the objective is 1 or 0 whatever that
+        chance is -- the matchup is already decided. Set them level and the objective becomes
+        the chance itself. So the slope is the probability of landing in that middle case, and
+        the scenario table is that probability written out: the level rows are the only ones
+        that respond, and every other row is flat.
+        """
+        with self.voiceover(text=NARRATION['tipping_point_probability']) as tracker:
+            self.play(FadeOut(VGroup(self.forward_columns, self.all_paths,
+                                     self.lattice, self.win_region)), run_time=0.7)
+            panel = self.build_tipping_panel()
+            self.play(FadeIn(panel['frame']), run_time=1.0)
+
+            wait_until_phrase(self, tracker, 'precisely even')
+            self.play(*self.set_toggles(panel, LEVEL_CASE), run_time=0.9)
+            self.play(Transform(panel['objective'], self.objective_readout(LEVEL_CASE)),
+                      run_time=0.6)
+            self.wait(1.2)
+
+            wait_until_phrase(self, tracker, 'not even')
+            for others in (DECIDED_WON, DECIDED_LOST):
+                self.play(*self.set_toggles(panel, others), run_time=0.7)
+                self.play(Transform(panel['objective'], self.objective_readout(others)),
+                          run_time=0.5)
+                self.wait(0.9)
+
+            wait_until_phrase(self, tracker, 'we call this a tipping point')
+            self.play(FadeOut(panel['frame']), FadeOut(panel['objective']), run_time=0.5)
+            table = self.build_scenario_table()
+            self.play(FadeIn(table), run_time=1.4)
+            self.wait(max(0.6, tracker.get_remaining_duration() - 1.0))
+
+            # Handed back. This act borrows the frame from the walk, and the cut that follows
+            # reaches for the forward sweep and the lattice again -- left cleared, the cut would
+            # open on a backward sweep with nothing to meet.
+            self.play(FadeOut(table), run_time=0.5)
+            self.play(FadeIn(VGroup(self.lattice, self.all_paths, self.win_region,
+                                    self.forward_columns)), run_time=0.7)
+
+    def build_tipping_panel(self) -> dict:
+        """Eight toggles, the chance of taking the ninth, and the objective beside them."""
+        self.toggles = VGroup()
+        for index in range(len(CATEGORIES) - 1):
+            row, column = divmod(index, 4)
+            self.toggles.add(Rectangle(
+                width=0.86, height=0.46, stroke_width=2, stroke_color=GREY_D,
+                fill_color=GREY_D, fill_opacity=0.25,
+            ).move_to([-4.3 + column * 1.0, 1.5 - row * 0.62, 0.0]))
+        heading = Text('the other eight', font_size=22, color=GREY_B)
+        heading.move_to([-2.8, 2.3, 0.0])
+
+        mine = VGroup(
+            Text('this category', font_size=22, color=GREY_B),
+            Text('p', font_size=34, color=YELLOW),
+        ).arrange(DOWN, buff=0.18).move_to([0.9, 1.2, 0.0])
+
+        objective = self.objective_readout(None)
+        return {'frame': VGroup(heading, self.toggles, mine), 'objective': objective}
+
+    def objective_readout(self, others) -> VGroup:
+        """What the majority objective comes to, given what the other eight did."""
+        if others is None:
+            value = '?'
+        else:
+            won = sum(others)
+            value = 'p' if won == MAJORITY - 1 else ('1' if won >= MAJORITY else '0')
+        return VGroup(
+            Text('chance of the majority', font_size=22, color=GREY_B),
+            Text(value, font_size=46, color=YELLOW if value == 'p' else GREY_B),
+        ).arrange(DOWN, buff=0.22).move_to([4.2, 1.2, 0.0])
+
+    def set_toggles(self, panel, others):
+        """Light the toggles for a given outcome of the other eight."""
+        return [
+            toggle.animate.set_fill(BLUE_D if won else GREY_D,
+                                    opacity=0.9 if won else 0.25)
+            for toggle, won in zip(self.toggles, others)
+        ]
+
+    def build_scenario_table(self) -> VGroup:
+        """Every way the other eight can land, marked by whether this category still matters.
+
+        Rows that sit level are the only ones where the answer depends on p at all; the rest
+        are already decided, so they contribute nothing to the slope. The share of probability
+        in the level rows IS the tipping point.
+        """
+        rows = VGroup()
+        level_chance = 0.0
+        for number in range(2 ** (len(CATEGORIES) - 1)):
+            bits = [(number >> shift) & 1 for shift in range(len(CATEGORIES) - 2, -1, -1)]
+            chance = 1.0
+            for bit, probability in zip(bits, WIN_CHANCES[:-1]):
+                chance *= probability if bit else (1.0 - probability)
+            if sum(bits) == MAJORITY - 1:
+                level_chance += chance
+            if number >= SCENARIO_ROWS_DRAWN:
+                continue
+            cells = VGroup(*[
+                Rectangle(width=0.3, height=0.24, stroke_width=0,
+                          fill_color=BLUE_D if bit else GREY_D, fill_opacity=1.0)
+                for bit in bits
+            ]).arrange(RIGHT, buff=0.06)
+            level = sum(bits) == MAJORITY - 1
+            verdict = Text('p' if level else ('1' if sum(bits) >= MAJORITY else '0'),
+                           font_size=20, color=YELLOW if level else GREY_D)
+            rows.add(VGroup(cells, verdict).arrange(RIGHT, buff=0.4))
+        rows.arrange(DOWN, buff=0.1).move_to([-1.4, 0.0, 0.0])
+
+        summary = VGroup(
+            Text('only the level rows respond to p', font_size=24, color=YELLOW),
+            Text(f'their total probability: {level_chance:.1%}', font_size=26, color=YELLOW),
+            Text('that is the tipping point', font_size=22, color=GREY_B),
+        ).arrange(DOWN, buff=0.28).move_to([3.7, 0.0, 0.0])
+        return VGroup(rows, summary)
 
     def show_cut_at(self, category: int, first_time: bool = False) -> None:
         """Open a gap where one category sits, keeping only what reaches it from either side."""
