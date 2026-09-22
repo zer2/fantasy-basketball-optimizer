@@ -37,8 +37,8 @@ from manim import (
     VGroup, Line, DashedLine, Rectangle, Text, Dot,
     FadeIn, FadeOut, Create, Write, Transform,
     DOWN, UP, LEFT, RIGHT,
-    BLUE_B, BLUE_D, GREEN_C, RED_B, GREY_B, GREY_D, GREY_E, YELLOW,
-    interpolate_color,
+    BLUE_B, BLUE_D, GREEN_C, RED_B, GREY_B, GREY_D, YELLOW, WHITE, BLACK,
+    rgb_to_hex,
 )
 from manim_voiceover import VoiceoverScene
 
@@ -112,9 +112,11 @@ HEAT_ROW_GAP = 0.44
 HEAT_LEFT_X = -1.9
 HEAT_CELL_WIDTH = 0.42
 HEAT_CELL_HEIGHT = 0.36
-HEAT_WEAK = RED_B        # losing the category
-HEAT_NEUTRAL = GREY_E    # a coin flip
-HEAT_STRONG = BLUE_D     # winning it
+# stat_styler_primary's parameters. The multiplier is set so a category at 0% or 100% saturates
+# exactly at the styler's own cap, which is what the product does at the ends of its range.
+STYLER_MIDDLE = 50.0
+STYLER_CAP = 110
+STYLER_MULTIPLIER = STYLER_CAP / STYLER_MIDDLE
 INSET_CURVE_CENTRE = [0.0, -2.75, 0.0]
 
 
@@ -434,7 +436,7 @@ class Rotisserie(VoiceoverScene):
                          [3.2, INSET_CURVE_CENTRE[1] - 0.62, 0.0],
                          color=GREY_D, stroke_width=2)
             caption = Text('the season it produces', font_size=19, color=GREY_D)
-            caption.move_to([0.0, INSET_CURVE_CENTRE[1] - 0.92, 0.0])
+            caption.move_to([0.0, INSET_CURVE_CENTRE[1] - 1.12, 0.0])
             return table, VGroup(curve, floor, caption)
 
         first_table, first_curve = build_panel(
@@ -508,16 +510,45 @@ class Rotisserie(VoiceoverScene):
                                    stroke_width=0, fill_opacity=1.0,
                                    fill_color=self.heat_colour(chance))
                          .move_to([HEAT_LEFT_X + opponent * HEAT_CELL_WIDTH, row_y, 0.0]))
-            rows.add(Text(f'{chance:.0%}', font_size=20, color=self.heat_colour(chance))
-                     .move_to([HEAT_LEFT_X + (TEAMS - 1) * HEAT_CELL_WIDTH + 0.6, row_y, 0.0]))
+            # On its own cell colour, so it is legible whatever the cell is: the styler picks
+            # black or white by luminance, and a flat grey was invisible at fifty percent.
+            chip = Rectangle(width=0.86, height=HEAT_CELL_HEIGHT, stroke_width=0,
+                             fill_opacity=1.0, fill_color=self.heat_colour(chance))
+            chip.move_to([HEAT_LEFT_X + (TEAMS - 1) * HEAT_CELL_WIDTH + 0.72, row_y, 0.0])
+            rows.add(chip)
+            rows.add(Text(f'{chance:.0%}', font_size=19,
+                          color=self.heat_text_colour(chance)).move_to(chip.get_center()))
 
         columns = Text('eleven opponents', font_size=19, color=GREY_D)
         columns.move_to([HEAT_LEFT_X + (TEAMS - 2) * HEAT_CELL_WIDTH / 2,
                          HEAT_TOP_Y + 0.45, 0.0])
         return VGroup(title, columns, rows)
 
-    def heat_colour(self, chance: float):
-        """Red where a category is being lost, blue where it is being won, neutral at a flip."""
-        if chance >= 0.5:
-            return interpolate_color(HEAT_NEUTRAL, HEAT_STRONG, (chance - 0.5) * 2.0)
-        return interpolate_color(HEAT_NEUTRAL, HEAT_WEAK, (0.5 - chance) * 2.0)
+    def heat_colour(self, chance: float) -> str:
+        """The app's own cell colour, so a category here looks like a category in the product.
+
+        This is stat_styler_primary's dark variant, copied from its definition rather than
+        approximated: green above the midpoint, red below, both rising out of the same slate,
+        with the blue channel following at seven tenths. See testing_files/season_simulation/
+        render.py, which carries the same mapping for its static tables.
+        """
+        raw = (chance * 100 - STYLER_MIDDLE) * STYLER_MULTIPLIER
+        intensity = min(round(abs(raw)), STYLER_CAP)
+        red   = 55 if raw > 0 else 55 + intensity
+        green = 55 + intensity if raw > 0 else 55
+        blue  = 70 + round(intensity * 0.7)
+        return rgb_to_hex((red / 255, green / 255, blue / 255))
+
+    def heat_text_colour(self, chance: float) -> str:
+        """What the styler writes on that cell: black on a light one, white on a dark one.
+
+        The percentages were drawn in grey regardless, which on the near-neutral cells at fifty
+        percent was grey on dark slate and effectively invisible.
+        """
+        raw = (chance * 100 - STYLER_MIDDLE) * STYLER_MULTIPLIER
+        intensity = min(round(abs(raw)), STYLER_CAP)
+        red   = 55 if raw > 0 else 55 + intensity
+        green = 55 + intensity if raw > 0 else 55
+        blue  = 70 + round(intensity * 0.7)
+        luminance = red * 0.299 + green * 0.587 + blue * 0.114
+        return BLACK if luminance > 150 else WHITE
