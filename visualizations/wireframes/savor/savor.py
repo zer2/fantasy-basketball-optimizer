@@ -88,6 +88,9 @@ POSSIBLE_OUTCOMES = (
 PROJECTED_DOLLARS = (62, 45, 33, 24, 17, 11, 7, 4, 2, 1)
 REPLACEMENT_DOLLARS = 1
 S_SIGMA = 10.0
+# Ticks in dollars above replacement. The curve act draws in units of S-sigma, so a tick every
+# twenty dollars is every two units, and the axis reaches forty without running past its end.
+AXIS_DOLLAR_TICKS = (-20, 0, 20, 40)
 TABLE_TOP_Y = 2.55
 TABLE_ROW_GAP = 0.46
 # How long the nudged curve takes to settle back, once its line has finished.
@@ -113,11 +116,26 @@ class Savor(VoiceoverScene):
         return value * SCENE_UNITS_PER_VALUE
 
     def build_axis(self) -> VGroup:
+        """The value axis, ticked in dollars rather than left as a bare line.
+
+        A projection's spread is S-sigma, which ships at ten dollars, so the scene's unit IS a
+        ten dollar step and the axis can simply say so. That also lets the replacement line be
+        labelled with what it is worth -- nothing -- and connects this act to the dollar table
+        the scene ends on.
+        """
         axis = Line([-AXIS_HALF_WIDTH, BASELINE_Y, 0.0], [AXIS_HALF_WIDTH, BASELINE_Y, 0.0],
                     color=GREY_B, stroke_width=3)
+        marks = VGroup()
+        for dollars in AXIS_DOLLAR_TICKS:
+            x = self.to_scene_x(dollars / S_SIGMA)
+            marks.add(Line([x, BASELINE_Y - 0.11, 0.0], [x, BASELINE_Y + 0.11, 0.0],
+                           color=GREY_B, stroke_width=2))
+            marks.add(Text(f'${dollars}' if dollars >= 0 else f'-${abs(dollars)}',
+                           font_size=20, color=GREY_D)
+                      .move_to([x, BASELINE_Y - 0.36, 0.0]))
         caption = Text('value delivered over the season', font_size=23, color=GREY_B)
-        caption.move_to([0.0, BASELINE_Y - 0.52, 0.0])
-        return VGroup(axis, caption)
+        caption.move_to([0.0, BASELINE_Y - 0.78, 0.0])
+        return VGroup(axis, marks, caption)
 
     def build_replacement_line(self) -> VGroup:
         line = DashedLine([self.to_scene_x(REPLACEMENT), BASELINE_Y, 0.0],
@@ -125,7 +143,7 @@ class Savor(VoiceoverScene):
                           color=YELLOW, stroke_width=3, dash_length=0.12)
         # Above the line it names, which is where it belongs. It sits clear of the players'
         # own labels because the tallest of those is lower than the top of this line.
-        label = Text('replacement level', font_size=21, color=YELLOW)
+        label = Text('replacement level  ($0)', font_size=21, color=YELLOW)
         label.move_to([self.to_scene_x(REPLACEMENT), BASELINE_Y + 3.38, 0.0])
         return VGroup(line, label)
 
@@ -215,7 +233,7 @@ class Savor(VoiceoverScene):
             self.wait(0.8)
 
         with self.voiceover(text=NARRATION['the_floor']) as tracker:
-            wait_until_phrase(self, tracker, 'draw a line on here')
+            wait_until_phrase(self, tracker, 'below the replacement level')
             self.replacement = self.build_replacement_line()
             self.play(Create(self.replacement), run_time=1.0)
             wait_until_phrase(self, tracker, 'below the line do not actually help')
