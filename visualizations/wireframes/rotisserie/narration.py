@@ -29,12 +29,12 @@ NARRATION = {
         'matters is maximizing the area on the right that has some yellow.',
     # -- Why spread is worth having ----------------------------------------------------
     'widen':
-        'We can do that in two ways: either by increasing our expected value, which shift everything to the right, '
-        'or increasing variance, which widens the distribution. The reward for variance is a unique aspect of Rotisserie',
+        'We can do that in two ways: either by increasing our expected value, which shifts everything to the right, '
+        'or increasing variance, which widens the distribution. The reward for variance is a unique aspect of Rotisserie.',
     # -- Where spread comes from -------------------------------------------------------
     'two_builds':
         'The way that we control variance is through the kinds of builds that we design. We can increase variance by leaving the '
-        'possibility of winning many points in many categories open. Consider two ways to build a team- one where every individual '
+        'possibility of winning many points in many categories open. Consider two ways to build a team; one where every individual '
         'fantasy point is a coinflip, and one in which most are nearly guaranteed wins, and the rest are nearly guaranteed losses.',
     'coin_flips':
         'The first has an average expected value and strong variance.',

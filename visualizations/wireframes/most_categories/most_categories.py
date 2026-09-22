@@ -45,7 +45,7 @@ from manim import ThreeDScene, DEGREES                     # noqa: E402
 from manim_voiceover import VoiceoverScene
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
-from shared.draft_voice import DraftVoice                 # noqa: E402
+from shared.narration_voice import NarrationVoice         # noqa: E402
 from shared.narration_timing import wait_until_phrase     # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -166,7 +166,7 @@ class MostCategories(VoiceoverScene, ThreeDScene):
     """The 512-leaf tree, its collapse into a tally, and the tipping point that falls out."""
 
     def construct(self) -> None:
-        self.set_speech_service(DraftVoice())
+        self.set_speech_service(NarrationVoice())
         self.play_a_week()
         self.play_the_table()
         self.play_walk()
@@ -349,7 +349,7 @@ class MostCategories(VoiceoverScene, ThreeDScene):
             self.win_region = self.build_win_region()
             self.play(FadeIn(self.win_region), run_time=0.8)
 
-            wait_until_phrase(self, tracker, 'walk forward though all')
+            wait_until_phrase(self, tracker, 'walk forward through all')
             self.play_column_sweep()
 
             # The answer, picked out of the last column: the probabilities above the line, added

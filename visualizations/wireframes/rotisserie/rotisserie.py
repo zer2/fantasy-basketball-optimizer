@@ -43,7 +43,7 @@ from manim import (
 from manim_voiceover import VoiceoverScene
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
-from shared.draft_voice import DraftVoice                 # noqa: E402
+from shared.narration_voice import NarrationVoice         # noqa: E402
 from shared.narration_timing import wait_until_phrase     # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -124,7 +124,7 @@ class Rotisserie(VoiceoverScene):
     """What a Rotisserie score is, how hard the bar is, and why spread beats a better average."""
 
     def construct(self) -> None:
-        self.set_speech_service(DraftVoice())
+        self.set_speech_service(NarrationVoice())
         self.rng = np.random.default_rng(SIMULATION_SEED)
         self.play_the_scale()
         self.play_the_bar()

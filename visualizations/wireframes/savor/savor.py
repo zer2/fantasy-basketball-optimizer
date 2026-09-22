@@ -39,7 +39,7 @@ from manim import (
 from manim_voiceover import VoiceoverScene
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
-from shared.draft_voice import DraftVoice                 # noqa: E402
+from shared.narration_voice import NarrationVoice         # noqa: E402
 from shared.narration_timing import wait_until_phrase     # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -87,12 +87,15 @@ POSSIBLE_OUTCOMES = (
 
 # The auction board the last act works on. Dollar values a drafter would recognise, against a
 # one dollar replacement player, and S-sigma at the sidebar default of 10.
-# One team's $200 budget, every figure being value ABOVE REPLACEMENT -- which is what the
+# A $100 pot, every figure being value ABOVE REPLACEMENT -- which is what the
 # adjustment is defined on and what the axis of the curve act is already ticked in. Replacement
 # level is zero by definition: it is what a freely available player is worth. A one dollar
 # minimum bid is a different idea altogether, and mixing the two is what made the bottom of this
 # table read as a player going to nothing and back.
-PROJECTED_DOLLARS = (60, 44, 32, 23, 16, 10, 7, 4, 3, 1)
+#
+# A hundred rather than two hundred, so nobody reads these as one team's budget: the adjustment
+# redistributes across the whole pot, not within a single roster.
+PROJECTED_DOLLARS = (30, 22, 16, 12, 8, 5, 3, 2, 1, 1)
 S_SIGMA = 10.0
 # Ticks in dollars above replacement. The curve act draws in units of S-sigma, so a tick every
 # twenty dollars is every two units, and the axis reaches forty without running past its end.
@@ -111,7 +114,7 @@ class Savor(VoiceoverScene):
     """A projection with a floor under it, and the free player it has to beat."""
 
     def construct(self) -> None:
-        self.set_speech_service(DraftVoice())
+        self.set_speech_service(NarrationVoice())
         self.play_three_players()
         self.play_the_nudge()
         self.play_the_calculation()
@@ -389,7 +392,7 @@ class Savor(VoiceoverScene):
                      color=GREY_D, stroke_width=2),
                 Text(f'${sum(PROJECTED_DOLLARS):.1f}', font_size=24, color=WHITE)
                 .move_to([-3.4, bottom - 0.08, 0.0]),
-                Text('the budget', font_size=19, color=GREY_D)
+                Text('the pot', font_size=19, color=GREY_D)
                 .move_to([-3.4, bottom - 0.45, 0.0]),
             ),
             'raw': column(raw, -0.6, GREY_B),
@@ -398,7 +401,7 @@ class Savor(VoiceoverScene):
                      color=GREY_D, stroke_width=2),
                 Text(f'${sum(raw):.1f}', font_size=24, color=GREY_B)
                 .move_to([-0.6, bottom - 0.08, 0.0]),
-                Text('short of the budget', font_size=19, color=GREY_D)
+                Text('short of the pot', font_size=19, color=GREY_D)
                 .move_to([-0.6, bottom - 0.45, 0.0]),
             ),
             'scaling': Text(f'x {scaling:.2f}', font_size=28, color=YELLOW)
@@ -409,7 +412,7 @@ class Savor(VoiceoverScene):
                      color=GREY_D, stroke_width=2),
                 Text(f'${sum(final):.1f}', font_size=24, color=YELLOW)
                 .move_to([2.4, bottom - 0.08, 0.0]),
-                Text('back to the budget', font_size=19, color=GREY_D)
+                Text('back to the pot', font_size=19, color=GREY_D)
                 .move_to([2.4, bottom - 0.45, 0.0]),
             ),
             'change': column(change, 4.5, GREEN_C, money=False),

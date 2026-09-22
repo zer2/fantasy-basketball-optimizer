@@ -21,7 +21,7 @@ NARRATION = {
         'replacement level, the parts of the distribution that are below the line do not actually help us. With a player who is a flyer or just a bit'
         ' better than a flyer, we are banking on their positive outcome; if they dip a little they will not be worth anything to us. ',
     'the_flyer_half':
-        'This effects how much value we can actually realize from investing into players. Imagine starting from a flyer player and adding '
+        'This affects how much value we can actually realize from investing into players. Imagine starting from a flyer player and adding '
         'one dollar of expected value. The distribution moves, but its still about half below-replacement, so '
         'we only get to capture that extra one dollar of value about half the time. That one dollar is worth an expected fifty cents of real value.',
     'the_star_whole':

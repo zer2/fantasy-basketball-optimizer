@@ -23,7 +23,7 @@ NARRATION = {
         'objective function for it, not just adding up category-level win probabilities.',
     # -- What has to be added up -------------------------------------------------------
     'the_table':
-        'There are many different ways to get to the majority of categories, and each has their own probability. '
+        'There are many different ways to get to the majority of categories, and each has its own probability. '
         'Theoretically, we could just calculate the probability of each of these scenarios and add them up.',
     'how_many_rows':
         'There are two to the ninth of those rows. Two to the eighth if we only consider the winning scenarios. '
@@ -36,13 +36,13 @@ NARRATION = {
         'how many of them we won, not which ones we won. So if we assume that the categories are independent '
         'from each other, we can walk through the categories one by one, keeping track of the distribution '
         'of how many we have won. For example, if the first two categories are both 50-50, we know that by the end, we will '
-        'have a 50 percent chance of being even, and 25 percent chances of being 2-0 or 0-2. That\'s all we need to remember- '
+        'have a 50 percent chance of being even, and 25 percent chances of being 2-0 or 0-2. That\'s all we need to remember; '
         'there is no need to keep track of the precise likelihood of winning the first category and losing the second.',
     'collapse':
         'Extending the walking analogy, winning a category is like walking one level upwards, and losing '
         'a category is walking one level down. We can just keep track of the probability of being at any particular level '
         'at any particular time. It does not matter how we got to that level; just the probability that we got there. And '
-        'what matters is the total probability that we end up above the middle line. So we can walk forward though all '
+        'what matters is the total probability that we end up above the middle line. So we can walk forward through all '
         'nine categories, then add up the probabilities above the middle line at the end.',
     # -- What a category is worth ------------------------------------------------------
     'tipping':
@@ -64,8 +64,8 @@ NARRATION = {
         'on one walk are the opposite of the categories that lead up to it on the other walk. The two partial walks give us complete '
         'information on the scenarios for all of the other categories.',
     'convolution':
-        'All we have to do is check the convolutions- if the left side was at plus some level and the right side was at minus that level, '
-        'they offset and we are at a tipping point. So we multiply the opposing numbers to each other and add up the sums.',
+        'All we have to do is check the convolutions; if the left side was at plus some level and the right side was at minus that level, '
+        'they offset and we are at a tipping point. So we multiply the opposing numbers to each other and add up the products.',
     'slide':
         'We can easily do this for any category. Each cut preserves all the information we need on the left and right side to know '
         'exactly what happens to the other categories. ',
