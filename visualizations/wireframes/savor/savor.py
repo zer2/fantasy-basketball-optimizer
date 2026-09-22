@@ -72,6 +72,14 @@ PLAYERS = (
 # How far a mean is pushed to ask what the improvement is worth. Small on purpose: the claim is
 # about the MARGINAL unit, and a large shift would be answering a different question.
 NUDGE = 0.45
+
+# The auction board the last act works on. Dollar values a drafter would recognise, against a
+# one dollar replacement player, and S-sigma at the sidebar default of 10.
+PROJECTED_DOLLARS = (62, 45, 33, 24, 17, 11, 7, 4, 2, 1)
+REPLACEMENT_DOLLARS = 1
+S_SIGMA = 10.0
+TABLE_TOP_Y = 2.55
+TABLE_ROW_GAP = 0.46
 # How long the nudged curve takes to settle back, once its line has finished.
 REVERT_SECONDS = 0.8
 
@@ -87,7 +95,7 @@ class Savor(VoiceoverScene):
         self.set_speech_service(DraftVoice())
         self.play_three_players()
         self.play_the_nudge()
-        self.play_concentration()
+        self.play_the_calculation()
 
     # ── Shared apparatus ──────────────────────────────────────────────────────────────
 
@@ -134,7 +142,7 @@ class Savor(VoiceoverScene):
         return Polygon(*points, color=GREY_D, fill_color=GREY_D,
                        fill_opacity=0.55, stroke_width=0)
 
-    def savor_value(self, mean: float, spread: float = NOISE_SPREAD) -> float:
+    def savor_value(self, mean: float, spread: float = NOISE_SPREAD) -> float:  # noqa: D401
         """The docs' formula, written as the two expectations it actually is.
 
         E[max(mu + noise, 0)] - E[max(noise, 0)], the second being the dollar flyer. Expanding
@@ -165,14 +173,15 @@ class Savor(VoiceoverScene):
                 label.move_to([self.to_scene_x(player['value']) + player['label_shift'],
                                BASELINE_Y + player['label_height'], 0.0])
                 self.names.add(label)
-            wait_until_phrase(self, tracker, 'A star')
+            wait_until_phrase(self, tracker, 'Here are some potential distributions')
             self.play(FadeIn(self.curves), FadeIn(self.names), run_time=1.6)
             self.wait(1.0)
 
         with self.voiceover(text=NARRATION['the_floor']) as tracker:
+            wait_until_phrase(self, tracker, 'draw a line on here')
             self.replacement = self.build_replacement_line()
             self.play(Create(self.replacement), run_time=1.0)
-            wait_until_phrase(self, tracker, 'ever really yours')
+            wait_until_phrase(self, tracker, 'below the line do not actually help')
             self.lost = VGroup(*[self.build_lost_tail(player['value']) for player in PLAYERS])
             self.play(FadeIn(self.lost), run_time=1.2)
             self.wait(1.2)
@@ -237,26 +246,98 @@ class Savor(VoiceoverScene):
         from math import erf, sqrt
         return 0.5 * (1.0 + erf((mean - REPLACEMENT) / (spread * sqrt(2.0))))
 
-    # -- Act three: so the money goes to the top --------------------------------------
+    # -- Act three: the calculation itself --------------------------------------------
 
-    def play_concentration(self) -> None:
-        with self.voiceover(text=NARRATION['concentration']):
+    def play_the_calculation(self) -> None:
+        """The adjustment as it is actually applied: project, translate, scale back up.
+
+        The middle column is the SAVOR value -- what a player is worth once the floor and the
+        flyer are taken into account -- and it is SMALLER than the projection for everyone,
+        because every player loses the outcomes below replacement. Summed, the board no longer
+        adds up to the money in the room, so the whole column is scaled back up until it does.
+
+        That last step is what turns an across-the-board haircut into a redistribution. The
+        scaling is uniform, but the haircut was not, so the players who lost least to the floor
+        come out ahead and the ones who lost most come out behind.
+        """
+        with self.voiceover(text=NARRATION['the_general_rule']) as tracker:
             self.play(FadeOut(VGroup(self.curves, self.names, self.lost,
                                      self.replacement, self.axis, self.rule)),
-                      run_time=0.8)
-            rows = VGroup(*[self.value_row(player) for player in PLAYERS])
-            rows.arrange(DOWN, buff=0.55).move_to([0.0, 0.1, 0.0])
-            self.play(FadeIn(rows), run_time=1.2)
-            self.wait(2.4)
+                      run_time=0.7)
+
+            table = self.build_value_table()
+            self.play(FadeIn(table['frame']), run_time=0.8)
+            self.play(FadeIn(table['projected']), run_time=0.9)
+
+            wait_until_phrase(self, tracker, 'relative to flyers')
+            self.play(FadeIn(table['raw']), run_time=1.0)
+            self.play(FadeIn(table['raw_total']), run_time=0.6)
+
+            wait_until_phrase(self, tracker, 'scales the values back up')
+            self.play(FadeIn(table['scaling']), run_time=0.8)
+            self.play(FadeIn(table['final']), FadeIn(table['final_total']), run_time=1.0)
+            self.table = table
+            self.wait(0.8)
+
+        with self.voiceover(text=NARRATION['concentration']) as tracker:
+            wait_until_phrase(self, tracker, 'concentrates value')
+            self.play(FadeIn(table['change']), run_time=1.0)
+            self.wait(2.0)
         self.wait(0.6)
 
-    def value_row(self, player: dict) -> VGroup:
-        """What a player projects at, against what they are worth once the floor is applied."""
-        kept = self.savor_value(player['value'])
-        return VGroup(
-            Text(player['name'], font_size=26, color=player['colour']),
-            Text(f"{player['value']:.2f}  →  {kept:.2f}",
-                 font_size=32, color=YELLOW),
-            Text(f"{self.share_above_replacement(player['value']):.0%} per extra unit",
-                 font_size=22, color=GREY_B),
-        ).arrange(RIGHT, buff=0.5)
+    def build_value_table(self) -> dict:
+        """Projected dollars, their SAVOR values, the scale-up, and what each player ends on."""
+        above = [value - REPLACEMENT_DOLLARS for value in PROJECTED_DOLLARS]
+        raw = [self.savor_value(margin, S_SIGMA) for margin in above]
+        scaling = sum(above) / sum(raw)
+        final = [value * scaling + REPLACEMENT_DOLLARS for value in raw]
+
+        def column(values, x, colour, money=True):
+            entries = VGroup()
+            for row, value in enumerate(values):
+                # A value that rounds to zero is written as zero: the replacement player's SAVOR
+                # value is a hair below it and came out as "$-0".
+                shown = 0.0 if abs(value) < 0.05 else value
+                # Gains and losses are the whole point of the last column, so they are not one
+                # colour: money moves from the bottom of the board to the top.
+                tint = colour if money else (GREEN_C if shown > 0 else GREY_B)
+                entries.add(
+                    Text(f'${shown:.0f}' if money else f'{shown:+.1f}',
+                         font_size=24, color=tint)
+                    .move_to([x, TABLE_TOP_Y - row * TABLE_ROW_GAP, 0.0]))
+            return entries
+
+        headings = VGroup(
+            Text('projected', font_size=22, color=GREY_B).move_to([-3.4, TABLE_TOP_Y + 0.6, 0]),
+            Text('SAVOR value', font_size=22, color=GREY_B).move_to([-0.6, TABLE_TOP_Y + 0.6, 0]),
+            Text('scaled back up', font_size=22, color=GREY_B).move_to([2.4, TABLE_TOP_Y + 0.6, 0]),
+        )
+        rule = Line([-4.6, TABLE_TOP_Y + 0.35, 0.0], [4.9, TABLE_TOP_Y + 0.35, 0.0],
+                    color=GREY_D, stroke_width=2)
+        bottom = TABLE_TOP_Y - len(PROJECTED_DOLLARS) * TABLE_ROW_GAP
+        return {
+            'frame': VGroup(headings, rule),
+            'projected': column(PROJECTED_DOLLARS, -3.4, WHITE),
+            'raw': column(raw, -0.6, GREY_B),
+            'raw_total': VGroup(
+                Line([-1.6, bottom + 0.22, 0.0], [0.4, bottom + 0.22, 0.0],
+                     color=GREY_D, stroke_width=2),
+                Text(f'${sum(raw):.0f}', font_size=24, color=GREY_B)
+                .move_to([-0.6, bottom - 0.08, 0.0]),
+                Text('short of the pot', font_size=19, color=GREY_D)
+                .move_to([-0.6, bottom - 0.45, 0.0]),
+            ),
+            'scaling': Text(f'x {scaling:.2f}', font_size=28, color=YELLOW)
+                       .move_to([1.0, bottom - 0.08, 0.0]),
+            'final': column(final, 2.4, YELLOW),
+            'final_total': VGroup(
+                Line([1.4, bottom + 0.22, 0.0], [3.4, bottom + 0.22, 0.0],
+                     color=GREY_D, stroke_width=2),
+                Text(f'${sum(final):.0f}', font_size=24, color=YELLOW)
+                .move_to([2.4, bottom - 0.08, 0.0]),
+                Text('the pot, exactly', font_size=19, color=GREY_D)
+                .move_to([2.4, bottom - 0.45, 0.0]),
+            ),
+            'change': column([f - p for f, p in zip(final, PROJECTED_DOLLARS)],
+                             4.5, GREEN_C, money=False),
+        }
