@@ -35,7 +35,7 @@ from pathlib import Path
 import numpy as np
 from manim import (
     VGroup, Line, DashedLine, Rectangle, Text, Dot,
-    FadeIn, FadeOut, Create, Write,
+    FadeIn, FadeOut, Create, Write, Transform,
     DOWN, UP, RIGHT,
     BLUE_B, GREEN_C, RED_B, GREY_B, GREY_D, YELLOW,
 )
@@ -55,7 +55,13 @@ TEAMS = 12
 CATEGORIES = 9
 MAX_POINTS = TEAMS * CATEGORIES            # 108: first in every category
 AVERAGE_POINTS = (TEAMS + 1) / 2 * CATEGORIES
-AXIS_TICKS = (0, 54, MAX_POINTS)           # ends and midpoint, so the scale reads at a glance
+# The reachable ends and the middle. NOT zero: a team that finishes last in all nine categories
+# still scores nine, because the worst place in a category pays one point rather than none.
+MIN_POINTS = CATEGORIES * 1
+# The middle of 9..108 is 58.5, which is ALSO what an average team scores: points 1..12 are
+# symmetric about 6.5, so nine categories of them centre on 9 x 6.5. The midpoint of the scale
+# and the mean of the distribution are the same number here.
+AXIS_TICKS = (MIN_POINTS, AVERAGE_POINTS, MAX_POINTS)
 
 # Nothing is drawn per season any more -- the seasons only supply the distribution and
 # the conditional win rate -- so this can be large enough to make both smooth.
@@ -67,14 +73,14 @@ SIMULATION_SEED = 7
 BALANCED_BUILD = ([0.0] * CATEGORIES, 1.0)
 COMMITTED_BUILD = ([3.0] * 5 + [-3.0] * 4, 0.30)
 
-ORDINALS = {1: '1st', 2: '2nd', 3: '3rd', 11: '11th', 12: '12th'}
-
 # -- Layout ---------------------------------------------------------------------------
 
 AXIS_Y = -2.9
 AXIS_LEFT_X = -6.0
 AXIS_RIGHT_X = 6.0
 CLOUD_HEIGHT = 4.2         # height of the most common total; the rest scale against it
+# The winning bar is drawn shorter, so it reads as background against the team's own curve.
+THRESHOLD_HEIGHT = 2.4
 
 
 class Rotisserie(VoiceoverScene):
@@ -83,7 +89,7 @@ class Rotisserie(VoiceoverScene):
     def construct(self) -> None:
         self.set_speech_service(DraftVoice())
         self.rng = np.random.default_rng(SIMULATION_SEED)
-        self.play_what_a_point_is()
+        self.play_the_scale()
         self.play_the_bar()
         self.play_widening()
         self.play_two_builds()
@@ -107,9 +113,10 @@ class Rotisserie(VoiceoverScene):
             x = self.to_scene_x(points)
             marks.add(Line([x, AXIS_Y - 0.12, 0.0], [x, AXIS_Y + 0.12, 0.0],
                            color=GREY_B, stroke_width=3))
-            marks.add(Text(str(points), font_size=22, color=GREY_B)
+            written = f'{points:g}'
+            marks.add(Text(written, font_size=22, color=GREY_B)
                       .move_to([x, AXIS_Y - 0.38, 0.0]))
-        caption = Text('Rotisserie points over the season', font_size=23, color=GREY_B)
+        caption = Text('Fantasy points', font_size=23, color=GREY_B)
         caption.move_to([0.0, AXIS_Y - 0.82, 0.0])
         return VGroup(axis, marks, caption)
 
@@ -165,68 +172,67 @@ class Rotisserie(VoiceoverScene):
             ))
         return columns
 
+    def build_threshold_distribution(self, bar, height: float = THRESHOLD_HEIGHT,
+                                     opacity: float = 0.32) -> VGroup:
+        """What it took to win, as its own curve, sitting behind the team's.
+
+        The bar is the best of eleven rivals, so it is a distribution in its own right and a
+        different one every season. Drawn as a single dashed line it looked like a fixed target,
+        which is the one thing it is not -- and it is why a modest season can still win a weak
+        year.
+        """
+        lowest, highest = int(bar.min()), int(bar.max())
+        counts = np.bincount(bar - lowest, minlength=highest - lowest + 1).astype(float)
+        tallest = counts.max()
+        width = (self.to_scene_x(1) - self.to_scene_x(0)) * 0.92
+
+        columns = VGroup()
+        for offset, count in enumerate(counts):
+            if count <= 0:
+                continue
+            column_height = height * count / tallest
+            columns.add(Rectangle(width=width, height=column_height, stroke_width=0,
+                                  fill_color=RED_B, fill_opacity=opacity)
+                        .move_to([self.to_scene_x(lowest + offset),
+                                  AXIS_Y + column_height / 2, 0.0]))
+        return columns
+
     def win_rate(self, totals, bar) -> float:
         """How often the season beat that year's bar."""
         return float(np.mean(totals > bar))
 
     # -- Act one: what a Rotisserie point is -------------------------------------------
 
-    def play_what_a_point_is(self) -> None:
-        """The scale has to mean something before anything can be plotted against it."""
-        with self.voiceover(text=NARRATION['the_points']) as tracker:
-            # The twelve teams arrive with the first words. Waiting for the clause about ranking
-            # left eight seconds of black at the very start of the scene, which is the fault
-            # this act was rewritten to fix in the first place.
-            self.league = self.build_league_row()
-            self.play(FadeIn(self.league), run_time=1.2)
-            wait_until_phrase(self, tracker, 'each category is ranked')
-            self.ladder = self.build_rank_ladder()
-            self.play(FadeOut(self.league), run_time=0.4)
-            self.play(FadeIn(self.ladder), run_time=1.2)
-
+    def play_the_scale(self) -> None:
+        """Straight onto the axis. Anyone watching a Rotisserie explainer knows what Rotisserie
+        is, so the scoring is stated in one sentence rather than taught in an act."""
         with self.voiceover(text=NARRATION['the_scale']) as tracker:
-            wait_until_phrase(self, tracker, 'a perfect season')
             self.axis = self.build_axis()
-            self.play(FadeOut(self.ladder), run_time=0.5)
             self.play(Create(self.axis), run_time=1.2)
 
-            wait_until_phrase(self, tracker, 'an average one')
+            # What a category pays, shown while the line says it. Without this the axis sat
+            # alone for twelve seconds under a running sentence, which is the fault this scene
+            # has already been rewritten once to remove.
+            wait_until_phrase(self, tracker, 'twelve points')
+            paid = VGroup(
+                Text('1st in a category', font_size=24, color=GREY_B),
+                Text('12 points', font_size=26, color=BLUE_B),
+                Text('last in a category', font_size=24, color=GREY_B),
+                Text('1 point', font_size=26, color=GREY_D),
+            ).arrange_in_grid(rows=2, cols=2, buff=(0.6, 0.35))
+            paid.move_to([0.0, 1.1, 0.0])
+            self.play(FadeIn(paid), run_time=1.0)
+
+            wait_until_phrase(self, tracker, 'about fifty eight')
+            self.play(FadeOut(paid), run_time=0.5)
             average = DashedLine([self.to_scene_x(AVERAGE_POINTS), AXIS_Y, 0.0],
                                  [self.to_scene_x(AVERAGE_POINTS), AXIS_Y + 1.1, 0.0],
                                  color=GREY_B, stroke_width=2, dash_length=0.1)
-            label = Text(f'average team, {AVERAGE_POINTS:.0f}', font_size=21, color=GREY_B)
+            label = Text('an average team', font_size=21, color=GREY_B)
             label.next_to(average, UP, buff=0.1)
             self.play(Create(average), FadeIn(label), run_time=0.9)
             self.average_mark = VGroup(average, label)
             self.wait(0.6)
-
-    def build_league_row(self) -> VGroup:
-        """The twelve teams, since Rotisserie is played against all of them at once."""
-        markers = VGroup(*[
-            VGroup(Dot(radius=0.17, color=BLUE_B if seat == 0 else GREY_D),
-                   Text('you' if seat == 0 else f'{seat + 1}', font_size=18,
-                        color=BLUE_B if seat == 0 else GREY_D))
-            .arrange(DOWN, buff=0.16)
-            for seat in range(TEAMS)
-        ]).arrange(RIGHT, buff=0.42)
-        caption = Text('every team, all season, at the same time',
-                       font_size=24, color=GREY_B)
-        return VGroup(markers, caption).arrange(DOWN, buff=0.55).move_to([0.0, 0.3, 0.0])
-
-    def build_rank_ladder(self) -> VGroup:
-        """Where you finish in one category, and what it pays."""
-        rows = VGroup()
-        for place in (1, 2, 3, 11, 12):
-            points = TEAMS + 1 - place
-            rows.add(VGroup(
-                Text(f'{ORDINALS[place]} in a category', font_size=26, color=GREY_B),
-                Text(f'{points} points', font_size=26,
-                     color=BLUE_B if points > 6 else GREY_D),
-            ).arrange(RIGHT, buff=0.7))
-        ladder = VGroup(rows[0], rows[1], rows[2],
-                        Text('...', font_size=26, color=GREY_D),
-                        rows[3], rows[4])
-        return ladder.arrange(DOWN, buff=0.3).move_to([0.0, 0.2, 0.0])
 
     # -- Act two: the bar, and how rarely anyone clears it -----------------------------
 
@@ -234,20 +240,30 @@ class Rotisserie(VoiceoverScene):
         with self.voiceover(text=NARRATION['the_bar']) as tracker:
             self.mine, self.bar = self.simulate(BALANCED_BUILD)
             wait_until_phrase(self, tracker, 'lands around')
-            self.bar_line = DashedLine(
-                [self.to_scene_x(self.bar.mean()), AXIS_Y, 0.0],
-                [self.to_scene_x(self.bar.mean()), AXIS_Y + CLOUD_HEIGHT + 0.3, 0.0],
-                color=RED_B, stroke_width=3, dash_length=0.14)
+            # Introduced at full height and explained on its own. It only becomes background
+            # once the team's curve arrives to sit in front of it -- coming up already faint
+            # would make it scenery before anyone had been told what it is.
+            self.bar_line = self.build_threshold_distribution(
+                self.bar, height=CLOUD_HEIGHT, opacity=0.55)
             bar_label = Text('what it took to win', font_size=22, color=RED_B)
-            bar_label.next_to(self.bar_line, UP, buff=0.1)
+            bar_label.move_to([self.to_scene_x(self.bar.mean()) + 1.6,
+                               AXIS_Y + CLOUD_HEIGHT + 0.25, 0.0])
             self.play(FadeOut(self.average_mark), run_time=0.4)
-            self.play(Create(self.bar_line), FadeIn(bar_label), run_time=1.0)
+            self.play(FadeIn(self.bar_line), FadeIn(bar_label), run_time=1.0)
             self.bar_label = bar_label
-            self.wait(0.5)
+            self.wait(1.0)
 
         with self.voiceover(text=NARRATION['simulate']) as tracker:
+            # Now it goes to the back, shorter and fainter, and the team's own curve takes the
+            # front of the frame.
+            receded = self.build_threshold_distribution(self.bar)
+            self.play(Transform(self.bar_line, receded),
+                      self.bar_label.animate.move_to(
+                          [self.to_scene_x(self.bar.mean()) + 1.6,
+                           AXIS_Y + THRESHOLD_HEIGHT + 0.3, 0.0]),
+                      run_time=1.0)
             self.cloud = self.build_win_shaded_distribution(self.mine, self.bar, BLUE_B)
-            self.play(FadeIn(self.cloud), run_time=max(1.5, tracker.duration * 0.4))
+            self.play(FadeIn(self.cloud), run_time=max(1.4, tracker.duration * 0.35))
             self.wait(0.6)
 
         with self.voiceover(text=NARRATION['its_hard']):

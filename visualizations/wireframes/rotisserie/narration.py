@@ -11,14 +11,11 @@ differently from how it is written ('sigma', 'fifty-fifty').
 """
 
 NARRATION = {
-    # -- What a Rotisserie score even is -----------------------------------------------
-    'the_points':
-        'Rotisserie is not a series of matchups. You play every team at once, all season. At the '
-        'end, each category is ranked, and you score points for where you finished.',
+    # -- The scale, assumed rather than taught -----------------------------------------
     'the_scale':
-        'In a twelve team league you get twelve points for winning a category, down to one point '
-        'for finishing last. Nine categories, so a perfect season is a hundred and eight points, '
-        'and an average one is around fifty eight.',
+        'A Rotisserie season comes down to one number. Nine categories, twelve points for '
+        'winning one and one point for finishing last, so a season lands somewhere between nine '
+        'and a hundred and eight. An average team scores about fifty eight.',
 
     # -- The bar you actually have to clear --------------------------------------------
     'the_bar':
