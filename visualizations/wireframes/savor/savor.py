@@ -288,9 +288,18 @@ class Savor(VoiceoverScene):
     def build_value_table(self) -> dict:
         """Projected dollars, their SAVOR values, the scale-up, and what each player ends on."""
         above = [value - REPLACEMENT_DOLLARS for value in PROJECTED_DOLLARS]
-        raw = [self.savor_value(margin, S_SIGMA) for margin in above]
-        scaling = sum(above) / sum(raw)
-        final = [value * scaling + REPLACEMENT_DOLLARS for value in raw]
+        exact_raw = [self.savor_value(margin, S_SIGMA) for margin in above]
+        scaling = sum(above) / sum(exact_raw)
+
+        # Rounded to what is actually PRINTED, and every total summed from those same rounded
+        # numbers. Printing whole dollars against changes carrying a decimal made the table
+        # visibly wrong: $33 went to $33.5, which showed as "$33, change +0.5", and the final
+        # column's rows added to $205 under a total reading $206. The underlying arithmetic was
+        # right -- the changes cancel exactly and both totals are 206.0 -- so the fix is to show
+        # a decimal everywhere and to add up what is on screen rather than what is behind it.
+        raw = [round(value, 1) for value in exact_raw]
+        final = [round(value * scaling + REPLACEMENT_DOLLARS, 1) for value in exact_raw]
+        change = [round(end - start, 1) for end, start in zip(final, PROJECTED_DOLLARS)]
 
         def column(values, x, colour, money=True):
             entries = VGroup()
@@ -302,7 +311,7 @@ class Savor(VoiceoverScene):
                 # colour: money moves from the bottom of the board to the top.
                 tint = colour if money else (GREEN_C if shown > 0 else GREY_B)
                 entries.add(
-                    Text(f'${shown:.0f}' if money else f'{shown:+.1f}',
+                    Text(f'${shown:.1f}' if money else f'{shown:+.1f}',
                          font_size=24, color=tint)
                     .move_to([x, TABLE_TOP_Y - row * TABLE_ROW_GAP, 0.0]))
             return entries
@@ -317,12 +326,16 @@ class Savor(VoiceoverScene):
         bottom = TABLE_TOP_Y - len(PROJECTED_DOLLARS) * TABLE_ROW_GAP
         return {
             'frame': VGroup(headings, rule),
-            'projected': column(PROJECTED_DOLLARS, -3.4, WHITE),
+            'projected': VGroup(*[
+                Text(f'${value:.0f}', font_size=24, color=WHITE)
+                .move_to([-3.4, TABLE_TOP_Y - row * TABLE_ROW_GAP, 0.0])
+                for row, value in enumerate(PROJECTED_DOLLARS)
+            ]),
             'raw': column(raw, -0.6, GREY_B),
             'raw_total': VGroup(
                 Line([-1.6, bottom + 0.22, 0.0], [0.4, bottom + 0.22, 0.0],
                      color=GREY_D, stroke_width=2),
-                Text(f'${sum(raw):.0f}', font_size=24, color=GREY_B)
+                Text(f'${sum(raw):.1f}', font_size=24, color=GREY_B)
                 .move_to([-0.6, bottom - 0.08, 0.0]),
                 Text('short of the pot', font_size=19, color=GREY_D)
                 .move_to([-0.6, bottom - 0.45, 0.0]),
@@ -333,11 +346,10 @@ class Savor(VoiceoverScene):
             'final_total': VGroup(
                 Line([1.4, bottom + 0.22, 0.0], [3.4, bottom + 0.22, 0.0],
                      color=GREY_D, stroke_width=2),
-                Text(f'${sum(final):.0f}', font_size=24, color=YELLOW)
+                Text(f'${sum(final):.1f}', font_size=24, color=YELLOW)
                 .move_to([2.4, bottom - 0.08, 0.0]),
                 Text('the pot, exactly', font_size=19, color=GREY_D)
                 .move_to([2.4, bottom - 0.45, 0.0]),
             ),
-            'change': column([f - p for f, p in zip(final, PROJECTED_DOLLARS)],
-                             4.5, GREEN_C, money=False),
+            'change': column(change, 4.5, GREEN_C, money=False),
         }
