@@ -41,6 +41,7 @@ from manim import (
     DOWN, UP, LEFT, RIGHT,
     BLUE_D, BLUE_B, RED_D, RED_B, GREEN_C, GREY_B, GREY_D, YELLOW, WHITE,
 )
+from manim import ThreeDScene, DEGREES                     # noqa: E402
 from manim_voiceover import VoiceoverScene
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
@@ -108,10 +109,13 @@ TABLE_TOP_Y = 3.4
 # The walk the tree collapses into: one column per category, net position up for a category won
 # and down for one lost. Nine steps is odd, so the walk can never finish level -- it is above the
 # line exactly when five or more were won, which is what makes "majority" a side of the picture.
-WALK_LEFT_X = -5.2
-WALK_RIGHT_X = 5.2
-WALK_CENTRE_Y = -0.35
-WALK_UNIT_Y = 0.30
+# Kept near square. At ten units wide against five tall the walk sprawled sideways and the
+# steps read as shallow; the shape of a random walk is easier to see when a step up is about as
+# big as a step along.
+WALK_LEFT_X = -3.7
+WALK_RIGHT_X = 3.7
+WALK_CENTRE_Y = -0.30
+WALK_UNIT_Y = 0.34
 # Where the cut opens first, and where it slides to -- one kept category, then two abandoned.
 CUT_CATEGORY = 2
 SLIDE_TO = (5, 0)
@@ -120,17 +124,41 @@ SLIDE_TO = (5, 0)
 # whether the remaining eight are level, and that is the whole punting argument.
 # The three cases the toggle panel steps through: the other eight level, then already won,
 # then already lost. Only the first leaves the ninth category mattering at all.
+# The two sweeps sit on parallel planes, so tilting the camera separates them in depth rather
+# than leaving the backward one nudged sideways and overlapping the forward one. Flat-on
+# (phi = 0) the scene renders exactly as a 2D one, which is what every other act wants.
+WALK_BACKWARD_Z = -1.7
+# A gentle tilt. At sixty-plus degrees the planes foreshortened into slivers and everything
+# written on them sheared with the camera; this is enough to separate the two sweeps in depth
+# while the walk still reads as a walk.
+WALK_VIEW_PHI, WALK_VIEW_THETA = 34, -84
+# Readouts are pinned in SCREEN space, not on the planes: at any camera angle a line of text
+# lying on a tilted plane shears, and pinning only its orientation left the glyphs spread apart.
+READOUT_SCREEN_Y = -3.05
+FLAT_VIEW_PHI, FLAT_VIEW_THETA = 0, -90
+
+# The focus sits in the middle of the row, so the other eight fall four either side of it.
+FOCUS_INDEX = 4
+PANEL_CELL_WIDTH = 0.82
+PANEL_CELL_HEIGHT = 0.52
+PANEL_CELL_GAP = 0.95
+PANEL_ROW_Y = 1.35
+
 LEVEL_CASE   = (1, 1, 1, 1, 0, 0, 0, 0)
 DECIDED_WON  = (1, 1, 1, 1, 1, 1, 0, 0)
 DECIDED_LOST = (1, 1, 0, 0, 0, 0, 0, 0)
 
 CONTESTED_COUNT = 5
+# Which category gets taken off the board in each case: one that is being held, then one that
+# has been given up.
+EXCLUDED_HELD = 2
+EXCLUDED_GIVEN_UP = 7
 PUNT_BAR_HEIGHT = 1.9
 # How many of the 256 scenarios are drawn before the table is summarised rather than continued.
 SCENARIO_ROWS_DRAWN = 14
 
 
-class MostCategories(VoiceoverScene):
+class MostCategories(VoiceoverScene, ThreeDScene):
     """The 512-leaf tree, its collapse into a tally, and the tipping point that falls out."""
 
     def construct(self) -> None:
@@ -138,6 +166,7 @@ class MostCategories(VoiceoverScene):
         self.play_a_week()
         self.play_the_table()
         self.play_walk()
+        self.play_the_slope()
         self.play_what_tipping_means()
         self.play_tipping_point()
 
@@ -318,7 +347,19 @@ class MostCategories(VoiceoverScene):
 
             wait_until_phrase(self, tracker, 'walk forward though all')
             self.play_column_sweep()
-            self.wait(0.6)
+
+            # The answer, picked out of the last column: the probabilities above the line, added
+            # up. The line asks for exactly this and the sweep stopped one step short of it.
+            wait_until_phrase(self, tracker, 'above the middle line at the end')
+            final = self.forward[len(CATEGORIES)]
+            gold = self.build_column(final, len(CATEGORIES), above_colour=YELLOW)
+            self.play(Transform(self.forward_columns[-1], gold), run_time=0.8)
+            self.majority_readout = Text(
+                f'{self.winning_mass(final):.1%} chance of the majority',
+                font_size=27, color=YELLOW).move_to([0.0, READOUT_SCREEN_Y + 0.55, 0.0])
+            self.add_fixed_in_frame_mobjects(self.majority_readout)
+            self.play(FadeIn(self.majority_readout), run_time=0.9)
+            self.wait(0.8)
 
     # The walk: ten columns (before any category, then after each of the nine) against net
     # position, which runs from -9 to +9 but only ever reaches values of the step's own parity.
@@ -407,20 +448,26 @@ class MostCategories(VoiceoverScene):
             stepped[net - 1] = stepped.get(net - 1, 0.0) + probability * (1.0 - chance)
         return stepped
 
-    def build_column(self, distribution: dict, step: int, forward: bool = True) -> VGroup:
+    def winning_mass(self, distribution: dict) -> float:
+        """The probability of finishing above the line, which is the objective itself."""
+        return sum(probability for net, probability in distribution.items() if net > 0)
+
+    def build_column(self, distribution: dict, step: int, forward: bool = True,
+                     above_colour=None) -> VGroup:
         """One column of a sweep: a dot per reachable height, sized by its probability.
 
-        The backward sweep is drawn a little to the right of the forward one and in its own
-        colour, so the two sit side by side at the same position rather than on top of each
-        other -- the cut in the next beat needs both to be readable at once.
+        The backward sweep sits on its own plane behind the forward one, in its own colour, so
+        the tilted camera separates them in depth -- the cut in the next beat needs both to be
+        readable at once, and side by side on one plane they overlapped.
         """
-        offset = 0.0 if forward else 0.13
+        depth = 0.0 if forward else WALK_BACKWARD_Z
         dots = VGroup()
         for net, probability in distribution.items():
             dots.add(Dot(
-                point=[self.walk_x(step) + offset, self.walk_y(net), 0.0],
+                point=[self.walk_x(step), self.walk_y(net), depth],
                 radius=0.05 + 0.18 * probability ** 0.5,
-                color=(BLUE_B if net > 0 else GREY_D) if forward else GREEN_C,
+                color=((above_colour or BLUE_B) if net > 0 else GREY_D)
+                      if forward else GREEN_C,
             ).set_opacity(0.30 + 0.60 * probability ** 0.5))
         return dots
 
@@ -440,10 +487,11 @@ class MostCategories(VoiceoverScene):
         eight-step walk per category would look like the same answer and teach the opposite
         lesson: the point of the two tables is that nine categories cost two sweeps, not nine.
         """
-        with self.voiceover(text=NARRATION['tipping']):
-            self.wait(1.4)
-
         with self.voiceover(text=NARRATION['backward']):
+            # Tilted only now. Everything before this is flat artwork that a rotated camera
+            # would skew for no reason; the angle exists to separate the two sweeps in depth.
+            self.move_camera(phi=WALK_VIEW_PHI * DEGREES,
+                             theta=WALK_VIEW_THETA * DEGREES, run_time=1.6)
             self.backward_columns = VGroup()
             for step in range(len(CATEGORIES), -1, -1):
                 column = self.build_column(self.backward[step], step, forward=False)
@@ -468,6 +516,9 @@ class MostCategories(VoiceoverScene):
             self.wait(0.8)
 
         with self.voiceover(text=NARRATION['punting']) as tracker:
+            # Back to flat for the closing board, which is 2D artwork like the opening.
+            self.move_camera(phi=FLAT_VIEW_PHI * DEGREES,
+                             theta=FLAT_VIEW_THETA * DEGREES, run_time=1.2)
             # Everything currently drawn, rather than a list of names that has to be kept in
             # step by hand -- the previous list had fallen behind and the board came up on top
             # of the scenario table and the leftover sweep.
@@ -476,14 +527,40 @@ class MostCategories(VoiceoverScene):
             board = self.build_punt_board()
             self.play(FadeIn(board['bars']), run_time=1.2)
 
+            # The excluded category is actually taken off the board, not just described. The
+            # whole claim is about what the OTHER eight look like, and that is a different
+            # picture in each case rather than the same picture with different words over it.
             wait_until_phrase(self, tracker, 'excluding one of them')
-            self.play(FadeIn(board['contested']), run_time=1.0)
+            self.play(*self.exclude_bar(board, EXCLUDED_HELD), run_time=0.8)
+            self.play(FadeIn(board['contested']), run_time=0.9)
             self.wait(1.4)
 
             wait_until_phrase(self, tracker, 'For the punted categories')
-            self.play(FadeIn(board['punted']), run_time=1.0)
+            self.play(*self.restore_bar(board, EXCLUDED_HELD),
+                      FadeOut(board['contested']), run_time=0.6)
+            self.play(*self.exclude_bar(board, EXCLUDED_GIVEN_UP), run_time=0.8)
+            self.play(FadeIn(board['punted']), run_time=0.9)
             self.wait(2.0)
         self.wait(0.6)
+
+    def exclude_bar(self, board, index: int):
+        """Take one category off the board: its level greyed out and struck through.
+
+        Only the FILL is dimmed. Dimming the whole bar also touches its outline, whose fill is
+        deliberately empty -- restoring that to full opacity painted a white block across the
+        top of the bar.
+        """
+        outline, filled = board['bars'][1][index]
+        return [filled.animate.set_fill(GREY_D, opacity=0.25),
+                outline.animate.set_stroke(GREY_D, opacity=0.35),
+                FadeIn(board['strikes'][index])]
+
+    def restore_bar(self, board, index: int):
+        outline, filled = board['bars'][1][index]
+        held = index < CONTESTED_COUNT
+        return [filled.animate.set_fill(BLUE_D if held else GREY_D, opacity=0.9),
+                outline.animate.set_stroke(GREY_D, opacity=1.0),
+                FadeOut(board['strikes'][index])]
 
     def build_punt_board(self) -> dict:
         """Five categories held high and four given up, and what taking one away leaves.
@@ -515,13 +592,43 @@ class MostCategories(VoiceoverScene):
                 Text(note, font_size=22, color=GREY_B),
             ).arrange(RIGHT, buff=0.5).move_to([0.0, y, 0.0])
 
+        strikes = VGroup(*[
+            Line([-4.6 + index * 1.15 - 0.45, 0.9, 0.0],
+                 [-4.6 + index * 1.15 + 0.45, 0.9, 0.0],
+                 color=GREY_B, stroke_width=4)
+            for index in range(len(CATEGORIES))
+        ])
         return {
             'bars': VGroup(caption, bars),
+            'strikes': strikes,
             'contested': verdict('take away a held category', 'the rest sit 4 - 4',
                                  'level, so it decides the matchup', YELLOW, -1.1),
             'punted': verdict('take away a given-up category', 'the rest sit 5 - 3',
                               'already settled, so it decides nothing', GREY_B, -2.1),
         }
+
+    def play_the_slope(self) -> None:
+        """The question the next two acts answer, asked where the script asks it.
+
+        This ran AFTER the tipping-point explanation, which put the answer before the question:
+        the script asks how you differentiate the thing just built, and only then says what the
+        derivative turns out to be.
+        """
+        with self.voiceover(text=NARRATION['tipping']) as tracker:
+            # This line asks how you differentiate the thing just built, and had been left as a
+            # bare wait -- the one beat in the scene with nothing to look at. The answer it is
+            # reaching for is a slope, so the question is put as one: nudge a category, and ask
+            # how far the total above the line moves.
+            wait_until_phrase(self, tracker, 'calculate the slope')
+            question = VGroup(
+                Text('if one category gets better...', font_size=26, color=GREY_B),
+                Text('...how much does the majority chance move?', font_size=26, color=YELLOW),
+            ).arrange(DOWN, buff=0.34).move_to([0.0, self.walk_y(9) + 1.25, 0.0])
+            self.play(FadeIn(question[0]), run_time=0.8)
+            self.wait(0.6)
+            self.play(FadeIn(question[1]), run_time=0.8)
+            self.wait(max(0.5, tracker.get_remaining_duration() - 1.0))
+            self.play(FadeOut(question), run_time=0.6)
 
     def play_what_tipping_means(self) -> None:
         """Why the gradient is a probability: the other eight settle it unless they are level.
@@ -534,10 +641,15 @@ class MostCategories(VoiceoverScene):
         that respond, and every other row is flat.
         """
         with self.voiceover(text=NARRATION['tipping_point_probability']) as tracker:
+            # The majority total goes with the walk it belongs to. Pinned in screen space, it
+            # was not in the group being cleared and sat over this act as a stray number.
             self.play(FadeOut(VGroup(self.forward_columns, self.all_paths,
-                                     self.lattice, self.win_region)), run_time=0.7)
+                                     self.lattice, self.win_region)),
+                      FadeOut(self.majority_readout), run_time=0.7)
             panel = self.build_tipping_panel()
-            self.play(FadeIn(panel['frame']), run_time=1.0)
+            # The objective has to be ADDED, not only transformed: a Transform on a mobject the
+            # scene never received shows nothing, so this column was simply missing.
+            self.play(FadeIn(panel['frame']), FadeIn(panel['objective']), run_time=1.0)
 
             wait_until_phrase(self, tracker, 'precisely even')
             self.play(*self.set_toggles(panel, LEVEL_CASE), run_time=0.9)
@@ -566,24 +678,36 @@ class MostCategories(VoiceoverScene):
                                     self.forward_columns)), run_time=0.7)
 
     def build_tipping_panel(self) -> dict:
-        """Eight toggles, the chance of taking the ninth, and the objective beside them."""
+        """All nine categories in one row, the focus among them rather than set apart.
+
+        The eight used to sit in a block with the ninth off to the side under its own heading,
+        which made the focus look like a different KIND of thing. It is not -- any of the nine
+        could be the one being valued, and the argument only works because they are
+        interchangeable. So they are drawn identically, in one row, and the one in question is
+        simply the middle one, marked.
+        """
         self.toggles = VGroup()
-        for index in range(len(CATEGORIES) - 1):
-            row, column = divmod(index, 4)
-            self.toggles.add(Rectangle(
-                width=0.86, height=0.46, stroke_width=2, stroke_color=GREY_D,
-                fill_color=GREY_D, fill_opacity=0.25,
-            ).move_to([-4.3 + column * 1.0, 1.5 - row * 0.62, 0.0]))
-        heading = Text('the other eight', font_size=22, color=GREY_B)
-        heading.move_to([-2.8, 2.3, 0.0])
+        cells = VGroup()
+        for index in range(len(CATEGORIES)):
+            x = -(len(CATEGORIES) - 1) / 2 * PANEL_CELL_GAP + index * PANEL_CELL_GAP
+            focus = index == FOCUS_INDEX
+            cell = Rectangle(
+                width=PANEL_CELL_WIDTH, height=PANEL_CELL_HEIGHT, stroke_width=2,
+                stroke_color=YELLOW if focus else GREY_D,
+                fill_color=GREY_D, fill_opacity=0.0 if focus else 0.25,
+            ).move_to([x, PANEL_ROW_Y, 0.0])
+            cells.add(cell)
+            if focus:
+                cells.add(Text('p', font_size=32, color=YELLOW).move_to(cell.get_center()))
+            else:
+                self.toggles.add(cell)
 
-        mine = VGroup(
-            Text('this category', font_size=22, color=GREY_B),
-            Text('p', font_size=34, color=YELLOW),
-        ).arrange(DOWN, buff=0.18).move_to([0.9, 1.2, 0.0])
-
+        heading = Text('nine categories, any one of them', font_size=22, color=GREY_B)
+        heading.move_to([0.0, PANEL_ROW_Y + 0.72, 0.0])
+        marker = Text('the one being valued', font_size=19, color=YELLOW)
+        marker.move_to([0.0, PANEL_ROW_Y - 0.62, 0.0])
         objective = self.objective_readout(None)
-        return {'frame': VGroup(heading, self.toggles, mine), 'objective': objective}
+        return {'frame': VGroup(heading, cells, marker), 'objective': objective}
 
     def objective_readout(self, others) -> VGroup:
         """What the majority objective comes to, given what the other eight did."""
@@ -595,7 +719,7 @@ class MostCategories(VoiceoverScene):
         return VGroup(
             Text('chance of the majority', font_size=22, color=GREY_B),
             Text(value, font_size=46, color=YELLOW if value == 'p' else GREY_B),
-        ).arrange(DOWN, buff=0.22).move_to([4.2, 1.2, 0.0])
+        ).arrange(DOWN, buff=0.22).move_to([0.0, PANEL_ROW_Y - 1.75, 0.0])
 
     def set_toggles(self, panel, others):
         """Light the toggles for a given outcome of the other eight."""
@@ -658,12 +782,17 @@ class MostCategories(VoiceoverScene):
         fades += [self.backward_columns[len(CATEGORIES) - index].animate.set_opacity(0.12)
                   for index in range(len(CATEGORIES) + 1) if index != keep_backward]
 
+        label.move_to([0.0, READOUT_SCREEN_Y + 1.15, 0.0])
         if first_time:
             self.cut_marker, self.cut_label = marker, label
+            self.add_fixed_in_frame_mobjects(label)
             self.play(Create(marker), FadeIn(label), *fades, run_time=1.0)
         else:
             self.play(Transform(self.cut_marker, marker),
-                      Transform(self.cut_label, label), *fades, run_time=0.8)
+                      FadeOut(self.cut_label), *fades, run_time=0.6)
+            self.add_fixed_in_frame_mobjects(label)
+            self.play(FadeIn(label), run_time=0.3)
+            self.cut_label = label
 
     def play_meeting(self, category: int, quickly: bool = False) -> None:
         """Pair each height on the left with the opposite height on the right, and total it.
@@ -681,18 +810,25 @@ class MostCategories(VoiceoverScene):
             total += probability * partner
             arcs.add(Line(
                 [self.walk_x(category), self.walk_y(height), 0.0],
-                [self.walk_x(category + 1), self.walk_y(-height), 0.0],
+                [self.walk_x(category + 1), self.walk_y(-height), WALK_BACKWARD_Z],
                 color=YELLOW, stroke_width=1.0 + 7.0 * (probability * partner) ** 0.5,
             ).set_opacity(0.35 + 0.65 * (probability * partner) ** 0.5))
 
-        readout = Text(f'{CATEGORIES[category]} decides it {total:.1%} of the time',
+        readout = Text(f'{CATEGORIES[category]} is decisive {total:.1%} of the time',
                        font_size=26, color=YELLOW)
-        readout.move_to([0.0, self.walk_y(-9) - 0.55, 0.0])
+        readout.move_to([0.0, READOUT_SCREEN_Y, 0.0])
 
+        # The readout is REPLACED, never transformed. Transform morphs one Text into another
+        # glyph by glyph, so between two lines of different length it drags letters across the
+        # frame and strands the leftovers -- which is what put stray characters over the walk.
         if quickly:
             self.play(Transform(self.meeting_arcs, arcs),
-                      Transform(self.meeting_readout, readout), run_time=0.9)
+                      FadeOut(self.meeting_readout), run_time=0.7)
+            self.add_fixed_in_frame_mobjects(readout)
+            self.play(FadeIn(readout), run_time=0.4)
+            self.meeting_readout = readout
         else:
             self.meeting_arcs, self.meeting_readout = arcs, readout
             self.play(Create(arcs), run_time=1.2)
-            self.play(Write(readout), run_time=0.9)
+            self.add_fixed_in_frame_mobjects(readout)
+            self.play(FadeIn(readout), run_time=0.7)
