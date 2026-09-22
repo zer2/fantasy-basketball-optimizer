@@ -71,7 +71,15 @@ SIMULATION_SEED = 7
 # The two builds. Values are per-category strengths for the focal team; every rival draws around
 # zero, so a strength of zero is a coin flip against each of them.
 BALANCED_BUILD = ([0.0] * CATEGORIES, 1.0)
-COMMITTED_BUILD = ([3.0] * 5 + [-3.0] * 4, 0.30)
+# 90% per category, not 100%. Two reasons, both measured. A build at 100/0 has almost no spread
+# left (sigma 0.5), so its curve is 22x taller than the balanced one and the two cannot share a
+# vertical scale -- and without a shared scale their areas are not comparable, though both are
+# distributions with mass one. And a MILD tilt is not punished at all: at 70% per category the
+# team wins MORE often than the balanced one (9.2% against 7.8%), because it gains mean faster
+# than it loses spread. The penalty only appears once commitment is severe. 90% is where the
+# argument is true and the picture is still drawable: 5.4% against 7.8%, and 2.2x the height.
+_COMMITTED_STRENGTH = 1.8124      # Phi(0.90) x sqrt(2): beats a neutral rival 90% of the time
+COMMITTED_BUILD = ([_COMMITTED_STRENGTH] * 5 + [-_COMMITTED_STRENGTH] * 4, 1.0)
 
 # -- Layout ---------------------------------------------------------------------------
 
@@ -137,7 +145,8 @@ class Rotisserie(VoiceoverScene):
         totals = ranks.sum(axis=2)
         return totals[:, 0], totals[:, 1:].max(axis=1)
 
-    def build_win_shaded_distribution(self, totals, bar, colour) -> VGroup:
+    def build_win_shaded_distribution(self, totals, bar, colour,
+                                      reference_peak: float | None = None) -> VGroup:
         """Your season totals as a column chart, each column tinted by how often it won.
 
         The column height is how often you finish on that total. The yellow laid over it is
@@ -152,7 +161,11 @@ class Rotisserie(VoiceoverScene):
         """
         lowest, highest = int(totals.min()), int(totals.max())
         counts = np.bincount(totals - lowest, minlength=highest - lowest + 1).astype(float)
-        tallest = counts.max()
+        probabilities = counts / counts.sum()
+        # Height is probability against a SHARED reference, not against this curve's own peak.
+        # Scaling each to its own peak makes two distributions that both integrate to one look
+        # like different amounts of stuff, which is exactly the wrong thing to imply.
+        reference = reference_peak if reference_peak is not None else probabilities.max()
         width = (self.to_scene_x(1) - self.to_scene_x(0)) * 0.92
 
         columns = VGroup()
@@ -162,7 +175,7 @@ class Rotisserie(VoiceoverScene):
             total = lowest + offset
             landed = totals == total
             enough = float(np.mean(bar[landed] < total)) if landed.sum() else 0.0
-            height = CLOUD_HEIGHT * count / tallest
+            height = CLOUD_HEIGHT * probabilities[offset] / reference
             centre = [self.to_scene_x(total), AXIS_Y + height / 2, 0.0]
             columns.add(VGroup(
                 Rectangle(width=width, height=height, stroke_width=0,
@@ -171,6 +184,11 @@ class Rotisserie(VoiceoverScene):
                           fill_color=YELLOW, fill_opacity=enough).move_to(centre),
             ))
         return columns
+
+    def peak_probability(self, totals) -> float:
+        """The tallest single total's share, which sets the shared vertical scale."""
+        counts = np.bincount(totals - int(totals.min())).astype(float)
+        return float(counts.max() / counts.sum())
 
     def build_threshold_distribution(self, bar, height: float = THRESHOLD_HEIGHT,
                                      opacity: float = 0.32) -> VGroup:
@@ -285,7 +303,6 @@ class Rotisserie(VoiceoverScene):
             # either way", the right picked out as the part that gained. Wants the cloud redrawn
             # at a wider spread with the mean pinned, which is a second simulation.
             self.wait(2.4)
-            self.play(FadeOut(VGroup(self.cloud, self.win_readout)), run_time=0.7)
 
     # -- Act four: two builds, their tables, and what they actually win ----------------
 
@@ -295,7 +312,11 @@ class Rotisserie(VoiceoverScene):
         # which is the same fault the old opening had.
         table = self.build_matchup_table(BALANCED_BUILD, 'every category a coin flip', BLUE_B)
         with self.voiceover(text=NARRATION['two_builds']) as tracker:
-            self.play(FadeOut(VGroup(self.bar_line, self.bar_label, self.axis)), run_time=0.6)
+            # Everything goes at once. The blue used to be taken away at the end of the previous
+            # line while the red stayed behind it, so the curve being talked about vanished and
+            # its backdrop did not.
+            self.play(FadeOut(VGroup(self.cloud, self.win_readout, self.bar_line,
+                                     self.bar_label, self.axis)), run_time=0.6)
             self.play(FadeIn(table), run_time=1.2)
 
         with self.voiceover(text=NARRATION['coin_flips']):
@@ -313,9 +334,16 @@ class Rotisserie(VoiceoverScene):
             self.play(FadeOut(self.committed_table), run_time=0.4)
             self.play(Create(self.axis), run_time=0.9)
             clouds, self.summaries = VGroup(), []
-            for build, colour in ((BALANCED_BUILD, BLUE_B), (COMMITTED_BUILD, GREEN_C)):
-                mine, bar = self.simulate(build)
-                clouds.add(self.build_win_shaded_distribution(mine, bar, colour))
+            runs = [self.simulate(build) for build in (BALANCED_BUILD, COMMITTED_BUILD)]
+            # Both drawn against the balanced curve's peak, so the two areas are comparable and
+            # the committed one reads as what it is: the same amount of probability, packed into
+            # a narrower range rather than spread across a wide one.
+            # Scaled to the TALLER of the two, so the narrow curve fits the frame and the wide
+            # one sits correctly short beside it. Using the wide one as the reference sent the
+            # narrow one straight off the top of the screen.
+            reference = max(self.peak_probability(mine) for mine, _ in runs)
+            for (mine, bar), colour in zip(runs, (BLUE_B, GREEN_C)):
+                clouds.add(self.build_win_shaded_distribution(mine, bar, colour, reference))
                 self.summaries.append((float(mine.mean()), float(mine.std()),
                                        self.win_rate(mine, bar)))
             self.clouds = clouds

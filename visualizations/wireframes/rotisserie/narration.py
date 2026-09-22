@@ -48,15 +48,16 @@ NARRATION = {
         'The first is competitive everywhere. Every category is close to a coin flip against '
         'every rival. Nothing is settled, so the season total swings widely.',
     'certainties':
-        'The second commits. It locks in five categories and abandons four. Those are near '
-        'certainties, and certainties do not vary, so the total barely moves from year to year.',
+        'The second commits. It goes after five categories hard enough to win them nine times in '
+        'ten, and gives up the other four just as hard. Very little is left in doubt, so the '
+        'season total barely moves from one year to the next.',
     'the_result':
         'Now run both. And here is the part worth pausing on. The committed team actually scores '
-        'more points on average, sixty four against fifty eight. It is the better team by the '
+        'more points on average, sixty three against fifty eight. It is the better team by the '
         'obvious measure.',
     'conclusion':
-        'And it wins the league almost never. Two tenths of one percent, against nearly eight '
-        'percent for the balanced team. It is pinned too tightly to its own average ever to '
-        'reach the bar. That is why the Rotisserie algorithm holds categories near fifty-fifty, '
-        'and why it punts far less than the head to head formats do.',
+        'And it wins the league less often. Five percent against nearly eight. It is packed too '
+        'tightly around its own average to reach up to the bar as often. That is why the '
+        'Rotisserie algorithm keeps categories closer to fifty-fifty, and why it punts far less '
+        'than the head to head formats do.',
 }
