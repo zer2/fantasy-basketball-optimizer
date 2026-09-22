@@ -87,7 +87,7 @@ POSSIBLE_OUTCOMES = (
 
 # The auction board the last act works on. Dollar values a drafter would recognise, against a
 # one dollar replacement player, and S-sigma at the sidebar default of 10.
-PROJECTED_DOLLARS = (62, 45, 33, 24, 17, 11, 7, 4, 2, 1)
+PROJECTED_DOLLARS = (60, 44, 32, 23, 16, 10, 7, 4, 3, 1)   # one team's $200 auction budget
 REPLACEMENT_DOLLARS = 1
 S_SIGMA = 10.0
 # Ticks in dollars above replacement. The curve act draws in units of S-sigma, so a tick every
@@ -253,9 +253,6 @@ class Savor(VoiceoverScene):
         starter, 98.6% for the star. So "half their distribution" is not a loose way of speaking;
         it is the number.
         """
-        with self.voiceover(text=NARRATION['the_question']):
-            self.wait(1.6)
-
         for key, index in (('the_flyer_half', 2), ('the_star_whole', 0)):
             with self.voiceover(text=NARRATION[key]) as tracker:
                 self.play_one_nudge(index, tracker)
@@ -311,13 +308,8 @@ class Savor(VoiceoverScene):
         come out ahead and the ones who lost most come out behind.
         """
         with self.voiceover(text=NARRATION['the_general_rule']) as tracker:
-            rule = Text('one more dollar of projection  =  the share of that player '
-                        'projected above replacement',
-                        font_size=24, color=WHITE).move_to([0.0, 3.15, 0.0])
-            self.play(Write(rule), run_time=1.2)
-            self.wait(1.0)
             self.play(FadeOut(VGroup(self.curves, self.names, self.lost,
-                                     self.replacement, self.axis, rule)),
+                                     self.replacement, self.axis)),
                       run_time=0.7)
 
             table = self.build_value_table()
@@ -342,6 +334,11 @@ class Savor(VoiceoverScene):
 
     def build_value_table(self) -> dict:
         """Projected dollars, their SAVOR values, the scale-up, and what each player ends on."""
+        # Every column in TOTAL auction dollars. The adjustment is defined on value above
+        # replacement, so that is what gets transformed and scaled -- but the replacement dollar
+        # is added back before anything is printed. Shown without it, the middle column sat on a
+        # different baseline from its neighbours and the last row read "$1 becomes $0 becomes
+        # $1", which is not a thing that happens to a player.
         above = [value - REPLACEMENT_DOLLARS for value in PROJECTED_DOLLARS]
         exact_raw = [self.savor_value(margin, S_SIGMA) for margin in above]
         scaling = sum(above) / sum(exact_raw)
@@ -352,7 +349,7 @@ class Savor(VoiceoverScene):
         # column's rows added to $205 under a total reading $206. The underlying arithmetic was
         # right -- the changes cancel exactly and both totals are 206.0 -- so the fix is to show
         # a decimal everywhere and to add up what is on screen rather than what is behind it.
-        raw = [round(value, 1) for value in exact_raw]
+        raw = [round(value + REPLACEMENT_DOLLARS, 1) for value in exact_raw]
         final = [round(value * scaling + REPLACEMENT_DOLLARS, 1) for value in exact_raw]
         change = [round(end - start, 1) for end, start in zip(final, PROJECTED_DOLLARS)]
 
@@ -381,18 +378,26 @@ class Savor(VoiceoverScene):
         bottom = TABLE_TOP_Y - len(PROJECTED_DOLLARS) * TABLE_ROW_GAP
         return {
             'frame': VGroup(headings, rule),
-            'projected': VGroup(*[
-                Text(f'${value:.0f}', font_size=24, color=WHITE)
-                .move_to([-3.4, TABLE_TOP_Y - row * TABLE_ROW_GAP, 0.0])
-                for row, value in enumerate(PROJECTED_DOLLARS)
-            ]),
+            'projected': VGroup(
+                *[Text(f'${value:.0f}', font_size=24, color=WHITE)
+                  .move_to([-3.4, TABLE_TOP_Y - row * TABLE_ROW_GAP, 0.0])
+                  for row, value in enumerate(PROJECTED_DOLLARS)],
+                # The budget is shown, not just asserted, so the column the scaling restores
+                # can be read against the one it started from.
+                Line([-4.4, bottom + 0.22, 0.0], [-2.4, bottom + 0.22, 0.0],
+                     color=GREY_D, stroke_width=2),
+                Text(f'${sum(PROJECTED_DOLLARS):.1f}', font_size=24, color=WHITE)
+                .move_to([-3.4, bottom - 0.08, 0.0]),
+                Text('the budget', font_size=19, color=GREY_D)
+                .move_to([-3.4, bottom - 0.45, 0.0]),
+            ),
             'raw': column(raw, -0.6, GREY_B),
             'raw_total': VGroup(
                 Line([-1.6, bottom + 0.22, 0.0], [0.4, bottom + 0.22, 0.0],
                      color=GREY_D, stroke_width=2),
                 Text(f'${sum(raw):.1f}', font_size=24, color=GREY_B)
                 .move_to([-0.6, bottom - 0.08, 0.0]),
-                Text('short of the pot', font_size=19, color=GREY_D)
+                Text('short of the budget', font_size=19, color=GREY_D)
                 .move_to([-0.6, bottom - 0.45, 0.0]),
             ),
             'scaling': Text(f'x {scaling:.2f}', font_size=28, color=YELLOW)
@@ -403,7 +408,7 @@ class Savor(VoiceoverScene):
                      color=GREY_D, stroke_width=2),
                 Text(f'${sum(final):.1f}', font_size=24, color=YELLOW)
                 .move_to([2.4, bottom - 0.08, 0.0]),
-                Text('the pot, exactly', font_size=19, color=GREY_D)
+                Text('back to the budget', font_size=19, color=GREY_D)
                 .move_to([2.4, bottom - 0.45, 0.0]),
             ),
             'change': column(change, 4.5, GREEN_C, money=False),

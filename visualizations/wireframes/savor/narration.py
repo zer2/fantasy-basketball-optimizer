@@ -20,10 +20,9 @@ NARRATION = {
         'Here\'s a complication: if a player ends up below the replacement level, we are not going to keep them. So if we draw a line on here for the '
         'replacement level, the parts of the distribution that are below the line do not actually help us. With a player who is a flyer or just a bit'
         ' better than a flyer, we are banking on their positive outcome; if they dip a little they will not be worth anything to us. ',
-    'the_question':
-        'So when we think about real value to us, is that exactly equal to the mean of the original value distribution? It is actually not.',
     'the_flyer_half':
-        'Imagine starting from a flyer player and adding one dollar of expected value. The distribution moves, but its still about half below-replacement, so '
+        'This effects how much value we can actually realize from investing into players. Imagine starting from a flyer player and adding '
+        'one dollar of expected value. The distribution moves, but its still about half below-replacement, so '
         'we only get to capture that extra one dollar of value about half the time. That one dollar is worth an expected fifty cents of real value.',
     'the_star_whole':
         'On the other hand, increasing the value of a star is almost definitely going to pay off, since they will almost definitely stay on the team. '
