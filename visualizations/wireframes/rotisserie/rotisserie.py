@@ -3,24 +3,24 @@
 WIREFRAME -- a first draft to find out whether the argument lands, drafted against gTTS rather
 than the shipped voice. See wireframes/README.md.
 
-The counter-intuitive claim the docs make in one sentence: because winning a league needs an
-aberrant result, VARIANCE is worth having, and a Bernoulli's variance p(1-p) is largest at
-p = 0.5 -- so the algorithm holds categories near fifty-fifty instead of punting them.
+The docs put the claim in one sentence: winning a league needs an aberrant result, so variance
+is worth having, and a Bernoulli's variance p(1-p) is largest at p = 0.5 -- which is why the
+Rotisserie algorithm holds categories near fifty-fifty instead of punting them.
 
-The argument in three moves:
+The scene argues it by simulation rather than by algebra, because the probability of winning a
+league is a comparison between your season total and the BEST of eleven others -- a convolution
+against an order statistic, which is not a shape anyone reads off a picture. Simulated seasons
+are: a thousand dots, and the ones above the line are the leagues you won. The fraction above
+the line IS the win probability, with nothing left to take on trust.
 
-    One, two curves on one axis: the total needed to win the league, and your own total. You win
-    on the overlap, and the overlap is small. That smallness is what makes the rest follow.
+The result it lands on is stronger than "same mean, more spread", and it is measured here rather
+than asserted:
 
-    Two, widen your curve without moving its centre. The left tail buys nothing -- losing badly
-    and losing narrowly are the same outcome -- while the right tail reaches into the win. So
-    spread is worth something the mean is not.
+    everything 50/50        total 58.5 +/- 10.3    wins  7.8%
+    five locked, four out   total 64.0 +/-  0.5    wins  0.2%
 
-    Three, where spread comes from. Nine coin flips vary a great deal; nine near-certainties
-    barely vary at all. Same expected total, different width, and the first wins more leagues.
-
-The distributions here are illustrative rather than measured -- the point is the shape of the
-argument. A prep script against the real Rotisserie objective comes once the beats settle.
+The committed team scores MORE on average and wins the league about forty times less often. It
+is pinned too tightly to its own average ever to reach a bar that sits around 75.
 
     manim -ql visualizations/wireframes/rotisserie/rotisserie.py Rotisserie
 """
@@ -28,14 +28,15 @@ argument. A prep script against the real Rotisserie objective comes once the bea
 from __future__ import annotations
 
 import sys
+from math import erf, sqrt
 from pathlib import Path
 
 import numpy as np
 from manim import (
-    VGroup, Line, Polygon, Text, MathTex,
-    FadeIn, FadeOut, Create, Write, Transform,
-    DOWN, UP,
-    BLUE_D, BLUE_B, RED_B, GREY_B, GREY_D, YELLOW, WHITE,
+    VGroup, Line, DashedLine, Rectangle, Text, Dot,
+    FadeIn, FadeOut, Create, Write,
+    DOWN, UP, RIGHT,
+    BLUE_B, GREEN_C, RED_B, GREY_B, GREY_D,
 )
 from manim_voiceover import VoiceoverScene
 
@@ -47,170 +48,285 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from narration import NARRATION                           # noqa: E402
 
 
-# ── Layout ───────────────────────────────────────────────────────────────────────────
+# -- The league ----------------------------------------------------------------------
 
-BASELINE_Y = -2.35
-AXIS_HALF_WIDTH = 6.0
-CURVE_HEIGHT = 2.5          # height of the TALLEST curve drawn; area is what is held constant
-CURVE_SAMPLES = 220
+TEAMS = 12
+CATEGORIES = 9
+MAX_POINTS = TEAMS * CATEGORIES            # 108: first in every category
+AVERAGE_POINTS = (TEAMS + 1) / 2 * CATEGORIES
+AXIS_TICKS = (0, 54, MAX_POINTS)           # ends and midpoint, so the scale reads at a glance
 
-# In the scene's own units, where a season total sits on the axis. The bar to beat is high and
-# fairly tight; the team is centred below it, which is what makes winning unlikely.
-WINNING_BAR_CENTRE, WINNING_BAR_SPREAD = 2.0, 1.0
-TEAM_CENTRE = -0.3
-TEAM_NARROW_SPREAD, TEAM_WIDE_SPREAD = 0.85, 1.75
+SEASONS_DRAWN = 1000
+SIMULATION_SEED = 7
 
-# Nine categories as coin flips against nine as near-certainties. Same expected wins, wildly
-# different spread -- which is the whole third act.
-BALANCED_CHANCES  = (0.5,) * 9
-COMMITTED_CHANCES = (0.97, 0.96, 0.95, 0.94, 0.93, 0.06, 0.05, 0.04, 0.02)
+# The two builds. Values are per-category strengths for the focal team; every rival draws around
+# zero, so a strength of zero is a coin flip against each of them.
+BALANCED_BUILD = ([0.0] * CATEGORIES, 1.0)
+COMMITTED_BUILD = ([3.0] * 5 + [-3.0] * 4, 0.30)
+
+ORDINALS = {1: '1st', 2: '2nd', 3: '3rd', 11: '11th', 12: '12th'}
+
+# -- Layout ---------------------------------------------------------------------------
+
+AXIS_Y = -2.9
+AXIS_LEFT_X = -6.0
+AXIS_RIGHT_X = 6.0
+CLOUD_TOP_Y = 2.1          # simulated seasons stack between the axis and here
+DOT_RADIUS = 0.028
+DOT_STACK_GAP = 0.055
 
 
 class Rotisserie(VoiceoverScene):
-    """The bar to beat, the value of width, and where width comes from."""
+    """What a Rotisserie score is, how hard the bar is, and why spread beats a better average."""
 
     def construct(self) -> None:
         self.set_speech_service(DraftVoice())
+        self.rng = np.random.default_rng(SIMULATION_SEED)
+        self.play_what_a_point_is()
         self.play_the_bar()
         self.play_widening()
         self.play_two_builds()
 
-    # ── Shared apparatus ──────────────────────────────────────────────────────────────
+    # -- Shared apparatus --------------------------------------------------------------
+
+    def to_scene_x(self, points: float) -> float:
+        return AXIS_LEFT_X + (AXIS_RIGHT_X - AXIS_LEFT_X) * points / MAX_POINTS
 
     def build_axis(self) -> VGroup:
-        axis = Line([-AXIS_HALF_WIDTH, BASELINE_Y, 0.0], [AXIS_HALF_WIDTH, BASELINE_Y, 0.0],
-                    color=GREY_B, stroke_width=3)
-        caption = Text('season total', font_size=24, color=GREY_B)
-        caption.move_to([0.0, BASELINE_Y - 0.5, 0.0])
-        return VGroup(axis, caption)
+        """The season-points scale, with its ends and midpoint written on it.
 
-    def build_curve(self, centre: float, spread: float, colour, opacity: float = 0.35,
-                    tallest_spread: float | None = None) -> Polygon:
-        """A Normal curve as a filled shape, drawn so that AREA is what stays constant.
-
-        Height is scaled by tallest_spread/spread rather than fixed, because a curve that got
-        wider without getting shorter would be claiming more total probability -- which is
-        exactly the thing the widening act must not appear to do.
+        Marked rather than bare: the scene is entirely about where a total sits relative to a
+        bar, and an unlabelled line gives a viewer nothing to place either against. It also used
+        to sit on screen alone under a long sentence, which is what made the opening feel empty.
         """
-        reference = tallest_spread if tallest_spread is not None else spread
-        peak = CURVE_HEIGHT * reference / spread
-        xs = np.linspace(-AXIS_HALF_WIDTH, AXIS_HALF_WIDTH, CURVE_SAMPLES)
-        # 1.15 rather than 1.6: at the wider setting a curve's tail reached past the end
-        # of the axis and was cut off flat there, which reads as a bar rather than a tail.
-        ys = peak * np.exp(-0.5 * ((xs - self.to_scene_x(centre)) / (spread * 1.15)) ** 2)
-        points = [[x, BASELINE_Y + y, 0.0] for x, y in zip(xs, ys)]
-        points = [[xs[0], BASELINE_Y, 0.0]] + points + [[xs[-1], BASELINE_Y, 0.0]]
-        return Polygon(*points, color=colour, fill_color=colour,
-                       fill_opacity=opacity, stroke_width=2.5)
+        axis = Line([AXIS_LEFT_X, AXIS_Y, 0.0], [AXIS_RIGHT_X, AXIS_Y, 0.0],
+                    color=GREY_B, stroke_width=3)
+        marks = VGroup()
+        for points in AXIS_TICKS:
+            x = self.to_scene_x(points)
+            marks.add(Line([x, AXIS_Y - 0.12, 0.0], [x, AXIS_Y + 0.12, 0.0],
+                           color=GREY_B, stroke_width=3))
+            marks.add(Text(str(points), font_size=22, color=GREY_B)
+                      .move_to([x, AXIS_Y - 0.38, 0.0]))
+        caption = Text('Rotisserie points over the season', font_size=23, color=GREY_B)
+        caption.move_to([0.0, AXIS_Y - 0.82, 0.0])
+        return VGroup(axis, marks, caption)
 
-    def to_scene_x(self, value: float) -> float:
-        """Season-total units onto the drawn axis."""
-        return value * 1.55
+    def simulate(self, build) -> tuple[np.ndarray, np.ndarray]:
+        """Season totals for the focal team and for the best rival, by the real scoring rule.
 
-    # ── Act one: the bar, and how far under it you are ────────────────────────────────
+        Every team draws a value per category and the ranks pay 1..12 points. That IS Rotisserie
+        scoring, so the distributions the scene draws come out of the rule rather than being
+        fitted to it -- including the fact that the bar is the MAXIMUM of eleven others, which is
+        why it sits so far above average.
+        """
+        means, spread = build
+        rivals = self.rng.standard_normal((SEASONS_DRAWN, TEAMS - 1, CATEGORIES))
+        focal = (self.rng.standard_normal((SEASONS_DRAWN, 1, CATEGORIES)) * spread
+                 + np.array(means))
+        board = np.concatenate([focal, rivals], axis=1)
+        ranks = board.argsort(axis=1).argsort(axis=1) + 1
+        totals = ranks.sum(axis=2)
+        return totals[:, 0], totals[:, 1:].max(axis=1)
 
-    def play_the_bar(self) -> None:
-        with self.voiceover(text=NARRATION['the_bar']):
+    def build_season_cloud(self, totals: np.ndarray, bar: np.ndarray, colour) -> VGroup:
+        """One dot per simulated season, stacked into a column at the total it scored.
+
+        Height carries nothing but crowding, so the cloud reads as a histogram that individual
+        seasons can still be picked out of. A season is coloured when it beat that year's bar --
+        so the coloured fraction is the probability of winning the league, counted rather than
+        derived. That is the honest way to show it: the real quantity is a convolution measured
+        against the maximum of eleven rivals, which no single curve on a page displays.
+        """
+        dots = VGroup()
+        columns: dict[int, int] = {}
+        for total, threshold in zip(totals, bar):
+            height = columns.get(int(total), 0)
+            columns[int(total)] = height + 1
+            y = AXIS_Y + 0.12 + height * DOT_STACK_GAP
+            if y > CLOUD_TOP_Y:
+                continue
+            won = total > threshold
+            dots.add(Dot(point=[self.to_scene_x(total), y, 0.0], radius=DOT_RADIUS,
+                         color=colour if won else GREY_D)
+                     .set_opacity(1.0 if won else 0.4))
+        return dots
+
+    # -- Act one: what a Rotisserie point is -------------------------------------------
+
+    def play_what_a_point_is(self) -> None:
+        """The scale has to mean something before anything can be plotted against it."""
+        with self.voiceover(text=NARRATION['the_points']) as tracker:
+            # The twelve teams arrive with the first words. Waiting for the clause about ranking
+            # left eight seconds of black at the very start of the scene, which is the fault
+            # this act was rewritten to fix in the first place.
+            self.league = self.build_league_row()
+            self.play(FadeIn(self.league), run_time=1.2)
+            wait_until_phrase(self, tracker, 'each category is ranked')
+            self.ladder = self.build_rank_ladder()
+            self.play(FadeOut(self.league), run_time=0.4)
+            self.play(FadeIn(self.ladder), run_time=1.2)
+
+        with self.voiceover(text=NARRATION['the_scale']) as tracker:
+            wait_until_phrase(self, tracker, 'a perfect season')
             self.axis = self.build_axis()
-            self.play(Create(self.axis), run_time=0.9)
-            self.wait(0.8)
+            self.play(FadeOut(self.ladder), run_time=0.5)
+            self.play(Create(self.axis), run_time=1.2)
 
-        with self.voiceover(text=NARRATION['winning_total']):
-            self.bar = self.build_curve(WINNING_BAR_CENTRE, WINNING_BAR_SPREAD, RED_B,
-                                        tallest_spread=WINNING_BAR_SPREAD)
-            bar_label = Text('what it takes to win the league', font_size=22, color=RED_B)
-            bar_label.move_to([self.to_scene_x(WINNING_BAR_CENTRE), 1.75, 0.0])
-            self.play(Create(self.bar), FadeIn(bar_label), run_time=1.2)
-            self.bar_label = bar_label
-            self.wait(0.8)
-
-        with self.voiceover(text=NARRATION['your_total']):
-            self.team = self.build_curve(TEAM_CENTRE, TEAM_NARROW_SPREAD, BLUE_D,
-                                         tallest_spread=WINNING_BAR_SPREAD)
-            team_label = Text('your team', font_size=22, color=BLUE_B)
-            team_label.move_to([self.to_scene_x(TEAM_CENTRE) - 1.4, 1.35, 0.0])
-            self.play(Create(self.team), FadeIn(team_label), run_time=1.2)
-            self.team_label = team_label
+            wait_until_phrase(self, tracker, 'an average one')
+            average = DashedLine([self.to_scene_x(AVERAGE_POINTS), AXIS_Y, 0.0],
+                                 [self.to_scene_x(AVERAGE_POINTS), AXIS_Y + 1.1, 0.0],
+                                 color=GREY_B, stroke_width=2, dash_length=0.1)
+            label = Text(f'average team, {AVERAGE_POINTS:.0f}', font_size=21, color=GREY_B)
+            label.next_to(average, UP, buff=0.1)
+            self.play(Create(average), FadeIn(label), run_time=0.9)
+            self.average_mark = VGroup(average, label)
             self.wait(0.6)
 
-        with self.voiceover(text=NARRATION['the_overlap']):
-            # PLACEHOLDER: the win region wants shading where the team's right tail passes the
-            # bar's left tail, which is a proper overlap integral rather than a clipped curve.
-            # Left as a marker so the beat exists and can be timed.
-            marker = Text('you win up here', font_size=20, color=YELLOW)
-            marker.move_to([self.to_scene_x(WINNING_BAR_CENTRE) - 0.4, BASELINE_Y + 0.45, 0.0])
-            self.play(FadeIn(marker), run_time=0.7)
-            self.overlap_marker = marker
-            self.wait(1.2)
+    def build_league_row(self) -> VGroup:
+        """The twelve teams, since Rotisserie is played against all of them at once."""
+        markers = VGroup(*[
+            VGroup(Dot(radius=0.17, color=BLUE_B if seat == 0 else GREY_D),
+                   Text('you' if seat == 0 else f'{seat + 1}', font_size=18,
+                        color=BLUE_B if seat == 0 else GREY_D))
+            .arrange(DOWN, buff=0.16)
+            for seat in range(TEAMS)
+        ]).arrange(RIGHT, buff=0.42)
+        caption = Text('every team, all season, at the same time',
+                       font_size=24, color=GREY_B)
+        return VGroup(markers, caption).arrange(DOWN, buff=0.55).move_to([0.0, 0.3, 0.0])
 
-    # ── Act two: width is worth something the mean is not ─────────────────────────────
+    def build_rank_ladder(self) -> VGroup:
+        """Where you finish in one category, and what it pays."""
+        rows = VGroup()
+        for place in (1, 2, 3, 11, 12):
+            points = TEAMS + 1 - place
+            rows.add(VGroup(
+                Text(f'{ORDINALS[place]} in a category', font_size=26, color=GREY_B),
+                Text(f'{points} points', font_size=26,
+                     color=BLUE_B if points > 6 else GREY_D),
+            ).arrange(RIGHT, buff=0.7))
+        ladder = VGroup(rows[0], rows[1], rows[2],
+                        Text('...', font_size=26, color=GREY_D),
+                        rows[3], rows[4])
+        return ladder.arrange(DOWN, buff=0.3).move_to([0.0, 0.2, 0.0])
+
+    # -- Act two: the bar, and how rarely anyone clears it -----------------------------
+
+    def play_the_bar(self) -> None:
+        with self.voiceover(text=NARRATION['the_bar']) as tracker:
+            self.mine, self.bar = self.simulate(BALANCED_BUILD)
+            wait_until_phrase(self, tracker, 'lands around')
+            self.bar_line = DashedLine(
+                [self.to_scene_x(self.bar.mean()), AXIS_Y, 0.0],
+                [self.to_scene_x(self.bar.mean()), CLOUD_TOP_Y + 0.4, 0.0],
+                color=RED_B, stroke_width=3, dash_length=0.14)
+            bar_label = Text('what it took to win', font_size=22, color=RED_B)
+            bar_label.next_to(self.bar_line, UP, buff=0.1)
+            self.play(FadeOut(self.average_mark), run_time=0.4)
+            self.play(Create(self.bar_line), FadeIn(bar_label), run_time=1.0)
+            self.bar_label = bar_label
+            self.wait(0.5)
+
+        with self.voiceover(text=NARRATION['simulate']) as tracker:
+            self.cloud = self.build_season_cloud(self.mine, self.bar, BLUE_B)
+            self.play(FadeIn(self.cloud), run_time=max(1.5, tracker.duration * 0.4))
+            self.wait(0.6)
+
+        with self.voiceover(text=NARRATION['its_hard']):
+            won = float(np.mean(self.mine > self.bar))
+            self.win_readout = Text(f'won the league in {won:.1%} of seasons',
+                                    font_size=28, color=BLUE_B)
+            self.win_readout.move_to([0.0, 3.1, 0.0])
+            self.play(Write(self.win_readout), run_time=1.0)
+            self.wait(1.6)
+
+    # -- Act three: spread is worth something the average is not -----------------------
 
     def play_widening(self) -> None:
-        with self.voiceover(text=NARRATION['widen']) as tracker:
-            wait_until_phrase(self, tracker, 'wider')
-            wide = self.build_curve(TEAM_CENTRE, TEAM_WIDE_SPREAD, BLUE_D,
-                                    tallest_spread=WINNING_BAR_SPREAD)
-            centre_mark = Line([self.to_scene_x(TEAM_CENTRE), BASELINE_Y, 0.0],
-                               [self.to_scene_x(TEAM_CENTRE), BASELINE_Y + 2.1, 0.0],
-                               color=YELLOW, stroke_width=3)
-            self.play(Transform(self.team, wide), Create(centre_mark), run_time=1.6)
-            self.centre_mark = centre_mark
-            self.wait(0.8)
+        with self.voiceover(text=NARRATION['widen']):
+            self.wait(2.0)
 
         with self.voiceover(text=NARRATION['why_wide']):
-            # PLACEHOLDER: the two tails want opposite treatment -- the left greyed out as
-            # "losing either way", the right picked out as the part that gained. Needs the
-            # overlap shading above to exist first.
-            self.wait(2.2)
-            self.play(FadeOut(VGroup(self.bar, self.team, self.bar_label, self.team_label,
-                                     self.overlap_marker, self.centre_mark)), run_time=0.8)
+            # PLACEHOLDER: the two tails want opposite treatment -- the left greyed as "losing
+            # either way", the right picked out as the part that gained. Wants the cloud redrawn
+            # at a wider spread with the mean pinned, which is a second simulation.
+            self.wait(2.4)
+            self.play(FadeOut(VGroup(self.cloud, self.win_readout)), run_time=0.7)
 
-    # ── Act three: where width comes from ─────────────────────────────────────────────
+    # -- Act four: two builds, their tables, and what they actually win ----------------
 
     def play_two_builds(self) -> None:
-        with self.voiceover(text=NARRATION['two_builds']):
-            self.wait(1.0)
+        # The first table comes up DURING this line rather than after it. Clearing the screen
+        # and then waiting out the sentence left ten seconds of black with a voice over it,
+        # which is the same fault the old opening had.
+        table = self.build_matchup_table(BALANCED_BUILD, 'every category a coin flip', BLUE_B)
+        with self.voiceover(text=NARRATION['two_builds']) as tracker:
+            self.play(FadeOut(VGroup(self.bar_line, self.bar_label, self.axis)), run_time=0.6)
+            self.play(FadeIn(table), run_time=1.2)
 
         with self.voiceover(text=NARRATION['coin_flips']):
-            balanced = self.build_category_row(BALANCED_CHANCES, 1.55, 'nine coin flips')
-            self.play(FadeIn(balanced), run_time=1.0)
-            self.balanced_row = balanced
-            self.wait(1.0)
+            self.wait(2.0)
 
         with self.voiceover(text=NARRATION['certainties']):
-            committed = self.build_category_row(COMMITTED_CHANCES, -0.35,
-                                                'five locked in, four abandoned')
+            committed = self.build_matchup_table(
+                COMMITTED_BUILD, 'five locked in, four abandoned', GREEN_C)
+            self.play(FadeOut(table), run_time=0.4)
             self.play(FadeIn(committed), run_time=1.0)
-            self.committed_row = committed
-            self.wait(1.0)
+            self.committed_table = committed
+
+        with self.voiceover(text=NARRATION['the_result']) as tracker:
+            self.axis = self.build_axis()
+            self.play(FadeOut(self.committed_table), run_time=0.4)
+            self.play(Create(self.axis), run_time=0.9)
+            clouds, self.summaries = VGroup(), []
+            for build, colour in ((BALANCED_BUILD, BLUE_B), (COMMITTED_BUILD, GREEN_C)):
+                mine, bar = self.simulate(build)
+                clouds.add(self.build_season_cloud(mine, bar, colour))
+                self.summaries.append((float(mine.mean()), float(mine.std()),
+                                       float(np.mean(mine > bar))))
+            self.clouds = clouds
+            self.play(FadeIn(clouds), run_time=1.6)
+            wait_until_phrase(self, tracker, 'more points on average')
+            self.wait(1.4)
 
         with self.voiceover(text=NARRATION['conclusion']):
-            # The two spreads written out, which is the arithmetic the whole scene rests on:
-            # a sum of Bernoulli variances, largest when every p is a half.
-            spreads = VGroup(
-                self.spread_readout(BALANCED_CHANCES, 'coin flips', BLUE_B),
-                self.spread_readout(COMMITTED_CHANCES, 'certainties', GREY_B),
-            ).arrange(DOWN, buff=0.4).move_to([0.0, -2.1, 0.0])
-            self.play(FadeIn(spreads), run_time=1.0)
-            self.wait(2.0)
+            rows = VGroup(*[
+                VGroup(
+                    Text(name, font_size=23, color=colour),
+                    Text(f'{mean:.1f} points, spread {spread:.1f}', font_size=21, color=GREY_B),
+                    Text(f'wins {won:.1%}', font_size=25, color=colour),
+                ).arrange(RIGHT, buff=0.45)
+                for name, colour, (mean, spread, won) in (
+                    ('every category a coin flip', BLUE_B, self.summaries[0]),
+                    ('five locked, four abandoned', GREEN_C, self.summaries[1]),
+                )
+            ]).arrange(DOWN, buff=0.4).move_to([0.0, 2.9, 0.0])
+            self.play(FadeIn(rows), run_time=1.2)
+            self.wait(2.4)
         self.wait(0.6)
 
-    def build_category_row(self, chances, y: float, caption: str) -> VGroup:
-        """Nine categories as win-probability bars, with a caption."""
-        bars = VGroup()
-        for index, chance in enumerate(chances):
-            x = -4.4 + index * 1.1
-            full = Line([x, y - 0.5, 0.0], [x, y + 0.5, 0.0], color=GREY_D, stroke_width=9)
-            filled = Line([x, y - 0.5, 0.0], [x, y - 0.5 + chance, 0.0],
-                          color=BLUE_D, stroke_width=9)
-            bars.add(VGroup(full, filled))
-        label = Text(caption, font_size=22, color=GREY_B).move_to([0.0, y + 1.0, 0.0])
-        return VGroup(bars, label)
+    def build_matchup_table(self, build, heading: str, colour) -> VGroup:
+        """Chance of beating each rival in each category: nine rows, eleven opponents.
 
-    def spread_readout(self, chances, name: str, colour) -> VGroup:
-        """The standard deviation of the number of categories won, written out."""
-        variance = float(sum(p * (1 - p) for p in chances))
-        return VGroup(
-            Text(f'{name}:  ', font_size=24, color=colour),
-            MathTex(rf'\sigma = {variance ** 0.5:.2f}', font_size=34, color=colour),
-        ).arrange(buff=0.2)
+        A Rotisserie team plays everyone at once, so what settles a category is not one number
+        but a row of them. A table is the honest shape for that; a single bar would be the head
+        to head picture wearing Rotisserie's name.
+        """
+        means, spread = build
+        title = Text(heading, font_size=26, color=colour).move_to([0.0, 2.9, 0.0])
+        grid = VGroup()
+        for category in range(CATEGORIES):
+            # P(this team beats a neutral rival in this category), for strengths drawn around
+            # these means against rivals drawn around zero.
+            chance = 0.5 * (1.0 + erf(means[category] / sqrt(2.0 * (1.0 + spread ** 2))))
+            row_y = 1.75 - category * 0.38
+            for opponent in range(TEAMS - 1):
+                grid.add(Rectangle(width=0.44, height=0.30, stroke_width=0,
+                                   fill_color=colour, fill_opacity=max(0.05, chance))
+                         .move_to([-3.6 + opponent * 0.50, row_y, 0.0]))
+            grid.add(Text(f'{chance:.0%}', font_size=19, color=GREY_B)
+                     .move_to([2.5, row_y, 0.0]))
+        legend = Text('one row per category, one column per opponent',
+                      font_size=20, color=GREY_D).move_to([0.0, -1.6, 0.0])
+        return VGroup(title, grid, legend)
