@@ -36,7 +36,7 @@ NARRATION = {
         'how many of them we won, not which ones we won. So if we assume that the categories are independent '
         'from each other, we can walk through the categories one by one, keeping track of the distribution '
         'of how many we have won. For example, if the first two categories are both 50-50, we know that by the end, we will '
-        'have a 50 percent chance of being even, and 25 percent chances of being 2-0 or 0-2. That\'s all we need to remember; '
+        'have a 50 percent chance of being tied 1-1, and 25 percent chances of being 2-0 or 0-2. That\'s all we need to remember; '
         'there is no need to keep track of the precise likelihood of winning the first category and losing the second.',
     'collapse':
         'Extending the walking analogy, winning a category is like walking one level upwards, and losing '
@@ -50,12 +50,12 @@ NARRATION = {
         'functions we use. How do we do that with such a complex function? Fortunately, there is a relatively easy way to calculate the '
         'gradient of this function with only a small extension to the machinery we just built.',
     'tipping_point_probability':
-        'Let\'s pick a category. The slope in the direction of winning that category more is the responsiveness of the function: by increasing '
-        'the probability of winning this category, how much do we increase the probability of winning a majority? Well, there is an intuitive '
-        'way to think about that responsiveness. If the other eight categories are precisely even, then the probability of winning a majority is exactly '
-        'the probability of winning this category. If the other eight categories are not even, then this category does not matter at all; '
-        'the matchup has already been won or lost. That means, the responsiveness is just the probability the other categories are even- '
-        'we call this a tipping point probability. ',
+        'Let\'s pick a category. The gradient is the marginal influence of the category on the reward function: by increasing '
+        'the probability of winning this category, how much do we increase the probability of winning a majority? There is an intuitive way '
+        'to approach this question. If the other eight categories are precisely tied, then the probability of winning a majority is exactly '
+        'the probability of winning this category. The gradient is exactly one. On the other hand, if the other eight categories are not tied'
+        ', then this category does not matter at all; the matchup has already been won or lost, and the gradient is zero. That means the gradient '
+        'is just the probability that the other categories are tied- we call this a tipping point probability. ',
     'backward':
         'To calculate the tipping point probability, all we need to do is run the walking process again, this time backwards. '
         'We start at the last category and move to the first category. This will give us the information we need.',
