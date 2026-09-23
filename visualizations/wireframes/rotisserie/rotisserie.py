@@ -34,11 +34,11 @@ from pathlib import Path
 
 import numpy as np
 from manim import (
-    VGroup, Line, DashedLine, Rectangle, Text, Dot,
+    VGroup, Line, DashedLine, Rectangle, Text, Dot, ImageMobject,
     FadeIn, FadeOut, Create, Write, Transform,
     DOWN, UP, LEFT, RIGHT,
     BLUE_B, BLUE_D, GREEN_C, RED_B, GREY_B, GREY_D, YELLOW, WHITE, BLACK,
-    rgb_to_hex,
+    rgb_to_hex, interpolate_color,
 )
 from manim_voiceover import VoiceoverScene
 
@@ -71,7 +71,7 @@ SIMULATION_SEED = 7
 
 # The two builds. Values are per-category strengths for the focal team; every rival draws around
 # zero, so a strength of zero is a coin flip against each of them.
-BALANCED_BUILD = ([0.0] * CATEGORIES, 1.0)
+BALANCED_BUILD = ((0.0,) * CATEGORIES, 1.0)
 # 90% per category, not 100%. Two reasons, both measured. A build at 100/0 has almost no spread
 # left (sigma 0.5), so its curve is 22x taller than the balanced one and the two cannot share a
 # vertical scale -- and without a shared scale their areas are not comparable, though both are
@@ -80,13 +80,13 @@ BALANCED_BUILD = ([0.0] * CATEGORIES, 1.0)
 # than it loses spread. The penalty only appears once commitment is severe. 90% is where the
 # argument is true and the picture is still drawable: 5.4% against 7.8%, and 2.2x the height.
 _COMMITTED_STRENGTH = 1.8124      # Phi(0.90) x sqrt(2): beats a neutral rival 90% of the time
-COMMITTED_BUILD = ([_COMMITTED_STRENGTH] * 5 + [-_COMMITTED_STRENGTH] * 4, 1.0)
+COMMITTED_BUILD = ((_COMMITTED_STRENGTH,) * 5 + (-_COMMITTED_STRENGTH,) * 4, 1.0)
 
 # The two levers the widening act demonstrates, measured: a better team (58.5 -> 70.1 points,
 # 7.7% -> 35.0%), and a wilder one at exactly the same expectation (sigma 10.3 -> 13.8, and
 # 7.7% -> 14.5% on nothing but spread).
-RICHER_BUILD = ([0.42] * CATEGORIES, 1.0)
-WILDER_BUILD = ([0.0] * CATEGORIES, 2.6)
+RICHER_BUILD = ((0.42,) * CATEGORIES, 1.0)
+WILDER_BUILD = ((0.0,) * CATEGORIES, 2.6)
 
 # -- Layout ---------------------------------------------------------------------------
 
@@ -102,7 +102,6 @@ STANDINGS_COLUMN_GAP = 0.62
 STANDINGS_TOTAL_X = 0.9
 # A build's own season, shown beside its table: small, above the grid, on the same vertical
 # scale as the overlay that follows so the two readings agree.
-INSET_CURVE_SCALE = 0.42
 
 # The build heat map: a row per category, a column per opponent, on a diverging scale.
 CATEGORY_NAMES = ('Field Goal %', 'Free Throw %', 'Threes', 'Points', 'Rebounds',
@@ -117,7 +116,27 @@ HEAT_CELL_HEIGHT = 0.36
 STYLER_MIDDLE = 50.0
 STYLER_CAP = 110
 STYLER_MULTIPLIER = STYLER_CAP / STYLER_MIDDLE
-INSET_CURVE_CENTRE = [0.0, -2.75, 0.0]
+
+# The two builds sit side by side from the moment the line starts describing them both -- it
+# names them in one breath ('one where ... and one in which ...') and then says 'the first' and
+# 'the second', which needs both on screen at once to mean anything.
+SPLIT_SCALE = 0.60
+PANEL_CENTRE_X = 3.45
+PANEL_TABLE_CENTRE_Y = 1.75
+# Each panel's own distribution, sitting ON its floor. The shared inset used to be centred on a
+# fixed point with the floor line drawn at another, so the balanced curve floated a quarter of a
+# unit above its own axis and the committed one -- more than twice as tall -- hung below it.
+PANEL_CURVE_SCALE = 0.32
+PANEL_FLOOR_Y = -1.75
+
+# The closing beat points at the real objective, and the real objective already exists as a
+# figure -- this is the same image the H-scores page shows under 'How does the algorithm work
+# for Rotisserie?'. Reused rather than redrawn, so the two cannot drift apart.
+EQUATIONS_IMAGE = (Path(__file__).resolve().parent.parent.parent.parent
+                   / 'docs' / 'img' / 'roto_equations.png')
+# Nearly the full height of the frame. The figure is dense and its own white margins eat
+# into it, so anything smaller reads as a picture OF equations rather than as equations.
+EQUATIONS_HEIGHT = 6.8
 
 
 class Rotisserie(VoiceoverScene):
@@ -126,6 +145,11 @@ class Rotisserie(VoiceoverScene):
     def construct(self) -> None:
         self.set_speech_service(NarrationVoice())
         self.rng = np.random.default_rng(SIMULATION_SEED)
+        # One season-run per build, kept and reused. Every call used to draw fresh seasons off
+        # the same generator, so the balanced build was simulated four separate times and the
+        # scene quoted three different win rates for the same team -- 7.7% under the first
+        # distribution and 7.8% in the closing summary.
+        self.runs = {}
         self.play_the_scale()
         self.play_the_bar()
         self.play_widening()
@@ -165,6 +189,8 @@ class Rotisserie(VoiceoverScene):
         fitted to it -- including the fact that the bar is the MAXIMUM of eleven others, which is
         why it sits so far above average.
         """
+        if build in self.runs:
+            return self.runs[build]
         means, spread = build
         rivals = self.rng.standard_normal((SEASONS_DRAWN, TEAMS - 1, CATEGORIES))
         focal = (self.rng.standard_normal((SEASONS_DRAWN, 1, CATEGORIES)) * spread
@@ -172,16 +198,18 @@ class Rotisserie(VoiceoverScene):
         board = np.concatenate([focal, rivals], axis=1)
         ranks = board.argsort(axis=1).argsort(axis=1) + 1
         totals = ranks.sum(axis=2)
-        return totals[:, 0], totals[:, 1:].max(axis=1)
+        self.runs[build] = (totals[:, 0], totals[:, 1:].max(axis=1))
+        return self.runs[build]
 
     def build_win_shaded_distribution(self, totals, bar, colour,
                                       reference_peak: float | None = None,
-                                      show_win_shading: bool = True) -> VGroup:
+                                      show_win_shading: bool = True,
+                                      column_opacity: float = 0.78) -> VGroup:
         """Your season totals as a column chart, each column tinted by how often it won.
 
-        The column height is how often you finish on that total. The yellow laid over it is
-        P(win | total = x) -- taken from the seasons that actually landed there, so the shading
-        is a measured conditional rather than a curve fitted to look right.
+        The column height is how often you finish on that total. Its COLOUR is P(win | total =
+        x) -- taken from the seasons that actually landed there, so the shading is a measured
+        conditional rather than a curve fitted to look right.
 
         That conditioning matters. Your total and the bar are NOT independent: ranks are shared,
         so a season where you do well is one where the rivals were pushed down. Multiplying your
@@ -207,12 +235,16 @@ class Rotisserie(VoiceoverScene):
             enough = float(np.mean(bar[landed] < total)) if landed.sum() else 0.0
             height = CLOUD_HEIGHT * probabilities[offset] / reference
             centre = [self.to_scene_x(total), AXIS_Y + height / 2, 0.0]
-            bar_column = VGroup(Rectangle(width=width, height=height, stroke_width=0,
-                                          fill_color=colour, fill_opacity=0.50).move_to(centre))
-            if show_win_shading:
-                bar_column.add(Rectangle(width=width, height=height, stroke_width=0,
-                                         fill_color=YELLOW, fill_opacity=enough).move_to(centre))
-            columns.add(bar_column)
+            # ONE column, its colour mixed between the team's own hue and yellow by how often
+            # that total won. This was a yellow rectangle stacked on a half-transparent blue
+            # one, which is the same quantity but a worse picture: two translucent fills over
+            # black muddied the middle of the range into olive and left the blue itself dim.
+            # Mixing the colour keeps every column at one strength, so the tint alone carries
+            # the probability.
+            fill = interpolate_color(colour, YELLOW, enough) if show_win_shading else colour
+            columns.add(VGroup(Rectangle(width=width, height=height, stroke_width=0,
+                                         fill_color=fill, fill_opacity=column_opacity)
+                               .move_to(centre)))
         return columns
 
     def peak_probability(self, totals) -> float:
@@ -379,16 +411,16 @@ class Rotisserie(VoiceoverScene):
         with self.voiceover(text=NARRATION['widen']) as tracker:
             wait_until_phrase(self, tracker, 'increasing our expected value')
             self.play(Transform(self.cloud, self.variant_cloud(RICHER_BUILD)),
-                      Transform(self.win_readout, self.win_line(RICHER_BUILD)),
+                      *self.swap_win_readout(RICHER_BUILD),
                       run_time=1.6)
             self.wait(0.8)
             self.play(Transform(self.cloud, self.variant_cloud(BALANCED_BUILD)),
-                      Transform(self.win_readout, self.win_line(BALANCED_BUILD)),
+                      *self.swap_win_readout(BALANCED_BUILD),
                       run_time=0.9)
 
             wait_until_phrase(self, tracker, 'increasing variance')
             self.play(Transform(self.cloud, self.variant_cloud(WILDER_BUILD)),
-                      Transform(self.win_readout, self.win_line(WILDER_BUILD)),
+                      *self.swap_win_readout(WILDER_BUILD),
                       run_time=1.6)
             self.wait(max(0.6, tracker.get_remaining_duration() - 0.9))
             self.play(FadeOut(VGroup(self.cloud, self.win_readout, self.bar_line,
@@ -404,15 +436,26 @@ class Rotisserie(VoiceoverScene):
         return Text(f'won the league in {self.win_rate(mine, bar):.1%} of seasons',
                     font_size=28, color=BLUE_B).move_to([0.0, 3.1, 0.0])
 
+    def swap_win_readout(self, build) -> list:
+        """Put up the win rate for a build in place of whatever line is already there.
+
+        REPLACED, never transformed. The lines differ in character count -- '7.7%' against
+        '35.0%' -- and Transform morphs one Text into another glyph by glyph, which between
+        two lines of different length drags letters across the frame and strands the leftovers.
+        Both sit at the same point, so a crossfade reads as the number changing.
+        """
+        replacement = self.win_line(build)
+        outgoing, self.win_readout = self.win_readout, replacement
+        return [FadeOut(outgoing), FadeIn(replacement)]
+
     # -- Act four: two builds, each with the season it produces ------------------------
 
     def play_two_builds(self) -> None:
-        """Each build gets its table AND the distribution that table produces, then both are
-        laid over one axis together.
+        """One empty table, split in two, each half filled with the build its clause describes.
 
-        Introducing a build without showing what it lands on left the tables as assertions --
-        the whole claim is about the shape of the season each one produces, so that shape
-        belongs on screen while the build is being described.
+        The line names both builds in a single breath, and the two lines after it say 'the
+        first' and 'the second' -- which needs both on screen together to mean anything. This
+        used to show one table, clear it away, and then show the other.
         """
         runs = [self.simulate(build) for build in (BALANCED_BUILD, COMMITTED_BUILD)]
         # A single vertical scale across every distribution the act draws, set by the tallest,
@@ -421,51 +464,72 @@ class Rotisserie(VoiceoverScene):
         self.summaries = [(float(mine.mean()), float(mine.std()), self.win_rate(mine, bar))
                           for mine, bar in runs]
 
-        def build_panel(build, colour, heading, run):
-            table = self.build_matchup_table(build, heading, colour)
-            mine, bar = run
-            # No win shading here. These panels are introducing a BUILD -- what the yellow
-            # means belongs to the comparison that follows, and shown beside a table of win
-            # probabilities it reads as a second, unexplained quantity.
-            curve = self.build_win_shaded_distribution(mine, bar, colour, reference,
-                                                       show_win_shading=False)
-            curve.scale(INSET_CURVE_SCALE).move_to(INSET_CURVE_CENTRE)
-            # A baseline under it, so the little curve reads as a distribution rather than as a
-            # shape floating below the grid.
-            floor = Line([-3.2, INSET_CURVE_CENTRE[1] - 0.62, 0.0],
-                         [3.2, INSET_CURVE_CENTRE[1] - 0.62, 0.0],
-                         color=GREY_D, stroke_width=2)
-            caption = Text('the season it produces', font_size=19, color=GREY_D)
-            caption.move_to([0.0, INSET_CURVE_CENTRE[1] - 1.12, 0.0])
-            return table, VGroup(curve, floor, caption)
+        left = self.build_matchup_table(BALANCED_BUILD, 'every fantasy point a coin flip',
+                                        BLUE_B)
+        right = self.build_matchup_table(COMMITTED_BUILD,
+                                         'most nearly won, the rest nearly lost', GREEN_C)
+        # Everything starts at nothing and is brought up a piece at a time. Adding the parts as
+        # they appear would leave each table's own group outside the scene, and the split has to
+        # scale and move a whole table as one.
+        for table in (left, right):
+            table['all'].set_opacity(0.0)
+            self.add(table['all'])
+        right['all'].scale(SPLIT_SCALE).move_to([PANEL_CENTRE_X, PANEL_TABLE_CENTRE_Y, 0.0])
 
-        first_table, first_curve = build_panel(
-            BALANCED_BUILD, BLUE_B, 'every fantasy point a coin flip', runs[0])
-        with self.voiceover(text=NARRATION['two_builds']):
-            # Up from the first word. Anchored half way through the line instead, the first
-            # twelve seconds of it played over a black screen.
-            self.play(FadeIn(first_table), run_time=1.0)
+        with self.voiceover(text=NARRATION['two_builds']) as tracker:
+            # The bare frame first: what the columns are, and which nine categories they run
+            # over. A finished row arriving alone and then holding the frame by itself was the
+            # awkward part -- the table should exist as a shape before it means anything.
+            self.play(left['columns'].animate.set_opacity(1.0),
+                      *[label.animate.set_opacity(1.0) for label in left['labels']],
+                      lag_ratio=0.12, run_time=1.5)
+
+            wait_until_phrase(self, tracker, 'kinds of builds that we design')
+            self.play(*[cell.animate.set_stroke(opacity=1.0) for cell in left['grid']],
+                      lag_ratio=0.012, run_time=4.2)
+
+            # The split, on the words that introduce a second build. The table already up
+            # becomes the left one, and an empty one arrives beside it.
+            wait_until_phrase(self, tracker, 'Consider two ways to build a team')
+            self.play(left['all'].animate.scale(SPLIT_SCALE)
+                      .move_to([-PANEL_CENTRE_X, PANEL_TABLE_CENTRE_Y, 0.0]),
+                      right['columns'].animate.set_opacity(1.0),
+                      *[label.animate.set_opacity(1.0) for label in right['labels']],
+                      *[cell.animate.set_stroke(opacity=1.0) for cell in right['grid']],
+                      run_time=1.7)
+
+            wait_until_phrase(self, tracker, 'every individual fantasy point is a coinflip')
+            self.play(left['title'].animate.set_opacity(1.0),
+                      *[cell.animate.set_opacity(1.0) for cell in left['cells']],
+                      lag_ratio=0.04, run_time=2.0)
+
+            wait_until_phrase(self, tracker, 'most are nearly guaranteed wins')
+            self.play(right['title'].animate.set_opacity(1.0),
+                      *[cell.animate.set_opacity(1.0) for cell in right['cells']],
+                      lag_ratio=0.04, run_time=2.0)
+
+        curves = [self.build_panel_curve(mine, bar, colour, reference, side * PANEL_CENTRE_X)
+                  for (mine, bar), colour, side in zip(runs, (BLUE_B, GREEN_C), (-1, 1))]
 
         with self.voiceover(text=NARRATION['coin_flips']):
-            self.play(FadeIn(first_curve), run_time=0.9)
-            self.wait(1.2)
+            self.play(FadeIn(curves[0]), run_time=0.9)
+            self.wait(0.5)
 
-        with self.voiceover(text=NARRATION['certainties']):
-            second_table, second_curve = build_panel(
-                COMMITTED_BUILD, GREEN_C, 'most nearly won, the rest nearly lost', runs[1])
-            self.play(FadeOut(VGroup(first_table, first_curve)), run_time=0.4)
-            self.play(FadeIn(second_table), run_time=0.8)
-            self.play(FadeIn(second_curve), run_time=0.8)
-            self.second_panel = VGroup(second_table, second_curve)
+        with self.voiceover(text=NARRATION['certainties']) as tracker:
+            self.play(FadeIn(curves[1]), run_time=0.9)
+            self.wait(max(0.5, tracker.get_remaining_duration() - 0.4))
 
-        with self.voiceover(text=NARRATION['conclusion']) as tracker:
-            # The committed panel is cleared HERE rather than at the end of its own line, which
+        with self.voiceover(text=NARRATION['punting_summary']) as tracker:
+            # Both panels are cleared HERE rather than at the end of their own lines, which
             # left the rest of that sentence running over nothing.
-            self.play(FadeOut(self.second_panel), run_time=0.5)
+            self.play(FadeOut(VGroup(left['all'], right['all'], *curves)), run_time=0.5)
             self.axis = self.build_axis()
             self.play(Create(self.axis), run_time=0.9)
+            # Thinner here than anywhere else in the scene: two distributions are laid over
+            # each other, and at full strength the one drawn second simply hides the other.
             clouds = VGroup(*[
-                self.build_win_shaded_distribution(mine, bar, colour, reference)
+                self.build_win_shaded_distribution(mine, bar, colour, reference,
+                                                   column_opacity=0.52)
                 for (mine, bar), colour in zip(runs, (BLUE_B, GREEN_C))
             ])
             self.play(FadeIn(clouds), run_time=1.4)
@@ -483,8 +547,61 @@ class Rotisserie(VoiceoverScene):
                 )
             ]).arrange(DOWN, buff=0.4).move_to([0.0, 2.9, 0.0])
             self.play(FadeIn(rows), run_time=1.2)
-            self.wait(2.0)
-        self.wait(0.6)
+            self.wait(max(0.5, tracker.get_remaining_duration() - 0.3))
+
+        with self.voiceover(text=NARRATION['the_math']) as tracker:
+            # The line spends its first half on what the scene just showed and its second half
+            # admitting the real thing is harder than that, so the picture changes on the turn.
+            wait_until_phrase(self, tracker, 'The actual math')
+            self.play(FadeOut(VGroup(clouds, rows, self.axis)), run_time=0.6)
+
+            # A fully opaque white figure on a black ground, which is what it should look like:
+            # a page from the paper the line is sending people to, not something this scene drew.
+            equations = ImageMobject(str(EQUATIONS_IMAGE))
+            equations.height = EQUATIONS_HEIGHT
+            self.play(FadeIn(equations), run_time=0.9)
+            self.wait(max(0.6, tracker.get_remaining_duration() - 0.4))
+        self.wait(0.8)
+
+    def to_panel_x(self, points: float, centre_x: float) -> float:
+        """Where a season total sits inside a panel -- the same mapping in both panels."""
+        midpoint = self.to_scene_x(MAX_POINTS / 2)
+        return centre_x + (self.to_scene_x(points) - midpoint) * PANEL_CURVE_SCALE
+
+    def build_panel_curve(self, totals, bar, colour, reference_peak, centre_x: float) -> VGroup:
+        """One panel's season, on a shortened copy of the scene's own axis.
+
+        No win shading: these panels are introducing a BUILD, and what the yellow means belongs
+        to the comparison that follows -- beside a table of win probabilities it reads as a
+        second, unexplained quantity.
+
+        Scaled about the axis midpoint rather than moved by its bounding box, which matters more
+        than it sounds. Centring each curve on its own middle gave the two panels DIFFERENT
+        x-mappings, so the committed build's higher expected value -- the thing its own line
+        claims -- was invisible: both curves sat in the middle of their own panel whatever they
+        scored. The same centring put the balanced curve a quarter of a unit above its floor
+        line and left the committed one, more than twice as tall, hanging below it.
+
+        The axis is drawn out rather than captioned. A line reading 'the season it produces'
+        says nothing the shape does not already say; the ticks say what it is worth.
+        """
+        curve = self.build_win_shaded_distribution(totals, bar, colour, reference_peak,
+                                                   show_win_shading=False)
+        midpoint = self.to_scene_x(MAX_POINTS / 2)
+        curve.scale(PANEL_CURVE_SCALE, about_point=[midpoint, AXIS_Y, 0.0])
+        curve.shift([centre_x - midpoint, PANEL_FLOOR_Y - AXIS_Y, 0.0])
+
+        axis = Line([self.to_panel_x(0, centre_x), PANEL_FLOOR_Y, 0.0],
+                    [self.to_panel_x(MAX_POINTS, centre_x), PANEL_FLOOR_Y, 0.0],
+                    color=GREY_D, stroke_width=2)
+        marks = VGroup()
+        for points in AXIS_TICKS:
+            x = self.to_panel_x(points, centre_x)
+            marks.add(Line([x, PANEL_FLOOR_Y - 0.09, 0.0], [x, PANEL_FLOOR_Y + 0.09, 0.0],
+                           color=GREY_D, stroke_width=2))
+            marks.add(Text(f'{points:g}', font_size=18, color=GREY_D)
+                      .move_to([x, PANEL_FLOOR_Y - 0.33, 0.0]))
+        return VGroup(curve, axis, marks)
 
     def build_matchup_table(self, build, heading: str, colour) -> VGroup:
         """Chance of beating each rival in each category, as a heat map.
@@ -499,30 +616,45 @@ class Rotisserie(VoiceoverScene):
         """
         means, spread = build
         title = Text(heading, font_size=26, color=colour).move_to([0.0, 2.95, 0.0])
-        rows = VGroup()
+        # The frame and the numbers are separate groups, so a beat can put an empty table up and
+        # fill it in afterwards. Built as finished rows instead, the first category arrived
+        # complete and then sat alone while the line ran on.
+        labels, grid, cells = VGroup(), VGroup(), VGroup()
         for category in range(CATEGORIES):
             chance = 0.5 * (1.0 + erf(means[category] / sqrt(2.0 * (1.0 + spread ** 2))))
             row_y = HEAT_TOP_Y - category * HEAT_ROW_GAP
-            rows.add(Text(CATEGORY_NAMES[category], font_size=19, color=GREY_B)
-                     .move_to([HEAT_LEFT_X - 0.55, row_y, 0.0], aligned_edge=RIGHT))
+            labels.add(Text(CATEGORY_NAMES[category], font_size=19, color=GREY_B)
+                       .move_to([HEAT_LEFT_X - 0.55, row_y, 0.0], aligned_edge=RIGHT))
+
+            row = VGroup()
             for opponent in range(TEAMS - 1):
-                rows.add(Rectangle(width=HEAT_CELL_WIDTH, height=HEAT_CELL_HEIGHT,
-                                   stroke_width=0, fill_opacity=1.0,
-                                   fill_color=self.heat_colour(chance))
-                         .move_to([HEAT_LEFT_X + opponent * HEAT_CELL_WIDTH, row_y, 0.0]))
+                position = [HEAT_LEFT_X + opponent * HEAT_CELL_WIDTH, row_y, 0.0]
+                # An empty outline under every cell, so the table exists as a shape before any
+                # of it is filled in. The coloured cell lands on top of its own outline.
+                grid.add(Rectangle(width=HEAT_CELL_WIDTH, height=HEAT_CELL_HEIGHT,
+                                   stroke_width=1.0, stroke_color=GREY_D, fill_opacity=0.0)
+                         .move_to(position))
+                row.add(Rectangle(width=HEAT_CELL_WIDTH, height=HEAT_CELL_HEIGHT,
+                                  stroke_width=0, fill_opacity=1.0,
+                                  fill_color=self.heat_colour(chance))
+                        .move_to(position))
             # On its own cell colour, so it is legible whatever the cell is: the styler picks
             # black or white by luminance, and a flat grey was invisible at fifty percent.
             chip = Rectangle(width=0.86, height=HEAT_CELL_HEIGHT, stroke_width=0,
                              fill_opacity=1.0, fill_color=self.heat_colour(chance))
             chip.move_to([HEAT_LEFT_X + (TEAMS - 1) * HEAT_CELL_WIDTH + 0.72, row_y, 0.0])
-            rows.add(chip)
-            rows.add(Text(f'{chance:.0%}', font_size=19,
-                          color=self.heat_text_colour(chance)).move_to(chip.get_center()))
+            row.add(chip)
+            row.add(Text(f'{chance:.0%}', font_size=19,
+                         color=self.heat_text_colour(chance)).move_to(chip.get_center()))
+            cells.add(row)
 
         columns = Text('eleven opponents', font_size=19, color=GREY_D)
         columns.move_to([HEAT_LEFT_X + (TEAMS - 2) * HEAT_CELL_WIDTH / 2,
                          HEAT_TOP_Y + 0.45, 0.0])
-        return VGroup(title, columns, rows)
+        # Returned as parts AND as one group: the parts so a beat can reveal them in order, the
+        # group so the whole table can be scaled and moved to its side of the frame as one.
+        return {'title': title, 'columns': columns, 'labels': labels, 'grid': grid,
+                'cells': cells, 'all': VGroup(title, columns, labels, grid, cells)}
 
     def heat_colour(self, chance: float) -> str:
         """The app's own cell colour, so a category here looks like a category in the product.

@@ -40,9 +40,12 @@ NARRATION = {
         'The first has an average expected value and strong variance.',
     'certainties':
         'The second has a higher expected value, with much lower variance. This would be an amazing Most Categories team, '
-        'almost guaranteed to win every matchup.',
-    'conclusion':
+        'usually winning at least five categories.',
+    'punting_summary':
         'But in Rotisserie, it is the first team that wins the league more often. The team that punts heavily is too concentrated '
         'around its mean; it did not leave open the possibility of doing broadly well across all categories, which made its only '
         'winning scenario nearly impossible.',
+    'the_math' : 
+        'This is the basic principle behind how the Rotisserie algorithm works, and suggests balanced teams. The actual math the '
+        'algorithm uses is quite complicated: you can find the details in the third paper. '
 }
