@@ -42,7 +42,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))          # visua
 
 from backend.api.routers.sessions import _build_current_settings          # noqa: E402
 from backend.services.session_management import build_session             # noqa: E402
-from backend.math.algorithm_agents import HAgent                          # noqa: E402
+from backend.math.algorithm_agents import HAgent, AdamOptimizer           # noqa: E402
 from backend.math.algorithm_agents import _PUNT_SEED_FACTOR                 # noqa: E402
 from shared.prepare_season_data import build_default_session_request, SEASON, SPORT   # noqa: E402
 
@@ -69,11 +69,14 @@ BALANCED_WEIGHTS  = (0.85, 1.35)
 SUMMIT_MERGE_WEIGHT = 0.16     # summits closer than this on both axes are one broad hilltop
 
 # How many three-summit slices are traced before one is kept. The shape of a surface is cheap to
-# measure and says nothing about where a descent ends on it: the plane is a two-dimensional cut
-# through a nine-dimensional landscape, and the real descent moves in all nine, so its path is a
-# PROJECTION that can drift off the slice it is drawn on. Whether it drifts is a property of the
-# particular slice, and the only way to find out is to run it. So several are run and the one
-# whose climb finishes nearest its own summit is kept.
+# measure and says nothing about where a descent ends on it, so several are run and the one whose
+# climb finishes nearest its own summit is kept.
+#
+# Both scenes' climbs are now held to the two weights they draw (see trace_from_seed's
+# `hold_to_plane`), so a path no longer drifts off the slice it is drawn on -- it cannot, the
+# other seven weights do not move. What still varies between slices, and is still only knowable
+# by running them, is whether the climb goes anywhere worth watching: which basin it settles in,
+# how far it walks, and whether it doubles back getting there.
 MENU_SLICES_TO_TRACE = 16
 # At most this many cuts from any one candidate-and-anchor. Sorted by advantage alone the
 # shortlist filled with the same surface over and over -- six of eight were one player at one
@@ -86,11 +89,11 @@ CUTS_PER_CANDIDATE = 2
 # the summit has nowhere to go: it shuffles about on the flat top, doubles back on itself, and
 # shows none of the walking uphill the scene is there to show. So a slice is kept for the LENGTH
 # of the journey its chosen seed makes, once the journey ends somewhere near the right peak.
-# Judged against the climb this scene ships today, which walks 11.2 points, lands 7.2 from the
-# summit and wanders 6.29 times the straight line between the two. The complaint it has to beat
-# is the doubling back, so the wander bound is the tight one: anything under about two and a
-# half is a different picture from that. The landing bound is looser, because a ball that stops
-# fifteen points short of a broad summit still plainly climbed it.
+# The complaint these are here to rule out is the doubling back, so the wander bound is the tight
+# one: a free descent measured on the descent scene's own slice wandered 3.22 times the straight
+# line, and anything under about two and a half is a different picture from that. The landing
+# bound is looser, because a ball that stops fifteen points short of a broad summit still plainly
+# climbed it.
 LANDING_TOLERANCE = 15.0       # percentage points from the summit still counted as arriving
 WANDER_TOLERANCE = 2.5         # path length over straight-line distance; above this it meanders
 
@@ -124,16 +127,15 @@ def anchor_menu(neutral, index_a, index_b):
         cuts.append((index, anchor))
     return cuts
 
-# How many times the seed-menu slice is re-cut through its own answer. The seven weights that are
-# not on the plane have to be held at SOMETHING, and holding them at the balanced build -- the
-# obvious choice -- puts the cut somewhere the algorithm leaves on its first step: the descent
-# moves all nine weights, so its path is a shadow and its end is not a point of the picture. Held
-# instead at the values the descent settles on, the endpoint lies IN the plane and the ball lands
-# on a real summit of the surface it is drawn on.
+# How many times the seed-menu slice is re-cut through its own answer. The seven category weights
+# that are not on the plane are now pinned to the cut for the whole descent, so THEY no longer
+# argue for re-cutting: the endpoint lies in the plane by construction.
 #
-# That is circular -- the cut depends on the climb, and the climb's seed is built on the cut -- so
-# it is iterated. Both cuts are judged and the better kept, since the balanced cut sometimes
-# gives the longer climb even when the re-cut one lands closer.
+# The FLEX SHARES still do. The solver returns gradients for them as well and the descent moves
+# them, and they are a dimension the plane neither shows nor can show -- so a surface drawn at the
+# shares the cut started from is cut through a slightly different place than the one the climb
+# finished in. The second pass re-cuts through the finishing shares. Both are judged and the
+# better kept, since the first sometimes gives the longer climb even when the second lands closer.
 ANCHOR_PASSES = 2
 PUNTED_MAX_WEIGHT = 0.72
 KEPT_MIN_WEIGHT   = 0.78
@@ -165,7 +167,8 @@ def narrow_to_one_candidate(args, row: int):
             pitching_preference)
 
 
-def run_bootstrap_watching(agent, n_iterations, tracked_players, forced_seeds=None):
+def run_bootstrap_watching(agent, n_iterations, tracked_players, forced_seeds=None,
+                           held_to_plane=None):
     """Run the shipped bootstrap, following several players' solves through it.
 
     Returns {player_id: (context, trajectory)} -- the objective's arguments narrowed to that
@@ -176,12 +179,22 @@ def run_bootstrap_watching(agent, n_iterations, tracked_players, forced_seeds=No
     `forced_seeds` maps a player to a seed that replaces the menu's choice FOR HIM ONLY. Every
     other candidate keeps the seed the menu picked, so the field the passes settle into is the
     same in every run and the trajectories are comparable.
+
+    `held_to_plane` maps a player to the two category indices a scene draws, and confines his
+    descent to them: the other seven weights take no step. See trace_from_seed's `hold_to_plane`,
+    and the descent section of main(), for why a scene would want that.
     """
     tracked_players = list(tracked_players)
     forced_seeds = forced_seeds or {}
+    held_to_plane = held_to_plane or {}
     captured = {player: {'context': None, 'trajectory': []} for player in tracked_players}
     original_select = HAgent._select_starting_weights
     original_objective = HAgent.get_objective_and_gradient
+    original_minimize = AdamOptimizer.minimize
+    # Which row of the current batch each tracked player occupies, refreshed on every objective
+    # call and read by the Adam hook below -- the optimiser is handed a gradient and no idea whose
+    # it is, and the update it returns has to be masked for one row only.
+    live_rows: dict = {}
 
     def tracked_rows(agent_self):
         batch_index = getattr(agent_self, '_current_batch_index', None)
@@ -204,7 +217,10 @@ def run_bootstrap_watching(agent, n_iterations, tracked_players, forced_seeds=No
 
     def objective(self, *args, **kwargs):
         weights = np.asarray(args[0], dtype=float)
-        for player, row in tracked_rows(self).items():
+        rows = tracked_rows(self)
+        live_rows.clear()
+        live_rows.update(rows)
+        for player, row in rows.items():
             if weights.shape[0] <= row:
                 continue
             record = captured[player]
@@ -216,13 +232,49 @@ def run_bootstrap_watching(agent, n_iterations, tracked_players, forced_seeds=No
             record['context'] = narrow_to_one_candidate(args, row)
         return original_objective(self, *args, **kwargs)
 
+    def minimize(self, gradient):
+        """Adam's step, with the off-plane categories zeroed for the players being held.
+
+        The mask has to go on the UPDATE rather than on the gradient. The solver centres the
+        category gradient row by row before handing it over, so a gradient zeroed beforehand comes
+        back non-zero the moment the row mean is subtracted from it.
+
+        Only the category optimiser is masked. It is told apart from the shares optimiser by the
+        width of what it returns, which is asserted to be unambiguous before any of this runs.
+        """
+        update = original_minimize(self, gradient)
+        if not held_to_plane:
+            return update
+        update = np.asarray(update, dtype=float)
+        if update.ndim != 2 or update.shape[1] != agent.n_categories:
+            return update
+        update = update.copy()
+        for player, row in live_rows.items():
+            drawn = held_to_plane.get(player)
+            if drawn is None or row >= update.shape[0]:
+                continue
+            off_plane = np.ones(agent.n_categories, dtype=bool)
+            off_plane[list(drawn)] = False
+            update[row, off_plane] = 0.0
+        return update
+
+    if held_to_plane and agent.position_means is not None:
+        n_positions = agent.position_means.shape[1]
+        if n_positions == agent.n_categories:
+            raise RuntimeError(
+                f'There are as many positions as categories ({n_positions}), so the Adam hook '
+                f'cannot tell the category optimiser from the shares one by the width of its '
+                f'update. Hold the descent some other way rather than masking the wrong thing.')
+
     HAgent._select_starting_weights = select
     HAgent.get_objective_and_gradient = objective
+    AdamOptimizer.minimize = minimize
     try:
         agent.populate_default_h_scores(n_iterations)
     finally:
         HAgent._select_starting_weights = original_select
         HAgent.get_objective_and_gradient = original_objective
+        AdamOptimizer.minimize = original_minimize
 
     solved = {player: (record['context'], record['trajectory'])
               for player, record in captured.items() if record['context'] is not None}
@@ -554,11 +606,11 @@ def measure_slice(agent, context, neutral, index_a, index_b, anchor=None,
 
     `hold_assignment` scores the whole grid against ONE matching, taken at the balanced build, so
     the surface underneath the notches shows through. On the cut the scene ships -- Scottie
-    Barnes, Threes against Turnovers -- holding it drops the creasing from 104x to 27x along the
-    rows and from 30x to 7x along the columns, and moves the surface by at most 0.00331 against a
-    relief of 0.02330. That is 14% of the relief, so this is not a free cosmetic pass: it is a
-    visible change of heights, and the reason it is still honest is that both summits stay in the
-    same cells and in the same order.
+    Barnes, Threes against Steals -- holding moves the surface by at most 0.00302 against a relief
+    of 0.02222. That is 14% of the relief, so this is not a free cosmetic pass: it is a visible
+    change of heights, and the reason it is still honest is that both summits stay in the same
+    cells and in the same order. main() prints both figures on every run, so a slice that starts
+    costing more than this says so rather than being taken on trust.
 
     Holding cannot be used for the SEARCH, only for the final drawing. Held still, some cuts lose
     their balanced summit altogether and read as two punts, and punt_advantage needs a balanced
@@ -592,14 +644,20 @@ def trace_from_seed(agent
                     , index_a
                     , index_b
                     , axis
-                    , surface):
+                    , surface
+                    , hold_to_plane=False):
     """Re-run the bootstrap with one seed forced on the tracked player, and keep his descent.
 
     The seed replaces the menu's choice for that player only, so the field the passes settle into
     is the same in every run and the climbs can be compared with each other.
+
+    `hold_to_plane` confines the descent to the two weights the scene draws. See the descent
+    section of main() for what that buys and how it narrows the claim being made.
     """
     seed = plane.weights_at(np.array([start]))[0]
-    rerun = run_bootstrap_watching(agent, n_iterations, [tracked], forced_seeds={tracked: seed})
+    rerun = run_bootstrap_watching(
+        agent, n_iterations, [tracked], forced_seeds={tracked: seed},
+        held_to_plane={tracked: (index_a, index_b)} if hold_to_plane else None)
     rerun_context, trajectory = rerun[tracked]
 
     path = [project_onto_plane(weights, neutral, index_a, index_b) for weights in trajectory]
@@ -637,13 +695,17 @@ def without_working(climbs):
 
 
 def write_measurements(filename: str, payload: dict) -> None:
-    data_path = _VISUALIZATIONS_DIR / 'data' / filename
+    data_path = _VISUALIZATIONS_DIR / 'prepared_data' / filename
     data_path.parent.mkdir(parents=True, exist_ok=True)
     data_path.write_text(json.dumps(payload), encoding='utf-8')
     print(f'Wrote {data_path.relative_to(_VISUALIZATIONS_DIR.parent)}')
 
 
 def main() -> None:
+    build = sys.argv[1] if len(sys.argv) > 1 else 'both'
+    if build not in ('both', 'menu', 'descent'):
+        raise SystemExit(f'Build what? Expected both, menu or descent; got {build!r}.')
+
     print(f'Building a {SEASON} session at the app defaults...')
     session = build_session(
         current_settings = _build_current_settings(
@@ -667,136 +729,159 @@ def main() -> None:
     print('Searching every candidate and category pairing...')
     menu_slices, simple_slice = search_slices(agent, solved, neutral, categories, player_names)
 
-    # ── The seed menu: three starts on a surface with three summits ───────────────────
-    # Each shortlisted slice is traced in full and kept only if its climb lands nearer its own
-    # summit than the best so far. Prominence alone picked a surface whose climb stopped fifteen
-    # percentage points from the visible peak, which reads as the algorithm giving up early.
-    print(f'\nTracing {len(menu_slices)} shortlisted slices to see where each climb lands...')
-    best_menu = None
-    for tracked, index_a, index_b, cut, found_anchor in menu_slices:
-        category_a, category_b = categories[index_a], categories[index_b]
-        held = 'balanced' if cut == 'balanced' else f'punting {categories[cut]}'
-        print(f'\n   {player_names[tracked]}: {category_a} against {category_b}, '
-              f'others held {held}')
+    # The seed-menu slice is the expensive half -- sixteen shortlisted cuts, each traced in
+    # full -- and its scene is signed off. Rebuilding only the descent slice leaves that file
+    # exactly as it is rather than re-deriving a blessed picture as a side effect.
+    if build != 'descent':
+        # ── The seed menu: three starts on a surface with three summits ───────────────────
+        # Each shortlisted slice is traced in full and kept only if its climb lands nearer its own
+        # summit than the best so far. Prominence alone picked a surface whose climb stopped fifteen
+        # percentage points from the visible peak, which reads as the algorithm giving up early.
+        print(f'\nTracing {len(menu_slices)} shortlisted slices to see where each climb lands...')
+        best_menu = None
+        for tracked, index_a, index_b, cut, found_anchor in menu_slices:
+            category_a, category_b = categories[index_a], categories[index_b]
+            held = 'balanced' if cut == 'balanced' else f'punting {categories[cut]}'
+            print(f'\n   {player_names[tracked]}: {category_a} against {category_b}, '
+                  f'others held {held}')
 
-        anchor, context, best_pass = found_anchor, solved[tracked][0], None
-        for attempt in range(ANCHOR_PASSES):
-            plane, axis, surface = measure_slice(
-                agent, context, neutral, index_a, index_b, anchor)
+            anchor, context, best_pass = found_anchor, solved[tracked][0], None
+            for attempt in range(ANCHOR_PASSES):
+                plane, axis, surface = measure_slice(
+                    agent, context, neutral, index_a, index_b, anchor)
 
-            # The shape is re-checked on the fine grid the scene actually draws rather than
-            # trusted from the coarse search: a punt that beats the balanced build by a hair at
-            # fifteen steps can lose to it at thirty-one, and then the picture argues the
-            # opposite of the narration.
-            drawn = punt_advantage(merge_summits(local_maxima(surface, axis),
-                                                 SUMMIT_MERGE_WEIGHT))
-            if drawn is None or drawn <= 0:
-                # Two quite different failures, worth telling apart: the surface may have lost
-                # one of the two summits entirely, or it may still have both with the balanced
-                # one on top. Only the second is "the punt is not worth it".
-                reason = ('no balanced summit and punt summit to compare'
-                          if drawn is None else
-                          f'the balanced summit wins by {-drawn:.5f}')
-                print(f'      cut {attempt + 1}: {reason} -- dropped')
-                break
+                # The shape is re-checked on the fine grid the scene actually draws rather than
+                # trusted from the coarse search: a punt that beats the balanced build by a hair at
+                # fifteen steps can lose to it at thirty-one, and then the picture argues the
+                # opposite of the narration.
+                drawn = punt_advantage(merge_summits(local_maxima(surface, axis),
+                                                     SUMMIT_MERGE_WEIGHT))
+                if drawn is None or drawn <= 0:
+                    # Two quite different failures, worth telling apart: the surface may have lost
+                    # one of the two summits entirely, or it may still have both with the balanced
+                    # one on top. Only the second is "the punt is not worth it".
+                    reason = ('no balanced summit and punt summit to compare'
+                              if drawn is None else
+                              f'the balanced summit wins by {-drawn:.5f}')
+                    print(f'      cut {attempt + 1}: {reason} -- dropped')
+                    break
 
-            climbs = [
-                trace_from_seed(agent, n_iterations, tracked, plane, start, label,
-                                neutral, index_a, index_b, axis, surface)
-                for label, start in ((f'punt {category_a}', [PUNT_SEED_FACTOR, 1.0])
-                                     , (f'punt {category_b}', [1.0, PUNT_SEED_FACTOR])
-                                     , ('balanced', [1.0, 1.0]))
-            ]
-            chosen, shape = climb_shape(climbs, axis, surface)
-            arrives = shape['landing'] <= LANDING_TOLERANCE
-            direct = shape['wander'] <= WANDER_TOLERANCE
-            print(f'      cut {attempt + 1}: climbs {chosen["label"]!r:22} '
-                  f'starts {shape["journey"]:5.1f} from the summit, lands {shape["landing"]:5.1f} '
-                  f'away, wanders x{shape["wander"]:.2f}'
-                  f'{"" if arrives and direct else "   -- rejected"}')
+                climbs = [
+                    trace_from_seed(agent, n_iterations, tracked, plane, start, label,
+                                    neutral, index_a, index_b, axis, surface,
+                                    hold_to_plane=True)
+                    for label, start in ((f'punt {category_a}', [PUNT_SEED_FACTOR, 1.0])
+                                         , (f'punt {category_b}', [1.0, PUNT_SEED_FACTOR])
+                                         , ('balanced', [1.0, 1.0]))
+                ]
+                chosen, shape = climb_shape(climbs, axis, surface)
+                arrives = shape['landing'] <= LANDING_TOLERANCE
+                direct = shape['wander'] <= WANDER_TOLERANCE
+                print(f'      cut {attempt + 1}: climbs {chosen["label"]!r:22} '
+                      f'starts {shape["journey"]:5.1f} from the summit, lands {shape["landing"]:5.1f} '
+                      f'away, wanders x{shape["wander"]:.2f}'
+                      f'{"" if arrives and direct else "   -- rejected"}')
 
-            # Kept for the JOURNEY, once it arrives and goes more or less straight there. A
-            # climb that starts beside the summit is correct and dull; the scene needs one that
-            # visibly walks uphill.
-            if arrives and direct and (best_pass is None or shape['journey'] > best_pass[0]):
-                best_pass = (shape['journey'], shape, plane, axis, surface, climbs)
-            # The next cut goes through this climb's own endpoint, in every dimension the
-            # plane does not draw: the seven other category weights via the anchor, and the flex
-            # shares via the context the climb itself finished in.
-            anchor, context = chosen['_final_weights'], chosen['_context']
+                # Kept for the JOURNEY, once it arrives and goes more or less straight there. A
+                # climb that starts beside the summit is correct and dull; the scene needs one that
+                # visibly walks uphill.
+                if arrives and direct and (best_pass is None or shape['journey'] > best_pass[0]):
+                    best_pass = (shape['journey'], shape, plane, axis, surface, climbs)
+                # The next cut goes through this climb's own endpoint, in every dimension the
+                # plane does not draw: the seven other category weights via the anchor, and the flex
+                # shares via the context the climb itself finished in.
+                anchor, context = chosen['_final_weights'], chosen['_context']
 
-        if best_pass is None:
-            print('      nothing usable from this pairing')
-            continue
-        journey, shape, plane, axis, surface, climbs = best_pass
-        if best_menu is None or journey > best_menu[0]:
-            best_menu = (journey, shape, tracked, index_a, index_b, plane, axis, surface, climbs)
+            if best_pass is None:
+                print('      nothing usable from this pairing')
+                continue
+            journey, shape, plane, axis, surface, climbs = best_pass
+            if best_menu is None or journey > best_menu[0]:
+                best_menu = (journey, shape, tracked, index_a, index_b, plane, axis, surface, climbs)
 
-    if best_menu is None:
-        raise RuntimeError(
-            'No shortlisted slice produced a climb that both arrives near its summit and goes '
-            'more or less straight there. Widen MENU_SLICES_TO_TRACE or loosen LANDING_TOLERANCE '
-            'and WANDER_TOLERANCE -- but loosening them means shipping a scene whose ball either '
-            'stops short of the peak or doubles back on the way, which is what they are for.')
-
-    journey, shape, tracked, index_a, index_b, plane, axis, surface, climbs = best_menu
-    category_a, category_b = categories[index_a], categories[index_b]
-    print(f'\nSeed menu -- {player_names[tracked]}: {category_a} against {category_b}; '
-          f'the climb walks {journey:.1f} points to within {shape["landing"]:.1f} of the summit, '
-          f'wandering x{shape["wander"]:.2f}')
-
-    # Redrawn with the roster assignment held, which takes the notches out of the hillside. The
-    # pairing and its climbs were chosen above on the honest surface and are not re-chosen here;
-    # only the heights being drawn change. See measure_slice for what that costs.
-    if HOLD_DRAWN_ASSIGNMENT:
-        honest = surface
-        # This plane was measured many bootstrap runs ago -- every later pairing in the menu ran
-        # its own passes through the same agent. Scoring it again unheld has to reproduce what
-        # was measured back then, exactly. If it does not, the agent has moved underneath the
-        # plane, and the held surface would be cut through a different place than the climbs were
-        # traced in: the drawn ball would descend a hill that is not the one drawn under it.
-        # That mismatch is what every earlier version of this scene got wrong, so it is checked
-        # rather than assumed.
-        redrawn = plane.score(
-            np.array([[a, b] for a in axis for b in axis])).reshape(GRID_STEPS, GRID_STEPS)
-        drift = float(np.abs(redrawn - honest).max())
-        if drift > 0.0:
+        if best_menu is None:
             raise RuntimeError(
-                f'The chosen plane no longer scores as it did when it was measured: rescoring it '
-                f'unheld moves the surface by {drift:.6f}. The agent has changed underneath it, '
-                f'so holding the assignment now would draw a hill the climbs were never traced '
-                f'on. Measure and hold the surface inside the search loop instead of here.')
+                'No shortlisted slice produced a climb that both arrives near its summit and goes '
+                'more or less straight there. Widen MENU_SLICES_TO_TRACE or loosen LANDING_TOLERANCE '
+                'and WANDER_TOLERANCE -- but loosening them means shipping a scene whose ball either '
+                'stops short of the peak or doubles back on the way, which is what they are for.')
 
-        surface = rescore_held(agent, plane, axis)
-        moved = float(np.abs(surface - honest).max())
-        relief = float(honest.max() - honest.min())
-        print(f'   held still: the plane still scores as measured (drift {drift:.6f}); holding '
-              f'moved the surface by at most {moved:.5f} against a span of {relief:.5f} '
-              f'({moved / relief:.0%} of the relief)')
-        for weight_a, weight_b, score in merge_summits(local_maxima(surface, axis)
-                                                       , SUMMIT_MERGE_WEIGHT):
-            print(f'      ({as_percent(weight_a):5.1f}%, {as_percent(weight_b):5.1f}%)  '
-                  f'{score:.5f}')
-    write_measurements('weight_surface.json', {
-        'season':     SEASON
-        , 'candidate':  player_names[tracked]
-        , 'category_a': category_a
-        , 'category_b': category_b
-        , 'axis':       [as_percent(value) for value in axis]
-        , 'surface':    np.round(surface, 6).tolist()
-        , 'climbs':     without_working(climbs)
-    })
+        journey, shape, tracked, index_a, index_b, plane, axis, surface, climbs = best_menu
+        category_a, category_b = categories[index_a], categories[index_b]
+        print(f'\nSeed menu -- {player_names[tracked]}: {category_a} against {category_b}; '
+              f'the climb walks {journey:.1f} points to within {shape["landing"]:.1f} of the summit, '
+              f'wandering x{shape["wander"]:.2f}')
+
+        # Redrawn with the roster assignment held, which takes the notches out of the hillside. The
+        # pairing and its climbs were chosen above on the honest surface and are not re-chosen here;
+        # only the heights being drawn change. See measure_slice for what that costs.
+        if HOLD_DRAWN_ASSIGNMENT:
+            honest = surface
+            # This plane was measured many bootstrap runs ago -- every later pairing in the menu ran
+            # its own passes through the same agent. Scoring it again unheld has to reproduce what
+            # was measured back then, exactly. If it does not, the agent has moved underneath the
+            # plane, and the held surface would be cut through a different place than the climbs were
+            # traced in: the drawn ball would descend a hill that is not the one drawn under it.
+            # That mismatch is what every earlier version of this scene got wrong, so it is checked
+            # rather than assumed.
+            redrawn = plane.score(
+                np.array([[a, b] for a in axis for b in axis])).reshape(GRID_STEPS, GRID_STEPS)
+            drift = float(np.abs(redrawn - honest).max())
+            if drift > 0.0:
+                raise RuntimeError(
+                    f'The chosen plane no longer scores as it did when it was measured: rescoring it '
+                    f'unheld moves the surface by {drift:.6f}. The agent has changed underneath it, '
+                    f'so holding the assignment now would draw a hill the climbs were never traced '
+                    f'on. Measure and hold the surface inside the search loop instead of here.')
+
+            surface = rescore_held(agent, plane, axis)
+            moved = float(np.abs(surface - honest).max())
+            relief = float(honest.max() - honest.min())
+            print(f'   held still: the plane still scores as measured (drift {drift:.6f}); holding '
+                  f'moved the surface by at most {moved:.5f} against a span of {relief:.5f} '
+                  f'({moved / relief:.0%} of the relief)')
+            for weight_a, weight_b, score in merge_summits(local_maxima(surface, axis)
+                                                           , SUMMIT_MERGE_WEIGHT):
+                print(f'      ({as_percent(weight_a):5.1f}%, {as_percent(weight_b):5.1f}%)  '
+                      f'{score:.5f}')
+        write_measurements('weight_surface.json', {
+            'season':     SEASON
+            , 'candidate':  player_names[tracked]
+            , 'category_a': category_a
+            , 'category_b': category_b
+            , 'axis':       [as_percent(value) for value in axis]
+            , 'surface':    np.round(surface, 6).tolist()
+            , 'climbs':     without_working(climbs)
+        })
 
     # ── Gradient descent: one start on a surface with one hill ────────────────────────
+    if build == 'menu':
+        return
     tracked, index_a, index_b = simple_slice
     category_a, category_b = categories[index_a], categories[index_b]
     print(f'\nGradient descent -- {player_names[tracked]}: {category_a} against {category_b}')
     plane, axis, surface = measure_slice(
         agent, solved[tracked][0], neutral, index_a, index_b)
+    # This climb is held to the two weights being drawn: the other seven take no Adam step, so the
+    # path is a path ON this surface rather than the shadow of one through nine dimensions.
+    #
+    # It is worth being plain about what that changes, because it is a real change and not a
+    # cosmetic one. The free descent moves all nine weights, and the drawn curve divides its two
+    # coordinates by the median of the other seven to undo the solver's renormalisation -- so when
+    # those seven drift, and measured here they drift 65% out of proportion, the drawn path
+    # wobbles in a way the descent itself never did. It also ends somewhere this plane does not
+    # contain, twelve points from the summit drawn beneath it.
+    #
+    # Held, the same seed walks to the summit of the surface it is drawn on, and its readout is
+    # the height of the hill under it. The scene's claim narrows honestly with it: this is what
+    # climbing looks like in the two weights on screen, which is what the narration says and all
+    # the picture was ever able to show. The menu scene is NOT held -- its subject is where a
+    # descent ends up, and holding it would decide that.
     middle = [sum(WEIGHT_RANGE) / 2] * 2
     climbs = without_working([
         trace_from_seed(agent, n_iterations, tracked, plane, middle,
-                        'the middle of the surface', neutral, index_a, index_b, axis, surface)])
+                        'the middle of the surface', neutral, index_a, index_b, axis, surface,
+                        hold_to_plane=True)])
     write_measurements('weight_surface_simple.json', {
         'season':     SEASON
         , 'candidate':  player_names[tracked]

@@ -41,7 +41,7 @@ and reports any line the render has fallen behind on.
 copied into `docs/videos/` — that is the tracked copy and the one MkDocs serves:
 
 ```
-cp visualizations/media/videos/z_score/1080p60/TeamDifferentialFull.mp4 docs/videos/z-scores.mp4
+cp visualizations/render_cache/videos/z_score/1080p60/TeamDifferentialFull.mp4 docs/videos/z-scores.mp4
 ```
 
 The pages embed them as raw HTML `<video>` tags. MkDocs rewrites relative paths in Markdown
@@ -73,7 +73,7 @@ The voice reads the text literally — write "sigma", not "σ".
 ## Rendering
 
 From the repository root, so that `manim.cfg` is picked up (it puts output in
-`visualizations/media/`):
+`visualizations/render_cache/`):
 
 ```
 manim -ql visualizations/6_self_play/self_play.py SelfPlayLoop      # draft, 480p15

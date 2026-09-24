@@ -94,7 +94,7 @@ FLOOR_DIP = 0.45
 #
 # A real player rather than the words 'a player'. The act opened on an abstraction and a bare
 # number, when the thing a viewer already knows how to picture is a person and a stat line.
-_HEADSHOT_DIR = Path(__file__).resolve().parent.parent.parent / 'assets' / 'headshots'
+_HEADSHOT_DIR = Path(__file__).resolve().parent.parent.parent / 'prepared_assets' / 'headshots'
 OPENING_PLAYER_ID = 1626164
 OPENING_PLAYER_NAME = 'Devin Booker'
 # What nobody knows in September. Written as questions because that is what they are.

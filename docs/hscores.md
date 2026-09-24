@@ -37,7 +37,7 @@ While the spinner is up, the algorithm is iterating, attempting to repeatedly im
 A simple demonstration of the algorithm using gradient ascent to optimize two input parameters, which are weights for two categories
 ///
 
-Gradient descent is possible whenever the underlying function that is being optimized has a defined slope (or gradient). The H-scoring function is defined in such a way that all of its constituent functions have gradients, which can be composted together. 
+Gradient descent is possible whenever the underlying function that is being optimized has a defined slope (or gradient). The H-scoring function is defined in such a way that all of its constituent functions have gradients, which can be composed together. 
 
 ??? note "How exactly does the algorithm use gradient descent?"
 
@@ -90,14 +90,13 @@ Top 100% Most Categories H-scores for the first pick, 2024-25 season
 
 The table above is based on the same dataset as the Each Category version, with different overall H-scores because it has Most Categories set to 100%. With Most Categories scoring, the algorithm is more incentivized to punt, since winning extra categories provides no marginal benefit. This leads to players like Giannis, who benefit greatly from punting, scoring better (In Each Category he is in a tie for sixth. In Most Categories, he is sole sixth by a significant margin).
 
-??? note "How is Most Categories scoring handled differently from Each Category, mathematically?"
-    The scoring format is reflected in the outer-level objective function layer of the H-scoring model. Different formats necessitate different structures for that function, which then drive different behavior for the formats. 
-
-    For Each Category, the objective function is just the sum of probabilities of winning each category. It is relatively simple to calculate, and calculate the gradient of. The probability of winning a category is the cumulative distribution function of the point differential between two teams evaluated at zero. Its derivative is the probability distribution function evaluated at zero. These are both easy to calculate with the approximation that point differentials are Normal. 
-
-    For Most Categories scoring, the objective function is the probability of winning a majority of categories (assuming they are independent), which is more complicated. It is calculated with a dynamic programming approach, calculating probability distributions for winning different numbers of categories out of the first N, then expanding to N+1 etc. It does this simultaneously from both sides.
-
-    The gradient of the MC objective turns out to be the 'tipping point' probability, which is the likelihood that any given category will end up being decisive (multiplied by the base EC gradient). It is calculated in much the same way as the overall MC objective is calculated, with a dynamic programming approach to calculate the tipping point probability for each category. 
+<video controls preload="metadata" width="100%" poster="../videos/most-categories-poster.jpg">
+    <source src="../videos/most-categories.mp4" type="video/mp4">
+</video>
+/// caption
+An exploration of how to compute the Most Categories objective, and how the underlying 
+mathematical structure incentivizes aggressive punting in the format
+///
 
 The Head to Head formats can be blended together through the sidebar because they are comparable, and for some leagues, it might make sense to optimize for both at the same time. When the slider is at zero H-scoring optimizes for purely Each Category scoring. If the EC/MC slider is moved all the way to one, it optimizes for purely Most Categories scoring. If the slider is somewhere in between, H-scoring computes and optimizes for both objectives, with weight on Most Categories based on the value of the slider. For example if the slider is at 0.6 it weighs Most Categories scoring at 60% and Each Category scoring at 40%. Setting the slider to somewhere in the middle can make sense for a league that determines regular season standings with Each Category, and does playoffs with Most Categories. 
 
@@ -255,7 +254,7 @@ The papers assume that player projections are all known and agreed upon by all t
 
 The ℶ (beth) parameter controls the influence of the adjustment. Higher values of ℶ more aggressively regress the strength of the team towards the average. It defaults to 3. An adjustment is made to the algorithm's assessment of its team's strength for any pick after the first.
 
-??? note "The math: how the adjustment is computed"
+??? note "How is the ℶ adjustment computed?"
     Say that $w$ is a vector of the algorithm's naive guess at how likely it is to win each category, before performing gradient descent to optimize a future strategy. Corrected versions are calculated as
 
     $$
@@ -274,7 +273,7 @@ The ℶ (beth) parameter controls the influence of the adjustment. Higher values
 
 The justification for this adjustment is a Bayesian model for updating expectations of team strengths, given drafting decisions made by all drafters. 
 
-??? note "The math: the Bayesian justification"
+??? note "What is the justification for the ℶ adjustment?"
     Say that there are prior expectations that 
 
     - H-scoring's estimates for how often it will win a category are unbiased, but have some Normally distributed error $\epsilon_a$. 

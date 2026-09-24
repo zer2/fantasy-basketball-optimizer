@@ -85,7 +85,7 @@ CONTRAST_PULSE = 1.18         # how far the two circles swell when the volume fa
 VOLUME_FORMULA_CENTRE = [1.85, 3.05, 0.0]
 
 LIQUID_OPACITY = 0.85
-_DATA_PATH = Path(__file__).resolve().parent.parent / 'data' / 'pool_2025_26.json'
+_DATA_PATH = Path(__file__).resolve().parent.parent / 'prepared_data' / 'pool_2025_26.json'
 
 
 def load_shooting() -> dict:

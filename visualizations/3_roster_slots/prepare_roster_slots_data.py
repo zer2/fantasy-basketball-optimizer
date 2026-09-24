@@ -2,7 +2,7 @@
 
 Run once (or whenever the season, the defaults or the chosen players change):
 
-    python visualizations/prepare_assignment_data.py
+    python visualizations/3_roster_slots/prepare_roster_slots_data.py
 
 Writes one file into this directory:
   data/assignment_<season>.json    the thirteen roster slots, five drafted players and their
@@ -70,7 +70,7 @@ DRAFTED_PLAYER_IDS = [
 ]
 
 _VISUALIZATIONS_DIR = Path(__file__).resolve().parent.parent
-_HEADSHOT_DIR = _VISUALIZATIONS_DIR / 'assets' / 'headshots'
+_HEADSHOT_DIR = _VISUALIZATIONS_DIR / 'prepared_assets' / 'headshots'
 
 
 def build_slot_labels(position_config: PositionConfig) -> tuple[list[str], list[str]]:
@@ -181,7 +181,7 @@ def main() -> None:
         # Named rather than counted: the scene cannot draw a face it does not have, and the fix is
         # either to run prepare_season_data.py or to choose a different player.
         raise SystemExit(f'No headshot for: {", ".join(missing_headshots)}. Run '
-                         f'`python visualizations/prepare_season_data.py` first, or choose '
+                         f'`python visualizations/shared/prepare_season_data.py` first, or choose '
                          f'players from the pool it writes.')
 
     # ── The two halves of the matrix, both from the shipped builders ────────────────────
@@ -241,7 +241,7 @@ def main() -> None:
           f'flex-slot guess {naive_total:.4f} '
           f'(costs {optimal_total - naive_total:.4f})')
 
-    data_path = _VISUALIZATIONS_DIR / 'data' / f'assignment_{SEASON.replace("-", "_")}.json'
+    data_path = _VISUALIZATIONS_DIR / 'prepared_data' / f'assignment_{SEASON.replace("-", "_")}.json'
     data_path.parent.mkdir(parents=True, exist_ok=True)
     data_path.write_text(json.dumps({
         'season':             SEASON,

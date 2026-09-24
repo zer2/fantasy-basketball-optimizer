@@ -18,8 +18,8 @@ of it, red is what abandoning the category gave back.
 
 The scene carries no words; see `visualizations/narration_notes.md` for what it is saying.
 
-    manim -ql visualizations/scenes/punting.py PuntingSearch
-    manim -qh visualizations/scenes/punting.py PuntingSearch
+    manim -ql visualizations/5_punting/punting.py PuntingSearch
+    manim -qh visualizations/5_punting/punting.py PuntingSearch
 """
 
 from __future__ import annotations
