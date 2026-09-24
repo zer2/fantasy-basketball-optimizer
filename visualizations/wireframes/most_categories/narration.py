@@ -40,10 +40,10 @@ NARRATION = {
         'there is no need to keep track of the precise likelihood of winning the first category and losing the second.',
     'collapse':
         'Extending the walking analogy, winning a category is like walking one level upwards, and losing '
-        'a category is walking one level down. We can just keep track of the probability of being at any particular level '
-        'at any particular time. It does not matter how we got to that level; just the probability that we got there. And '
-        'what matters is the total probability that we end up above the middle line. So we can walk forward through all '
-        'nine categories, then add up the probabilities above the middle line at the end.',
+        'a category is like walking one level down. We can just keep track of the probability of being at any particular level '
+        'at any particular time. It does not matter how we got to that level; just the probability that we got there. The '
+        'ultimate winning scenarios are those that end up above the middle line at the end, so once we have traversed '
+        'across to the end we can add those probabilities up to get the matchup win probability.',
     # -- What a category is worth ------------------------------------------------------
     'tipping':
         'This is elegant, but there is also a complication. For gradient descent, we need to calculate the slope, or gradient of all of the '
@@ -54,7 +54,7 @@ NARRATION = {
         'the probability of winning this category, how much do we increase the probability of winning a majority? There is an intuitive way '
         'to approach this question. If the other eight categories are precisely tied, then the probability of winning a majority is exactly '
         'the probability of winning this category. The gradient is exactly one. On the other hand, if the other eight categories are not tied'
-        ', then this category does not matter at all; the matchup has already been won or lost, and the gradient is zero. That means the gradient '
+        ', then this category does not matter at all, the matchup has already been won or lost, and the gradient is zero. That means the gradient '
         'is just the probability that the other categories are tied- we call this a tipping point probability. ',
     'backward':
         'To calculate the tipping point probability, all we need to do is run the walking process again, this time backwards. '
@@ -68,10 +68,13 @@ NARRATION = {
         'they offset and we are at a tipping point. So we multiply the opposing numbers to each other and add up the products.',
     'slide':
         'We can easily do this for any category. Each cut preserves all the information we need on the left and right side to know '
-        'exactly what happens to the other categories. ',
+        'exactly what happens to the other categories.',
     'punting':
-        'This gives us a mathematical way of thinking about why punting is so good in Most Categories. If we are winning five categories '
-        'decisively and losing four decisively, the tipping point probability is very high for the contested categories, since after '
-        'excluding one of them, we are at a four-four tie with the others. For the punted categories, the tipping point probability is low, '
-        'since we will usually be winning the others 5-3.',
+        'This gives us a mathematical way of thinking about why punting is so good in Most Categories. Let\'s say we are winning four categories '
+        'decisively, losing four decisively, and are average in the last. The tipping point probability is high for the average category, since '
+        'after excluding it, we are likely at a four-four tie with the others. For the other categories, the tipping point probability is low, '
+        'since after excluding it we already likely have won or lost. The key point is that for a roughly average team, average categories are '
+        'the most likely to be decisive, since the rest of the team is overall average. This establishes an extra reason for the algorithm to '
+        'abandon categories that it is weak in, in addition to the standard expected-value based justification for punting. Between the two, '
+        'the case for punting in this format is strong.',
 }

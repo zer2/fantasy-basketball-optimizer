@@ -18,7 +18,26 @@ triggered. Rewriting the line moves the phrase and its trigger together.
 
 from __future__ import annotations
 
+from manim import config
 from manim_voiceover.helper import remove_bookmarks
+
+
+def snap_to_frames(seconds: float) -> float:
+    """Round a duration to a whole number of frames, never below one.
+
+    Manim advances its clock two different ways. An animation it RENDERS moves time on by a
+    whole number of frames; one it takes from the partial-file cache moves it on by the exact
+    float run time instead. For a duration that is not already frame-aligned those disagree,
+    and the difference accumulates over a scene.
+
+    That matters here because wait_until_phrase decides whether to wait at all by comparing
+    accumulated time against a phrase's position. Sub-frame drift can flip that comparison,
+    which adds or removes a Wait, which changes how many animations the scene has -- two runs
+    of identical code produced 155 and 157, one with a beat on cue and one with it late. A
+    film should not depend on what was sitting in the cache, so every duration computed here
+    is snapped to the grid both code paths agree on.
+    """
+    return max(1, round(seconds * config.frame_rate)) / config.frame_rate
 
 
 def seconds_until_phrase(tracker, phrase: str) -> float:
@@ -63,4 +82,15 @@ def wait_until_phrase(scene, tracker, phrase: str, lead_seconds: float = 0.0) ->
     elapsed = scene.renderer.time - tracker.start_t
     remaining = seconds_until_phrase(tracker, phrase) - lead_seconds - elapsed
     if remaining > 0:
-        scene.wait(remaining)
+        # Snapped, and ALWAYS a wait when there is one to make: the animation count has to be
+        # the same on every run, or the partial-file cache and the timeline disagree forever.
+        scene.wait(snap_to_frames(remaining))
+        return
+    # Nothing to wait for means the beats before this one already ran past the phrase, so this
+    # anchor did nothing and its beat plays late by however far they overran. That is a timing
+    # bug in the beat BEFORE this one, and it used to pass in silence -- the walk's column
+    # sweep overran 'add those probabilities up' by 2.75 seconds and the answer appeared four
+    # seconds after Alistair asked for it, with nothing anywhere to say so.
+    if remaining < -0.1:
+        print(f'  LATE BEAT: "{phrase}" was reached {-remaining:.2f}s after the voice got '
+              f'there, because what runs before it overran. The anchor could not help.')
