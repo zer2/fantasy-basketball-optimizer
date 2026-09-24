@@ -6,7 +6,9 @@ import pandas as pd
 from backend.platform_integration.helpers import (
     deduplicate_team_names, build_platform_player_id_lookup,
 )
-from backend.platform_integration.integrations.fantrax import FantraxIntegration
+from backend.platform_integration.integrations.fantrax import (
+    FantraxIntegration, to_unified_fantrax_id,
+)
 from backend.platform_integration.integrations.yahoo import YahooIntegration, _pad_with_open_seats
 from backend.platform_integration.integrations.espn import ESPNIntegration
 from backend.platform_integration.base import PlatformConfig
@@ -69,41 +71,49 @@ def test_deduplicate_team_names_preserves_every_team():
 
 # ── Fantrax draft/roster fetch (mocked API + unified table) ───────────────────
 
-class _FakeFantraxAPI:
-    def __init__(self, roster_rows_by_team: dict):
-        self._roster_rows_by_team = roster_rows_by_team
-
-    def _request(self, method: str, **kwargs):
-        if method == 'getTeamRosterInfo':
-            return {'tables': [{'rows': self._roster_rows_by_team[kwargs['teamId']]}]}
-        raise AssertionError(f'unexpected _request method {method!r}')
+def _fake_beta_api(rosters_by_team: dict):
+    """Stands in for the Beta API's getTeamRosters, whose shape is
+    {'rosters': {team_id: {'teamName', 'rosterItems'}}}."""
+    def fetch(endpoint: str, league_id: str, **params):
+        if endpoint == 'getTeamRosters':
+            return {'rosters': {team_id: {'teamName': team_id, 'rosterItems': items}
+                                for team_id, items in rosters_by_team.items()}}
+        raise AssertionError(f'unexpected Beta API endpoint {endpoint!r}')
+    return fetch
 
 
 # Prebuilt platform-key -> player-id lookup (the integration consumes this; the
 # builder that produces it is exercised separately above).
+# Keyed the way UNIFIED_PLAYER_TABLE.FANTRAX_ID actually spells a Fantrax id -- wrapped in
+# asterisks. The Beta API sends the bare id, and the integration wraps it to match; keying this
+# on bare ids would have passed while production matched nothing.
 _PLAYER_ID_LOOKUP = {
-    'j01': _JOKIC_ID,
-    'b02': _ADEBAYO_ID,
-    'h03': _HARDEN_ID,
+    '*j01*': _JOKIC_ID,
+    '*b02*': _ADEBAYO_ID,
+    '*h03*': _HARDEN_ID,
 }
+
+
+def test_to_unified_fantrax_id_wraps_bare_ids_only():
+    assert to_unified_fantrax_id('03e75') == '*03e75*'
+    assert to_unified_fantrax_id('*03e75*') == '*03e75*'   # never double-wrapped
 
 
 def _fantrax_with_fake_api(monkeypatch, roster_rows_by_team) -> FantraxIntegration:
     integration = FantraxIntegration()
-    fake = _FakeFantraxAPI(roster_rows_by_team)
-    monkeypatch.setattr(integration, '_make_api', lambda league_id: fake)
+    monkeypatch.setattr(integration, 'fetch_from_beta_api', _fake_beta_api(roster_rows_by_team))
     return integration
 
 
 def test_get_draft_results_maps_ids_and_excludes_injured_in_season(monkeypatch):
     roster_rows = {
         't1': [
-            {'scorer': {'scorerId': 'j01'}, 'statusId': '1'},
-            {'scorer': {'scorerId': 'b02'}, 'statusId': '3'},   # injured reserve
-            {'no_scorer': True},                                 # skipped (no 'scorer')
+            {'scorerId': 'j01', 'status': 'ACTIVE'},
+            {'scorerId': 'b02', 'status': 'IR'},                # injured reserve
+            {'emptySlot': True},                                # skipped (no player id)
         ],
         't2': [
-            {'scorer': {'scorerId': 'h03'}, 'statusId': '1'},
+            {'scorerId': 'h03', 'status': 'ACTIVE'},
         ],
     }
     integration = _fantrax_with_fake_api(monkeypatch, roster_rows)
@@ -123,7 +133,7 @@ def test_get_draft_results_maps_ids_and_excludes_injured_in_season(monkeypatch):
 
 
 def test_get_draft_results_keeps_injured_in_draft_mode(monkeypatch):
-    roster_rows = {'t1': [{'scorer': {'scorerId': 'b02'}, 'statusId': '3'}]}
+    roster_rows = {'t1': [{'scorerId': 'b02', 'status': 'IR'}]}
     integration = _fantrax_with_fake_api(monkeypatch, roster_rows)
     config = PlatformConfig(
         platform='Retrieve from Fantrax', league_id='LID', division_id=None,
