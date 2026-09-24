@@ -19,7 +19,11 @@ import sys
 from pathlib import Path
 
 _VISUALIZATIONS = Path(__file__).resolve().parent.parent
-_CACHE_FILE = _VISUALIZATIONS / 'media' / 'voiceovers' / 'cache.json'
+# Where manim-voiceover keeps what has been bought. It derives this as media_dir/voiceovers, and
+# manim.cfg points media_dir at render_cache, so the two have to agree -- this path was left
+# behind at the old media/ name once and reported every line as unpaid, which is the most
+# alarming thing this script can say and it was not true.
+_CACHE_FILE = _VISUALIZATIONS / 'render_cache' / 'voiceovers' / 'cache.json'
 
 # What the plan allows per month. Not enforced anywhere -- it is here so the report can say how
 # much of the month a render would take, which is the number a decision is actually made on.
@@ -27,9 +31,18 @@ MONTHLY_CHARACTER_ALLOWANCE = 40_000
 
 
 def cached_lines() -> set[str]:
-    """Every line the paid voice has already spoken, as normalised text."""
+    """Every line the paid voice has already spoken, as normalised text.
+
+    A missing cache file raises rather than reading as an empty cache. The two are indistinguishable
+    in the report -- both say every line must be bought -- but they mean opposite things: one is a
+    set that has genuinely never been rendered, the other is this script looking in the wrong place
+    while the narration sits paid for somewhere else.
+    """
     if not _CACHE_FILE.exists():
-        return set()
+        raise FileNotFoundError(
+            f'No narration cache at {_CACHE_FILE}. If narration really has never been bought, '
+            f'this file appears on the first render; if it has, this path is wrong and the report '
+            f'below would claim a full-price render for lines that are already paid for.')
     return {
         ' '.join(entry['input_text'].split())
         for entry in json.loads(_CACHE_FILE.read_text(encoding='utf-8'))

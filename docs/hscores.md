@@ -37,7 +37,7 @@ While the spinner is up, the algorithm is iterating, attempting to repeatedly im
 A simple demonstration of the algorithm using gradient ascent to optimize two input parameters, which are weights for two categories
 ///
 
-Gradient descent is possible whenever the underlying function that is being optimized has a defined slope (or gradient). The H-scoring function is defined in such a way that all of its constituent functions have gradients, which can be composted together. 
+Gradient descent is possible whenever the underlying function that is being optimized has a defined slope (or gradient). The H-scoring function is defined in such a way that all of its constituent functions have gradients, which can be composed together. 
 
 ??? note "How exactly does the algorithm use gradient descent?"
 

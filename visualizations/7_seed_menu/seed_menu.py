@@ -16,7 +16,7 @@ from manim_voiceover import VoiceoverScene
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from shared.weight_surface_base import (                              # noqa: E402
-    WeightSurfaceScene, CAMERA_DRIFT,
+    WeightSurfaceScene, CAMERA_DRIFT, READOUT_PURPLE,
 )
 
 # The axes alone, before a word is said. Everything drawn before the first line is silence, so
@@ -88,14 +88,20 @@ class SeedMenu(VoiceoverScene, WeightSurfaceScene):
         chosen = max(range(len(climbs)), key=lambda index: climbs[index]['start_score'])
         with self.voiceover(text=NARRATION['the_choice']):
             self.play(balls[chosen].animate.set_color(PURPLE_A),
-                      scores[chosen].animate.set_color(PURPLE_A), run_time=0.8)
+                      scores[chosen].animate.set_color(READOUT_PURPLE), run_time=0.8)
             self.wait(1.0)
             self.play(*[FadeOut(score) for score in scores], run_time=0.6)
 
         # The one descent that is actually run. The other two starts stay on screen, unmoved.
         with self.voiceover(text=NARRATION['the_descent']):
             self.play_climb(axes, climbs[chosen], PURPLE_A)
+            # Beside the arrival rather than over or under it. This climb finishes on the higher
+            # of the two summits, up in the corner the caption occupies, with its own trail
+            # sweeping back underneath -- so neither of the usual places is free and the readout
+            # goes into the open ground to its right.
             self.play(FadeIn(self.write_score(axes, climbs[chosen]['path'][-1],
-                                              climbs[chosen]['score'], PURPLE_A)), run_time=0.8)
+                                              climbs[chosen]['score'], READOUT_PURPLE,
+                                              clear_by=0.38, sideways=0.60)),
+                      run_time=0.8)
             self.wait(2.0)
         self.stop_ambient_camera_rotation()
