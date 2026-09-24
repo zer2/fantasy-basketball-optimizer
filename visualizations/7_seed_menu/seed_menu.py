@@ -11,7 +11,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from manim import Create, FadeIn, FadeOut, WHITE, YELLOW
+from manim import Create, FadeIn, FadeOut, WHITE, PURPLE_A
 from manim_voiceover import VoiceoverScene
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -87,15 +87,15 @@ class SeedMenu(VoiceoverScene, WeightSurfaceScene):
         # The choice: the best seed where it stands, which is all the algorithm looks at.
         chosen = max(range(len(climbs)), key=lambda index: climbs[index]['start_score'])
         with self.voiceover(text=NARRATION['the_choice']):
-            self.play(balls[chosen].animate.set_color(YELLOW),
-                      scores[chosen].animate.set_color(YELLOW), run_time=0.8)
+            self.play(balls[chosen].animate.set_color(PURPLE_A),
+                      scores[chosen].animate.set_color(PURPLE_A), run_time=0.8)
             self.wait(1.0)
             self.play(*[FadeOut(score) for score in scores], run_time=0.6)
 
         # The one descent that is actually run. The other two starts stay on screen, unmoved.
         with self.voiceover(text=NARRATION['the_descent']):
-            self.play_climb(axes, climbs[chosen], YELLOW)
+            self.play_climb(axes, climbs[chosen], PURPLE_A)
             self.play(FadeIn(self.write_score(axes, climbs[chosen]['path'][-1],
-                                              climbs[chosen]['score'], YELLOW)), run_time=0.8)
+                                              climbs[chosen]['score'], PURPLE_A)), run_time=0.8)
             self.wait(2.0)
         self.stop_ambient_camera_rotation()

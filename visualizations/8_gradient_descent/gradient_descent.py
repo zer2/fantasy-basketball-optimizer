@@ -11,7 +11,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from manim import FadeIn, WHITE, YELLOW
+from manim import FadeIn, WHITE, PURPLE_A
 from manim_voiceover import VoiceoverScene
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -47,10 +47,10 @@ class GradientDescent(VoiceoverScene, WeightSurfaceScene):
             self.wait(1.0)
 
         with self.voiceover(text=NARRATION['the_climb']):
-            self.play_climb(axes, climb, YELLOW)
+            self.play_climb(axes, climb, PURPLE_A)
 
         with self.voiceover(text=NARRATION['the_top']):
-            self.play(FadeIn(self.write_score(axes, climb['path'][-1], climb['score'], YELLOW)),
+            self.play(FadeIn(self.write_score(axes, climb['path'][-1], climb['score'], PURPLE_A)),
                       run_time=0.8)
             self.wait(2.4)
         self.stop_ambient_camera_rotation()
