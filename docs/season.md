@@ -43,11 +43,8 @@ A G-score table is also provided, which shows the net changes in G-scores for bo
 This view is available even if the trade is impermissible by position structure. 
 
 Only trades with the same number of players sent and received can be analyzed. 
-
-??? note "Why can only symmetrical trades be analyzed?"
-    In theory asymmetric trades could be analyzed. The post-trade team that goes down in number of players could be scored with the normal H-scoring algorithm, which chooses one candidate from the pool of available players and generates a future draft strategy if needed. The post-trade team that goes up in players could be scored by checking every possible set of players that could be dropped and finding the option that maximizes H-score.
-
-    However, this process is very sensitive to the conditions of the available player pool. For example, if a player has been dropped by another team because he is unlikely to play in the near future, he could still be considered as an addition for the team that drops players. The trade would then look artificially good because H-scoring would jump on that player's optimistic projection. Practically, this makes it difficult to analyze asymmetric trades robustly. For the sake of simplicity the option has been removed. 
+    
+In theory asymmetric trades could be analyzed. The team getting bigger could be scored by checking every possible set of players that could be dropped and finding the option that maximizes H-score. The team getting smaller could be scored with the normal H-scoring algorithm, which chooses one candidate from the pool of available players and generates a future draft strategy if needed. However, this process is very sensitive to the conditions of the available player pool. If an injured player has been dropped by another team, they could still be considered as a potential addition. The trade would then look artificially good because H-scoring would jump on that player's optimistic projection. Practically, this makes it difficult to analyze asymmetric trades robustly. For the sake of simplicity the option has been removed. 
 
 ### Trade suggestions 
 

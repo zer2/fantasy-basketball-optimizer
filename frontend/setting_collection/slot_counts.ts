@@ -160,6 +160,42 @@ export function isSlotCountsValid(): boolean {
 }
 
 /**
+ * Applies the default position structure parameters.yaml defines for `nPicks`, if it defines
+ * one, and revalidates either way.
+ *
+ * The structures are keyed by pick count (13, 14, 15, 16 for the NBA) and each sums to its own
+ * key, so selecting the right one satisfies the slot-total validation by construction.
+ * renderSlotCounts only ever reads the entry for the n_picks DEFAULT, so a league with some
+ * other pick count kept the default 13-slot structure however many spots it really had --
+ * connecting a 16-spot league left the algorithm optimising for a roster shape the league does
+ * not use.
+ *
+ * Returns false when no structure is defined for that pick count. That is not an error: the
+ * slots are left alone and the validation message states the mismatch, which is the honest
+ * outcome for a league the parameters file has no opinion about.
+ */
+export function applySlotDefaultsForPicks(nPicks: number): boolean {
+    const config = getSportConfig()
+    if (!config) throw new Error('Sport config not loaded')
+    const posEntry = config.positions[String(nPicks)]
+    if (posEntry) {
+        const defaults: Record<string, number> = { ...posEntry.base, ...posEntry.flex }
+        const positions = [...config.position_structure.base_list, ...config.position_structure.flex_list]
+        for (const pos of positions) {
+            const input = document.getElementById(`sc-${pos.toLowerCase()}`) as HTMLInputElement | null
+            if (!input) throw new Error(`Slot count input sc-${pos.toLowerCase()} not found`)
+            const count = defaults[pos] ?? 0
+            input.value = String(count)
+            // Saved too, or the next render reads the stale preference back over this.
+            savePref(`slot_${pos}`, count)
+        }
+    }
+    revalidateSlotCounts()
+    return posEntry !== undefined
+}
+
+
+/**
  * Re-runs the slot count validation against the current n_picks value.
  * Call this when n_picks changes in League Settings so the error stays in sync.
  */

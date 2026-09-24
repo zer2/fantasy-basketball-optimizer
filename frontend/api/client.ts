@@ -92,6 +92,23 @@ async function jsonRequest<T>(
 
 // ── Map backend Candidate → frontend PlayerResult ─────────────────────────────
 
+/** The id the backend gives the single team-score row a FULL-roster evaluate returns
+ *  (backend/player_identity.py). It is deliberately not a player and has no registry entry,
+ *  so it must never reach the rendering layer: every display path resolves a player id
+ *  through the session registry, which throws on an id it does not hold. A drafting team
+ *  that fills its last slot produced exactly that -- "Player id 0 is not in the session
+ *  registry" -- because this adapter passed the row straight through.
+ *
+ *  Its scores are still worth showing; readFullRosterScore below hands them to callers that
+ *  want them, rather than the row being silently dropped. */
+export const FULL_ROSTER_SCORE_PLAYER_ID = 0
+
+/** The team H-score from a full-roster evaluate, or null when the response ranks players. */
+export function readFullRosterScore(candidates: any[]): number | null {
+    const row = candidates.find(c => c.player_id === FULL_ROSTER_SCORE_PLAYER_ID)
+    return row ? row.h_score : null
+}
+
 
 // Adapter between backend snake_case Candidate objects and frontend PlayerResult objects.
 // The backend follows Python naming conventions; this is the single place where that translation
@@ -99,7 +116,9 @@ async function jsonRequest<T>(
 // rendering layer via the session registry.
 /** Converts raw backend Candidate objects to frontend PlayerResult objects, remapping snake_case keys to camelCase. */
 export function candidatesToPlayerResults(candidates: any[]): PlayerResult[] {
-    return candidates.filter(c => c.h_score != null).map((c, i) => ({
+    return candidates
+        .filter(c => c.h_score != null && c.player_id !== FULL_ROSTER_SCORE_PLAYER_ID)
+        .map((c, i) => ({
         player_id:        c.player_id,
         h_score:          c.h_score,
         h_rank:           c.h_rank,

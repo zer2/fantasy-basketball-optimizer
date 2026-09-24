@@ -24,16 +24,15 @@ For some reason, Yahoo's API does not return anything for auctions until a few m
 
 The concept of estimating player values for auctions is not new. A well known heuristic is described in many places including [this article from rotowire](https://www.rotowire.com/basketball/article/nba-auction-strategy-part-2-21393). It converts player strength quantified by something like Z-score into an equivalent dollar value, and it is the basis for evaluating players in the auction context. 
 
-??? note "What is the standard auction heuristic?"
-    The standard method for estimating auction value is
+The standard method for estimating auction value is
 
-    1. Calculate the replacement-level score. That is, if 156 players will be chosen, the 157th-highest score is the replacement value
-    2. Adjust all scores by subtracting out the replacement-level value. If this would make a score go below zero, set it to zero instead
-    3. Calculate the sum of scores above replacement. This is the total amount of real value available in the auction
-    4. Divide the total number of dollars available by the total amount of real value available. This yields a conversion rate from score above replacement to dollars
-    5. Multiply each players' score above replacement with the conversion rate calculated in the previous step. The result is each players' auction value
+1. Calculate the replacement-level score. That is, if 156 players will be chosen, the 157th-highest score is the replacement value
+2. Adjust all scores by subtracting out the replacement-level value. If this would make a score go below zero, set it to zero instead
+3. Calculate the sum of scores above replacement. This is the total amount of real value available in the auction
+4. Divide the total number of dollars available by the total amount of real value available. This yields a conversion rate from score above replacement to dollars
+5. Multiply each players' score above replacement with the conversion rate calculated in the previous step. The result is each players' auction value
 
-    This process ensures both that players' dollar values are proportional to their values over replacement, and that the total of all players' dollar values are equal to the total amount of $ available. 
+This process ensures both that players' dollar values are proportional to their values over replacement, and that the total of all players' dollar values are equal to the total amount of $ available. 
 
 The website uses a few different variations of this idea. Five different dollar value estimates can be found within players' detailed drop-downs. 
 
@@ -82,9 +81,18 @@ After the previously described processing for H-score and G-score dollar values,
 
 SAVOR stands for Streaming-Adjusted Value Over Replacement. It adjusts for the fact that the lowest-ranking players are highly likely to be shuffled around over the course of the season through waiver wires and free agency, so it is not worth spending much money on them, even if theoretically they are projected to be somewhat more valuable than their alternatives. The general concept is known within the fantasy basketball community- for example it is referenced in this [reddit thread](https://www.reddit.com/r/fantasybball/comments/16se6gt/auction_draft_observationsdata/). Low-value players are likely to be shifted around after snake drafts too, but there is no reason to actually make the SAVOR adjustment in the snake drafting context, because it is a monotonic transformation that would never influence candidate order. That is why it is unique to the auction context. 
 
+<video controls preload="metadata" width="100%" poster="../videos/savor-poster.jpg">
+    <source src="../videos/savor.mp4" type="video/mp4">
+</video>
+/// caption
+Why value concentrates at the top of an auction: a player's season is a distribution rather than
+a single number, and anyone below replacement level can be swapped out from the waiver wire, so
+the downside is capped and the upside is not
+///
+
 SAVOR takes an input parameter, $S_{\sigma}$ (S-sigma). It controls the degree to which players are expected to move up and down in dollar value across the season according to the SAVOR model. Its default value of 10 is sourced by vibes- different values may be just as or more reasonable. 
 
-??? note "The theoretical framework behind the SAVOR calculation"
+??? note "What is the theoretical framework behind the SAVOR calculation?"
 
     Details of the SAVOR adjustment are included in the appendix of [an old version of the first paper](https://arxiv.org/abs/2307.02188v4). It was removed from the most recent version because it was not topical to the main point of the paper. 
 

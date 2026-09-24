@@ -16,7 +16,21 @@ The team table shows the G-scores of players already chosen for a team, and thei
 
 Fantasy basketball's standard way of quantifying player value across categories is the Z-score: a player's projected value in a category, minus the average across the player pool, divided by the pool's standard deviation. Ranking players by their total Z-score across categories is the traditional 'static' approach.
 
-G-scores are a refinement. Z-scores implicitly assume every player performs at exactly their long-term average, but in reality performances vary week to week, and that extra uncertainty makes categories harder to win or lose decisively. G-scores account for it by widening the standard deviation to include week-to-week variance on top of player-to-player variance, which down-weights categories where performances are noisier. The full derivation of why this is the right adjustment is covered in the paper. 
+<video controls preload="metadata" width="100%" poster="../videos/z-scores-poster.jpg">
+  <source src="../videos/z-scores.mp4" type="video/mp4">
+</video>
+/// caption
+A justification of Z-scores, based on the paper. Z-scores are definitely not perfect but they do have a real logical basis
+///
+
+G-scores are a refinement. Z-scores implicitly assume every player performs at exactly their long-term average, but in reality performances vary week to week, and that extra uncertainty makes categories harder to win or lose decisively. G-scores account for it by widening the standard deviation to include week-to-week variance on top of player-to-player variance, which down-weights categories where performances are noisier. 
+
+<video controls preload="metadata" width="100%" poster="../videos/g-scores-poster.jpg">
+  <source src="../videos/g-scores.mp4" type="video/mp4">
+</video>
+/// caption
+An explanation of the G-score adjustment to Z-scores, which accounts for week-to-week variance. Also based on the paper
+///
 
 ## Calculation logic 
 

@@ -363,6 +363,16 @@ const STATES = {
         }
         await waitEval(page)
     },
+    // Team 2 is the default counterparty and has no qualifying 1-for-1 trade with Team 1, so
+    // the suggestions pane rendered its "No promising trades found." stub and the shot shipped
+    // empty. Team 3 has three. The wait is on a table ROW, not on the pane: the pane exists
+    // either way, which is exactly why the empty capture went unnoticed.
+    async 'season-suggestions'(page) {
+        await ensure(page, 'season-trading')
+        await setSelect(page, 'trade-their-team', 'Team 3')
+        await page.locator('[data-testid="trade-suggestions"] table tbody tr').first()
+            .waitFor({ timeout: 20000 })
+    },
     async 'season-trade-g'(page)  { await ensure(page, 'season-trade'); await page.locator('.trade-tab-btn', { hasText: /G-score/i }).click(); await page.waitForTimeout(150) },
     async 'season-rosters'(page)  { await setMode(page, 'Season Mode'); await selectHistoricalSeason(page, '2025-26'); await page.locator('.season-tab-btn[data-tab="rosters"]').click() },
     async 'season-roster-insp'(page) {
@@ -536,7 +546,7 @@ const SHOTS = [
     { name: 'hwaiverexp',       state: 'season-waiver-exp', selector: '[data-testid="gscore-expectations-table"]' },
     { name: 'tradeanalysis',    state: 'season-trade',      selector: '[data-testid="trade-hscore-pane"]' },
     { name: 'tradeanalysisg',   state: 'season-trade-g',    selector: '[data-testid="trade-gscore-pane"]' },
-    { name: 'tradesuggestions', state: 'season-trading',    selector: '[data-testid="trade-suggestions"]' },
+    { name: 'tradesuggestions', state: 'season-suggestions', selector: '[data-testid="trade-suggestions"]' },
     { name: 'rosters',          state: 'season-rosters',    selector: '#rosters-left' },
     { name: 'rosterinspection', state: 'season-roster-insp', selector: '[data-testid="roster-inspection-gscore"]' },
     { name: 'rosterh',          state: 'season-roster-insp', selector: '[data-testid="roster-inspection-hscore"]' },
