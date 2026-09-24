@@ -11,6 +11,7 @@ import { makeConnectors, connectorPlatforms } from '../platforms/registry.js'
 import { PlatformConnector, ConnectStatus } from '../platforms/connector.js'
 import { isSignedIn, makeSignInPrompt } from '../api/auth.js'
 import { defaultTeamLabel } from '../data_entry/team_labels.js'
+import { applySlotDefaultsForPicks } from './slot_counts.js'
 
 const DRAFT_MODE_OPTIONS = ['Draft Mode', 'Auction Mode', 'Season Mode'] as const
 export type DraftMode = typeof DRAFT_MODE_OPTIONS[number]
@@ -342,6 +343,11 @@ export function renderLeagueSettings(container: HTMLElement): void {
                 // the hidden textarea's input event (main.ts repopulates it).
                 nDraftersInput.value = String(resp.n_drafters)
                 nPicksInput.value    = String(resp.n_picks)
+                // Setting .value fires no change event, so neither the position structure nor
+                // its validation followed the league's own pick count: a 16-spot league sat on
+                // the default 13-slot structure with nothing on screen to say so, and the
+                // evaluate went ahead optimising for a roster shape the league does not use.
+                applySlotDefaultsForPicks(resp.n_picks)
                 hiddenNamesTextarea.value = resp.team_names.join('\n')
                 hiddenNamesTextarea.dispatchEvent(new Event('input', { bubbles: true }))
                 // Enables the live-layout Refresh Analysis button, for as long as the controls
