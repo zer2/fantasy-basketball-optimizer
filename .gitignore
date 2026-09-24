@@ -99,3 +99,10 @@ visualizations/media/texts/
 # (manim writes the moov atom last, which stops a browser seeking a streamed file).
 docs/videos/*.mp4
 docs/videos/*-poster.jpg
+
+# Circular headshots built by visualizations/shared/prepare_season_data.py from the app's
+# .cache/headshots. Build output: 161 PNGs that dominate any diff of this branch. Rebuilding
+# them needs the app run once against the season so the cache fills from cdn.nba.com -- so
+# unlike the scenes, the inputs are NOT all in the repo. Accepted deliberately: if that source
+# ever stops serving them the headshots need a new source regardless of what git holds.
+visualizations/assets/
