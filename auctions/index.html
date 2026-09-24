@@ -686,8 +686,6 @@
 <p>For some reason, Yahoo's API does not return anything for auctions until a few minutes after the auction has started. Because of that, the displayed values may be the default values for the first few picks. Besides that, the integration works much the same way as for drafting mode. </p>
 <h2 id="quantifying-auction-value">Quantifying auction value</h2>
 <p>The concept of estimating player values for auctions is not new. A well known heuristic is described in many places including <a href="https://www.rotowire.com/basketball/article/nba-auction-strategy-part-2-21393">this article from rotowire</a>. It converts player strength quantified by something like Z-score into an equivalent dollar value, and it is the basis for evaluating players in the auction context. </p>
-<details class="note">
-<summary>What is the standard auction heuristic?</summary>
 <p>The standard method for estimating auction value is</p>
 <ol>
 <li>Calculate the replacement-level score. That is, if 156 players will be chosen, the 157th-highest score is the replacement value</li>
@@ -697,7 +695,6 @@
 <li>Multiply each players' score above replacement with the conversion rate calculated in the previous step. The result is each players' auction value</li>
 </ol>
 <p>This process ensures both that players' dollar values are proportional to their values over replacement, and that the total of all players' dollar values are equal to the total amount of $ available. </p>
-</details>
 <p>The website uses a few different variations of this idea. Five different dollar value estimates can be found within players' detailed drop-downs. </p>
 <figure>
 <p><img alt="Auction candidate detail drop-down" src="../img/auctiondetail.png" /></p>
@@ -731,9 +728,19 @@
 <h3 id="the-savor-adjustment">The SAVOR adjustment</h3>
 <p>After the previously described processing for H-score and G-score dollar values, the website makes an additional adjustment called SAVOR. It is reflected in all of the displayed dollar values. </p>
 <p>SAVOR stands for Streaming-Adjusted Value Over Replacement. It adjusts for the fact that the lowest-ranking players are highly likely to be shuffled around over the course of the season through waiver wires and free agency, so it is not worth spending much money on them, even if theoretically they are projected to be somewhat more valuable than their alternatives. The general concept is known within the fantasy basketball community- for example it is referenced in this <a href="https://www.reddit.com/r/fantasybball/comments/16se6gt/auction_draft_observationsdata/">reddit thread</a>. Low-value players are likely to be shifted around after snake drafts too, but there is no reason to actually make the SAVOR adjustment in the snake drafting context, because it is a monotonic transformation that would never influence candidate order. That is why it is unique to the auction context. </p>
+<figure>
+<video controls preload="metadata" width="100%" poster="../videos/savor-poster.jpg">
+    <source src="../videos/savor.mp4" type="video/mp4">
+</video>
+<figcaption>
+<p>Why value concentrates at the top of an auction: a player's season is a distribution rather than
+a single number, and anyone below replacement level can be swapped out from the waiver wire, so
+the downside is capped and the upside is not</p>
+</figcaption>
+</figure>
 <p>SAVOR takes an input parameter, <span class="arithmatex">\(S_{\sigma}\)</span> (S-sigma). It controls the degree to which players are expected to move up and down in dollar value across the season according to the SAVOR model. Its default value of 10 is sourced by vibes- different values may be just as or more reasonable. </p>
 <details class="note">
-<summary>The theoretical framework behind the SAVOR calculation</summary>
+<summary>What is the theoretical framework behind the SAVOR calculation?</summary>
 <p>Details of the SAVOR adjustment are included in the appendix of <a href="https://arxiv.org/abs/2307.02188v4">an old version of the first paper</a>. It was removed from the most recent version because it was not topical to the main point of the paper. </p>
 <p>The first foundational idea is to model observations of player values as noisy estimates, which are resolved once the season begins. If a player is projected to be valuable before the draft but ends up being below replacement-level during the season, they will be replaced by a replacement-level player. </p>
 <p>The second foundational idea is that value during an auction is relative to a player that could be picked up at the end for essentially no cost. These players are not useless- it is possible that they could end up being more valuable than projected, and turn into a meaningful asset. </p>
