@@ -94,9 +94,8 @@ The table above is based on the same dataset as the Each Category version, with 
     <source src="../videos/most-categories.mp4" type="video/mp4">
 </video>
 /// caption
-How the Most Categories objective is calculated, and why it rewards punting: one walk over the
-categories instead of every scenario separately, cut and reassembled to get each category's
-tipping point probability -- the chance that it is the one that decides the matchup
+An exploration of how to compute the Most Categories objective, and how the underlying 
+mathematical structure incentivizes aggressive punting in the format
 ///
 
 The Head to Head formats can be blended together through the sidebar because they are comparable, and for some leagues, it might make sense to optimize for both at the same time. When the slider is at zero H-scoring optimizes for purely Each Category scoring. If the EC/MC slider is moved all the way to one, it optimizes for purely Most Categories scoring. If the slider is somewhere in between, H-scoring computes and optimizes for both objectives, with weight on Most Categories based on the value of the slider. For example if the slider is at 0.6 it weighs Most Categories scoring at 60% and Each Category scoring at 40%. Setting the slider to somewhere in the middle can make sense for a league that determines regular season standings with Each Category, and does playoffs with Most Categories. 
@@ -255,7 +254,7 @@ The papers assume that player projections are all known and agreed upon by all t
 
 The ℶ (beth) parameter controls the influence of the adjustment. Higher values of ℶ more aggressively regress the strength of the team towards the average. It defaults to 3. An adjustment is made to the algorithm's assessment of its team's strength for any pick after the first.
 
-??? note "The math: how the adjustment is computed"
+??? note "How is the ℶ adjustment computed?"
     Say that $w$ is a vector of the algorithm's naive guess at how likely it is to win each category, before performing gradient descent to optimize a future strategy. Corrected versions are calculated as
 
     $$
@@ -274,7 +273,7 @@ The ℶ (beth) parameter controls the influence of the adjustment. Higher values
 
 The justification for this adjustment is a Bayesian model for updating expectations of team strengths, given drafting decisions made by all drafters. 
 
-??? note "The math: the Bayesian justification"
+??? note "What is the justification for the ℶ adjustment?"
     Say that there are prior expectations that 
 
     - H-scoring's estimates for how often it will win a category are unbiased, but have some Normally distributed error $\epsilon_a$. 
