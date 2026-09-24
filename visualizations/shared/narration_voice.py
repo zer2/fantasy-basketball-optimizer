@@ -18,7 +18,7 @@ API needs. Measured: a library voice id synthesises without being added to the a
     self.set_speech_service(NarrationVoice())
 
 THE CACHE IS MONEY. This voice is billed per character against a monthly allowance, and the
-cache under media/voiceovers is what stops a line being paid for twice. Deleting it re-buys
+cache under render_cache/voiceovers is what stops a line being paid for twice. Deleting it re-buys
 every line in the set; the cache is also gitignored, so nothing restores it. Before rendering,
 `python visualizations/shared/narration_budget.py` says what a render would spend and what is
 already paid for. Editing a line by one word makes it a new line, at full price.

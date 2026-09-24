@@ -65,7 +65,7 @@ INTENSITY_CAP           = 110   # where the app's ramp stops getting stronger
 # the narration does, instead of speeding up and slowing down beat by beat.
 PASS_NARRATION_KEYS = ('early_passes', 're_estimation', 'late_passes')
 
-_DATA_PATH = Path(__file__).resolve().parent.parent / 'data' / 'self_play.json'
+_DATA_PATH = Path(__file__).resolve().parent.parent / 'prepared_data' / 'self_play.json'
 
 
 def load_measurements() -> dict:

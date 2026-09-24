@@ -637,7 +637,7 @@ def without_working(climbs):
 
 
 def write_measurements(filename: str, payload: dict) -> None:
-    data_path = _VISUALIZATIONS_DIR / 'data' / filename
+    data_path = _VISUALIZATIONS_DIR / 'prepared_data' / filename
     data_path.parent.mkdir(parents=True, exist_ok=True)
     data_path.write_text(json.dumps(payload), encoding='utf-8')
     print(f'Wrote {data_path.relative_to(_VISUALIZATIONS_DIR.parent)}')

@@ -7,7 +7,7 @@ since it is what makes a category something you can be favoured or unfavoured to
 than a number you simply accumulate.
 
 Everything shown is real: 2025-26 per-game scoring for the 156 players a twelve-team league
-drafts, chosen by G-score. Run `python visualizations/prepare_season_data.py` to build the data
+drafts, chosen by G-score. Run `python visualizations/shared/prepare_season_data.py` to build the data
 and headshots this reads; the draws are seeded there, so a re-render reproduces the same video.
 
 Every player contributes the same number in every simulation here -- their season average. The
@@ -16,8 +16,8 @@ that average is hiding.
 
 Render one act while tuning it, the whole thing when it is right:
 
-    manim -ql visualizations/scenes/team_differential.py ActOneSingleDraw
-    manim -qh visualizations/scenes/team_differential.py TeamDifferentialFull
+    manim -ql visualizations/1_z_score/z_score.py ActOneSingleDraw
+    manim -qh visualizations/1_z_score/z_score.py TeamDifferentialFull
 """
 
 from __future__ import annotations

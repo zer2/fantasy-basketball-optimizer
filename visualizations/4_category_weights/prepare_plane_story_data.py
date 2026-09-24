@@ -15,7 +15,7 @@ setup rather than the answer, and the frame is worth more to the answer.
 The images are written here rather than drawn in the scene because a smooth field is an image,
 not ten thousand mobjects: Manim would spend the whole render on it and still band.
 
-    python visualizations/prepare_plane_story_data.py
+    python visualizations/4_category_weights/prepare_plane_story_data.py
 """
 
 from __future__ import annotations
@@ -49,7 +49,7 @@ NEUTRAL_COLOUR = (255, 214, 80)
 ALTERNATIVE_COLOUR = (110, 170, 255)
 
 _VISUALIZATIONS_DIR = Path(__file__).resolve().parent.parent
-_IMAGE_DIR = _VISUALIZATIONS_DIR / 'assets' / 'plane_story'
+_IMAGE_DIR = _VISUALIZATIONS_DIR / 'prepared_assets' / 'plane_story'
 _CORRELATION_PATH = (_VISUALIZATIONS_DIR.parent / 'coefficient_exploration_output'
                      / 'correlations_2024-25.csv')
 
@@ -217,7 +217,7 @@ def main() -> None:
             - np.array(summary['neutral']['pick_mean']))
     print(f'tilt (alternative minus neutral) {tilt.round(3).tolist()}')
 
-    data_path = _VISUALIZATIONS_DIR / 'data' / 'plane_story.json'
+    data_path = _VISUALIZATIONS_DIR / 'prepared_data' / 'plane_story.json'
     data_path.parent.mkdir(parents=True, exist_ok=True)
     data_path.write_text(json.dumps({
         'categories':        CATEGORIES,

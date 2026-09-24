@@ -66,15 +66,15 @@ TEAM_LIGHT_COLOURS = (BLUE_B, RED_B)
 # so the tie is broken by what can be said.
 TEAM_LABELS        = ('Team 1', 'Team 2')
 
-_DATA_DIR     = Path(__file__).resolve().parent.parent / 'data'
-_HEADSHOT_DIR = Path(__file__).resolve().parent.parent / 'assets' / 'headshots'
+_DATA_DIR     = Path(__file__).resolve().parent.parent / 'prepared_data'
+_HEADSHOT_DIR = Path(__file__).resolve().parent.parent / 'prepared_assets' / 'headshots'
 
 
 def load_prepared_data(data_path: Path) -> dict:
     """The pool and the precomputed draws written by prepare_season_data.py."""
     if not data_path.exists():
         raise FileNotFoundError(
-            f'{data_path} is missing. Run `python visualizations/prepare_season_data.py` '
+            f'{data_path} is missing. Run `python visualizations/shared/prepare_season_data.py` '
             f'first -- the scenes deliberately do no data fetching of their own.')
     prepared = json.loads(data_path.read_text(encoding='utf-8'))
     prepared['rosters'] = np.array(prepared['simulation_rosters'])

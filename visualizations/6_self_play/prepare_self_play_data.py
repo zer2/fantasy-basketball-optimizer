@@ -25,7 +25,7 @@ Nothing here models anything. An earlier version of this script simulated a twel
 was thrown away: it converged in a single pass, which said more about the toy than about the
 algorithm.
 
-    python visualizations/prepare_self_play_data.py
+    python visualizations/6_self_play/prepare_self_play_data.py
 """
 
 from __future__ import annotations
@@ -205,7 +205,7 @@ def main() -> None:
     print(f'row 1 at the start: {session.player_registry[tracked[first_order[0]]].name}')
     print(f'row 1 at the end:   {session.player_registry[tracked[last_order[0]]].name}')
 
-    data_path = _VISUALIZATIONS_DIR / 'data' / 'self_play.json'
+    data_path = _VISUALIZATIONS_DIR / 'prepared_data' / 'self_play.json'
     data_path.parent.mkdir(parents=True, exist_ok=True)
     data_path.write_text(json.dumps({
         'season':         SEASON,

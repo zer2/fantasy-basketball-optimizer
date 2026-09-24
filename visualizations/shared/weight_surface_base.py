@@ -80,7 +80,7 @@ READOUT_RISE = 0.62   # how far above a point its H-score is written
 
 TICK_PERCENTS = (50, 100, 150)
 
-_DATA_DIRECTORY = Path(__file__).resolve().parent.parent / 'data'
+_DATA_DIRECTORY = Path(__file__).resolve().parent.parent / 'prepared_data'
 
 
 def load_measurements(filename: str) -> dict:

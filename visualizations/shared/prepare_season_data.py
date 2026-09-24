@@ -2,7 +2,7 @@
 
 Run once (or whenever the season or the pool definition changes):
 
-    python visualizations/prepare_season_data.py
+    python visualizations/shared/prepare_season_data.py
 
 Writes two things into this directory:
   data/pool_<season>.json       the drafted pool, each player's name and per-game Points,
@@ -361,7 +361,7 @@ def main() -> None:
           f'{totals.mean():.1f}, differential sd {differentials.std():.1f}, '
           f'99% within +/-{np.percentile(np.abs(differentials), 99):.1f}')
 
-    data_path = _VISUALIZATIONS_DIR / 'data' / f'pool_{SEASON.replace("-", "_")}.json'
+    data_path = _VISUALIZATIONS_DIR / 'prepared_data' / f'pool_{SEASON.replace("-", "_")}.json'
     data_path.parent.mkdir(parents=True, exist_ok=True)
     data_path.write_text(json.dumps({
         'season':           SEASON,
@@ -385,7 +385,7 @@ def main() -> None:
           f'differential sd {weekly_differentials.std():.1f}, '
           f'99% within +/-{np.percentile(np.abs(weekly_differentials), 99):.1f}')
 
-    weekly_path = _VISUALIZATIONS_DIR / 'data' / f'weekly_{SEASON.replace("-", "_")}.json'
+    weekly_path = _VISUALIZATIONS_DIR / 'prepared_data' / f'weekly_{SEASON.replace("-", "_")}.json'
     weekly_path.write_text(json.dumps({
         'season':           SEASON,
         'statistic':        STATISTIC,
@@ -413,7 +413,7 @@ def main() -> None:
           f'{matchup_differentials.std():.1f}^2) = {quadrature:.1f} '
           f'against a measured {weekly_differentials.std():.1f}')
 
-    matchup_path = _VISUALIZATIONS_DIR / 'data' / f'matchup_{SEASON.replace("-", "_")}.json'
+    matchup_path = _VISUALIZATIONS_DIR / 'prepared_data' / f'matchup_{SEASON.replace("-", "_")}.json'
     matchup_path.write_text(json.dumps({
         'season':           SEASON,
         'statistic':        STATISTIC,
@@ -426,7 +426,7 @@ def main() -> None:
     }), encoding='utf-8')
     print(f'Wrote {matchup_path.relative_to(_VISUALIZATIONS_DIR.parent)}')
 
-    headshot_directory = _VISUALIZATIONS_DIR / 'assets' / 'headshots'
+    headshot_directory = _VISUALIZATIONS_DIR / 'prepared_assets' / 'headshots'
     missing = []
     for player in pool:
         source = _HEADSHOT_SOURCE_DIR / f'{player["player_id"]}.png'

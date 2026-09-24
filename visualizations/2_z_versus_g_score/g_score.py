@@ -20,8 +20,8 @@ This scene takes the assumption away, in two simulations and a piece of arithmet
 Every spread on screen is read back out of the prepared simulations rather than written down, so
 re-running the prep script with a different season or seed moves the scene with the data.
 
-    python visualizations/prepare_season_data.py      # writes all three datasets
-    manim -ql visualizations/scenes/g_score.py GScoreFull
+    python visualizations/shared/prepare_season_data.py      # writes all three datasets
+    manim -ql visualizations/2_z_versus_g_score/g_score.py GScoreFull
 """
 
 from __future__ import annotations
@@ -57,7 +57,7 @@ from narration import NARRATION   # noqa: E402
 FIXED_MATCHUP_DATA = 'matchup_2025_26.json'
 BOTH_VARY_DATA     = 'weekly_2025_26.json'
 
-_DATA_DIR = Path(__file__).resolve().parent.parent / 'data'
+_DATA_DIR = Path(__file__).resolve().parent.parent / 'prepared_data'
 
 
 class WeeklyUnitDifferential(DifferentialSceneBase):
