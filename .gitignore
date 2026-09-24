@@ -90,3 +90,12 @@ visualizations/media/images/
 visualizations/media/voiceovers/
 visualizations/media/Tex/
 visualizations/media/texts/
+
+# Rendered explainer videos and their poster frames. Regenerable from the scenes in
+# visualizations/ (1_z_score .. 8_gradient_descent, wireframes/*), so they are build output
+# rather than source: ~85 MB of binaries that git stores afresh on every re-render, including
+# re-encodes that change no pixels. The docs reference them at ../videos/<name>.mp4, so the
+# publish step is responsible for rendering them and applying `ffmpeg -movflags +faststart`
+# (manim writes the moov atom last, which stops a browser seeking a streamed file).
+docs/videos/*.mp4
+docs/videos/*-poster.jpg
