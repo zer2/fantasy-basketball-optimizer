@@ -108,9 +108,6 @@ H-scores with a half-and-half Each Category and Most Categories objective.
 
 With a mixture, overall H-scores are somewhere between typical Each Category numbers and typical Most Categories numbers. It should be noted that H-scores for Most Categories tend to be more extreme, so in a sense at 50-50 the algorithm cares more about the Most Categories score. 
 
-??? note "How exactly are the two kinds of scoring blended together?"
-    The objective functions are literally added together with their weights, along with their gradients. This can be justified by considering Most Categories scoring to be equivalent to either winning every category or losing every category. In that case, the expected value of categories won is the probability of winning the matchup times the number of categories for Most Categories scoring, versus the sum of the probabilities of winning each category for Each Category scoring. Dividing each by the number of categories yields the probability of winning a matchup versus the average probability of winning a category, making them sensible objectives to compare. 
-
 With an even number of categories a Most Categories matchup can end level — four each out of eight, for example. By default the website treats that as half a win. The sidebar also presents an option for a tiebreaker category when the number of categories is even and the Most Categories weight is above zero. The tiebreaker category essentially counts for two, which makes the total odd and gives every matchup a winner. The tiebreaker option only applies to the Most Categories objective. If weight is given to the Each Category objective as well, the tiebreaker category is ignored for that component. 
 
 ??? note "Why does counting a category twice behave equivalently to having it as a tiebreaker?"
@@ -131,19 +128,17 @@ Top Rotisserie H-scores, for the 2024-25 season
 
 The ranking for Rotisserie is significantly different from both Each Category and Most Categories. Giannis barely hangs within the top twelve, which aligns with the traditional wisdom that punting is not as advantageous for that format. 
 
+<video controls preload="metadata" width="100%" poster="../videos/rotisserie-poster.jpg">
+    <source src="../videos/rotisserie.mp4" type="video/mp4">
+</video>
+/// caption
+An explanation of why the Rotisserie format favors balance, using the mathematical principles underlying the H-score
+algorithm for Rotisserie
+///
+
 Winning a league is harder than winning a matchup, so H-scores are systematically lower for Rotisserie than for the Head to Head formats. The average is around 8% instead of 50%. 
 
 When the format is Rotisserie, category-level H-scores are expected fantasy point totals per category instead of the likelihood to win a single matchup. One should keep in mind that the expected fantasy point total is just a general average, not what the algorithm expects to happen in a winning scenario. While it may look like it expects some categories to end up below-average, it is still hoping to get lucky and do better than expected in those categories. 
-
-??? note "How does the algorithm work for Rotisserie?"
-    The Rotisserie objective is mathematically complicated
-
-    ![Rotisserie objective equations](img/roto_equations.png)
-    /// caption
-    Too many symbols... and this isn't even the whole thing
-    ///
-
-    Roughly, what they are doing is approximating the distribution of the fantasy point total needed to win, and calculating the probability that the team in question will surpass that total. Since the bar is quite high, and an aberrantly good performance is necessary to win, increasing the variance of the team's fantasy point total is beneficial. This motivates a structure which maximizes variance, accomplished by keeping win probabilities around 50-50 (Bernoulli variables have variance $p(1-p)$, maximized at $p=0.5$)
 
 ## Detailed drop-down
 
@@ -206,10 +201,7 @@ Expected flex-spot usage for the same example. The algorithm leans heavily on Po
 
 The flex position allocations show how the algorithm expects to use its flex spots, which can take players of multiple positions. This is relevant because the algorithm understands that different positions have different statistical tendencies. In the Dyson Daniels example above, the algorithm is leaning heavily on taking Power Forwards and Centers with its flex spots, likely because they tend to have poor Free Throw rates, and that synergizes with the strategy of punting Free Throws.
 
-??? note "How does H-scoring decide its positional strategy?"
-    The algorithm uses a simple model to estimate how its position strategy will influence its team's category-level strengths. It conceives of the fractional position allocations as expected values of how many players of each position it will take using the flex spots. It then adds average strengths within fantasy-relevant players for each position (normalized to sum to 0 G-scores for each position) multiplied by the flex position shares. This crudely estimates the expected differential driven by position. 
-
-    Modeling flex position decisions as continuous probabilities allows them to be incorporated into the ADAM optimization framework.
+The algorithm uses a simple model to estimate how its position strategy will influence its team's category-level strengths. It conceives of the fractional position allocations as expected values of how many players of each position it will take using the flex spots. It then adds average strengths within fantasy-relevant players for each position (normalized to sum to 0 G-scores for each position) multiplied by the flex position shares. This crudely estimates the expected differential driven by position. Flex positions are optimized simultaneously with category weights. 
 
 ### Roster allocation strategy
 
@@ -428,16 +420,7 @@ For Each Category and Most Categories, the website mitigates this flaw by choosi
 An example of the multi-starting process which is used for the first few picks
 ///
 
-??? note "How does the website check multiple punts?"
-    The website checks potential punts by calculating the current objective function with one category at a time set to 50% of its neutral weight. The weight distribution that evaluates to the highest score becomes the starting point for gradient descent.
-
-    Normally, multi-start gradient descent would perform gradient descent on each starting point. In this case, that is relatively unnecessary, because the strength of the simple punting strategy is highly indicative of which punt has the best optimal point. It also accounts for punting multiple categories natively, because once in the direction of one punt, the algorithm can see promising punts to pair it with. In testing, this procedure found essentially the same solutions as starting with many random points and performing gradient descent from all of them. 
-
-
-
 Punting is less common in Rotisserie, so gradient descent does not start at a punt. Instead it starts at a neutral position, slightly tilted towards categories that are robust like Points and Assists. That's where the Rotisserie algorithm generally wants to go, since it thinks it can rely more on luck for the unstable categories like Steals and Turnovers. 
-
-
 
 ### Constant categorical variance
 
@@ -452,11 +435,9 @@ The paper shows that when hard-punting free throws, teams still win the category
 
 These statistics come from simulations of real seasons using actual player data. Reality is less predictable- players outperform or underperform projections, players get traded or substituted, etc. This increased variance provides a counterbalance to the underprediction for threes. For free throw percent, it compounds, meaning that the algorithm likely underestimates the probability of winning the category despite punting by quite a bit. 
 
-??? note "Why doesn't the algorithm take into account player-level variance?"
+Mathematically, the central reason for the algorithm not taking player-level variance into account is that assuming constant variance makes the math significantly easier. It is what allows the algorithm to think only in the space of differentials- true magnitudes do not matter. 
 
-    Mathematically, the central reason for the algorithm not taking player-level variance into account is that assuming constant variance makes the math significantly easier. It is what allows the algorithm to think only in the space of differentials- true magnitudes do not matter. 
-    
-    Another reason is that predicting variance is hard, even ignoring the complicated reality of real fantasy basketball. Most likely, accounting for variance would require individual player-and-category-level forecasts of variance, which would require a massive overhaul of existing forecasting procedures. It might be possible to predict category variance as a function of expected value instead, but that would not necessarily be accurate. 
+Another reason is that predicting variance is hard, even ignoring the complicated reality of real fantasy basketball. Most likely, accounting for variance would require individual player-and-category-level forecasts of variance, which would require a massive overhaul of existing forecasting procedures. It might be possible to predict category variance as a function of expected value instead, but that would not necessarily be accurate. 
 
 ### Simplified player model 
 
