@@ -1044,9 +1044,8 @@
     <source src="../videos/most-categories.mp4" type="video/mp4">
 </video>
 <figcaption>
-<p>How the Most Categories objective is calculated, and why it rewards punting: one walk over the
-categories instead of every scenario separately, cut and reassembled to get each category's
-tipping point probability -- the chance that it is the one that decides the matchup</p>
+<p>An exploration of how to compute the Most Categories objective, and how the underlying 
+mathematical structure incentivizes aggressive punting in the format</p>
 </figcaption>
 </figure>
 <p>The Head to Head formats can be blended together through the sidebar because they are comparable, and for some leagues, it might make sense to optimize for both at the same time. When the slider is at zero H-scoring optimizes for purely Each Category scoring. If the EC/MC slider is moved all the way to one, it optimizes for purely Most Categories scoring. If the slider is somewhere in between, H-scoring computes and optimizes for both objectives, with weight on Most Categories based on the value of the slider. For example if the slider is at 0.6 it weighs Most Categories scoring at 60% and Each Category scoring at 40%. Setting the slider to somewhere in the middle can make sense for a league that determines regular season standings with Each Category, and does playoffs with Most Categories. </p>
@@ -1171,7 +1170,7 @@ algorithm for Rotisserie</p>
 <p>The papers assume that player projections are all known and agreed upon by all the drafters, so they don't address this issue. However, it is so important in practice that the website has its own logic to address it. </p>
 <p>The ℶ (beth) parameter controls the influence of the adjustment. Higher values of ℶ more aggressively regress the strength of the team towards the average. It defaults to 3. An adjustment is made to the algorithm's assessment of its team's strength for any pick after the first.</p>
 <details class="note">
-<summary>The math: how the adjustment is computed</summary>
+<summary>How is the ℶ adjustment computed?</summary>
 <p>Say that <span class="arithmatex">\(w\)</span> is a vector of the algorithm's naive guess at how likely it is to win each category, before performing gradient descent to optimize a future strategy. Corrected versions are calculated as</p>
 <div class="arithmatex">\[
 w^* = \left[ I_{n \times n} + \frac{\beth}{ n^2}\mathbf{1}_{n \times n}  \right]^{-1} \left[ w + \frac{\beth}{2n} \mathbf{1}_n \right ]
@@ -1185,7 +1184,7 @@ x^* = \text{CDF}^{-1} \left( w^* \right)
 </details>
 <p>The justification for this adjustment is a Bayesian model for updating expectations of team strengths, given drafting decisions made by all drafters. </p>
 <details class="note">
-<summary>The math: the Bayesian justification</summary>
+<summary>What is the justification for the ℶ adjustment?</summary>
 <p>Say that there are prior expectations that </p>
 <ul>
 <li>H-scoring's estimates for how often it will win a category are unbiased, but have some Normally distributed error <span class="arithmatex">\(\epsilon_a\)</span>. </li>
