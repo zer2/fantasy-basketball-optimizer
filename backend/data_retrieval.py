@@ -164,8 +164,12 @@ def get_darko_data(sport_params: dict) -> pd.DataFrame:
     df['player_id'] = df['NBA_PLAYER_ID'].astype('Int64')
     df = df.drop(columns=['NBA_PLAYER_ID']).sort_values('Player').fillna(0)
 
-    # Fetch position / minutes / games from ESPN table, joined by resolved id
-    extra = query('ESPN_PROJECTION_TABLE')[['ESPN_NAME', 'MINUTES_PLAYED', 'GAMES_PLAYED', 'POSITION']]
+    # Position / minutes / games come from ESPN, joined by resolved id.
+    # The VIEW, not the table: the table keeps every load ever made, and the view is the one that
+    # narrows to the most recent. They were the same thing for as long as the table held a single
+    # load, which is why reading the table worked until a second one landed -- at which point every
+    # player carried in both loads resolved two rows here and the merge below multiplied him.
+    extra = query('ESPN_PROJECTION_VIEW')[['ESPN_NAME', 'MINUTES_PLAYED', 'GAMES_PLAYED', 'POSITION']]
     extra.columns = ['Player', 'Minutes', 'Games Played %', 'Position']
     extra['Games Played %'] = extra['Games Played %'].astype(float) / n_games
     extra = attach_player_ids_by_name(extra).dropna(subset=['player_id'])
