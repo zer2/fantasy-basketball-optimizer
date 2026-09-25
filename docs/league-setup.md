@@ -8,7 +8,7 @@ Connecting a provider is the one part of the website that requires signing in wi
 
 The three platforms currently supported are: 
 
-**Yahoo**: support exists both for pulling existing teams during the season, and for integrating with drafts. This includes mock drafts. To integrate, one must authenticate with Yahoo by following the link on the pop-up generated when 'Retrieve from Yahoo' is selected.
+**Yahoo**: support exists both for pulling existing teams during the season, and for integrating with drafts. This includes mock drafts. To integrate, select 'Retrieve from Yahoo' and press 'Authenticate with Yahoo', then follow the link on the pop-up that appears.
 
 ![Yahoo authentication pop-up](img/yahoopop.png)
 
