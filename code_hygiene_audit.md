@@ -62,12 +62,28 @@ were reorganised, and the cross-references between scenes were not followed.
 
 ## C. Organisation
 
-1. **`backend/` root is a mixed bag.** Everything lives in a package except five modules sitting
-   at the root: `data_retrieval.py` (368), `models.py` (117), `player_identity.py` (130),
-   `parameters.py` (34) and `main.py` (142). `main.py` belongs at the root; the other four are
-   shared domain modules that `backend/math/` reaches *up* to import. It is not a layering
-   violation so much as an unnamed layer — they are the things every package depends on and
-   nothing depends back on. A `backend/domain/` or `backend/core/` package would say so.
+1. **`backend/` root is a mixed bag — but not one thing.** Everything lives in a package except
+   five modules at the root. `main.py` (142) belongs there. The other four look like one layer
+   and are not: three import nothing internal at all, and one does.
+
+   | module | imports internally | what it is |
+   |---|---|---|
+   | `parameters.py` (34) | nothing | loads and caches `parameters.yaml` |
+   | `models.py` (117) | nothing | the DTOs services build and the API declares |
+   | `player_identity.py` (130) | nothing | player ids, registry, name→id resolution |
+   | `data_retrieval.py` (368) | `infra.snowflake_connection`, `player_identity` | domain reads from Snowflake |
+
+   So "core" is the wrong name for the set. Suggested, in increasing order of doubt:
+
+   - **`parameters.py` → `backend/infra/`.** The clearest move. `infra/secret_config.py` (38) is
+     already "load configuration from disk"; this is the same job for a different file.
+   - **`models.py` + `player_identity.py` → a new package.** These two are the vocabulary of the
+     problem — what a player is, and what we hand back. `backend/domain/` says that; `shared/` is
+     accurate but says nothing. Note `models.py` cannot go into `api/` without inverting the
+     dependency, since services build these and the API only declares them.
+   - **`data_retrieval.py` — leave it** until someone has a view. It is the only one with
+     dependencies, and its docstring already states its position deliberately: the generic
+     Snowflake connection lives in `infra`, and this is the domain data-access layer above it.
 
 2. **Package sizes are lopsided.** `backend/math/` is 4893 lines across 8 files; every other
    package is under 2200. That is inherent to the subject rather than a mistake.
@@ -77,6 +93,33 @@ were reorganised, and the cross-references between scenes were not followed.
    so the convention is followed about 59% of the time. `backend/api/helpers.py` is the clearest
    mixed case. (The count is approximate; the trailing-comma detector will pick up some ordinary
    call arguments.)
+
+## C2. `services/ranking.py` is misnamed, not overloaded
+
+835 lines, but only **377 are code** (45% — the rest is comment and docstring). Of that code,
+`rank_candidates` is 73 lines and the five response builders are 289 — **80% of the file is
+shaping the answer**, not ranking it.
+
+That looked like a file doing two jobs. It is not. `rank_candidates` returns `EvaluateResponse`:
+the whole payload for `/evaluate`. The route validates, takes the session lock, calls it, and
+returns the result verbatim. Driving the agent and building the payload are both steps of one
+job — *produce the evaluate response* — and `ranking.py` names only the first step of it.
+
+Git confirms the name drifted rather than the file growing:
+
+    backend/evaluate.py  ->  backend/services/evaluate.py  ->  backend/services/ranking.py
+
+It was renamed away from the name that described it. And the comment at
+[process_player_data.py:405](backend/math/process_player_data.py#L405) still says `evaluate.py`,
+which section B lists as stale — it is more accurate about the file's job than the filename is.
+
+**Suggestion: rename back to `evaluate.py`** rather than split. That matches the endpoint, the
+`EvaluateResponse` it returns, and the vocabulary the rest of the code already uses; and it fixes
+one of the stale comments for free. `api/routers/ranking.py` would move with it, since the two
+are named as a pair.
+
+If the file is ever split anyway, the seam is obvious — the five `_build_*` functions are a
+cluster, and are already flagged elsewhere as the next target for vectorisation.
 
 ## D. Dead code — essentially none
 
