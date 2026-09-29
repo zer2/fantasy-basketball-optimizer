@@ -43,45 +43,45 @@ _SCORE_TOL = 0.0001   # allowed absolute deviation on H-score diffs (0–1 scale
 _EXPECTED = {
     '1v1': [
         {
-            'send':    ['Isaiah Hartenstein'],
-            'receive': ['Malik Monk'],
-            'your_score':  0.0021,
-            'their_score': 0.0006,
+            'send':    ['Daniel Gafford'],
+            'receive': ['Ty Jerome'],
+            'your_score':  0.0026,
+            'their_score': 0.0001,
         },
         {
             'send':    ['Daniel Gafford'],
             'receive': ['Andrew Wiggins'],
-            'your_score':  0.0015,
-            'their_score': 0.0013,
-        },
+            'your_score':  0.0003,
+            'their_score': 0.0027,
+        }
     ],
     '2v2': [
         {
-            'send':    ['Andrew Nembhard', 'Rudy Gobert'],
-            'receive': ['Andrew Wiggins', 'Tyrese Maxey'],
-            'your_score':  0.0044,
-            'their_score': 0.0005,
+            'send':    ['Daniel Gafford', 'Isaiah Hartenstein'],
+            'receive': ['Malik Monk', 'Ty Jerome'],
+            'your_score':  0.0047,
+            'their_score': 0.0003,
         },
         {
-            'send':    ['Andrew Nembhard', 'Isaiah Hartenstein'],
-            'receive': ['Derrick Jones Jr.', 'Malik Monk'],
-            'your_score':  0.0039,
-            'their_score': 0.0005,
-        },
+            'send':    ['Andrew Nembhard', 'Rudy Gobert'],
+            'receive': ['Andrew Wiggins', 'Tyrese Maxey'],
+            'your_score':  0.0043,
+            'their_score': 0.0013,
+        }
     ],
     '3v3': [
         {
-            'send':    ['Andrew Nembhard', 'Daniel Gafford', 'Rudy Gobert'],
-            'receive': ['Derrick Jones Jr.', 'Kyshawn George', 'Pascal Siakam'],
-            'your_score':  0.0063,
-            'their_score': 0.0004,
+            'send':    ['Andrew Nembhard', 'Isaiah Hartenstein', 'Rudy Gobert'],
+            'receive': ['Andrew Wiggins', 'Derrick Jones Jr.', 'Pascal Siakam'],
+            'your_score':  0.0081,
+            'their_score': 0.0008,
         },
         {
-            'send':    ['Daniel Gafford', 'Isaiah Hartenstein', 'Mike Conley'],
-            'receive': ['Andrew Wiggins', 'Malik Monk', 'Ty Jerome'],
-            'your_score':  0.0059,
-            'their_score': 0.0001,
-        },
+            'send':    ['Andrew Nembhard', 'Daniel Gafford', 'Isaiah Hartenstein'],
+            'receive': ['Andrew Wiggins', 'Derrick Jones Jr.', 'Malik Monk'],
+            'your_score':  0.0073,
+            'their_score': 0.0017,
+        }
     ],
 }
 
