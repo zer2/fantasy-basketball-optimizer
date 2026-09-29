@@ -74,6 +74,25 @@ function makeApplyChain(label: string) {
     }
 }
 
+/** A re-evaluate with no session patch, for a setting the pipeline does not read (the
+ *  force-weighting pins, which travel on the evaluate request). Its own abort chain, so rapid
+ *  retyping cancels its own stale post-steps the way each sidebar section's chain does. */
+function makeEvaluateOnlyChain(label: string) {
+    let controller: AbortController | null = null
+    return function runEvaluateOnlyChain(): Promise<void> {
+        controller?.abort()
+        controller = new AbortController()
+        const { signal } = controller
+        return runModeEval()
+            .then(() => { if (!signal.aborted) applyLayout() })
+            .catch(err => {
+                if (err.name === 'AbortError') return
+                console.error(`${label} failed:`, err)
+                showFailureInTable(err)
+            })
+    }
+}
+
 // ─── Async init: fetch config, then build sidebar ────────────────────────────
 
 ;(async () => {
@@ -323,6 +342,12 @@ const applyModelSettings = makeApplyChain('Model parameters apply')
 modelSection.addEventListener('change', () => {
     applyModelSettings(3, { model_settings: getModelSettings() })
 })
+
+// Retyping a force-weighting pin needs no session patch: no pipeline step reads the pins, they ride
+// on the evaluate request itself, so re-solving the board is the whole of the work. Driven by an
+// event so table/force_weights.ts does not import this module (it is imported FROM here — a cycle).
+const applyForcedWeights = makeEvaluateOnlyChain('Forced category weights apply')
+document.addEventListener('forced-weights-changed', () => { applyForcedWeights() })
 
 // ─── 5. Position Parameters ───────────────────────────────────────────────────
 

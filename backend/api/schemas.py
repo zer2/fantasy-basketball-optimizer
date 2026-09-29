@@ -94,6 +94,11 @@ class ModelSettings(BaseModel):
     opponent_model_confidence: float = 0.5
     n_iterations: int
     streaming_noise: float
+    # Force-weighting: when on, a category with a pinned weight is held at it and excluded from the
+    # descent, constraining the optimiser into a chosen build. The pins themselves ride on the
+    # evaluate request, not here -- they change the served board but nothing the pipeline builds, so
+    # sending them as a setting would rebuild the agent for every keystroke.
+    allow_force_weighting: bool = False
 
 
 class DataSource(BaseModel):
@@ -198,6 +203,11 @@ class EvaluateRequest(BaseModel):
     # is what establishes the generic ranking).
     candidate_offset: int = 0
     candidate_limit: Optional[int] = None
+    # Force-weighting pins: category -> a weight on the scale the UI displays (100 = neutral), or
+    # None/absent for "the algorithm sets this one". Ignored unless the session's model settings have
+    # allow_force_weighting on, so the toggle alone governs the feature and the typed boxes survive
+    # being toggled off and back on.
+    forced_category_weights: Optional[dict[str, Optional[float]]] = None
 
 
 # ── /sessions/{id}/trade/analyze ─────────────────────────────────────────────

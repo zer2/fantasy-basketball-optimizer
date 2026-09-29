@@ -9,6 +9,17 @@ import { ModelSettings } from '../types.js'
 import { getSportConfig } from '../app_state.js'
 import { pref, savePref } from '../preferences.js'
 
+// Force-weighting's toggle. Its own spec rather than a PARAM_SPECS entry because those are all
+// numeric inputs resolved against parameters.yaml min/max, and this is a checkbox with neither.
+const FORCE_WEIGHTING_SPEC = {
+    id:      'mp-allow-force-weighting',
+    key:     'allow_force_weighting',
+    label:   'Weight pinning',
+    caption: 'Allow some category weights to be fixed manually, constraining the algorithm and '
+           + "forcing it into a certain build. Categories still in 'auto' mode will be optimized by "
+           + 'the algorithm as normal',
+}
+
 interface ParamSpec {
     id:      string
     key:     string        // key in config.options (e.g. 'pick_pool_size', 'S')
@@ -101,6 +112,7 @@ export function renderModelSettings(container: HTMLElement): void {
     for (const spec of PARAM_SPECS) {
         grid.append(makeParamItem(spec))
     }
+    grid.append(makeForceWeightingItem())
 
     // Restore every parameter to its parameters.yaml default — including the saved
     // preferences, so the reset survives a reload. One bubbled change event afterwards
@@ -116,6 +128,9 @@ export function renderModelSettings(container: HTMLElement): void {
             input.value = String(resolved.default)
             savePref(spec.key, resolved.default)
         }
+        const forceToggle = document.getElementById(FORCE_WEIGHTING_SPEC.id) as HTMLInputElement
+        forceToggle.checked = false
+        savePref(FORCE_WEIGHTING_SPEC.key, false)
         container.dispatchEvent(new Event('change', { bubbles: true }))
     })
     container.append(restoreBtn)
@@ -187,6 +202,39 @@ function makeParamItem(spec: ParamSpec): HTMLElement {
     return item
 }
 
+/** Builds the force-weighting checkbox item. Mirrors makeParamItem's label row and caption so it
+ *  sits in the same grid, but carries a checkbox: the setting is on/off, with no default, min or max
+ *  in parameters.yaml to resolve against. */
+function makeForceWeightingItem(): HTMLElement {
+    const item = document.createElement('div')
+    item.className = 'param-item'
+
+    const labelRow = document.createElement('div')
+    labelRow.className = 'param-label-row'
+
+    const label = document.createElement('label')
+    label.htmlFor = FORCE_WEIGHTING_SPEC.id
+    label.textContent = FORCE_WEIGHTING_SPEC.label
+    labelRow.append(label)
+
+    const infoBtn = document.createElement('button')
+    infoBtn.type = 'button'
+    infoBtn.className = 'info-btn'
+    infoBtn.textContent = '\u24D8'
+    infoBtn.dataset.tooltip = FORCE_WEIGHTING_SPEC.caption
+    labelRow.append(infoBtn)
+
+    const input = document.createElement('input')
+    input.type = 'checkbox'
+    input.id = FORCE_WEIGHTING_SPEC.id
+    input.className = 'sidebar-checkbox'
+    input.checked = pref<boolean>(FORCE_WEIGHTING_SPEC.key, false)
+    input.addEventListener('change', () => savePref(FORCE_WEIGHTING_SPEC.key, input.checked))
+
+    item.append(labelRow, input)
+    return item
+}
+
 /** Reads all model parameter values from the DOM and returns them as a typed object. */
 export function getModelSettings(): ModelSettings {
     return {
@@ -201,7 +249,13 @@ export function getModelSettings(): ModelSettings {
         beth:            readNumberInput('mp-beth'),
         n_iterations:    readNumberInput('mp-n-iterations'),
         streaming_noise: readNumberInput('mp-s'),
+        allow_force_weighting: readCheckboxInput(FORCE_WEIGHTING_SPEC.id),
     }
+}
+
+/** Reads a checkbox element's state by DOM id. */
+function readCheckboxInput(id: string): boolean {
+    return (document.getElementById(id) as HTMLInputElement).checked
 }
 
 /** Reads a numeric input element's value by DOM id. */

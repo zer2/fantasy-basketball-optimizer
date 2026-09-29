@@ -28,6 +28,7 @@ import { getLeagueSettings, getMode } from '../setting_collection/league_setting
 import { getShortCategoryNames } from '../app_state.js'
 import { isMobileViewport } from '../helper_functions.js'
 import { buildFullPlayerDisplayHtml } from '../player_display.js'
+import { buildForcedWeightsRow } from './force_weights.js'
 
 const table = document.getElementById('hscoretable') as HTMLTableElement
 
@@ -193,6 +194,14 @@ export function buildTableHeader(): void {
         th.textContent = label
         headerRow.append(th)
     }
+
+    // Force-weighting's pin boxes, when the setting is on. A SECOND header row rather than a first
+    // one, so the labels keep their thead > tr:first-child rounded corners; the boxes still sit
+    // above every category's numbers, which is what they annotate. Column-aligned by construction:
+    // one blank leading cell per score column (Player plus H-Score, or Player plus the four
+    // auction dollar columns), then one box per category.
+    const forcedWeightsRow = buildForcedWeightsRow(categories, isAuction ? 5 : 2)
+    if (forcedWeightsRow) thead.append(forcedWeightsRow)
 }
 
 /** Builds one candidate's display + hidden-expand `<tr>` pair as an HTML string. */
