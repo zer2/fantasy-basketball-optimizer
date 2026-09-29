@@ -2517,3 +2517,37 @@ tr {
 .yahoo-attribution svg path:not([class]) {
     fill: light-dark(#1a1a1a, #ffffff);
 }
+
+
+/* ── Force-weighting pin boxes ─────────────────────────────────────────────────
+   A second candidate-table header row, shown only while force-weighting is on, holding one small
+   number box per category. Sized to the category columns it sits in, so turning the setting on
+   never widens the table. */
+.forced-weights-row > .tableheader {
+    padding: 1px 2px;
+}
+.forced-weights-label {
+    text-align: right;
+    font-weight: normal;
+    font-size: 0.85em;
+    opacity: 0.75;
+}
+.forced-weight-input {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 1px 2px;
+    border: 1px solid var(--border-color, #ccc);
+    border-radius: 3px;
+    font: inherit;
+    font-size: 0.85em;
+    text-align: center;
+    /* The spinners cost more width than the box has to give at category-column widths. */
+    appearance: textfield;
+    -moz-appearance: textfield;
+}
+.forced-weight-input::-webkit-outer-spin-button,
+.forced-weight-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}

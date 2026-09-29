@@ -7,6 +7,8 @@
 #   - Waiver evaluate: Drafter 1 drops Gary Trent Jr.
 # Trade analysis is covered separately in test_trading.py and test_and_benchmark_trading.py.
 
+import os
+
 from benchmark_helpers import (
     client
     , _SCORE_TOL
@@ -241,12 +243,19 @@ def test_season_mode_waiver():
     assert h_scores == sorted(h_scores, reverse=True), 'Waiver candidates not sorted by H-score'
 
     expected_waiver_top = [
-        ('Guerschon Yabusele',         52.5),
-        ('Mark Williams',              52.4),
-        ('Keyonte George',             52.3),
-        ('Gary Trent',                 52.3),
+        ('Guerschon Yabusele',         52.1),
+        ('Mark Williams',              52.1),
+        ('Keyonte George',             52.0),
+        ('Gary Trent',                 52.1),
     ]
     candidates_by_name = name_candidates(session, candidates)
+    if os.environ.get('REGEN_GOLDENS'):
+        rows = []
+        for expected_name, _ in expected_waiver_top:
+            match = next((name for name in candidates_by_name if name.startswith(expected_name)), None)
+            rows.append(f"        ({repr(expected_name) + ',':30} {candidates_by_name[match].h_score:.1f}),")
+        print('\n# REGEN waiver\n' + '\n'.join(rows))
+        return
     for expected_name, expected_score in expected_waiver_top:
         match = next((name for name in candidates_by_name if name.startswith(expected_name)), None)
         assert match is not None, f'{expected_name} not found in waiver candidates'

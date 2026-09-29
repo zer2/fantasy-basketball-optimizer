@@ -345,8 +345,15 @@ agent_cache_hits = 0     # introspection for tests and ops; no behavior reads th
 agent_cache_misses = 0
 
 
+# Settings no pipeline step reads, so keying on them would only ever cost a needless rebuild:
+# team_names is cosmetic, and allow_force_weighting is applied per-evaluate to the built agent
+# (see services/ranking.py) because the pins deliberately do not enter the field build.
+_CACHE_KEY_IGNORED = ('team_names', 'allow_force_weighting')
+
+
 def _agent_cache_key(current_settings: dict) -> str:
-    keyed = {key: value for key, value in current_settings.items() if key != 'team_names'}
+    keyed = {key: value for key, value in current_settings.items()
+             if key not in _CACHE_KEY_IGNORED}
     return json.dumps(keyed, sort_keys=True, default=str)
 
 

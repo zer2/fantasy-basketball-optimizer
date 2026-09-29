@@ -100,6 +100,12 @@ visualizations/render_cache/texts/
 docs/videos/*.mp4
 docs/videos/*-poster.jpg
 
+# The built copy of the above. `mkdocs build` re-copies docs/videos into site/ every time, so
+# tracking it would commit ~106 MB of binaries whose source is already ignored two lines up.
+# It still reaches the published site: `mkdocs gh-deploy` commits the built directory itself
+# rather than staging it, so .gitignore does not apply to what lands on gh-pages.
+site/videos/
+
 # Circular headshots built by visualizations/shared/prepare_season_data.py from the app's
 # .cache/headshots. Build output: 161 PNGs that dominate any diff of this branch. Rebuilding
 # them needs the app run once against the season so the cache fills from cdn.nba.com -- so

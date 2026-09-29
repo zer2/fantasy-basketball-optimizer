@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from backend.api.helpers import fail, require_session
 from backend.state.session import Session
 from backend.infra.rate_limit import enforce_rate_limit, COMPUTE_POLICY
+from backend.math.algorithm_agents import ForcedWeightsInfeasibleError
 from backend.services.ranking import rank_candidates, UnknownRosterPlayersError, UnknownTeamError
 from backend.infra.server_timing import begin_timing, server_timing_header
 from backend.api.schemas import EvaluateRequest
@@ -56,8 +57,9 @@ def rank_candidates_route(req: EvaluateRequest, response: Response,
                 remaining_cash     = req.remaining_cash,
                 candidate_offset   = req.candidate_offset,
                 candidate_limit    = req.candidate_limit,
+                forced_category_weights = req.forced_category_weights,
             )
-    except (UnknownRosterPlayersError, UnknownTeamError) as exc:
+    except (UnknownRosterPlayersError, UnknownTeamError, ForcedWeightsInfeasibleError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception:
         raise fail(500, 'Evaluation failed.')

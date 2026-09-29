@@ -18,6 +18,7 @@ import {
 } from './session.js'
 import { prefetchHeadshotsForDataSource } from '../player_display.js'
 import { patchSession, fetchGScores, evaluate, fetchDraftState, candidatesToPlayerResults, HTTPError } from './client.js'
+import { getForcedCategoryWeights } from '../table/force_weights.js'
 
 // Draft/waiver candidate batch size: score + paint the top players first, then fill in the
 // bench in follow-up requests. Auction is never batched (its $ values need the whole pool).
@@ -230,6 +231,15 @@ async function evaluateSeat(seat: string, forAutopilot = false): Promise<number 
             } else {
                 const { player_assignments } = getDraftState()
                 evalReq = { player_assignments, my_team_id: seat }
+            }
+
+            // Force-weighting: the user's pinned category weights, when any are set. Attached to the
+            // personalised request only — the base ("generic") evaluate below is deliberately left
+            // unpinned, because it is the neutral reference the board compares against. Batched
+            // follow-up requests spread this same object, so every batch is solved under the pins.
+            const forcedCategoryWeights = getForcedCategoryWeights()
+            if (forcedCategoryWeights) {
+                evalReq = { ...evalReq, forced_category_weights: forcedCategoryWeights }
             }
 
             // Autopilot never renders the board, so it needs neither the base-player comparison nor

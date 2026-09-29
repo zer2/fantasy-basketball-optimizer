@@ -64,6 +64,10 @@ export interface Roster {
 // ─── API request types ────────────────────────────────────────────────────────
 
 export interface ModelSettings {
+    // Force-weighting: lets some category weights be fixed by hand, constraining the algorithm into
+    // a chosen build. The pinned values themselves ride on the evaluate request, not here — they
+    // change the served board but nothing the pipeline builds.
+    allow_force_weighting: boolean
     // Window of the truncated-max future-pick model: how many surviving players each
     // future pick effectively chooses among (the punt-aggressiveness dial).
     pick_pool_size: number

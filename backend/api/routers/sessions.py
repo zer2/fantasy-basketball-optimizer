@@ -64,6 +64,7 @@ def _build_current_settings(req: SessionRequest) -> dict:
         'opponent_model_confidence': p.opponent_model_confidence,
         'n_iterations':     p.n_iterations,
         'streaming_noise':  p.streaming_noise,
+        'allow_force_weighting': p.allow_force_weighting,
         # auction
         'cash_per_team':    req.league.cash_per_team,
         # data source

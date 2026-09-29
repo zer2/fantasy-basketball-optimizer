@@ -274,6 +274,10 @@ export async function evaluate(
         remaining_cash?: Record<string, number>
         candidate_offset?: number   // draft/waiver batching: slice start
         candidate_limit?: number    // draft/waiver batching: slice size (omit = whole pool)
+        // Force-weighting: category -> a weight on the "100 = neutral" scale the table displays.
+        // Held fixed through the descent; omitted categories are left to the algorithm. Ignored by
+        // the server unless the session's model settings allow force-weighting.
+        forced_category_weights?: Record<string, number>
     }
     , signal?: AbortSignal
 ): Promise<{ iteration: number; candidates: any[]; has_more?: boolean; total_candidates?: number }> {

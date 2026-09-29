@@ -55,6 +55,7 @@ def rank_candidates(
     remaining_cash: Optional[dict[str, float]],
     candidate_offset: int = 0,
     candidate_limit: Optional[int] = None,
+    forced_category_weights: Optional[dict[str, Optional[float]]] = None,
 ) -> EvaluateResponse:
     """Drive the HAgent gradient-descent loop and return ranked candidates.
 
@@ -129,19 +130,28 @@ def rank_candidates(
         has_more         = False
         total_candidates = None
 
-    with record_phase('hscores'):
-        h_score_result = h_agent.get_h_scores(
-            player_assignments      = player_assignments,
-            drafter                 = my_team_id,
-            n_iterations            = n_iterations,
-            cash_remaining_per_team = remaining_cash,
-            exclusion_list          = exclusion_list,
-            candidate_subset        = candidate_subset,
-            # Global rank of this batch's first candidate, so the throttle's exact-solve tiers stay
-            # global: batches past the first fall outside them and exact-solve nobody. Zero when we
-            # score the whole pool (no subset), where the tiers apply normally from the top.
-            candidate_offset        = candidate_offset if candidate_subset is not None else 0,
-        )
+    # Force-weighting: hold the user's pinned categories for THIS solve only. Set here rather than
+    # at construction because the pins never enter the field build (see HAgent._forcing), so changing
+    # one needs no rebuild -- and released in the finally so the agent's resting state is unpinned
+    # and no other consumer of session.agent (trading) can inherit a pin from an evaluate.
+    h_agent.set_forced_category_weights(
+        bool(session.current_settings.get('allow_force_weighting')), forced_category_weights)
+    try:
+        with record_phase('hscores'):
+            h_score_result = h_agent.get_h_scores(
+                player_assignments      = player_assignments,
+                drafter                 = my_team_id,
+                n_iterations            = n_iterations,
+                cash_remaining_per_team = remaining_cash,
+                exclusion_list          = exclusion_list,
+                candidate_subset        = candidate_subset,
+                # Global rank of this batch's first candidate, so the throttle's exact-solve tiers
+                # stay global: batches past the first fall outside them and exact-solve nobody. Zero
+                # when we score the whole pool (no subset), where the tiers apply from the top.
+                candidate_offset        = candidate_offset if candidate_subset is not None else 0,
+            )
+    finally:
+        h_agent.set_forced_category_weights(False, None)
     actual_iterations = max(1, n_iterations)
 
     if h_score_result is None:

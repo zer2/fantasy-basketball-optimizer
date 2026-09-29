@@ -57,6 +57,18 @@ async function expandSection(page, titleRegex) {
 
 // setSelect / waitEval / lockInDraftPick are shared with the e2e suite — see browser_helpers.mjs.
 
+// The connector dialogs are modal overlays: one left open by a previous shot swallows every click
+// meant for the page beneath it. Close whichever are showing before driving the page again.
+async function dismissConnectorDialogs(page) {
+    for (const id of ['#ls-yahoo-dialog', '#ls-espn-dialog']) {
+        const overlay = page.locator(id)
+        if (await overlay.isVisible().catch(() => false)) {
+            await overlay.locator('.ls-dialog-close').click()
+            await overlay.waitFor({ state: 'hidden' })
+        }
+    }
+}
+
 // Expand a candidate's detail drop-down (the expectation / strategy tables live inside it).
 async function expandCandidate(page, i = 0) {
     await page.locator('#hscoretable .playerheaderdiv').nth(i).click()
@@ -329,7 +341,27 @@ const STATES = {
     },
 
     async 'league-fantrax'(page) { await ensure(page, 'league-settings'); await setSelect(page, 'ls-platform', 'Fantrax') },
-    async 'league-espn'(page)    { await ensure(page, 'league-settings'); await setSelect(page, 'ls-platform', 'ESPN') },
+    // Yahoo's own controls, before anyone has authenticated: the league select reads
+    // "(authenticate first)". That is the state the docs describe, so no login is needed.
+    async 'league-yahoo'(page)   { await ensure(page, 'league-settings'); await setSelect(page, 'ls-platform', 'Yahoo') },
+    // The auth dialog itself. It is opened by the button and carries the link to Yahoo — the
+    // handshake happens after this, so the dialog is capturable without any credentials.
+    async 'league-yahoo-dialog'(page) {
+        await ensure(page, 'league-yahoo')
+        await page.locator('#ls-yahoo-wrap button', { hasText: 'Authenticate with Yahoo' }).first().click()
+        await page.locator('#ls-yahoo-dialog .ls-dialog-box').waitFor({ state: 'visible', timeout: 10000 })
+        await page.waitForTimeout(200)
+    },
+    // Reached after the Yahoo dialog shot, whose overlay is still up and would eat the platform
+    // click. ESPN's own dialog then opens by itself, via the connector's onSelected.
+    async 'league-espn'(page) {
+        // Before ensure(), not after: reaching league-settings from the Yahoo dialog state replays a
+        // chain of clicks of its own, and every one of them lands under the overlay.
+        await dismissConnectorDialogs(page)
+        await ensure(page, 'league-settings')
+        await setSelect(page, 'ls-platform', 'ESPN')
+        await page.locator('#ls-espn-dialog .ls-dialog-box').waitFor({ state: 'visible' })
+    },
 
     async 'season-waiver'(page)   {
         await setMode(page, 'Season Mode')
@@ -491,7 +523,11 @@ const STATES = {
 //     updating (the transient eval spinner) was dropped from the docs entirely.
 //
 //   BLOCKED (skipped; external/live login — need real third-party credentials):
-//     yahoopop yahoosettings livedraft
+//     livedraft
+//
+//   yahoopop and yahoosettings were here until 2026-09-25. They do not need a Yahoo login: the
+//   dialog is what CARRIES the link to Yahoo, and the settings panel reads "(authenticate first)"
+//   until someone follows it. Both are the states the docs actually describe.
 //
 const SHOTS = [
     // Draft / H-scoring
@@ -532,8 +568,6 @@ const SHOTS = [
       union:       ['.ls-cell:has(#ls-n-drafters)', '.ls-cell:has(#ls-n-picks)', '#ls-trr-row'],
       clampAbove:  '[data-testid="ls-platform-wrapper"]',
       clampWithin: 'details.sidebar-section:has(#ls-trr-row)' },
-    { name: 'yahoopop',        state: 'load',          selector: 'body', skip: 'real external window.open to Yahoo login — needs popup-page handling, not deterministic' },
-    { name: 'yahoosettings',   state: 'load',          selector: '#ls-connect-cell', skip: 'requires a live Yahoo auth session' },
 
     // Auction — auctiondetail first (pristine empty board), then the Jokic entry, then the
     // dollar table from Team 1's post-pick perspective.
@@ -595,7 +629,11 @@ const SHOTS = [
     // poisons every own-data auction/season state above (blank rosters, no eval). Nothing own-data
     // dependent may run after them.
     { name: 'fantraxsettings', state: 'league-fantrax', selector: '#ls-fantrax-wrap' },
-    { name: 'espnpop',         state: 'league-espn',    selector: '.espn-modal-box' },
+    { name: 'yahoosettings',   state: 'league-yahoo',   selector: '#ls-yahoo-wrap' },
+    { name: 'yahoopop',        state: 'league-yahoo-dialog', selector: '#ls-yahoo-dialog .ls-dialog-box' },
+    // ESPN last: its dialog opens the moment the platform is selected, and the overlay it puts up
+    // would sit over anything captured after it.
+    { name: 'espnpop',         state: 'league-espn',    selector: '#ls-espn-dialog .ls-dialog-box' },
 ]
 
 // Auth: the app UI is gated behind Google login. Inject a session cookie minted with the

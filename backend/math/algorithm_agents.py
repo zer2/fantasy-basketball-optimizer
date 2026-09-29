@@ -103,6 +103,17 @@ REG_LAMBDA_UNIT = _CATEGORY_LEARNING_RATE
 # w == v via its rho clamp; the term_five 0/0 lived in the legacy simplified-form methods), so the
 # guard stays off; raise it if lambda_c's ceiling (0.5 x REG_LAMBDA_UNIT = half a step) is ever
 # actually used and neutral-adjacent builds start pinning to exact v.
+# Pinned category weights may not claim more than 1 - this much of the total, or the free ones
+# have nowhere to go. Rejected in __init__ rather than silently rescaled, because rescaling would
+# show the user a weight different from the one they typed.
+_FORCED_MINIMUM_BUDGET = 0.05
+
+
+class ForcedWeightsInfeasibleError(ValueError):
+    """The pinned category weights claim so much of the total that the free ones have no room.
+
+    Its own type so the API can answer 400 with the message (which names the offending categories)
+    rather than folding it into the evaluate route's blanket 500."""
 _REG_FLOOR = 0.0
 # Flex-position share regularisation: lambda_p is a fraction of the SHARES optimizer's own
 # per-iteration step, exactly as lambda_c is a fraction of the category step. The proximal
@@ -378,6 +389,11 @@ class HAgent:
                  # them); the NBA path's truncated-max model has no tilt price or generic level.
                  , omega: float = 0.7
                  , gamma: float = 0.25
+                 # FORCE-WEIGHTING: category -> a weight on the scale the UI displays (100 = neutral),
+                 # or None for "let the optimiser choose". Ignored unless allow_force_weighting is set,
+                 # so the toggle alone governs the feature and the typed boxes can persist behind it.
+                 , allow_force_weighting: bool = False
+                 , forced_category_weights: dict = None
                  ):
 
         self.omega         = omega
@@ -612,6 +628,12 @@ class HAgent:
         # suppresses the post-evaluate team-entry hook (the refresh loop stores the entry itself, keyed
         # by the opponent's FULL roster rather than the replay view's roster-minus-last-pick).
         self._opponent_inference_active = False
+        # FORCE-WEIGHTING: a pinned category is held at the weight the user typed and excluded from every
+        # step of the descent. Built below, once v is known; see the _forcing property for when it bites.
+        self._forced_mask       = None
+        self._forced_raw        = None
+        self._forced_budget     = 1.0
+        self._unconstrained_run = False
 
         if scoring_format == 'Rotisserie':
             self.x_scores = x_scores.loc[
@@ -644,6 +666,7 @@ class HAgent:
                                        self.most_categories_weight)
         self.original_v = np.array(v)
         self.v          = np.array(v / v.sum()).reshape(self.n_categories, 1)
+        self.set_forced_category_weights(allow_force_weighting, forced_category_weights)
 
         turnover_inverted_v = self.v.copy()
         turnover_inverted_v[-1] = -turnover_inverted_v[-1]
@@ -732,7 +755,12 @@ class HAgent:
         # full-pool run, which populate_default_h_scores already computed at build. Reuse it rather
         # than re-solving (this is the draft-start evaluate). Guarded so a filtered empty-board call
         # (exclusions or a candidate subset) still computes.
+        # NOT reusable under force-weighting: _default_result comes out of the bootstrap, which runs
+        # UNCONSTRAINED by design, so returning it would show an unpinned board at draft start -- the
+        # exact moment the user sets the pins -- and then jump to the pinned build on the first pick.
+        # So a pinned empty board pays for a real solve. That cost is only incurred with the toggle on.
         if (self._default_result is not None
+                and not self._forcing
                 and not exclusion_list
                 and candidate_subset is None
                 and all(len(roster) == 0 for roster in player_assignments.values())):
@@ -1661,7 +1689,7 @@ class HAgent:
 
         if len(self.players) >= _WEAKNESS_SEED_MIN_ROSTER:
             weakest = int(np.argmin(self.x_scores.loc[self.players].sum(axis=0).to_numpy()))
-            return np.array([gentle_punt(weakest)] * n_candidates)
+            return self._project_forced_weights(np.array([gentle_punt(weakest)] * n_candidates))
 
         # The full seed menu, identical for every self-play pass and the serves (a menu the
         # serve has and the passes lack lets the serve discover lanes the field never
@@ -1703,6 +1731,11 @@ class HAgent:
             self._position_rosters_cache = None
             return scores
 
+        # A pinned column makes the seeds infeasible, and the menu is chosen by comparing their
+        # objectives -- so project before scoring or the seed choice is made on the wrong problem.
+        # (A punt seed for a pinned category collapses onto the balanced build, which is correct: that
+        # category is not a lane the optimiser may choose any more.)
+        seed_matrices = [self._project_forced_weights(matrix) for matrix in seed_matrices]
         seed_scores = score_seeds()
         best = np.argmax(seed_scores, axis=0)
         if self._pass_weights_history and self._current_batch_index is not None:
@@ -1715,6 +1748,72 @@ class HAgent:
                                  - seed_scores[incumbent_index])
             best = np.where(challenger_margin < _SEED_INCUMBENT_MARGIN, incumbent_index, best)
         return np.array([seed_matrices[b][i] for i, b in enumerate(best)])
+
+    def set_forced_category_weights(self, allow_force_weighting: bool, forced_category_weights: dict):
+        """Pin, repin, or release the forced category weights on an already-built agent.
+
+        Settable rather than construction-only because the pins do not enter the field build at all
+        (see `_forcing`), so changing one needs no rebuild -- the caller sets them, solves, and
+        releases them. Called by __init__ too, so the conversion has one implementation.
+
+        The typed weights are on the scale the UI DISPLAYS, where 100 is neutral emphasis:
+        services/ranking.py shows raw / v * 100. So a pin of `typed` asks for a raw weight of
+        (typed / 100) * v[category], and the conversion belongs here rather than in the API because
+        v is normalised over the categories THIS league uses. That keeps the round trip exact --
+        type 40, see 40.0 in the expand view -- which is what makes the feature self-checking, and
+        it is why the box scale was chosen to match the displayed one.
+
+        Raises ValueError when the pins leave the free categories no room. Deliberately not
+        silently rescaled: that would show the user a weight different from the one they typed.
+        """
+        columns = list(self.x_scores.columns)
+        self._forced_mask = np.zeros(self.n_categories, dtype=bool)
+        self._forced_raw  = np.zeros(self.n_categories)
+        if allow_force_weighting and forced_category_weights:
+            for category, typed in forced_category_weights.items():
+                # A blank box arrives as None and means "the optimiser sets this one". A category
+                # the league does not use is ignored rather than rejected, so switching categories
+                # cannot strand a session on a pin it can no longer honour.
+                if typed is None or category not in columns:
+                    continue
+                index = columns.index(category)
+                self._forced_mask[index] = True
+                self._forced_raw[index]  = max(float(typed), 0.0) / 100.0 * float(self.v[index, 0])
+        self._forced_budget = 1.0 - float(self._forced_raw[self._forced_mask].sum())
+        if self._forced_mask.any() and self._forced_budget < _FORCED_MINIMUM_BUDGET:
+            heavy = ', '.join(str(columns[i]) for i in np.flatnonzero(self._forced_mask))
+            raise ForcedWeightsInfeasibleError(
+                f'The forced category weights leave no room for the others: {heavy} together claim '
+                f'{100 * (1 - self._forced_budget):.0f}% of the total weight, and at most '
+                f'{100 * (1 - _FORCED_MINIMUM_BUDGET):.0f}% is allowed. Lower them and try again.')
+
+    @property
+    def _forcing(self):
+        """Whether pinned category weights apply to the solve in progress.
+
+        ONLY the user-facing solve is constrained. Everything that builds the field -- every bootstrap
+        and self-play pass, and the opponent model's best-response inference -- runs unconstrained,
+        because a pin is the user's own build and not a claim about what the other seats are doing.
+        Pinning the simulated field too would have the user and the field solving different problems
+        while the field's converged weights are fed back as beliefs about it."""
+        return (self._forced_mask is not None and self._forced_mask.any()
+                and not self._unconstrained_run and not self._opponent_inference_active)
+
+    def _project_forced_weights(self, category_weights):
+        """Hold the pinned columns at their targets and renormalise only the free ones.
+
+        Called after the simplex renormalisation, which is the subtle part: that step rescales EVERY
+        column, so masking the gradient and the step alone would leave a pinned weight drifting anyway.
+        The free columns are scaled to whatever the pins leave over, so each row still sums to one.
+        Mutates in place; every caller passes an array it just created."""
+        if not self._forcing:
+            return category_weights
+        free = ~self._forced_mask
+        category_weights[:, self._forced_mask] = self._forced_raw[self._forced_mask]
+        if free.any():
+            total = category_weights[:, free].sum(axis=1, keepdims=True)
+            category_weights[:, free] *= self._forced_budget / np.where(total > 0, total, 1.0)
+        return category_weights
 
     def perform_iterations(self
                            , category_weights
@@ -1844,6 +1943,12 @@ class HAgent:
             category_reg_lambda = reg_lambda * cold_row_multiplier
             neutral_row = self.v.reshape(1, self.n_categories)
 
+            # Both the cold seeds above and a warm start handed in by get_h_scores can sit off the
+            # constraint set -- the frozen table was built by the unconstrained field passes. Project
+            # once here so the very first gradient is evaluated at a feasible point.
+            if self._forcing:
+                category_weights = self._project_forced_weights(np.array(category_weights, dtype=float))
+
             for iteration in range(max(1, n_iterations)):
                 category_weights_current  = category_weights
                 position_shares_current   = position_shares
@@ -1871,8 +1976,21 @@ class HAgent:
                         and (iteration + 1) % refresh_interval == 0):
                     self._candidate_priority = np.argsort(-np.nan_to_num(score, nan=-np.inf))
 
-                cat_grad_centered = gradients['Categories'] - gradients['Categories'].mean(axis=1).reshape(-1, 1)
+                # Centring the gradient IS the simplex projection, so with columns pinned it has to
+                # average over the FREE columns only: the free weights live on a smaller simplex, and
+                # centring over all of them would point the projected gradient off the constraint set
+                # and systematically mis-step the unpinned weights. Easy to miss, because the line
+                # reads as bookkeeping rather than as one of the mutations.
+                if self._forcing:
+                    free_columns      = ~self._forced_mask
+                    cat_grad_centered = (gradients['Categories']
+                                         - gradients['Categories'][:, free_columns].mean(axis=1).reshape(-1, 1))
+                    cat_grad_centered[:, self._forced_mask] = 0.0
+                else:
+                    cat_grad_centered = gradients['Categories'] - gradients['Categories'].mean(axis=1).reshape(-1, 1)
                 cat_updates       = optimizers['Categories'].minimize(cat_grad_centered)
+                if self._forcing:
+                    cat_updates[:, self._forced_mask] = 0.0
                 category_weights  = category_weights + cat_updates
                 if reg_lambda > 0.0:
                     # L1 proximal step: shrink each weight toward neutral v by up to reg_lambda (a linear
@@ -1882,11 +2000,17 @@ class HAgent:
                     # for warm-started rows (see above), the full schedule for cold rows.
                     deviation        = category_weights - neutral_row
                     shrink           = np.minimum(category_reg_lambda, np.maximum(np.abs(deviation) - _REG_FLOOR, 0.0))
+                    if self._forcing:
+                        # The regulariser pulls toward neutral; a pinned weight is the user overriding
+                        # exactly that, so it must not be dragged back.
+                        shrink = np.broadcast_to(shrink, category_weights.shape).copy()
+                        shrink[:, self._forced_mask] = 0.0
                     category_weights = category_weights - np.sign(deviation) * shrink
                 category_weights[category_weights < 0] = 0
 
                 if self.sport == 'NBA':
                     category_weights = category_weights / category_weights.sum(axis=1).reshape(-1, 1)
+                    category_weights = self._project_forced_weights(category_weights)
                 # MLB: unsupported and unreachable — see the MLB note in __init__.
                 elif self.sport == 'MLB':
                     bw = category_weights[:, self.batting_stat_indices]
@@ -2745,8 +2869,20 @@ class HAgent:
         self._player_frozen_shares  = result['Position-Shares']
         self._populate_pass_scores  = None   # populate-scoped; default_h_scores ranks from here on
 
-    def _run_bootstrap_pass(self, empty, n_iterations, cash_remaining_per_team, candidate_subset=None,
-                            preserve_frozen_weights=False):
+    def _run_bootstrap_pass(self, *arguments, **keyword_arguments):
+        """Every bootstrap and self-play pass, with force-weighting suppressed -- see `_forcing`.
+
+        A pass-through wrapper, so the suppression cannot be forgotten at one of the seven call sites;
+        the solve itself is _solve_bootstrap_pass below."""
+        previous = self._unconstrained_run
+        self._unconstrained_run = True
+        try:
+            return self._solve_bootstrap_pass(*arguments, **keyword_arguments)
+        finally:
+            self._unconstrained_run = previous
+
+    def _solve_bootstrap_pass(self, empty, n_iterations, cash_remaining_per_team, candidate_subset=None,
+                              preserve_frozen_weights=False):
         """One empty-board base-H-score solve against the current _anchor_player_order field. Clears the
         per-pass warm start and inferred-opponent store first (the empty board has no real opponents, so
         only the committed archetype field differs between passes). candidate_subset narrows which players
