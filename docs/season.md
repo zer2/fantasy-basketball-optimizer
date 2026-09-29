@@ -6,7 +6,7 @@ The waiver wire tab evaluates whether an available player might fit better on an
 
 ![Waiver substitution H-scores](img/hwaiver.png)
 /// caption
-Substitution H-scores for Team 1, considering dropping its lowest-ranked player, based on the 2025-26 season
+Substitution H-scores for Team 1, considering dropping its lowest-ranked player, based on the 2025-26 season.
 ///
 
 The player who is a candidate to be dropped is removed from the team, and H-scores are calculated for all available players plus the drop candidate. The drop candidate is highlighted in blue. Players who do not fit the position structure of the team are filtered out and their H-scores are not shown. 
@@ -17,7 +17,7 @@ G-score expectation breakdowns are available through the drop-down arrow. Waiver
 
 ![Waiver G-score breakdown](img/hwaiverexp.png)
 /// caption
-A breakdown of how Sam Hauser contributes to a team in terms of G-score
+A breakdown of how Sam Hauser contributes to a team in terms of G-score.
 ///
 
 
@@ -74,7 +74,7 @@ Only players from the loaded dataset can be added to the roster table, which are
 
 ![Player search drop-down](img/rosterjokic.png)
 /// caption
-Nikola Jokic is still shown as an option after already being taken by another team
+Nikola Jokic is still shown as an option after already being taken by another team.
 ///
 
 Generally draft results can be copy-pasted from the drafting view into an Excel and then into this table, so long as the dataset of valid players remains the same.

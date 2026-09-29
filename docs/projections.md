@@ -30,7 +30,7 @@ Historical data is available going all the way back to the 1984-85 season, thoug
 
 ![1984-85 season H-scores](img/1984-85.png)
 /// caption
-H-scores for the 1984-85 season, Each Category. NP means no position
+H-scores for the 1984-85 season, Each Category. NP means no position.
 ///
 
 Historical data cannot be used when integrated with a fantasy platform, because platforms do not run leagues based on past seasons.  
