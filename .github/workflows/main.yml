@@ -1,58 +1,21 @@
-name: Tag, Docker Build and Publish
+name: Tag each merge
 on:
   push:
     branches:
       - main
 concurrency: production
+permissions:
+  contents: write   # to push the tag
 jobs:
-  Patch:
+  Tag:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       with:
         fetch-depth: '0'
     - name: Minor version for each merge
-      id: taggerDryRun
       uses: anothrNick/github-tag-action@1.36.0
       env:
-        GITHUB_TOKEN: ${{ secrets.REPO_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         WITH_V: true
-        DRY_RUN: true
-
-    - name: echo new tag
-      run: |
-        echo "The next tag version will be: ${{ steps.taggerDryRun.outputs.new_tag }}"
-    - name: echo tag
-      run: |
-        echo "The current tag is: ${{ steps.taggerDryRun.outputs.tag }}"
-    - name: echo part
-      run: |
-        echo "The version increment was: ${{ steps.taggerDryRun.outputs.part }}"
-    
-    - name: Setup AWS ECR Details
-      uses: aws-actions/configure-aws-credentials@v1
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: "us-east-1"
-
-    - name: Login to Amazon ECR
-      id: login-pf-aws-ecr
-      uses: aws-actions/amazon-ecr-login@v1
-      
-
-    - name: Build and push the tagged docker image to Amazon ECR
-      env:
-        ECR_REGISTRY: ${{ steps.login-pf-aws-ecr.outputs.registry }}
-        ECR_REPOSITORY: "optimizer_app"
-        IMAGE_TAG: ${{ steps.taggerDryRun.outputs.new_tag }}
-      run: |
-        docker build -f .devcontainer/Dockerfile -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-    
-    - name: Minor version for each merge
-      id: taggerFinal
-      uses: anothrNick/github-tag-action@1.36.0
-      env:
-        GITHUB_TOKEN: ${{ secrets.REPO_TOKEN }}
-        WITH_V: true
+        DEFAULT_BUMP: minor
