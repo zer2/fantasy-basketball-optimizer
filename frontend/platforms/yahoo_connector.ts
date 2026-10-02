@@ -6,7 +6,7 @@
 
 import { makeCustomSelect } from '../custom_select.js'
 import { makeLabel } from '../helper_functions.js'
-import { fetchLeagues, fetchYahooAuthUrl, submitYahooToken } from '../api/client.js'
+import { fetchLeagues, fetchYahooAuthUrl, submitYahooToken, PlatformLeague } from '../api/client.js'
 import { PlatformConnector, ConnectStatus } from './connector.js'
 import { makeConnectorDialog } from './connector_dialog.js'
 
@@ -21,6 +21,15 @@ function extractLeagueId(raw: string): string {
     if (!trimmed.includes('/')) return trimmed
     const numericSegments = trimmed.split(/[/?#]/).filter(segment => /^\d+$/.test(segment))
     return numericSegments.length > 0 ? numericSegments[numericSegments.length - 1] : trimmed
+}
+
+/** A league's dropdown label: its name and NBA season. Yahoo renews a league every year under the same name and lists
+ *  every season the account has played, so names alone read as a column of duplicates ('Ducks+' four times). Yahoo
+ *  numbers an NBA season by the year it starts: 2025 is 2025-26. */
+function formatLeagueLabel(league: PlatformLeague): string {
+    if (league.season === undefined) return league.name
+    const startYear = Number(league.season)
+    return `${league.name} (${startYear}-${String((startYear + 1) % 100).padStart(2, '0')})`
 }
 
 
@@ -105,7 +114,7 @@ export function makeYahooConnector(status: ConnectStatus): PlatformConnector {
             // Not a failure, and not worth a sentence: a mock draft is never listed, and the
             // select itself now says so. The league-ID box below is the way through.
         } else {
-            leagueSelect.setOptions(leagues.map(league => ({ value: league.id, label: league.name })))
+            leagueSelect.setOptions(leagues.map(league => ({ value: league.id, label: formatLeagueLabel(league) })))
         }
         status.clear()
     }
@@ -131,15 +140,29 @@ export function makeYahooConnector(status: ConnectStatus): PlatformConnector {
         if (exchangeInFlight) return
         exchangeInFlight = true
         setDialogProgress('Exchanging code...')
-        submitYahooToken(trimmed)
-            .then(() => loadLeagues())
-            .then(() => {
-                codeInput.value = ''
-                authButton.textContent = 'Re-authenticate with Yahoo'
-                dialog.close()
-            })
-            .catch(err => setDialogError(`Token exchange failed: ${err.message}`))
-            .finally(() => { exchangeInFlight = false })
+        exchangeCodeThenLoadLeagues(trimmed).finally(() => { exchangeInFlight = false })
+    }
+
+    /** The two steps report separately. A failure in the second used to read "Token exchange failed" although the
+     *  token was stored and re-authenticating would change nothing; past the exchange the account is connected, and
+     *  the league-ID box still works. */
+    async function exchangeCodeThenLoadLeagues(code: string): Promise<void> {
+        try {
+            await submitYahooToken(code)
+        } catch (err) {
+            setDialogError(`Token exchange failed: ${(err as Error).message}`)
+            return
+        }
+        codeInput.value = ''
+        authButton.textContent = 'Re-authenticate with Yahoo'
+        try {
+            await loadLeagues()
+        } catch (err) {
+            setDialogError(`Connected to Yahoo, but listing your leagues failed: ${(err as Error).message}. `
+                + 'Close this window and enter the league ID instead.')
+            return
+        }
+        dialog.close()
     }
 
     authButton.addEventListener('click', () => {

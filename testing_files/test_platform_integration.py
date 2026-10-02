@@ -2,6 +2,9 @@
 # Unit tests for the platform_integration package (Phase 0: Fantrax).
 
 import pandas as pd
+import pytest
+from yfpy.exceptions import YahooFantasySportsDataNotFound
+from yfpy.models import Game, League
 
 from backend.platform_integration.helpers import (
     deduplicate_team_names, build_platform_player_id_lookup,
@@ -212,6 +215,42 @@ def test_yahoo_build_auth_url():
     url = YahooIntegration.build_auth_url('myclient')
     assert 'client_id=myclient' in url
     assert 'response_type=code' in url
+
+
+class _QueryRaising:
+    """A stand-in for the account-level yfpy query whose games call raises `error`."""
+    def __init__(self, error): self.error = error
+    def get_user_games(self): raise self.error
+
+
+def test_yahoo_list_leagues_is_empty_for_an_account_with_no_nba_history(monkeypatch):
+    # yfpy reports an account that has never played Yahoo fantasy basketball as data-not-found; that is an empty list,
+    # not the 502 such an account got straight after authenticating
+    integration = YahooIntegration(auth_dir='unused')
+    monkeypatch.setattr(integration, '_bare_query', lambda: _QueryRaising(YahooFantasySportsDataNotFound('no games')))
+    assert integration.list_leagues() == []
+
+
+class _QueryWithOneSeason:
+    """A stand-in whose games call returns a single Game, unwrapped, as yfpy does for a one-season account."""
+    def get_user_games(self): return Game({'season': '2026', 'game_key': '466', 'game_id': '466', 'code': 'nba'})
+
+
+def test_yahoo_list_leagues_handles_an_account_with_one_season(monkeypatch):
+    # production 2026-10-01: iterating the lone Game yielded strings and list_leagues raised
+    # "'str' object has no attribute 'season'"
+    integration = YahooIntegration(auth_dir='unused')
+    monkeypatch.setattr(integration, '_bare_query', lambda: _QueryWithOneSeason())
+    monkeypatch.setattr(integration, '_leagues_in', lambda game: [League({'league_id': '123', 'name': 'Ducks+', 'season': game.season})])
+    assert integration.list_leagues() == [{'id': '123', 'name': 'Ducks+', 'season': '2026'}]
+
+
+def test_yahoo_list_leagues_still_raises_on_other_failures(monkeypatch):
+    # an expired token or a network failure must not read as "no leagues": only reconnecting fixes those
+    integration = YahooIntegration(auth_dir='unused')
+    monkeypatch.setattr(integration, '_bare_query', lambda: _QueryRaising(RuntimeError('token expired')))
+    with pytest.raises(RuntimeError):
+        integration.list_leagues()
 
 
 # ── ESPN (composite league id + roster mapping, no espn_api network) ───────────
