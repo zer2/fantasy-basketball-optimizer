@@ -293,17 +293,17 @@ class YahooIntegration(PlatformIntegration):
         promises [] for an account with no leagues, and such an account (someone trying the app with a mock draft,
         typically) got a 502 straight after authenticating before this. Every other failure still raises.
 
-        An account with exactly ONE season gets that Game back on its own, not in a list (yfpy wraps a single league
-        in get_user_leagues_by_game_key but not a single game here), and iterating a yfpy object yields its field
-        values: sorting it raised "'str' object has no attribute 'season'" -- a 502 for every new account with only
-        the current season (production, 2026-10-01)."""
+        An account with exactly ONE season gets {'game': Game} back, not a list: yfpy unwraps each {'game': ...}
+        entry only when there are several, and wraps a single league in get_user_leagues_by_game_key but not a single
+        game here. Iterating that dict yields the string 'game', so every new account with only the current season got
+        a 502 ("'str' object has no attribute 'season'", production 2026-10-01)."""
         if self._games is None:
             try:
                 games = self._bare_query().get_user_games()
             except YahooFantasySportsDataNotFound:
                 games = []
-            if not isinstance(games, list):
-                games = [games]
+            if isinstance(games, dict):
+                games = [games['game']]
             self._games = sorted(games, key=lambda game: int(game.season), reverse=True)
         return self._games
 

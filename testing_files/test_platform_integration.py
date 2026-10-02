@@ -4,7 +4,8 @@
 import pandas as pd
 import pytest
 from yfpy.exceptions import YahooFantasySportsDataNotFound
-from yfpy.models import Game, League
+from yfpy.models import League
+from yfpy.query import YahooFantasySportsQuery
 
 from backend.platform_integration.helpers import (
     deduplicate_team_names, build_platform_player_id_lookup,
@@ -231,18 +232,39 @@ def test_yahoo_list_leagues_is_empty_for_an_account_with_no_nba_history(monkeypa
     assert integration.list_leagues() == []
 
 
-class _QueryWithOneSeason:
-    """A stand-in whose games call returns a single Game, unwrapped, as yfpy does for a one-season account."""
-    def get_user_games(self): return Game({'season': '2026', 'game_key': '466', 'game_id': '466', 'code': 'nba'})
+class _CannedResponse:
+    def __init__(self, payload): self.payload, self.url, self.status_code = payload, 'canned', 200
+    def json(self): return self.payload
 
 
-def test_yahoo_list_leagues_handles_an_account_with_one_season(monkeypatch):
-    # production 2026-10-01: iterating the lone Game yielded strings and list_leagues raised
-    # "'str' object has no attribute 'season'"
+def _make_query_answering_games(seasons: list[str]) -> YahooFantasySportsQuery:
+    """A REAL yfpy query whose HTTP call returns Yahoo's games payload for `seasons`, so the shape list_leagues sees is
+    the one yfpy's own unpacking produces -- not a guess at it. A hand-made stand-in returning a bare Game is exactly
+    how the first one-season fix passed its test and still failed in production."""
+    games = {str(index): {'game': [{'game_key': str(400 + index), 'game_id': str(400 + index), 'season': season,
+                                    'code': 'nba'}]}
+             for index, season in enumerate(seasons)}
+    games['count'] = len(seasons)
+    payload = {'fantasy_content': {'users': {'0': {'user': [{'guid': 'someone'}, {'games': games}]}, 'count': 1}}}
+    query = object.__new__(YahooFantasySportsQuery)   # skips the constructor's OAuth handshake
+    query.offline = False
+    query.all_output_as_json_str = False
+    query.fantasy_content_data_field = 'fantasy_content'
+    query.game_code = 'nba'
+    query.executed_queries = []
+    query.get_response = lambda url: _CannedResponse(payload)
+    return query
+
+
+@pytest.mark.parametrize('seasons', [['2026'], ['2024', '2026', '2025']])
+def test_yahoo_list_leagues_handles_any_number_of_seasons(monkeypatch, seasons):
+    # production 2026-10-01: for one season yfpy returns {'game': Game}, not a list; iterating it yielded 'game' and
+    # list_leagues raised "'str' object has no attribute 'season'" (and then, wrapped in a list, "'dict' object ...")
     integration = YahooIntegration(auth_dir='unused')
-    monkeypatch.setattr(integration, '_bare_query', lambda: _QueryWithOneSeason())
-    monkeypatch.setattr(integration, '_leagues_in', lambda game: [League({'league_id': '123', 'name': 'Ducks+', 'season': game.season})])
-    assert integration.list_leagues() == [{'id': '123', 'name': 'Ducks+', 'season': '2026'}]
+    monkeypatch.setattr(integration, '_bare_query', lambda: _make_query_answering_games(seasons))
+    monkeypatch.setattr(integration, '_leagues_in', lambda game: [League({'league_id': f'league{game.season}', 'name': 'Ducks+', 'season': game.season})])
+    newest_first = sorted(seasons, reverse=True)
+    assert integration.list_leagues() == [{'id': f'league{season}', 'name': 'Ducks+', 'season': int(season)} for season in newest_first]
 
 
 def test_yahoo_list_leagues_still_raises_on_other_failures(monkeypatch):
