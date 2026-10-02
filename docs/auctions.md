@@ -38,7 +38,7 @@ The website uses a few different variations of this idea. Five different dollar 
 
 ![Auction candidate detail drop-down](img/auctiondetail.png)
 /// caption
-All of the computed dollar estimates, from a detailed drop-down 
+All of the computed dollar estimates, from a detailed drop-down.
 ///
 
 ### Converting G-score value to dollar value 
@@ -57,7 +57,7 @@ The H-score-based estimates are also somewhat more complicated than the G-score 
 
 ![H-score-based dollar values](img/hdollars.png)
 /// caption
-H-score-based $ values for a manager who has already taken Jokic
+H-score-based $ values for a manager who has already taken Jokic.
 ///
 
 H-scores are probabilities, not general values. They are converted into dollar values with two steps
@@ -87,7 +87,7 @@ SAVOR stands for Streaming-Adjusted Value Over Replacement. It adjusts for the f
 /// caption
 Why value concentrates at the top of an auction: a player's season is a distribution rather than
 a single number, and anyone below replacement level can be swapped out from the waiver wire, so
-the downside is capped and the upside is not
+the downside is capped and the upside is not.
 ///
 
 SAVOR takes an input parameter, $S_{\sigma}$ (S-sigma). It controls the degree to which players are expected to move up and down in dollar value across the season according to the SAVOR model. Its default value of 10 is sourced by vibes- different values may be just as or more reasonable. 

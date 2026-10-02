@@ -321,7 +321,13 @@ function appendCustomUploadRow(
     }
     customUploadRows.push(row)
 
-    uploadInput.addEventListener('change', async () => {
+    uploadInput.addEventListener('change', async (event) => {
+        // The Player Stats section rebuilds the session on any change inside it, reading each slot's
+        // dataId. Let this event through and that rebuild runs NOW, while the upload is still in
+        // flight, with the slot's PREVIOUS data — and nothing rebuilds again when the new id lands.
+        // So this event stops here, and the handler announces the change itself once the slot holds
+        // the id the rebuild should use (see announceUploadChanged).
+        event.stopPropagation()
         const file = uploadInput.files?.[0]
         if (!file) return
         statusSpan.textContent = 'Uploading…'
@@ -352,14 +358,22 @@ function appendCustomUploadRow(
             slider.value = '0'
             valueDisplay.textContent = '0.00'
             saveCustomUploads()
-            // Browsers don't fire change when the same file is re-selected while the
-            // input still holds it — and retrying the same file is the normal recovery
-            // from a failure. Clear the input so the retry fires. On success the input
-            // keeps the filename (clearing it would display "No file chosen" beside a
-            // live upload); the expiry path clears it too, in markUploadedSourcesExpired.
-            uploadInput.value = ''
         }
+        // Browsers don't fire change when the same file is chosen again while the input still
+        // holds it — and choosing it again is exactly what re-uploading an edited file, or retrying
+        // a failed one, looks like. So the input is cleared after EVERY attempt. The input itself is
+        // visually hidden and the filename is drawn by fileNameLabel, so clearing it shows nothing.
+        uploadInput.value = ''
+        announceUploadChanged(uploadRow)
     })
+}
+
+/** Tells the Player Stats section that a slot's upload changed, once the slot holds the data id
+ *  a rebuild should use. Dispatched from the slot's row rather than the file input (whose own
+ *  change event is stopped) and never from an id starting "ps-w-", so the section treats it as
+ *  a change of which players exist, not a re-weighting of the same pool. */
+function announceUploadChanged(uploadRow: HTMLElement): void {
+    uploadRow.dispatchEvent(new Event('change', { bubbles: true }))
 }
 
 // ─── Getter ───────────────────────────────────────────────────────────────────

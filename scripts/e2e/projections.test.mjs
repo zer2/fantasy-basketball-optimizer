@@ -193,6 +193,70 @@ test('projection blend weights', async t => {
                       'the reloaded page should evaluate cleanly with the restored upload')
             expectCleanSession(app, 'reload with the restored upload')
         })
+
+        await t.test('re-uploading an edited file under the same name refreshes the data', async () => {
+            // The regression: a user uploads a file missing a stat, adds the stat, and uploads the
+            // file again under the same name. Two things kept the old data. The file input kept the
+            // file after a successful upload, so the browser fired no change event for the same
+            // name again; and when an upload did fire, its change event rebuilt the session at once,
+            // while the upload was still in flight, with the slot's PREVIOUS data id. (Playwright's
+            // setInputFiles dispatches change itself, so the first cause is checked by its
+            // mechanism: the input must be empty after an upload.)
+            const pooledPlayers = await page.evaluate(() =>
+                [...document.querySelectorAll('#hscoretable .playername')].slice(0, 30)
+                    .map(span => ({
+                        name:     span.childNodes[0].textContent.trim(),
+                        position: span.querySelector('.player-positions')?.textContent ?? '',
+                    })))
+            const withoutBlocks = 'Name,Pos,g,p/g,r/g,a/g,s/g,to/g,3/g,fg%,fga/g,ft%,fta/g\n'
+                + pooledPlayers.map(({ name, position }) =>
+                    `${name},"${position}",70,20.0,8.0,4.0,1.0,2.0,2.0,0.5,15.0,0.8,5.0`).join('\n')
+            const withBlocks = 'Name,Pos,g,p/g,r/g,a/g,s/g,b/g,to/g,3/g,fg%,fga/g,ft%,fta/g\n'
+                + pooledPlayers.map(({ name, position }) =>
+                    `${name},"${position}",70,25.0,9.0,5.0,1.5,2.5,2.0,2.5,0.5,18.0,0.8,6.0`).join('\n')
+
+            const sentDataIds = []
+            page.on('request', request => {
+                if (!request.url().includes('/sessions') || !['POST', 'PATCH'].includes(request.method())) return
+                const ids = request.postDataJSON()?.data_source?.custom_data_ids
+                if (Array.isArray(ids)) sentDataIds.push(ids)
+            })
+            const uploadInput = page.locator('#ps-upload-custom-1')
+            const uploadStatus = page.locator('#ps-upload-custom-1 ~ .sidebar-caption')
+            // the reload in the previous test collapses the Player Stats section, hiding the status line
+            await uploadInput.evaluate(el => { const d = el.closest('details'); if (d && !d.open) d.open = true })
+            async function uploadAs(csvText) {
+                const responsePromise = page.waitForResponse(r => r.url().includes('/data/upload'))
+                await uploadInput.setInputFiles({ name: 'edited-projections.csv', mimeType: 'text/csv', buffer: Buffer.from(csvText) })
+                const response = await responsePromise
+                assert.ok(response.ok(), `the upload was rejected: ${response.status()} ${await response.text()}`)
+                const dataId = (await response.json()).data_id
+                await uploadStatus.filter({ hasText: 'players loaded' }).waitFor({ timeout: 15000 })
+                await waitAppSettled(app, { timeout: 120000 })
+                return dataId
+            }
+
+            const firstId = await uploadAs(withoutBlocks)
+            assert.match(await uploadStatus.textContent(), /\(no [^)]*\)/, 'the first file is missing a stat, and says so')
+            assert.equal(await uploadInput.inputValue(), '',
+                         'after an upload the input must be empty, or choosing the same file again fires nothing')
+            await setBlendWeight('ps-w-custom-1', 1)
+            const firstSnapshot = await readCandidateSnapshot()
+
+            sentDataIds.length = 0
+            const secondId = await uploadAs(withBlocks)
+            assert.notEqual(secondId, firstId, 'each upload is stored under its own id')
+            assert.doesNotMatch(await uploadStatus.textContent(), /\(no [^)]*\)/,
+                                'the edited file has every stat, so the missing-stats note must go')
+            assert.ok(sentDataIds.length > 0, 'the re-upload must rebuild the session')
+            assert.ok(sentDataIds.every(ids => ids.includes(secondId) && !ids.includes(firstId)),
+                      `every rebuild after the re-upload must carry the new id, never the old one — sent: ${JSON.stringify(sentDataIds)}`)
+            assert.notDeepEqual(await readCandidateSnapshot(), firstSnapshot,
+                                'the edited projections must change the results')
+            expectCleanSession(app, 're-upload of an edited file')
+
+            await setBlendWeight('ps-w-custom-1', 0)
+        })
     } finally {
         await app.close()
     }

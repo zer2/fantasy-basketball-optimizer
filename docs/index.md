@@ -10,7 +10,7 @@ The algorithm is primarily designed for [drafting](drafts.md), but can be applie
 
 ![The website in draft mode](img/main.png)
 /// caption
-The website in drafting mode, with manual player entry
+The website in drafting mode, with manual player entry.
 ///
 
 Please note that the algorithm is based on a simplified model of fantasy basketball, ignoring many practical considerations, and there is no guarantee that using it will lead to success. Don't expect to automatically win your league with it or even to have a better shot than anyone else.
@@ -48,6 +48,7 @@ The website's calculations take a number of user-configurable parameters, availa
 | M (pool size) | How many reasonable players are available per pick in the future pick model. Effectively, a punting aggressiveness dial  | [H-scoring → H-scoring parameters](hscores.md#h-scoring-parameters) |
 | C (confidence) | Confidence in other drafters using an H-scoring like algorithm. 0 -> neutral, 1 -> using H-scoring | [H-scoring → No model of other managers](hscores.md#no-model-of-other-managers) |
 | λ (lambda) | How strongly early-round category weights are held near balanced, preserving room to pivot | [H-scoring → Only one strategy is evaluated](hscores.md#only-one-strategy-is-evaluated) |
+| Weight pinning | Whether category weights can be fixed by hand, in boxes at the top of the H-score table. Categories left on "auto" are optimized as normal | [H-scoring → Category weights](hscores.md#category-weights) |
 | Number of iterations | How long the H-scoring algorithm runs | [H-scoring → H-scoring parameters](hscores.md#h-scoring-parameters) |
 | Position requirements | The roster/position structure a team must satisfy | [H-scoring → Position structure](hscores.md#position-structure) |
 | υ, ψ (upsilon, psi) | How projections account for injuries and replacement players | [Player Stats → Injury handling](projections.md#injury-handling) |

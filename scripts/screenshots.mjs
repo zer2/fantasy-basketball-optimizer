@@ -124,6 +124,25 @@ async function clearDraftBoard(page) {
     if (await clearBtn.count()) { await clearBtn.first().click(); await waitEval(page) }
 }
 
+// Weight pinning: the "Weight pinning" checkbox in Model Parameters adds a row of pin boxes to the top of the
+// candidate table. The pins live in saved preferences, so a shot that sets them must clear them afterwards.
+async function setWeightPinning(page, on) {
+    await expandSection(page, /Model Parameters/i)
+    const toggle = page.locator('#mp-allow-force-weighting')
+    if ((await toggle.isChecked()) !== on) {
+        await toggle.click()
+        await waitEval(page)
+    }
+}
+
+// Type a pin for one category (blank = release it). The box's title names its category.
+async function pinCategory(page, category, value) {
+    const box = page.locator(`.forced-weights-row input[title^="Pin ${category}'s weight"]`)
+    await box.fill(value === null ? '' : String(value))
+    await box.press('Tab')          // commits the value: the box listens for "change"
+    await waitEval(page)
+}
+
 // Autopilot hides the seat selector while it runs and restores it when done. Wait for it to go hidden
 // (autopilot started) and then visible again (finished) — robust to a full-board run taking minutes.
 async function waitAutopilotDone(page) {
@@ -291,6 +310,18 @@ const STATES = {
         await setSelect(page, 'seat-select', 'Team 1')  // evaluate from Team 1's perspective
         await waitEval(page)
         await expandCandidateByName(page, 'Dyson Daniels')
+    },
+
+    // Weight pinning on, a clean board, Free Throw % pinned at 25 (the pin boxes use the displayed
+    // "100 = neutral" scale). The shot's `after` step unpins and switches pinning off again.
+    async 'draft-pinned'(page) {
+        await ensure(page, 'draft-EC')
+        await clearDraftBoard(page)
+        await setWeightPinning(page, true)
+        await page.locator('.forced-weights-row').first().waitFor({ timeout: 20000 })
+        await pinCategory(page, 'Free Throw %', 25)
+        await waitCandidateRows(page)
+        await page.waitForTimeout(300)
     },
 
     // Toggle two drafters' autodraft "A" squares on so they highlight in the entry-table header.
@@ -545,6 +576,9 @@ const SHOTS = [
     { name: 'hstrat',      state: 'candidate',   selector: '[data-testid="future-pick-strategy-table"]' },
     { name: 'hflex',       state: 'candidate',   selector: '[data-testid="flex-allocations-table"]' },
     { name: 'hroster',     state: 'candidate',   selector: '[data-testid="roster-assignments-table"]' },
+    // The top of the H-score table with weight pinning on and Free Throw % pinned at 25 (hscores.md).
+    { name: 'hpinning',    state: 'draft-pinned', selector: '#hscoretable', rows: 6,
+      after: async page => { await pinCategory(page, 'Free Throw %', null); await setWeightPinning(page, false) } },
     // #right-header holds the pick-control row and the board grid together in own-data mode.
     { name: 'mdraft',      state: 'draft-manual', selector: '#right-header' },
     // autodraft is defined LAST (before the platform shots) — toggling the "A" autodrafters kicks
@@ -656,6 +690,10 @@ async function captureShot(page, s) {
         else if (s.union) await shootUnion(page, s)
         else if (s.rows) await shootRows(page, s.name, s.selector, s.rows)
         else await shoot(page, s.name, s.selector)
+        if (s.after) {
+            await s.after(page)
+            current = null      // the after-step undid the state, so the next shot must re-establish its own
+        }
         return true
     } catch (err) {
         console.error(`✗ ${s.name}: ${err.message}`)
