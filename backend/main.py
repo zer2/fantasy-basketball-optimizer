@@ -13,6 +13,15 @@ import socket
 import time
 import logging
 
+# yahoo_oauth (a yfpy dependency) calls logging.setLoggerClass on import, installing a class that sets EVERY logger
+# created afterwards to DEBUG with its own stderr handler -- the Snowflake connector's, urllib3's, every library's, not
+# only its own. In production that sent library DEBUG chatter to Cloud Logging with tracebacks attached, and Cloud Run
+# files a traceback on stderr as an ERROR: the Snowflake connector's harmless, caught failure to import the optional
+# opentelemetry package appeared as an error on every query. Import it first and put the standard class back, so that
+# every logger created from here on is an ordinary one.
+import yahoo_oauth  # noqa: F401  (imported for its side effect, which is then undone)
+logging.setLoggerClass(logging.Logger)
+
 import urllib3.util.connection
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,18 +30,13 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 
-# Configure our loggers BEFORE importing the routers. The Yahoo integration (pulled in by the
-# platforms router) imports yahoo_oauth, which calls logging.setLoggerClass to install a logger
-# class that auto-attaches a handler to every logger created afterwards — duplicating and
-# reformatting log lines process-wide. Creating 'fbbo' / 'fbbo.api' here means they already exist
-# (clean) when the routers' getLogger calls run; the hijack only affects loggers created after it.
+# Our loggers: 'fbbo' owns one stderr handler at INFO, and every 'fbbo.*' logger reports through it.
 _fbbo_logger = logging.getLogger('fbbo')
 _fbbo_logger.setLevel(logging.INFO)
 _fbbo_handler = logging.StreamHandler()   # -> stderr, captured by Cloud Run / Cloud Logging
 _fbbo_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(name)s: %(message)s'))
 _fbbo_logger.addHandler(_fbbo_handler)
 _fbbo_logger.propagate = False   # this logger owns its handler; don't also emit via the root logger
-logging.getLogger('fbbo.api')    # instantiate now (clean), before the hijack fires below
 
 # Outbound HTTP resolves IPv4 only.
 #
@@ -58,10 +62,6 @@ from backend.api.routers import auth, reference, health, data, sessions, ranking
 # cap how fast one caller can ask for the expensive work, and malformed configuration should stop
 # the process rather than surface on an unlucky request.
 configure_rate_limits()
-
-# Undo yahoo_oauth's logging.setLoggerClass hijack (fired during the router imports above) so the
-# rest of the process's loggers behave normally. Our 'fbbo'* loggers were created before it.
-logging.setLoggerClass(logging.Logger)
 
 
 app = FastAPI(title='Fantasy Basketball Optimizer', version='1.0.0')
