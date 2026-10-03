@@ -30,7 +30,7 @@ import {
     renderFormatAndCategories, getScoringFormat, getMostCategoriesWeight, getTiebreakerCategory,
     getSelectedCategories, isCategorySelectionValid,
 } from './setting_collection/format_and_categories.js'
-import { renderPlayerStats, getPlayerStatsSettings, waitForSeasons, markUploadedSourcesExpired } from './setting_collection/player_stats.js'
+import { renderPlayerStats, getPlayerStatsSettings, waitForSeasons } from './setting_collection/player_stats.js'
 import { renderModelSettings, refreshFormatParameterControls, refreshStreamingNoiseControl, getModelSettings } from './setting_collection/model_parameters.js'
 import { renderSlotCounts, getSlotCounts, isSlotCountsValid, revalidateSlotCounts } from './setting_collection/slot_counts.js'
 
@@ -271,14 +271,6 @@ const applyPlayerStats = async (signal?: AbortSignal, keepsPlayerPool = false) =
         .then(() => { if (!signal || !signal.aborted) applyLayout() })
         .catch(err => {
             if (err.name === 'AbortError') return
-            // A dead upload id (backend restart, or the upload store's TTL) fails every
-            // patch that carries it, regardless of what the user changed. Surface it on
-            // the upload's status line, drop the dead ids, and retry without them so the
-            // rest of the change still lands.
-            if (String(err).includes('data_id') && markUploadedSourcesExpired()) {
-                applyPlayerStats(signal, keepsPlayerPool)
-                return
-            }
             console.error('Player stats apply failed:', err)
             showFailureInTable(err)
         })
@@ -401,18 +393,6 @@ waitForSeasons()
     .then(() => runModeEval())
     .then(() => applyLayout())
     .catch(err => {
-        // A remembered upload id can be dead by first load (backend restart, or the upload
-        // store's TTL), which fails the session create before anything renders. Same recovery
-        // as the player-stats patch path: say so on the upload's status line, forget the dead
-        // ids, and load once more without them.
-        if (String(err).includes('data_id') && markUploadedSourcesExpired()) {
-            return runModeEval()
-                .then(() => applyLayout())
-                .catch(retryErr => {
-                    console.error('Initial load failed after dropping expired uploads:', retryErr)
-                    showFailureInTable(retryErr)
-                })
-        }
         console.error('Initial load failed:', err)
         showFailureInTable(err)
     })

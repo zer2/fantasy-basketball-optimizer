@@ -8,7 +8,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
     launchAppPage, loadApp, expectCleanSession, drainSessionFailures, waitAppSettled,
-    setSelect, lockInDraftPick, pickControlButton, countBoardCellsWithPlayer,
+    setSelect, lockInDraftPick, pickControlButton, countBoardCellsWithPlayer, APP,
 } from './helpers.mjs'
 
 test('projection blend weights', async t => {
@@ -256,6 +256,47 @@ test('projection blend weights', async t => {
             expectCleanSession(app, 're-upload of an edited file')
 
             await setBlendWeight('ps-w-custom-1', 0)
+        })
+
+        await t.test('an expired upload is dropped on any rebuild, not reported as a server error', async () => {
+            // The 2026-10-03 failure: after a few days away the session had expired AND the upload store had forgotten
+            // the file. Connecting Yahoo rebuilt the session with the dead upload id, the create 404'd, and the table
+            // said "Something went wrong on the server" -- the expired-upload recovery lived only on the first-load
+            // and Player Stats paths. Here the rebuild comes from a model parameter, another path that had none.
+            await setBlendWeight('ps-w-custom-1', 1)
+            const uploadStatus = page.locator('#ps-upload-custom-1 ~ .sidebar-caption')
+            // The server's real answer for a dead id, served for this one upload: the store cannot be aged from here.
+            const isSessionCreate = url => new URL(url).pathname === '/sessions'
+            const answerAsExpired = async route => {
+                const ids = route.request().postDataJSON()?.data_source?.custom_data_ids ?? []
+                if (route.request().method() !== 'POST' || ids.length === 0) return route.continue()
+                await route.fulfill({ status: 404, contentType: 'application/json',
+                                      body: JSON.stringify({ detail: `data_id '${ids[0]}' not found or expired.` }) })
+            }
+            await page.route(isSessionCreate, answerAsExpired)
+            try {
+                const sessionId = app.sessionRequestLog.findLast(entry => entry.includes('/sessions/'))
+                    .match(/\/sessions\/([^/]+)/)[1]
+                assert.equal((await fetch(`${APP}/sessions/${sessionId}`, { method: 'DELETE' })).status, 204)
+
+                const upsilonInput = page.locator('#mp-upsilon')
+                await upsilonInput.evaluate(el => { const d = el.closest('details'); if (d && !d.open) d.open = true })
+                await upsilonInput.fill(String(parseFloat(await upsilonInput.inputValue()) + 0.05))
+                await upsilonInput.evaluate(el => el.blur())
+                await waitAppSettled(app, { timeout: 120000 })
+            } finally {
+                await page.unroute(isSessionCreate, answerAsExpired)
+            }
+
+            assert.match(await uploadStatus.textContent(), /Upload expired/, 'the upload slot must say why it emptied')
+            assert.equal(await page.locator('#hscoretable .table-message-error').count(), 0,
+                         'an expired upload is not a server error and must not be shown as one')
+            assert.ok(await page.locator('#hscoretable .playerheaderdiv').count() > 0,
+                      'the rebuild must go through without the dead upload')
+            const { failures, errors } = drainSessionFailures(app)
+            assert.ok(failures.every(failure => failure.startsWith('404')),
+                      `only the dead session's and dead upload's 404s are expected — saw: ${failures.join(' | ')}`)
+            assert.deepEqual(errors, [], 'the recovery must not log errors')
         })
     } finally {
         await app.close()
