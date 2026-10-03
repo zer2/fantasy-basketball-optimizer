@@ -5,9 +5,9 @@
 // logic lives in api/session.ts, table/player_table.ts, and layout.ts.
 
 import { createSection, addApplyBtn, makeSidebarToggle, MOBILE_BREAKPOINT_PX } from './helper_functions.js'
-import { makeDebouncer } from './api/session.js'
+import { makeDebouncer, withDisplayOwnership } from './api/session.js'
 import { setSportConfig } from './app_state.js'
-import { createOrPatchSession, runEvaluate, clearFullTeamResult, showDefaultRankings } from './api/draft_and_auction_session.js'
+import { createOrPatchSession, runEvaluate, clearFullTeamResult, showDefaultRankings, SEASON_PLATFORM_CONNECTED } from './api/draft_and_auction_session.js'
 import { runSeasonInit, refreshSeasonRostersFromPlatform, clearLivePlatformRosters } from './api/season_session.js'
 import { fetchConfig } from './api/client.js'
 import { fetchCurrentUser, setSignedInUser } from './api/auth.js'
@@ -157,14 +157,20 @@ function patchSessionForModeChange(): void {
 // that state clears the cache so the grid reverts to defaults.
 function refreshSeasonRostersIfLive(): void {
     const { platform, mode } = getLeagueSettings()
-    if (mode === 'Season Mode' && platform !== 'Enter your own data') {
-        refreshSeasonRostersFromPlatform()
+    // Only a connected league has rosters to pull. Polling before the connection reached the session was refused
+    // outright (the session had no platform config yet), and then nothing polled again: the connection itself is
+    // what triggers the poll now, via SEASON_PLATFORM_CONNECTED below.
+    if (mode === 'Season Mode' && platform !== 'Enter your own data' && isPlatformConnected()) {
+        withDisplayOwnership({ busy: 'fetching', onSuccess: 'idle', onFailure: 'idle' }, () => refreshSeasonRostersFromPlatform())
             .then(() => applyLayout())
             .catch(err => console.error('Season roster refresh failed:', err))
     } else {
         clearLivePlatformRosters()
     }
 }
+// Connecting in Season Mode changes neither the mode nor the platform, so the two listeners below never fired for
+// it and the grid stayed blank under the default team names until the user toggled one of them.
+document.addEventListener(SEASON_PLATFORM_CONNECTED, refreshSeasonRostersIfLive)
 // One listener per select, with the steps in explicit order — the sequencing used to be
 // three separate listeners relying on registration order. Step 1's buildTableHeader (inside
 // the apply chain) must precede step 2's applyLayout, which reads hscoretable.style.width.

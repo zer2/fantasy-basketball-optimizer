@@ -10,7 +10,7 @@ import { renderWaiverControls } from './data_entry/season/season_waiver.js'
 import { getAuctionState }     from './data_entry/auction_state.js'
 import { getDraftState }       from './data_entry/draft_state.js'
 import { renderTeamGScoreTable } from './table/gscore_table.js'
-import { getLeagueSettings, isPlatformConnected } from './setting_collection/league_settings.js'
+import { getLeagueSettings, isPlatformConnected, PLATFORM_SELECTION_CHANGED } from './setting_collection/league_settings.js'
 import { getCurrentSeat } from './app_state.js'
 import {
     getFullTeamResult, refreshLiveAnalysis, getLivePlayerAssignments, LIVE_BOARD_UPDATED,
@@ -149,7 +149,12 @@ function showLiveLayout(mode: string): void {
     refreshButton.textContent  = 'Refresh Analysis'
     refreshButton.disabled     = !isPlatformConnected()
     refreshButton.addEventListener('click', () => {
-        if (refreshButton.disabled) return
+        // Asked again rather than read off `disabled`: re-authenticating with Yahoo reloads its league list, which can
+        // change the selected league without any event the button hears.
+        if (!isPlatformConnected()) {
+            reflectConnectionInLiveControls({ ownsIndicator: true })
+            return
+        }
         refreshLiveAnalysis().catch(err => {
             console.error('Refresh analysis failed:', err)
             showFailureInTable(err)
@@ -184,6 +189,28 @@ function showLiveLayout(mode: string): void {
 function removeLiveRefreshButton(): void {
     document.getElementById('live-refresh-btn')?.remove()
 }
+
+/**
+ * Brings the live controls in line with whether the selected league is the connected one.
+ *
+ * Neither connecting nor changing the league selection draws a new layout -- the live layout went up when the platform
+ * was picked -- so without this the button kept the state it was drawn with: disabled forever after a connect, and
+ * enabled (polling the OLD league) after the user typed or picked another. The indicator follows a change of answer
+ * only, so an edit that leaves the answer as it was never stamps over an evaluate in flight -- and only when
+ * `ownsIndicator`: after a connect, the patch and evaluate that follow own it.
+ */
+function reflectConnectionInLiveControls({ ownsIndicator }: { ownsIndicator: boolean }): void {
+    const refreshButton = document.getElementById('live-refresh-btn') as HTMLButtonElement | null
+    if (refreshButton === null) return
+    const isConnected = isPlatformConnected()
+    if (refreshButton.disabled === !isConnected) return
+    refreshButton.disabled = !isConnected
+    if (!ownsIndicator) return
+    claimDisplay()
+    setIndicatorState(isConnected ? 'idle' : 'unconnected')
+}
+document.addEventListener('platform-connected', () => reflectConnectionInLiveControls({ ownsIndicator: false }))
+document.addEventListener(PLATFORM_SELECTION_CHANGED, () => reflectConnectionInLiveControls({ ownsIndicator: true }))
 
 // ─── Season layout ────────────────────────────────────────────────────────────
 

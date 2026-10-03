@@ -11,7 +11,7 @@ import { runEvaluate, clearFullTeamResult } from '../api/draft_and_auction_sessi
 import { setAutopilotOn, setAutopilotOff } from '../api/session.js'
 import { getDrafterMethod } from './drafter_methods.js'
 import { makeAutodraftToggle } from './autodraft_toggle.js'
-import { getTeamLabel, defaultTeamLabel, makeTeamLabelInput } from './team_labels.js'
+import { getTeamLabel, defaultTeamLabel, makeTeamLabelInput, TEAM_LABELS_CHANGED } from './team_labels.js'
 import { setSeatSelectorVisible } from '../seat_selector.js'
 import { getTeamIdentitiesFromSidebar } from '../setting_collection/league_settings.js'
 import {
@@ -213,11 +213,16 @@ function buildPickControl(container: HTMLElement): HTMLElement {
 
     const label = document.createElement('div')
     label.className = 'pick-control-label'
-    label.textContent = isDone
+    const describePick = (): string => isDone
         ? 'Draft complete'
         : isAutopilot
             ? `${getTeamLabel(pickDrafterVal)} (${currentMode})`
             : `Select Pick ${pickRowVal + 1} for ${getTeamLabel(pickDrafterVal)}`
+    label.textContent = describePick()
+    // Renaming a team in its header does not rebuild this control (it is rebuilt on picks), so it would keep the
+    // old name. Relabelled in place: rebuilding the board here would take focus from the header being typed in.
+    document.addEventListener(TEAM_LABELS_CHANGED, () => { label.textContent = describePick() },
+                              { signal: pickListenerController?.signal })
     row.append(label)
 
     if (_autopilotRunning) {
