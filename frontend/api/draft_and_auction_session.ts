@@ -157,6 +157,10 @@ export async function createOrPatchSession(
 }
 
 
+/** Fired (on document) once a Season Mode connection has reached the session, so main.ts can load the
+ *  league's rosters into the grid. */
+export const SEASON_PLATFORM_CONNECTED = 'season-platform-connected'
+
 // When a live platform connects, patch the session so it carries the platform's config
 // (which drives the draft-state poll + name lookup) and the platform's drafter/pick counts.
 // A patch suffices: the loaded player data is untouched, so the session does not need to be
@@ -186,8 +190,11 @@ document.addEventListener('platform-connected', () => {
             // own naming for unclaimed mock seats — leaves the seat exactly where it was.
             // Evaluating after the patch, not beside it, because the patch is what puts the
             // platform config and the league's counts on the session this reads.
-            // Season Mode fills its roster grid instead, from main.ts.
+            // Season Mode has no evaluate to run: it fills its roster grid instead, which main.ts owns. It is
+            // told here, after the patch, for the same reason the evaluate waits for it -- the roster poll reads
+            // the platform config this patch puts on the session.
             if (getMode() !== 'Season Mode') return runEvaluate()
+            document.dispatchEvent(new Event(SEASON_PLATFORM_CONNECTED))
         })
         .catch(err => {
             console.error('Platform connect patch failed:', err)

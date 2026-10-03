@@ -9,7 +9,7 @@ import { buildPlayerOption, makeMinimalPlayerDisplay } from '../player_display.j
 import { getTeamIdentitiesFromSidebar } from '../setting_collection/league_settings.js'
 import { makeDebouncer } from '../api/session.js'
 import { runEvaluate } from '../api/draft_and_auction_session.js'
-import { getTeamLabel, makeTeamLabelInput } from './team_labels.js'
+import { getTeamLabel, makeTeamLabelInput, TEAM_LABELS_CHANGED } from './team_labels.js'
 import {
     AuctionConfig,
     getPicks, getTeamIdentitiesFromBoard, getNDrafters, getNPicks, getCashPerTeam, getConfigKey, getHistory,
@@ -104,18 +104,22 @@ function buildPickControl(container: HTMLElement): HTMLElement {
     // Drafter dropdown — before cost so the cap makes sense visually; full teams excluded.
     // Option value is the team identity ("Team N", mapped back via indexOf on lock-in); the
     // shown label is the editable display label.
-    const availableTeamOptions = getTeamIdentitiesFromBoard()
+    const listAvailableTeamOptions = () => [{ value: '', label: '' }, ...getTeamIdentitiesFromBoard()
         .map((name, index) => ({ value: name, label: getTeamLabel(index), index }))
         .filter(({ index }) => currentPicks.some(pickRow => pickRow[index] === null))
-        .map(({ value, label }) => ({ value, label }))
+        .map(({ value, label }) => ({ value, label }))]
     const teamSel = makeCustomSelect(
         'auction-pick-team',
-        [{ value: '', label: '' }, ...availableTeamOptions],
+        listAvailableTeamOptions(),
         undefined,
         undefined,
         auctionListenerController?.signal,
     )
     teamSel.element.style.width = '100%'
+    // Renaming a team in its header does not rebuild this row (it is rebuilt on picks), so the options would keep the
+    // old name. Relabelled in place, keeping the chosen drafter: values are identities, which a rename leaves alone.
+    document.addEventListener(TEAM_LABELS_CHANGED, () => teamSel.setOptions(listAvailableTeamOptions()),
+                              { signal: auctionListenerController?.signal })
     const teamCol = makePickCol('Drafter', teamSel.element)
     teamCol.style.flex = '1'
     row.append(teamCol)

@@ -40,6 +40,10 @@ interface ConnectedTo {
 }
 let connectedTo: ConnectedTo | null = null
 
+/** Fired (on document) when a connector's controls change, which may make them name a league other than the
+ *  connected one. Listeners re-ask isPlatformConnected rather than assume the answer. */
+export const PLATFORM_SELECTION_CHANGED = 'platform-selection-changed'
+
 // The mode/platform select handles, exposed so main.ts can attach its change listeners to
 // the widgets' own event roots instead of reaching through this section's DOM nesting.
 let modeSelectHandle: ReturnType<typeof makeCustomSelect> | null = null
@@ -151,6 +155,11 @@ export function renderLeagueSettings(container: HTMLElement): void {
     platformSelectHandle = platformSelect
     platformSelect.element.addEventListener('change', () => {
         savePref('platform', platformSelect.getValue())
+        // A connection narrows the modes to what its platform supports (ESPN: Season only). That narrowing belongs to
+        // the connection, so it ends with it: without this, connecting ESPN and switching to own data left Draft and
+        // Auction unselectable until a reload. Connecting the new platform narrows them again. Silent, and keeps the
+        // current mode.
+        modeSelect.setOptions(DRAFT_MODE_OPTIONS.map(m => ({ value: m, label: m })))
     })
     platformCell.append(platformSelect.element)
     grid.append(platformCell)
@@ -239,6 +248,12 @@ export function renderLeagueSettings(container: HTMLElement): void {
     for (const connector of connectors) {
         connector.element.style.display = 'none'
         connectCell.append(connector.element)
+        // Typing another league id or picking another league ends the connection as far as isPlatformConnected is
+        // concerned, but nothing on screen asked it: Refresh Analysis stayed enabled and polled the OLD league while
+        // the sidebar named the new one. Every connector control's edit bubbles through here.
+        for (const eventName of ['input', 'change']) {
+            connector.element.addEventListener(eventName, () => document.dispatchEvent(new Event(PLATFORM_SELECTION_CHANGED)))
+        }
     }
 
     const connectButton = document.createElement('button')
@@ -423,6 +438,10 @@ export function getLeagueSettings(): {
  * 'Enter your own data' (or a live platform with no league ID entered yet).
  */
 export function getPlatformConfig(): { league_id: string; division_id?: string | null } | null {
+    // The CONNECTED league, not whatever the controls currently name. A session rebuilt (on expiry) while the user
+    // had typed another league's id took that league's config, under the connected league's team names and counts.
+    // Not connected means no config, which makes a manual session -- what startFreshSession expects.
+    if (!isPlatformConnected()) return null
     const platform = (document.getElementById('ls-platform') as HTMLInputElement).value
     return connectorsByPlatform.get(platform)?.getSelection() ?? null
 }

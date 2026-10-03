@@ -9,7 +9,7 @@ import {
     getScoringFormat, getMostCategoriesWeight, getTiebreakerCategory, getSelectedCategories,
     syncCategoriesFromBackend,
 } from '../setting_collection/format_and_categories.js'
-import { getPlayerStatsSettings } from '../setting_collection/player_stats.js'
+import { getPlayerStatsSettings, markUploadedSourcesExpired } from '../setting_collection/player_stats.js'
 import { getModelSettings } from '../setting_collection/model_parameters.js'
 import { getSlotCounts } from '../setting_collection/slot_counts.js'
 import { createSession, HTTPError } from './client.js'
@@ -174,7 +174,19 @@ export async function startFreshSession(signal?: AbortSignal): Promise<void> {
     // Warm the pool's headshots in parallel with the build: H-score setup is CPU-bound
     // server-side while image serving is pure I/O, so the build window is free time.
     prefetchHeadshotsForDataSource(data_source.type, data_source.season)
-    const resp = await createSession(req, signal)
+    let resp
+    try {
+        resp = await createSession(req, signal)
+    } catch (err) {
+        // A remembered upload id can be dead by now: the upload store forgets a file a day after it was last
+        // used. Every path that builds a session lands here -- first load, a Player Stats change, connecting a
+        // platform, an expired session being replaced -- so this is the one place that recovers: say so on the
+        // upload's status line, forget the dead ids, and build again without them. markUploadedSourcesExpired
+        // returns false once nothing is left to clear, so this retries at most once.
+        const isDeadUpload = err instanceof HTTPError && err.status === 404 && String(err).includes('data_id')
+        if (!isDeadUpload || !markUploadedSourcesExpired()) throw err
+        return startFreshSession(signal)
+    }
     sessionId = resp.session_id
     syncCategoriesFromBackend(resp.categories)
     setGScores(resp.g_scores)

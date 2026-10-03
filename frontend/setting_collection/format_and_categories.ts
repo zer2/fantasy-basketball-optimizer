@@ -44,9 +44,9 @@ function readStoredFormatAndWeight(): { format: string; weight: number } {
     return { format: storedFormat, weight: storedWeight }
 }
 
-// Set to true while syncCategoriesFromBackend is mutating the DOM so the
-// MutationObserver skips saving prefs / dispatching a change event.
-let _suppressCategoryEvents = false
+// The chip-area observer, held so syncCategoriesFromBackend can discard the records its own edit queued: that edit is
+// the backend's, not the user's, and must not save prefs or fire a change.
+let categoryChipObserver: MutationObserver | null = null
 
 /**
  * Renders the Format & Categories section: scoring format selector and
@@ -126,14 +126,14 @@ export function renderFormatAndCategories(container: HTMLElement): void {
     // Save categories on chip add/remove (observe DOM mutations on the chip area)
     const inputArea = container.querySelector('.ms-input-area')
     if (inputArea) {
-        new MutationObserver(() => {
-            if (_suppressCategoryEvents) return
+        categoryChipObserver = new MutationObserver(() => {
             savePref('categories', [..._selectedCategories])
             categoryValidationMsg.textContent = _selectedCategories.length === 0
                 ? 'Select at least one category.' : ''
             refreshTiebreakerControl()
             container.dispatchEvent(new Event('change', { bubbles: true }))
-        }).observe(inputArea, { childList: true })
+        })
+        categoryChipObserver.observe(inputArea, { childList: true })
     }
 }
 
@@ -150,24 +150,22 @@ export function syncCategoriesFromBackend(backendCategories: string[]): void {
     }
     if (invalidIndices.length === 0) return
 
-    _suppressCategoryEvents = true
-    try {
-        // Remove stale chips from DOM first (chip order mirrors _selectedCategories)
-        const inputArea = document.querySelector('.ms-input-area')
-        if (inputArea) {
-            const chips = Array.from(inputArea.querySelectorAll<HTMLElement>('.ms-chip'))
-            for (const idx of invalidIndices) {
-                chips[idx]?.remove()
-            }
-        }
-        // Mutate the live array in-place to match
+    // Remove stale chips from DOM first (chip order mirrors _selectedCategories)
+    const inputArea = document.querySelector('.ms-input-area')
+    if (inputArea) {
+        const chips = Array.from(inputArea.querySelectorAll<HTMLElement>('.ms-chip'))
         for (const idx of invalidIndices) {
-            _selectedCategories.splice(idx, 1)
+            chips[idx]?.remove()
         }
-        savePref('categories', [..._selectedCategories])
-    } finally {
-        _suppressCategoryEvents = false
     }
+    // Mutate the live array in-place to match
+    for (const idx of invalidIndices) {
+        _selectedCategories.splice(idx, 1)
+    }
+    savePref('categories', [..._selectedCategories])
+    // The observer's records for this edit are queued, not yet delivered (they arrive as a microtask), so discard them
+    // here: a flag raised around the edit is lowered before they arrive and suppresses nothing.
+    categoryChipObserver?.takeRecords()
 }
 
 // The tiebreaker select, and the row that hides it when a tie cannot arise. Module-level so the
