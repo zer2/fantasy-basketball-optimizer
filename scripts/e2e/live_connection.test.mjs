@@ -20,8 +20,10 @@ const LEAGUE_TEAMS = ['Ann', 'Bob', 'Cat', 'Dan']
 const ALL_MODES = ['Draft Mode', 'Auction Mode', 'Season Mode']
 const JOKIC_ID = 203999
 
-/** Stubs the live platform (see the header). `availableModes` is what the platform's connect reports. */
+/** Stubs the live platform (see the header). `availableModes` is what the platform's connect reports. Returns the
+ *  platform's board, which a test can change to stand in for picks being made on the platform. */
 async function stubLivePlatform(page, { availableModes }) {
+    const platformBoard = { assignments: { Ann: [JOKIC_ID], Bob: [], Cat: [], Dan: [] } }
     const connectedSessions = new Set()
     await page.route(url => url.pathname.endsWith('/connect'), route => route.fulfill({
         status: 200, contentType: 'application/json',
@@ -49,10 +51,11 @@ async function stubLivePlatform(page, { availableModes }) {
                                    body: JSON.stringify({ detail: 'Session is not connected to a live platform.' }) })
         }
         return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
-            player_assignments: { Ann: [JOKIC_ID], Bob: [], Cat: [], Dan: [] },
+            player_assignments: platformBoard.assignments,
             injured_players: [], status: 'Success', remaining_cash: null,
         }) })
     })
+    return platformBoard
 }
 
 async function connectYahooLeague(app, leagueId) {
@@ -77,34 +80,165 @@ async function typeYahooLeagueId(page, leagueId) {
 
 const indicatorText = page => page.locator('#eval-indicator').innerText()
 
-test('Refresh Analysis follows the connection', async t => {
+test('the status follows the connection', async t => {
     const app = await launchAppPage()
     const { page } = app
-    const refreshButton = page.locator('#live-refresh-btn')
     try {
         await loadApp(app)
         await stubLivePlatform(page, { availableModes: ALL_MODES })
 
-        await t.test('connecting enables it', async () => {
-            // The live layout is drawn when the platform is picked, before connecting, and connecting draws no new
-            // layout -- the button kept the disabled state it was drawn with.
-            await connectYahooLeague(app, '12345')
-            assert.equal(await refreshButton.isDisabled(), false, 'a connected league must be refreshable')
-            await refreshButton.click()
+        await t.test('before connecting it says so, and connecting clears it', async () => {
+            await setSelect(page, 'ls-platform', 'Retrieve from Yahoo')
             await waitAppSettled(app, { timeout: 120000 })
-            expectCleanSession(app, 'refresh after connecting')
+            assert.equal(await indicatorText(page), 'Unconnected')
+            await connectYahooLeague(app, '12345')
+            assert.notEqual(await indicatorText(page), 'Unconnected')
+            expectCleanSession(app, 'connected')
         })
 
-        await t.test('naming another league disables it, and naming the connected one again restores it', async () => {
+        await t.test('naming another league says unconnected, and naming the connected one again clears it', async () => {
+            // Connecting and editing the selection draw no new layout, so nothing else would update the status.
             await typeYahooLeagueId(page, '67890')
-            assert.equal(await refreshButton.isDisabled(), true,
-                         'the button would poll the connected league while the sidebar names another')
             assert.equal(await indicatorText(page), 'Unconnected')
             await typeYahooLeagueId(page, '12345')
-            assert.equal(await refreshButton.isDisabled(), false)
             assert.notEqual(await indicatorText(page), 'Unconnected')
             expectCleanSession(app, 'league id retyped')
         })
+    } finally {
+        await app.close()
+    }
+})
+
+test('a live platform uses projections: Historical is offered only with your own data', async () => {
+    // As in the Streamlit app. A live platform is a draft or season being played now, which a past season's stats
+    // would rank for a year that is over (a user drafting from Historical data saw a board that made no sense).
+    const app = await launchAppPage()
+    const { page } = app
+    const dataSource = () => page.locator('[data-testid="ps-data-type-wrapper"] .cs-search-input').inputValue()
+    // The Player Stats section can be collapsed (a reload collapses it), and a closed section's options cannot be read.
+    const readDataSourceOptions = async () => {
+        await page.locator('[data-testid="ps-data-type-wrapper"]').evaluate(el => { const d = el.closest('details'); if (d && !d.open) d.open = true })
+        return readDropdownOptionLabels(page, 'ps-data-type-wrapper')
+    }
+    try {
+        await loadApp(app)
+        await setSelect(page, 'ps-data-type', 'Historical')
+        await waitAppSettled(app, { timeout: 120000 })
+        assert.equal(await dataSource(), 'Historical')
+
+        await setSelect(page, 'ls-platform', 'Retrieve from Yahoo')
+        await waitAppSettled(app, { timeout: 120000 })
+        assert.equal(await dataSource(), 'Projections', 'a live platform must switch the data source to projections')
+        assert.deepEqual(await readDataSourceOptions(), ['Projections'])
+
+        await page.reload({ waitUntil: 'domcontentloaded' })
+        await page.locator('#hscoretable .playerheaderdiv').first().waitFor({ timeout: 120000 })
+        await waitAppSettled(app, { timeout: 120000 })
+        assert.equal(await dataSource(), 'Projections', 'a remembered live platform must not reload into Historical')
+
+        await setSelect(page, 'ls-platform', 'Enter your own data')
+        await waitAppSettled(app, { timeout: 120000 })
+        assert.deepEqual(await readDataSourceOptions(), ['Projections', 'Historical'])
+        expectCleanSession(app, 'data source follows the platform')
+    } finally {
+        await app.close()
+    }
+})
+
+test('a typed league id shows in the league dropdown, and clearing it restores the dropdown', async () => {
+    // The typed id wins over the dropdown; a dropdown still naming a league beside one read as connecting to it.
+    const app = await launchAppPage()
+    const { page } = app
+    const shownLeague = () => page.locator('[data-testid="ls-yahoo-league-wrapper"] .cs-search-input').inputValue()
+    try {
+        await loadApp(app)
+        await setSelect(page, 'ls-platform', 'Retrieve from Yahoo')
+        await waitAppSettled(app, { timeout: 120000 })
+        assert.equal(await shownLeague(), '(authenticate first)')
+        await typeYahooLeagueId(page, '2606456')
+        assert.equal(await shownLeague(), '(using the league ID below)')
+        await typeYahooLeagueId(page, '')
+        assert.equal(await shownLeague(), '(authenticate first)')
+        expectCleanSession(app, 'league id typed and cleared')
+    } finally {
+        await app.close()
+    }
+})
+
+test('a connected draft is followed without clicking Refresh', async t => {
+    // The platform is polled every second; a changed board re-runs the analysis, an unchanged one does nothing.
+    const app = await launchAppPage()
+    const { page } = app
+    const requestsSince = (start, fragment) =>
+        app.sessionRequestLog.slice(start).filter(entry => entry.includes(fragment)).length
+    const candidateRowsWith = name => page.locator('#hscoretable .playerheaderdiv', { hasText: name }).count()
+    try {
+        await loadApp(app)
+        const platformBoard = await stubLivePlatform(page, { availableModes: ALL_MODES })
+        await connectYahooLeague(app, '12345')
+
+        await t.test('a pick made on the platform reaches the analysis, leaving open detail panels open', async () => {
+            assert.ok(await candidateRowsWith('Bam Adebayo') > 0, 'Adebayo starts available')
+            // Open the top candidate's details: the re-ranking a pick causes must not close them.
+            const topCandidate = page.locator('#hscoretable .playerheaderdiv').first()
+            const openedName = (await topCandidate.locator('.playername').first().innerText()).split('\n')[0].trim()
+            await topCandidate.click()
+            await page.locator('#hscoretable .playerpopup.popup-open').first().waitFor({ timeout: 10000 })
+
+            platformBoard.assignments = { Ann: [JOKIC_ID], Bob: [1628389], Cat: [], Dan: [] }   // Bob takes Adebayo
+            await page.waitForFunction(
+                () => ![...document.querySelectorAll('#hscoretable .playerheaderdiv')]
+                    .some(row => row.textContent.includes('Bam Adebayo')),
+                { timeout: 15000 })
+            await waitAppSettled(app, { timeout: 120000 })
+            const openRow = page.locator('#hscoretable .playerheaderdiv', { hasText: openedName })
+                .filter({ has: page.locator('.playerpopup.popup-open') })
+            assert.equal(await openRow.count(), 1, `${openedName}'s details must still be open after the update`)
+            expectCleanSession(app, 'pick picked up by polling')
+        })
+
+        await t.test('an unchanged board is polled quietly', async () => {
+            const start = app.sessionRequestLog.length
+            await page.waitForTimeout(5000)
+            assert.ok(requestsSince(start, '/draft-state') >= 2, 'the board must keep being polled')
+            assert.equal(requestsSince(start, '/evaluate'), 0, 'an unchanged board must not re-run the analysis')
+            assert.notEqual(await indicatorText(page), 'Unconnected')
+            expectCleanSession(app, 'quiet polling')
+        })
+
+        await t.test('naming another league stops the polling', async () => {
+            await typeYahooLeagueId(page, '67890')
+            await page.waitForTimeout(500)    // a poll already in flight may still land
+            const start = app.sessionRequestLog.length
+            await page.waitForTimeout(5000)
+            assert.equal(requestsSince(start, '/draft-state'), 0, 'the old league must not keep being polled')
+            expectCleanSession(app, 'polling stopped')
+        })
+    } finally {
+        await app.close()
+    }
+})
+
+test('when the platform stops reporting a finished draft, its results stay up', async () => {
+    // A Yahoo mock room stops returning its results once the draft ends, and the integration reads "no results" as
+    // "not started": an empty board. Polled as-is, it replaced the final analysis with base rankings.
+    const app = await launchAppPage()
+    const { page } = app
+    try {
+        await loadApp(app)
+        const platformBoard = await stubLivePlatform(page, { availableModes: ALL_MODES })
+        await connectYahooLeague(app, '12345')
+        const resultsBefore = await page.locator('#hscoretable .overallhscore').allInnerTexts()
+
+        platformBoard.assignments = { Ann: [], Bob: [], Cat: [], Dan: [] }
+        await page.waitForTimeout(5000)
+        assert.deepEqual(await page.locator('#hscoretable .overallhscore').allInnerTexts(), resultsBefore,
+                         'the final results must stay up')
+        const pollsBefore = app.sessionRequestLog.filter(entry => entry.includes('/draft-state')).length
+        await page.waitForTimeout(5000)
+        assert.equal(app.sessionRequestLog.filter(entry => entry.includes('/draft-state')).length, pollsBefore,
+                     'a room that has stopped reporting is no longer polled')
+        expectCleanSession(app, 'room closed')
     } finally {
         await app.close()
     }

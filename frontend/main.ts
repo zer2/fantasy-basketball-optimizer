@@ -30,7 +30,7 @@ import {
     renderFormatAndCategories, getScoringFormat, getMostCategoriesWeight, getTiebreakerCategory,
     getSelectedCategories, isCategorySelectionValid,
 } from './setting_collection/format_and_categories.js'
-import { renderPlayerStats, getPlayerStatsSettings, waitForSeasons } from './setting_collection/player_stats.js'
+import { renderPlayerStats, getPlayerStatsSettings, waitForSeasons, limitDataSourcesToPlatform } from './setting_collection/player_stats.js'
 import { renderModelSettings, refreshFormatParameterControls, refreshStreamingNoiseControl, getModelSettings } from './setting_collection/model_parameters.js'
 import { renderSlotCounts, getSlotCounts, isSlotCountsValid, revalidateSlotCounts } from './setting_collection/slot_counts.js'
 
@@ -208,6 +208,7 @@ function syncForPlatformSwitch(): void {
     }
 }
 getPlatformSelectElement().addEventListener('change', () => {
+    limitDataSourcesToPlatform(getLeagueSettings().platform, { announceChange: true })   // 0. live platforms: projections only
     applyLayout()                 // 1. swap the layout for the new platform
     refreshSeasonRostersIfLive()  // 2. season live-roster sync
     syncForPlatformSwitch()       // 3. seat options + the right evaluation for the new source
@@ -256,6 +257,8 @@ document.addEventListener(TEAM_LABELS_CHANGED, () => { refreshSeatOptions() })
 
 const playerStatsSection = createSection(sidebarSections, 'Player Stats')
 renderPlayerStats(playerStatsSection)
+// A remembered live platform rules out a remembered Historical source before the first session is built.
+limitDataSourcesToPlatform(getLeagueSettings().platform, { announceChange: false })
 
 const applyPlayerStats = async (signal?: AbortSignal, keepsPlayerPool = false) => {
     // Switching the data source to Historical starts an async seasons fetch and fires this

@@ -63,6 +63,9 @@ interface CandidateRow {
 
 // The virtual "dataframe": candidate rows in descending H-score order (mirrors what the DOM would show).
 let candidateRows: CandidateRow[] = []
+// The players whose detail panels the user has open. Kept apart from the rows, which every rebuild
+// replaces, so an open panel survives the rebuild; only the user's own click closes one.
+const playerIdsWithDetailsOpen = new Set<number>()
 let tbodyEl: HTMLTableSectionElement | null = null
 let totalCandidates = 0     // final count (>= candidateRows.length); reserves scroll height while streaming
 let rowHeight = 0           // measured height of one collapsed display row (uniform)
@@ -269,34 +272,46 @@ function buildBatchRows(players: PlayerResult[], ctx: RenderContext): CandidateR
         const div = candidate.displayRow.querySelector('.playerheaderdiv') as HTMLElement
         // Larger click target = the whole header div. Closes over the candidate, not an index.
         div.addEventListener('click', () => toggleExpand(candidate, ctx))
+        // A panel the user left open stays open through a rebuild (a live-draft poll re-ranks the table
+        // every time a pick lands), showing the new numbers.
+        if (playerIdsWithDetailsOpen.has(players[k].player_id)) openDetails(candidate, ctx)
         batch.push(candidate)
     }
     return batch
 }
 
-/** Opens or closes one candidate's detail panel, then re-syncs the window. On expand we build the panel,
- *  render it (so it is in the DOM), then measure its height for the spacer maths and render once more. */
+/** Opens or closes one candidate's detail panel at the user's click, then re-syncs the window. */
 function toggleExpand(candidate: CandidateRow, ctx: RenderContext): void {
-    const button = candidate.displayRow.querySelector('.playerpopup') as HTMLButtonElement
     if (candidate.expanded) {
-        candidate.expanded       = false
-        candidate.expandedHeight = 0
-        candidate.expandRow.innerHTML = ''
-        candidate.expandRow.style.display = 'none'
-        button.classList.remove('popup-open')
-        windowDirty = true
-        renderWindow()
+        closeDetails(candidate)
+        playerIdsWithDetailsOpen.delete(candidate.player.player_id)
     } else {
-        candidate.expanded = true
-        candidate.expandRow.style.display = 'table-row'
-        buildExpandPanel(candidate.expandRow, candidate.player, ctx.categories)
-        button.classList.add('popup-open')
-        windowDirty = true
-        renderWindow()                                          // attach the (now-built) expand row
-        candidate.expandedHeight = candidate.expandRow.offsetHeight  // measure once it is laid out
-        windowDirty = true
-        renderWindow()                                          // correct the spacers with the real height
+        openDetails(candidate, ctx)
+        playerIdsWithDetailsOpen.add(candidate.player.player_id)
     }
+    windowDirty = true
+    renderWindow()
+}
+
+/** Builds and shows a candidate's detail panel. Its height is measured by renderWindow once the panel
+ *  is attached and laid out (expandedHeight 0 means "not measured yet"). */
+function openDetails(
+    candidate: CandidateRow
+  , ctx: RenderContext
+): void {
+    candidate.expanded       = true
+    candidate.expandedHeight = 0
+    candidate.expandRow.style.display = 'table-row'
+    buildExpandPanel(candidate.expandRow, candidate.player, ctx.categories)
+    ;(candidate.displayRow.querySelector('.playerpopup') as HTMLButtonElement).classList.add('popup-open')
+}
+
+function closeDetails(candidate: CandidateRow): void {
+    candidate.expanded       = false
+    candidate.expandedHeight = 0
+    candidate.expandRow.innerHTML = ''
+    candidate.expandRow.style.display = 'none'
+    ;(candidate.displayRow.querySelector('.playerpopup') as HTMLButtonElement).classList.remove('popup-open')
 }
 
 /** Merges an already-descending-sorted batch into `candidateRows` (data only — the DOM is synced by
@@ -397,6 +412,22 @@ function renderWindow(): void {
     renderedStart = start
     renderedEnd   = end
     windowDirty   = false
+
+    // A panel opened (by a click, or reopened by a rebuild) is measured the first time it is attached and laid
+    // out; the spacers are then redrawn with its real height. A panel that measures 0 (a hidden table) is left
+    // for a later render, rather than redrawing for nothing.
+    let measuredAny = false
+    for (let i = start; i < end; i++) {
+        const candidate = candidateRows[i]
+        if (candidate.expanded && candidate.expandedHeight === 0) {
+            candidate.expandedHeight = candidate.expandRow.offsetHeight
+            measuredAny = measuredAny || candidate.expandedHeight > 0
+        }
+    }
+    if (measuredAny) {
+        windowDirty = true
+        renderWindow()
+    }
 }
 
 /** Scrolls the document so candidate `idx` sits ~30% down the viewport (works with the document scroller). */

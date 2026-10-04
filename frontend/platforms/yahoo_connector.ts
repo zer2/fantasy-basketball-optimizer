@@ -44,7 +44,8 @@ export function makeYahooConnector(status: ConnectStatus): PlatformConnector {
     element.append(authButton)
 
     element.append(makeLabel('ls-yahoo-league', 'League'))
-    const leagueSelect = makeCustomSelect('ls-yahoo-league', [{ value: '', label: '(authenticate first)' }])
+    const NOT_AUTHENTICATED = [{ value: '', label: '(authenticate first)' }]
+    const leagueSelect = makeCustomSelect('ls-yahoo-league', NOT_AUTHENTICATED)
     element.append(leagueSelect.element)
 
     // Yahoo's API lists only the leagues a user has joined, and a mock draft is not one of them —
@@ -57,6 +58,30 @@ export function makeYahooConnector(status: ConnectStatus): PlatformConnector {
     leagueIdInput.className   = 'sidebar-input'
     leagueIdInput.placeholder = 'e.g. 12345, or paste the draft URL'
     element.append(leagueIdInput)
+
+    // The two ways of naming a league are exclusive, and the screen has to say which one is in use: a typed id wins
+    // (see getSelection), so a dropdown still showing a league beside one read as connecting to that league. While
+    // an id is typed, the dropdown says so; clearing the id brings back the league it showed; picking a league from
+    // the dropdown clears the id. Every switch is silent (setOptions), so neither control's handler sets off the other.
+    const USING_TYPED_ID = { value: '', label: '(using the league ID below)' }
+    let listedLeagueOptions: { value: string, label: string }[] = NOT_AUTHENTICATED
+    let leagueBeforeTypedId: string | null = null
+    leagueIdInput.addEventListener('input', () => {
+        const isIdTyped = leagueIdInput.value.trim() !== ''
+        if (isIdTyped && leagueBeforeTypedId === null) {
+            leagueBeforeTypedId = leagueSelect.getValue() ?? ''
+            leagueSelect.setOptions([USING_TYPED_ID, ...listedLeagueOptions], USING_TYPED_ID.value)
+        } else if (!isIdTyped && leagueBeforeTypedId !== null) {
+            leagueSelect.setOptions(listedLeagueOptions, leagueBeforeTypedId)
+            leagueBeforeTypedId = null
+        }
+    })
+    leagueSelect.element.addEventListener('change', () => {
+        if (leagueBeforeTypedId === null || !leagueSelect.getValue()) return
+        leagueIdInput.value = ''
+        leagueBeforeTypedId = null
+        leagueSelect.setOptions(listedLeagueOptions, leagueSelect.getValue() ?? undefined)
+    })
 
     // ── The authorization dialog ──────────────────────────────────────────────────────
     // Everything below here is the handshake, and none of it means anything once the token
@@ -109,12 +134,17 @@ export function makeYahooConnector(status: ConnectStatus): PlatformConnector {
     /** Loads the authenticated user's Yahoo leagues into the league select. */
     async function loadLeagues(): Promise<void> {
         const leagues = await fetchLeagues(PLATFORM)
-        if (leagues.length === 0) {
-            leagueSelect.setOptions([{ value: '', label: '(no leagues found)' }])
-            // Not a failure, and not worth a sentence: a mock draft is never listed, and the
-            // select itself now says so. The league-ID box below is the way through.
+        // Not a failure when empty, and not worth a sentence: a mock draft is never listed, and the
+        // select itself says so. The league-ID box below is the way through.
+        listedLeagueOptions = leagues.length === 0
+            ? [{ value: '', label: '(no leagues found)' }]
+            : leagues.map(league => ({ value: league.id, label: formatLeagueLabel(league) }))
+        if (leagueBeforeTypedId === null) {
+            leagueSelect.setOptions(listedLeagueOptions)
         } else {
-            leagueSelect.setOptions(leagues.map(league => ({ value: league.id, label: formatLeagueLabel(league) })))
+            // An id is typed: keep saying so, and let clearing it land on the newly listed leagues.
+            leagueBeforeTypedId = ''
+            leagueSelect.setOptions([USING_TYPED_ID, ...listedLeagueOptions], USING_TYPED_ID.value)
         }
         status.clear()
     }

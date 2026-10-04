@@ -13,9 +13,8 @@ import { renderTeamGScoreTable } from './table/gscore_table.js'
 import { getLeagueSettings, isPlatformConnected, PLATFORM_SELECTION_CHANGED } from './setting_collection/league_settings.js'
 import { getCurrentSeat } from './app_state.js'
 import {
-    getFullTeamResult, refreshLiveAnalysis, getLivePlayerAssignments, LIVE_BOARD_UPDATED,
+    getFullTeamResult, getLivePlayerAssignments, LIVE_BOARD_UPDATED,
 } from './api/draft_and_auction_session.js'
-import { showFailureInTable } from './table/failure_message.js'
 import { setIndicatorState, claimDisplay } from './api/session.js'
 
 // ─── Module state ─────────────────────────────────────────────────────────────
@@ -83,7 +82,6 @@ function showOwnDataLayout(mode: string): void {
     hide('left-panel')
     hide('season-rosters-row')
     hide('season-trading-row')
-    removeLiveRefreshButton()   // live-only; gone in own-data mode
 
     show('content-row')
     show('eval-indicator')
@@ -137,38 +135,13 @@ function showLiveLayout(mode: string): void {
 
     show('seat-selector-container')
 
-    // Live platforms have no manual data-entry grid; a Refresh Analysis button pulls the
-    // current draft/roster state and re-evaluates. It sits in the tab-row beside the seat
-    // selector (left of the status indicator) and is disabled until the platform connection
-    // is established — clicking before then would spin the indicator forever.
-    removeLiveRefreshButton()
-    const refreshButton = document.createElement('button')
-    refreshButton.type        = 'button'
-    refreshButton.id          = 'live-refresh-btn'
-    refreshButton.className    = 'section-apply-btn live-refresh-btn'
-    refreshButton.textContent  = 'Refresh Analysis'
-    refreshButton.disabled     = !isPlatformConnected()
-    refreshButton.addEventListener('click', () => {
-        // Asked again rather than read off `disabled`: re-authenticating with Yahoo reloads its league list, which can
-        // change the selected league without any event the button hears.
-        if (!isPlatformConnected()) {
-            reflectConnectionInLiveControls({ ownsIndicator: true })
-            return
-        }
-        refreshLiveAnalysis().catch(err => {
-            console.error('Refresh analysis failed:', err)
-            showFailureInTable(err)
-        })
-    })
-    const tabRow = document.getElementById('tab-row')!
-    tabRow.insertBefore(refreshButton, document.getElementById('eval-indicator'))
-
     // Until a platform is connected, the status reads "Unconnected" rather than a stale
     // "Updated"; once connected it returns to the neutral idle state (the default rankings
     // are still shown the whole time — see showDefaultRankings). Claimed so an async run
     // still in flight from the previous layout cannot overwrite this once it settles.
     claimDisplay()
-    setIndicatorState(isPlatformConnected() ? 'idle' : 'unconnected')
+    indicatorShowsConnected = isPlatformConnected()
+    setIndicatorState(indicatorShowsConnected ? 'idle' : 'unconnected')
 
     // The same two tabs manual entry gets: the candidate table, and team statistics for the
     // selected seat. Only the roster SOURCE differs — a live seat's players come from the
@@ -185,32 +158,29 @@ function showLiveLayout(mode: string): void {
     }
 }
 
-/** Removes the live-platform Refresh Analysis button from the tab-row, if present. */
-function removeLiveRefreshButton(): void {
-    document.getElementById('live-refresh-btn')?.remove()
-}
+// Whether the live layout's indicator last said the selected league is the connected one.
+let indicatorShowsConnected = false
 
 /**
- * Brings the live controls in line with whether the selected league is the connected one.
+ * Brings the live indicator in line with whether the selected league is the connected one.
  *
  * Neither connecting nor changing the league selection draws a new layout -- the live layout went up when the platform
- * was picked -- so without this the button kept the state it was drawn with: disabled forever after a connect, and
- * enabled (polling the OLD league) after the user typed or picked another. The indicator follows a change of answer
- * only, so an edit that leaves the answer as it was never stamps over an evaluate in flight -- and only when
- * `ownsIndicator`: after a connect, the patch and evaluate that follow own it.
+ * was picked -- so nothing else would tell the indicator that the user has typed or picked another league. It follows
+ * a change of answer only, so an edit that leaves the answer as it was never stamps over an evaluate in flight -- and
+ * only when `ownsIndicator`: after a connect, the patch and evaluate that follow own it.
  */
-function reflectConnectionInLiveControls({ ownsIndicator }: { ownsIndicator: boolean }): void {
-    const refreshButton = document.getElementById('live-refresh-btn') as HTMLButtonElement | null
-    if (refreshButton === null) return
+function reflectConnectionInIndicator({ ownsIndicator }: { ownsIndicator: boolean }): void {
+    const { platform, mode } = getLeagueSettings()
+    if (platform === 'Enter your own data' || mode === 'Season Mode') return   // no live draft layout up
     const isConnected = isPlatformConnected()
-    if (refreshButton.disabled === !isConnected) return
-    refreshButton.disabled = !isConnected
+    if (isConnected === indicatorShowsConnected) return
+    indicatorShowsConnected = isConnected
     if (!ownsIndicator) return
     claimDisplay()
     setIndicatorState(isConnected ? 'idle' : 'unconnected')
 }
-document.addEventListener('platform-connected', () => reflectConnectionInLiveControls({ ownsIndicator: false }))
-document.addEventListener(PLATFORM_SELECTION_CHANGED, () => reflectConnectionInLiveControls({ ownsIndicator: true }))
+document.addEventListener('platform-connected', () => reflectConnectionInIndicator({ ownsIndicator: false }))
+document.addEventListener(PLATFORM_SELECTION_CHANGED, () => reflectConnectionInIndicator({ ownsIndicator: true }))
 
 // ─── Season layout ────────────────────────────────────────────────────────────
 
@@ -220,7 +190,6 @@ function showSeasonLayout(): void {
     hide('left-panel')
     hide('seat-selector-container')
     hide('eval-indicator')
-    removeLiveRefreshButton()   // live draft/auction-only; gone in season mode
 
     // Clear sub-header so the tab bar from draft/auction mode doesn't bleed in
     const rightSubHeader = document.getElementById('right-sub-header')!
