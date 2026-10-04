@@ -12,14 +12,16 @@ import numpy as np
 import pandas as pd
 from backend.player_identity import RP_PLAYER_ID
 
-# ── public helpers ─────────────────────────────────────────────────────────────
+# ── helpers ────────────────────────────────────────────────────────────────────
+# The two category filters serve only process_player_data; get_category_level_rv is public
+# (algorithm_agents imports it).
 
-def get_counting_stats(sport_params: dict, categories: list[str]) -> list[str]:
+def _list_counting_stats(sport_params: dict, categories: list[str]) -> list[str]:
     """Return counting statistics from sport_params that are in the active categories."""
     return [c for c in sport_params['counting-statistics'] if c in categories]
 
 
-def get_ratio_stats(sport_params: dict, categories: list[str]) -> list[str]:
+def _list_ratio_stats(sport_params: dict, categories: list[str]) -> list[str]:
     """Return ratio statistics from sport_params that are in the active categories."""
     return [c for c in sport_params['ratio-statistics'] if c in categories]
 
@@ -238,6 +240,32 @@ _POSITION_MEAN_POOL_TOP_TRIM = 0.25
 
 # ── public pipeline steps ──────────────────────────────────────────────────────
 
+def drop_injured_players(player_stats_v0: pd.DataFrame
+                          , injured_players: tuple | list) -> pd.DataFrame:
+    """Pipeline step 2: drop the players marked injured or excluded. An id not in this pool is skipped:
+    a player the pool does not have needs no excluding."""
+    return player_stats_v0.drop(list(injured_players), errors='ignore')
+
+
+def make_upsilon_adjustment(player_stats_v1: pd.DataFrame
+                             , upsilon: float
+                             , sport_params: dict) -> pd.DataFrame:
+    """Pipeline step 3: scale per-game stats to weekly totals, discounting each player's missed games by
+    upsilon (0 ignores them, 1 counts them in full)."""
+    df = player_stats_v1.copy()
+    df['Games Played %'] = 1 - (1 - df['Games Played %']) * upsilon
+
+    counting_stats   = sport_params['counting-statistics']
+    volume_stats     = [info['volume-statistic'] for info in sport_params['ratio-statistics'].values()]
+    games_per_week   = sport_params['n_games_per_week']
+
+    for col in set(counting_stats + volume_stats):
+        if col in df.columns:
+            df[col] = df[col].astype(float) * df['Games Played %'] * games_per_week
+
+    return df
+
+
 def process_player_data(player_stats_v2: pd.DataFrame
                         , weekly_df
                         , mean_of_variances: pd.Series
@@ -259,17 +287,16 @@ def process_player_data(player_stats_v2: pd.DataFrame
     the scaling near the Total column. X-scores and the coefficients are deliberately left alone —
     they describe how categories are DISTRIBUTED, which the scoring rules do not change."""
 
-    counting_stats = get_counting_stats(sport_params, categories)
-    ratio_stats    = get_ratio_stats(sport_params, categories)
+    counting_stats = _list_counting_stats(sport_params, categories)
+    ratio_stats    = _list_ratio_stats(sport_params, categories)
     n_players      = n_drafters * n_active
-    player_means   = player_stats_v2
 
     if weekly_df is not None:
         all_players = list(pd.unique(weekly_df.index.get_level_values('Player')))
         coeff_first = calculate_coefficients_historical(weekly_df, all_players, sport_params,
                                                         counting_stats, ratio_stats)
     else:
-        coeff_first = calculate_coefficients(player_means, player_means.index,
+        coeff_first = calculate_coefficients(player_stats_v2, player_stats_v2.index,
                                              mean_of_variances, counting_stats,
                                              ratio_stats, sport_params)
 
@@ -280,7 +307,7 @@ def process_player_data(player_stats_v2: pd.DataFrame
     chi_factor = chi if scoring_format == 'Rotisserie' else 1
     coeff_first['Mean of Variances'] = coeff_first['Mean of Variances'] * chi_factor
 
-    g_first = calculate_scores_from_coefficients(player_means, coeff_first, sport_params, 1, 1,
+    g_first = calculate_scores_from_coefficients(player_stats_v2, coeff_first, sport_params, 1, 1,
                                                   counting_stats, ratio_stats, categories,
                                                   n_active)
     representative_player_set = (
@@ -291,7 +318,7 @@ def process_player_data(player_stats_v2: pd.DataFrame
         coefficients = calculate_coefficients_historical(weekly_df, representative_player_set,
                                                          sport_params, counting_stats, ratio_stats)
     else:
-        coefficients = calculate_coefficients(player_means, representative_player_set,
+        coefficients = calculate_coefficients(player_stats_v2, representative_player_set,
                                              mean_of_variances, counting_stats, ratio_stats, sport_params)
 
     coefficients['Mean of Variances'] = coefficients['Mean of Variances'] * chi_factor
@@ -324,14 +351,14 @@ def process_player_data(player_stats_v2: pd.DataFrame
     v = v_original / v_original.sum()
     w = vom / mov
 
-    g_scores = calculate_scores_from_coefficients(player_means, coefficients, sport_params, 1, 1,
+    g_scores = calculate_scores_from_coefficients(player_stats_v2, coefficients, sport_params, 1, 1,
                                                    counting_stats, ratio_stats, categories,
                                                    n_active)
-    x_scores = calculate_scores_from_coefficients(player_means, coefficients, sport_params, 0, 1,
+    x_scores = calculate_scores_from_coefficients(player_stats_v2, coefficients, sport_params, 0, 1,
                                                    counting_stats, ratio_stats, categories,
                                                    n_active)
 
-    replacement_games_rate = (1 - player_means['Games Played %'] / 100) * psi
+    replacement_games_rate = (1 - player_stats_v2['Games Played %'] / 100) * psi
     g_scores = games_played_adjustment(g_scores, replacement_games_rate, representative_player_set,
                                         sport_params, categories)
     x_scores = games_played_adjustment(x_scores, replacement_games_rate, representative_player_set,
@@ -367,7 +394,7 @@ def process_player_data(player_stats_v2: pd.DataFrame
     g_scores.sort_values('Total', ascending=False, inplace=True)
     x_scores = x_scores.loc[g_scores.index]
 
-    positions = player_means['Position'].str.split(',')
+    positions = player_stats_v2['Position'].str.split(',')
     position_structure = sport_params['position_structure']
     base_position_list = position_structure['base_list']
 
@@ -471,7 +498,7 @@ def process_player_data(player_stats_v2: pd.DataFrame
     # The replacement player gets a position row too, eligible for every base slot.
     #
     # He already has X- and G-score rows (above) but was left out of `positions`, which is built
-    # from player_means and joined inwards — so a roster holding him crashed the position-aware
+    # from player_stats_v2 and joined inwards — so a roster holding him crashed the position-aware
     # solve on a lookup he had no row for. He stands for a drafted player who did not resolve to
     # anyone in the pool, and such a player HAS taken a roster spot, so the least-wrong assumption
     # is that he can fill any of them; his -1 scores already make him worthless to field.
@@ -495,27 +522,3 @@ def process_player_data(player_stats_v2: pd.DataFrame
     }
 
     return info
-
-
-def make_upsilon_adjustment(player_stats_v1: pd.DataFrame
-                             , upsilon: float
-                             , sport_params: dict) -> pd.DataFrame:
-    """Explicit-parameter version: receives the DataFrame directly."""
-    df = player_stats_v1.copy()
-    df['Games Played %'] = 1 - (1 - df['Games Played %']) * upsilon
-
-    counting_stats   = sport_params['counting-statistics']
-    volume_stats     = [info['volume-statistic'] for info in sport_params['ratio-statistics'].values()]
-    games_per_week   = sport_params['n_games_per_week']
-
-    for col in set(counting_stats + volume_stats):
-        if col in df.columns:
-            df[col] = df[col].astype(float) * df['Games Played %'] * games_per_week
-
-    return df
-
-
-def drop_injured_players(player_stats_v0: pd.DataFrame
-                          , injured_players: tuple | list) -> pd.DataFrame:
-    """Explicit-parameter version: receives the DataFrame directly."""
-    return player_stats_v0.drop(list(injured_players), errors='ignore')
