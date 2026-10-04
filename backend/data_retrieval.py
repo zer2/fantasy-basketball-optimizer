@@ -22,7 +22,7 @@ import pandas as pd
 from backend.infra.snowflake_connection import query, run_query
 # One-way edge: player_identity deliberately imports nothing from this module (the resolver
 # takes the unified table as an argument), so these module-level imports cannot cycle.
-from backend.player_identity import allocate_synthetic_player_ids, build_name_to_player_id_resolver
+from backend.player_identity import allocate_synthetic_player_ids
 
 
 # ── Player name mapping ───────────────────────────────────────────────────────
@@ -129,12 +129,31 @@ def get_specified_historical_stats(season: str, sport_params: dict) -> pd.DataFr
 
 # ── Projection data ───────────────────────────────────────────────────────────
 
+def get_player_name_resolver() -> dict[str, int]:
+    """Every known spelling of every player -> NBA player id, from PLAYER_NAME_RESOLVER_VIEW.
+
+    Projections reach the app keyed by name, and from anywhere: ESPN, DARKO, Hashtag Basketball,
+    Basketball Monster, a hand-edited file, or a blend of several, each spelling players its own
+    way. So a name is looked up against every spelling UNIFIED_PLAYER_TABLE knows, in any of its
+    name columns. The view settles a spelling two players share (most recently active wins,
+    rookies first; scripts/player_name_resolver_view.sql) and leaves out rows with no NBA id, so a
+    name only they carry resolves to nothing, like a name never seen.
+    """
+    view = query('PLAYER_NAME_RESOLVER_VIEW')
+    # One row per spelling is the view's whole contract; a duplicate would make the lookup
+    # depend on row order, which is a broken view, not something to paper over here.
+    if not view['PLAYER_NAME'].is_unique:
+        duplicated = view.loc[view['PLAYER_NAME'].duplicated(), 'PLAYER_NAME'].tolist()
+        raise ValueError(f'PLAYER_NAME_RESOLVER_VIEW lists these spellings more than once: {duplicated[:10]}')
+    return dict(zip(view['PLAYER_NAME'], view['NBA_PLAYER_ID'].astype(int)))
+
+
 def attach_player_ids_by_name(df: pd.DataFrame) -> pd.DataFrame:
     """Resolve df['Player'] (a source's own spellings) to NBA player ids in a nullable
     'player_id' column — the ingestion edge for name-keyed sources. Unresolved rows keep
     a null id; the caller decides between synthetic allocation (uploads) and loud
     warnings (curated sources)."""
-    resolver = build_name_to_player_id_resolver(get_unified_player_table())
+    resolver = get_player_name_resolver()
     df = df.copy()
     df['player_id'] = df['Player'].map(resolver).astype('Int64')
     return df
