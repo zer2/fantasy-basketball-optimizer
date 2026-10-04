@@ -222,7 +222,7 @@ export function renderMultiselect(
         if (available.length === 0) {
             const empty = document.createElement('div')
             empty.className = 'ms-empty'
-            empty.textContent = filter ? 'No matches' : 'All options selected'
+            empty.textContent = filter ? 'No matches' : allOptions.length === 0 ? 'Nothing to choose from yet' : 'All options selected'
             dropdown.append(empty)
             return
         }
@@ -272,6 +272,8 @@ export interface MultiSelectWidget {
     getSelected:         () => string[]
     setSelected:         (values: string[]) => void
     setSelectedSilently: (values: string[]) => void
+    /** Replaces the options, unpicking any selection no longer among them, without firing onChange. */
+    setOptionsSilently:  (options: MultiSelectOption[]) => void
     onChange:            (cb: () => void) => void
 }
 
@@ -281,9 +283,10 @@ export interface MultiSelectWidget {
  */
 export function makeMultiSelectWidget(
     label:   string
-    , options: MultiSelectOption[]
+    , initialOptions: MultiSelectOption[]
     , wrapperClass = 'ms-widget'
 ): MultiSelectWidget {
+    let options = initialOptions
     const wrap = document.createElement('div')
     wrap.className = wrapperClass
 
@@ -332,6 +335,10 @@ export function makeMultiSelectWidget(
         },
         setSelectedSilently: (values: string[]) => {
             replaceSelection(values)
+        },
+        setOptionsSilently: (newOptions: MultiSelectOption[]) => {
+            options = newOptions
+            replaceSelection(selected.filter(value => newOptions.some(option => option.value === value)))
         },
         onChange:            (cb) => callbacks.push(cb),
     }

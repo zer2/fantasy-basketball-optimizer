@@ -828,11 +828,10 @@ def test_new_data_source_added_mid_draft_keeps_the_board_valid():
         f'the board drafted before the source change must still evaluate: {evaluate_response.text}'
 
     # A drafted player genuinely leaving the pool (here: marked injured) is a clear,
-    # named 400 — not a KeyError 500 from deep inside the H-score math. The injured list
-    # is the one name-typed input (free text), resolved server-side against the registry.
+    # named 400 — not a KeyError 500 from deep inside the H-score math.
     dropped_name = registry_by_id[drafted_ids[0]]['name']
     patch_response = client.patch(f'/sessions/{session_id}',
-                                  json={'from_step': 2, 'injured_players': [dropped_name]})
+                                  json={'from_step': 2, 'injured_players': [drafted_ids[0]]})
     assert patch_response.status_code == 200, patch_response.text
     evaluate_response = evaluate_board()
     assert evaluate_response.status_code == 400, evaluate_response.text

@@ -31,7 +31,7 @@ from backend.math.algorithm_agents import HAgent
 from backend.math.process_player_data import drop_injured_players, make_upsilon_adjustment, process_player_data
 from backend.player_identity import (
     RP_PLAYER_ID, allocate_synthetic_player_ids, make_player_identity,
-    make_replacement_player_identity, resolve_typed_player_names,
+    make_replacement_player_identity,
 )
 from backend.state.session import Session
 
@@ -256,10 +256,13 @@ def load_player_pool(
 # ── Step 2: remove injured players ────────────────────────────────────────────
 
 def remove_injured_players(session: Session) -> None:
-    """Resolve the free-typed injured list to player ids and drop them into v1_clean."""
+    """Drop the injured players (ids, picked from the registry) into v1_clean.
 
-    injured_names = session.current_settings['injured_players']
-    injured_player_ids = resolve_typed_player_names(session.player_registry, injured_names)
+    An id missing from this pool is skipped, not an error: the list travels in the same request as a data-source
+    change, which can take the player out of the pool before the frontend could know to unpick him, and a player who
+    is not in the pool needs no excluding."""
+
+    injured_player_ids = session.current_settings['injured_players']
     v1 = drop_injured_players(session.v0_clean, tuple(injured_player_ids))
     session.v1_clean = v1.copy()
 

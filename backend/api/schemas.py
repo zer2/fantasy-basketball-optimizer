@@ -122,7 +122,7 @@ class SessionRequest(BaseModel):
     slot_counts: dict[str, int]
     model_settings: ModelSettings
     data_source: DataSource
-    injured_players: list[str] = []
+    injured_players: list[int] = []   # player ids, picked from the session's registry
     my_team_id: Optional[str] = None
     platform_config: Optional[PlatformConfigRequest] = None   # live platforms only
 
@@ -173,7 +173,7 @@ class PatchRequest(BaseModel):
     league: Optional[PatchLeague] = None
     data_source: Optional[DataSource] = None
     slot_counts: Optional[dict[str, int]] = None
-    injured_players: Optional[list[str]] = None
+    injured_players: Optional[list[int]] = None   # player ids, picked from the session's registry
     platform: Optional[str] = None                            # set when connecting a live platform
     platform_config: Optional[PlatformConfigRequest] = None   # set when connecting a live platform
 

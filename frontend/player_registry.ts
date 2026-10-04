@@ -13,6 +13,9 @@ export interface PlayerRegistryEntry {
     has_headshot: boolean
 }
 
+/** The replacement-player sentinel's id (backend RP_PLAYER_ID): a stand-in the pipeline injects, not a player. */
+export const REPLACEMENT_PLAYER_ID = -1
+
 let entriesById: Map<number, PlayerRegistryEntry> | null = null
 let playerIdByName: Map<string, number> | null = null
 
