@@ -53,7 +53,7 @@ is evaluated through the same clamped machinery — preserves x(v) = 0 exactly.
 import numpy as np
 from scipy.special import ndtr, owens_t
 
-EULER_GAMMA = 0.5772156649015329
+_EULER_GAMMA = np.euler_gamma        # the Gumbel distribution's mean
 _SQRT_TWO_PI = np.sqrt(2.0 * np.pi)
 
 # rho^2 is kept this far inside 1: the smoothing radius of the neutral-point kink. Within
@@ -118,7 +118,7 @@ def _evaluate_expected_max_score(
     density_shape = t * cross                         # d(density)/dshape
     d_density = density_t * d_t + density_shape * d_shape
 
-    gumbel = EULER_GAMMA / (pick_pool_size * density)
+    gumbel = _EULER_GAMMA / (pick_pool_size * density)
     e = t + gumbel
     d_e = d_t - (gumbel / density) * d_density
 
@@ -134,16 +134,16 @@ def _evaluate_expected_max_score(
     # d(density_t)/dshape == d(density_shape)/dt == cross * (1 - t^2 (1 + shape^2))).
     mixed = cross * (1.0 - t * t * one_plus_shape2)
     density_tt = -density - t * density_t - shape * t * one_plus_shape2 * cross
-    density_shape_shape = -shape * t ** 3 * cross
+    density_shape_shape = -shape * t * t * t * cross
     d_density_t = density_tt * d_t + mixed * d_shape
     d_density_shape = mixed * d_t + density_shape_shape * d_shape
     dd_density = (
         d_density_t * d_t + density_t * dd_t
         + d_density_shape * d_shape + density_shape * dd_shape
     )
-    dd_e = dd_t - (EULER_GAMMA / pick_pool_size) * (
+    dd_e = dd_t - (_EULER_GAMMA / pick_pool_size) * (
         dd_density / (density * density)
-        - 2.0 * d_density * d_density / (density ** 3)
+        - 2.0 * d_density * d_density / (density * density * density)
     )
     return e, d_e, dd_e
 
@@ -171,6 +171,88 @@ def _score_value_geometry(
     return sigma_w, sigma_v, ss, sigma_s, sigma_u, rho, clamp_active
 
 
+class _PickModelState:
+    """Everything the pick and its Jacobian share, computed once for a batch of weight rows.
+
+    The generic team (w = v) rides along as one extra, LAST row, so it goes through
+    bit-for-bit the same arithmetic as every candidate row -- which is what makes the tilt
+    EXACTLY zero (not merely tiny) for a weight row equal to v. The Jacobian ignores that
+    row: the reference pick does not depend on the candidate's weights.
+
+    The costly part is the expected-max core (a bisection of the survival function, Owen's T
+    at every step), and the agent needs the tilts AND the Jacobian at every iteration of its
+    solve; building this once for both, rather than once per function, halves that cost.
+    """
+
+    def __init__(
+        self
+        , category_weights
+        , covariance
+        , value_direction
+        , pick_pool_size
+        , field_direction
+    ):
+        self.covariance = covariance
+        self.v = np.asarray(value_direction, dtype=float).reshape(-1)
+        weights_with_reference = np.vstack([np.asarray(category_weights, dtype=float), self.v])
+        (self.sigma_w, self.sigma_v, self.ss, self.sigma_s, self.sigma_u, self.rho,
+         self.clamp_active) = _score_value_geometry(
+            weights_with_reference, covariance,
+            value_direction if field_direction is None else field_direction)
+        self.e, self.d_e, self.dd_e = _evaluate_expected_max_score(self.rho, pick_pool_size)
+        self.score_coefficient = (self.e - self.rho * self.d_e) / self.sigma_s   # p~: the Sigma*w loading of grad W
+        self.value_coefficient = self.d_e / self.sigma_u                          # q~: the Sigma*v loading of grad W
+
+    def assemble_tilts(self):
+        """The candidates' picks minus the generic reference's, shape (P, C, 1)."""
+        picks = (
+            self.sigma_w * self.score_coefficient[:, None]
+            + self.sigma_v[None, :] * self.value_coefficient[:, None]
+        )
+        return (picks[:-1] - picks[-1][None, :]).reshape(-1, self.v.shape[0], 1)
+
+    def assemble_jacobian(self):
+        """d(pick)_i / d(weight)_k for the candidate rows, shape (P, C, C).
+
+        Differentiating the pick p~ * Sigma*w + q~ * Sigma*t: the first term gives
+        p~ * Sigma + Sigma*w (x) grad p~; the second gives only Sigma*t (x) grad q~, because
+        Sigma*t is constant in w. So q~ itself never appears here, only its gradient.
+        """
+        candidates = slice(None, -1)
+        sigma_w = self.sigma_w[candidates]
+        ss = self.ss[candidates]
+        sigma_s = self.sigma_s[candidates]
+        rho = self.rho[candidates]
+        dd_e = self.dd_e[candidates]
+        score_coefficient = self.score_coefficient[candidates]
+        clamp_active = self.clamp_active[candidates]
+
+        # rho = c / (sigma_s * sigma_u): the two scalar routes into the coefficients — both
+        # zero through an active clamp (the smoothing is flat there).
+        d_rho_d_ss = np.where(clamp_active, 0.0, -rho / (2.0 * ss))
+        d_rho_d_c = np.where(clamp_active, 0.0, 1.0 / (sigma_s * self.sigma_u))
+
+        d_score_coefficient_d_rho = -rho * dd_e / sigma_s
+        d_p_d_ss = (
+            -score_coefficient / (2.0 * ss)
+            + d_score_coefficient_d_rho * d_rho_d_ss
+        )
+        d_p_d_c = d_score_coefficient_d_rho * d_rho_d_c
+        d_q_d_ss = (dd_e / self.sigma_u) * d_rho_d_ss
+        d_q_d_c = (dd_e / self.sigma_u) * d_rho_d_c
+
+        grad_p = 2.0 * sigma_w * d_p_d_ss[:, None] + self.sigma_v[None, :] * d_p_d_c[:, None]
+        grad_q = 2.0 * sigma_w * d_q_d_ss[:, None] + self.sigma_v[None, :] * d_q_d_c[:, None]
+
+        jacobian = (
+            score_coefficient[:, None, None] * self.covariance[None, :, :]
+            + sigma_w[:, :, None] * grad_p[:, None, :]
+            + self.sigma_v[None, :, None] * grad_q[:, None, :]
+        )
+        n_categories = self.v.shape[0]
+        return jacobian.reshape(-1, n_categories, n_categories)
+
+
 def compute_expected_pick_tilts(
     category_weights
     , covariance
@@ -192,25 +274,12 @@ def compute_expected_pick_tilts(
     gets cheap and joining a crowded punt forfeits surplus — emergent, priced in effect
     space, moderated upstream by how confidently the field's behavior is modelled. The
     generic reference picks from the SAME contorted pool, so x(v) stays exactly zero.
-    """
-    weights = np.asarray(category_weights, dtype=float)
-    v = np.asarray(value_direction, dtype=float).reshape(-1)
-    # The generic team rides along as one extra batch row, so it goes through
-    # bit-for-bit the same arithmetic as every candidate row — which is what makes the
-    # tilt EXACTLY zero (not merely tiny) for a weight row equal to v.
-    weights_with_reference = np.vstack([weights, v])
-    sigma_w, sigma_v, ss, sigma_s, sigma_u, rho, _ = _score_value_geometry(
-        weights_with_reference, covariance,
-        value_direction if field_direction is None else field_direction)
 
-    e, d_e, _ = _evaluate_expected_max_score(rho, pick_pool_size)
-    score_coefficient = (e - rho * d_e) / sigma_s     # p~: the Sigma*w loading of grad W
-    value_coefficient = d_e / sigma_u                 # q~: the Sigma*v loading of grad W
-    picks = (
-        sigma_w * score_coefficient[:, None]
-        + sigma_v[None, :] * value_coefficient[:, None]
-    )
-    return (picks[:-1] - picks[-1][None, :]).reshape(-1, v.shape[0], 1)
+    Needing the Jacobian too? compute_expected_pick_tilts_and_jacobian does the costly part once.
+    """
+    return _PickModelState(
+        category_weights, covariance, value_direction, pick_pool_size, field_direction,
+    ).assemble_tilts()
 
 
 def compute_expected_pick_tilt_jacobian(
@@ -229,38 +298,24 @@ def compute_expected_pick_tilt_jacobian(
     drafting direction, defaulting to generic value), and every scalar y obeys
     dy/dw = (dy/dss) * 2*Sigma*w + (dy/dc) * Sigma*t. The field direction is constant with
     respect to my weights, so the Hessian structure is untouched by the anti-crowding pool.
+
+    Needing the tilts too? compute_expected_pick_tilts_and_jacobian does the costly part once.
     """
-    weights = np.asarray(category_weights, dtype=float)
-    v = np.asarray(value_direction, dtype=float).reshape(-1)
-    n_categories = v.shape[0]
-    sigma_w, sigma_v, ss, sigma_s, sigma_u, rho, clamp_active = _score_value_geometry(
-        weights, covariance,
-        value_direction if field_direction is None else field_direction)
+    return _PickModelState(
+        category_weights, covariance, value_direction, pick_pool_size, field_direction,
+    ).assemble_jacobian()
 
-    e, d_e, dd_e = _evaluate_expected_max_score(rho, pick_pool_size)
-    score_coefficient = (e - rho * d_e) / sigma_s
-    value_coefficient = d_e / sigma_u
 
-    # rho = c / (sigma_s * sigma_u): the two scalar routes into the coefficients — both
-    # zero through an active clamp (the smoothing is flat there).
-    d_rho_d_ss = np.where(clamp_active, 0.0, -rho / (2.0 * ss))
-    d_rho_d_c = np.where(clamp_active, 0.0, 1.0 / (sigma_s * sigma_u))
-
-    d_score_coefficient_d_rho = -rho * dd_e / sigma_s
-    d_p_d_ss = (
-        -score_coefficient / (2.0 * ss)
-        + d_score_coefficient_d_rho * d_rho_d_ss
+def compute_expected_pick_tilts_and_jacobian(
+    category_weights
+    , covariance
+    , value_direction
+    , pick_pool_size
+    , field_direction=None
+):
+    """(compute_expected_pick_tilts, compute_expected_pick_tilt_jacobian) from ONE pass of the
+    shared geometry and expected-max core -- what the agent's solve needs at every iteration."""
+    state = _PickModelState(
+        category_weights, covariance, value_direction, pick_pool_size, field_direction,
     )
-    d_p_d_c = d_score_coefficient_d_rho * d_rho_d_c
-    d_q_d_ss = (dd_e / sigma_u) * d_rho_d_ss
-    d_q_d_c = (dd_e / sigma_u) * d_rho_d_c
-
-    grad_p = 2.0 * sigma_w * d_p_d_ss[:, None] + sigma_v[None, :] * d_p_d_c[:, None]
-    grad_q = 2.0 * sigma_w * d_q_d_ss[:, None] + sigma_v[None, :] * d_q_d_c[:, None]
-
-    jacobian = (
-        score_coefficient[:, None, None] * covariance[None, :, :]
-        + sigma_w[:, :, None] * grad_p[:, None, :]
-        + sigma_v[None, :, None] * grad_q[:, None, :]
-    )
-    return jacobian.reshape(-1, n_categories, n_categories)
+    return state.assemble_tilts(), state.assemble_jacobian()

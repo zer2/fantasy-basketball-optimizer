@@ -348,8 +348,7 @@ from backend.math.position_optimization import (
 )
 from backend.math.position_config import PositionConfig, build_position_config
 from backend.math.truncated_max_pick_model import (
-    compute_expected_pick_tilt_jacobian,
-    compute_expected_pick_tilts,
+    compute_expected_pick_tilts_and_jacobian,
 )
 from backend.player_identity import RP_PLAYER_ID
 
@@ -2233,16 +2232,11 @@ class HAgent:
             # applied to one side only it is a fictitious handicap (measured: it printed
             # itself onto the Rotisserie board at pinned confidence 1.0). Field reaction
             # belongs in the pick model's pool composition (a price), not a level.
-            expected_future_diff_single = (
-                compute_expected_pick_tilts(
-                    category_weights, L[0], self.v, self.pick_pool_size)
-                + position_mu
-            )
-            del_full = (
-                (self.n_picks - 1 - n_players_selected)
-                * compute_expected_pick_tilt_jacobian(
-                    category_weights, L[0], self.v, self.pick_pool_size)
-            )
+            # One pass for both: they share the expected-max core, the costly part of the model.
+            expected_pick_tilts, expected_pick_tilt_jacobian = compute_expected_pick_tilts_and_jacobian(
+                category_weights, L[0], self.v, self.pick_pool_size)
+            expected_future_diff_single = expected_pick_tilts + position_mu
+            del_full = (self.n_picks - 1 - n_players_selected) * expected_pick_tilt_jacobian
 
         # MLB: unsupported and unreachable — see the MLB note in __init__.
         elif self.sport == 'MLB':

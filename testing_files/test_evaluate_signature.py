@@ -69,24 +69,24 @@ _TEAM_2 = [
 _GOLDEN = {
     ('Each Category',  'empty'): '61ad0e28acd6c9f94d3928248849f9703ff9be70a1582a113549d1b9a29fb49c',
     ('Each Category',  'mid'):   'cda6d0a4d75f02aee772cb7bfe500bfc2090b453c13186d09bd887015c034a3d',
-    ('Half and Half',  'empty'): 'ac5464d1a75cbe84ddf16168ba390928125753caafc2bdfb2f7326d1656f8a6e',
+    ('Half and Half',  'empty'): '29d1d2111a68251e384f39310c0cf9acf54e34ac3f48364e85d106d2eafe8e9c',
     ('Half and Half',  'mid'):   'e8d3b5e31191d3672aea76a03b2967230b2ca170d8f4afeb5bb17dd40bfb586a',
-    ('Most Categories','empty'): 'ae990a7643ba49f7f4c1d411393bac28f3327e3499ab404f486755fa773f0c2b',
+    ('Most Categories','empty'): '20213eae19ca6ba92a0de96c09eb1b220d992a63f8397944eec074f9c89f0b34',
     ('Most Categories','mid'):   'd7f2342c81d9c6d8a2dbc23786ddccb8b7f89cd40e07a6312e36e99bde9b41e1',
 
     # Eight categories (turnovers dropped), which is what a tiebreaker needs: a matchup that can
     # end level. Each objective appears with and without one named, so a change to the weighted
     # win-count DP, to what a category is worth in v, or to the G-score ranking the board is drawn
     # from has to show up here rather than only in a league nobody tested.
-    ('8cat Each Category',   'empty'): '81364efd509dd3ff621ba686ec1d57ae9ab0a47ade61658db060787751e11d29',
-    ('8cat Each Category',   'mid'):   '38b7941e207e7ee5cc4cb8074679669d96974e053428c68f2bd7cac8baf84574',
-    ('8cat Most Categories', 'empty'): 'cf27417767ab41f91dced3583c211e7756d6a26ee404b3fb32b0d07ef9cca5fc',
+    ('8cat Each Category',   'empty'): '72d652b438327193d463f94e2efa5a32bb074a45b575da25fd1334a46a17342e',
+    ('8cat Each Category',   'mid'):   'c3f6ef20f886440752a8279bff5b65f97945ea4f06ce489b05cf4e912a9eafa0',
+    ('8cat Most Categories', 'empty'): '6b1e5f1870392471585f0bf20e6e94a946506e5e27ee83e61127a6166ffaa92c',
     ('8cat Most Categories', 'mid'):   '2ff4e302babf350f23c32f609aa4a65ff521cf54cf8a4031f0e84ba8e2b03f4c',
     ('8cat MC + Points',     'empty'): '8caec930727d3ab1a3a82857cfa7e02a87688110087eaa4a7e171088108a6f1f',
     ('8cat MC + Points',     'mid'):   '61f3c99e9a0300e3f2d02f749e2562b9d47bb9d8db53a06482605232ac7b6704',
-    ('8cat Half and Half',   'empty'): 'cdf5c1fdd0fd08628b4bb8a5e225554137c28d94b70e2d8e3265c13b0dd0bd15',
+    ('8cat Half and Half',   'empty'): '0c5a7cb1bb5625c467796583d02be2794482d92f20e3150597324051c2320caf',
     ('8cat Half and Half',   'mid'):   '0630620253b4bb8710f55236c75f71e839d2d46529c8c535db013a8b33d5bba8',
-    ('8cat Half + Points',   'empty'): '8cdca14f6b6d88f994158279f672c003ebea59aa7767834c19429d55a74e124c',
+    ('8cat Half + Points',   'empty'): '9bcaf37f992f470dc010636dadc7d1b5ba4ffdc9a1f1ca08a4ed99a160f3f283',
     ('8cat Half + Points',   'mid'):   '78b11f038f0977195a85055b6ba0c7b5f22e4a3032c584ee44ab12d65d43f635',
 }
 
