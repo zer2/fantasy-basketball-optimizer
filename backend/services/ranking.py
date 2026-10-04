@@ -17,7 +17,7 @@ from backend.models import (
 from backend.math.algorithm_helpers import auction_value_adjuster
 from backend.player_identity import FULL_ROSTER_SCORE_PLAYER_ID
 from backend.infra.server_timing import record_phase
-from backend.services.build_agent import derive_effective_objective
+from backend.services.build_agent import count_unscorable_players_as_replacement, derive_effective_objective
 from backend.math.position_config import PositionConfig
 
 # The engine's internal index for the one result row of a full-roster evaluate
@@ -56,6 +56,8 @@ def rank_candidates(
     Returns:
         EvaluateResponse containing the iteration count and ranked Candidate list.
     """
+    # A rostered player the league's categories cannot score is replacement level, not an error.
+    player_assignments = count_unscorable_players_as_replacement(session, player_assignments)
     info           = session.agent.info
     h_agent              = session.agent
     current_settings = session.current_settings

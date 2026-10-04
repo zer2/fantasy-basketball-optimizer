@@ -12,11 +12,13 @@ The default for player statistics is to use forward-looking projections.
 
 ![Projection source weights](img/projections.png)
 
-The default projection source is a 50/50 split between ESPN's free forecasts and a modified version of DARKO. The website's version of DARKO projections takes games played and total minutes from the ESPN forecasts, and combines those with DARKO pace and per-possession projections to get per-game projections. This is necessary because DARKO does not forecast games played, and its minute forecasts are designed for the next game only, which is not ideal for fantasy. 
+The projection sources are ESPN's free forecasts and a modified version of DARKO. The default is ESPN alone (DARKO at 0%), because the DARKO projections are stale (see the note below). The website's version of DARKO projections takes games played and total minutes from the ESPN forecasts, and combines those with DARKO pace and per-possession projections to get per-game projections. This is necessary because DARKO does not forecast games played, and its minute forecasts are designed for the next game only, which is not ideal for fantasy. 
 
 **Note as of August 2026: the ESPN forecasting page currently has bugs, and for that reason the ESPN projections have not been updated since October. The DARKO app projections have also been down. So right now, the default forecasts are very stale**
 
 The weights are always re-scaled so they add up to 100%. E.g. if DARKO is set to 75% while ESPN is still at 50%, that re-scales to 60% DARKO and 40% ESPN. 
+
+Each player is blended over the sources that project him, so a player one source lacks is still included, on the other sources' numbers alone. DARKO, for example, does not yet project the incoming rookie class; with both sources on, a rookie's projection is ESPN's. A percentage category no source projects for a player counts as zero attempts, so it neither helps nor hurts his team's percentage.
 
 Any other set of projections can be uploaded and included in the blend, as either a CSV or an Excel file. There is no list of supported providers: the website reads each column on its own and recognizes the common ways each statistic is labelled, so most exports work as downloaded. If a file is missing a category, which is common for non-standard categories like Double Doubles, that category can still be used if at least one other projection set has the category. The category will just ignore the weight of the projection that does not have it. 
 

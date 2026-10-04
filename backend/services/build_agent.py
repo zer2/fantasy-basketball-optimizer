@@ -232,10 +232,17 @@ def build_scoring_info(session: Session) -> None:
     slot_counts = current_settings['slot_counts']
     n_active  = _count_active(slot_counts, n_picks)
 
+    # The requested objective, narrowed to what this data source can score. Derived, never
+    # written back: current_settings stays the request (see derive_effective_objective).
+    effective_categories, effective_tiebreaker = derive_effective_objective(session)
+
+    # Only the players this league's categories can be scored for (see list_unscorable_player_ids).
+    scorable_pool = session.v2.drop(index=list_unscorable_player_ids(session))
+
     # The pool must be able to fill every roster; otherwise the whole model is ill-posed (there is
     # no replacement-level player to anchor auction values, and managers could not complete teams).
     # Reject it here rather than letting process_player_data or the auction math fail obscurely later.
-    n_available = len(session.v2)
+    n_available = len(scorable_pool)
     n_required  = n_drafters * n_picks
     if n_available < n_required:
         raise InsufficientPlayerPoolError(
@@ -243,12 +250,8 @@ def build_scoring_info(session: Session) -> None:
             f'({n_drafters} teams x {n_picks} roster spots) to fill every roster.'
         )
 
-    # The requested objective, narrowed to what this data source can score. Derived, never
-    # written back: current_settings stays the request (see derive_effective_objective).
-    effective_categories, effective_tiebreaker = derive_effective_objective(session)
-
     info = process_player_data(
-        player_stats_v2   = session.v2,
+        player_stats_v2   = scorable_pool,
         weekly_df         = None,
         mean_of_variances = _load_mean_of_variances(),
         psi               = current_settings['psi'],
@@ -410,6 +413,39 @@ def _count_active(slot_counts: dict, n_picks: int) -> int:
     cannot be fielded at all, and that is what this count leaves out.
     """
     return sum(slot_counts.values()) if slot_counts else n_picks
+
+
+def count_unscorable_players_as_replacement(
+    session: Session
+    , player_assignments: dict[str, list[int]]
+) -> dict[str, list[int]]:
+    """A board with every unscorable rostered player (see list_unscorable_player_ids) counted as RP.
+
+    They are real players the league's categories cannot score, which is exactly what RP stands
+    for. Rejecting the board instead would stop a live draft dead the moment anyone drafted one --
+    an ESPN-only rookie in a 3P% league, say -- with no way for the user to fix it."""
+    unscorable = set(list_unscorable_player_ids(session))
+    if not unscorable:
+        return player_assignments
+    return {team: [RP_PLAYER_ID if player_id in unscorable else player_id for player_id in roster]
+            for team, roster in player_assignments.items()}
+
+
+def list_unscorable_player_ids(session: Session) -> list[int]:
+    """The pool's players missing a value a selected category needs: the category's own column, a ratio
+    category's volume column, and Games Played % always. The blend leaves a stat missing where no source
+    projects it for a player (ESPN projects no three-point attempts, so an ESPN-only rookie has no 3P%);
+    such a player cannot be scored in a league that counts that category, and in one that does not, the
+    gap does not matter. Derived from v2 and the categories, so a category change re-derives it."""
+    _, sport_params, _ = _resolve_sport_params(session)
+    categories, _ = derive_effective_objective(session)
+    ratio_statistics = sport_params['ratio-statistics']
+    needed_columns = {'Games Played %', *categories}
+    needed_columns |= {ratio_statistics[category]['volume-statistic'] for category in categories
+                       if category in ratio_statistics}
+    present_columns = [column for column in needed_columns if column in session.v2.columns]
+    missing_a_value = session.v2[present_columns].isna().any(axis=1)
+    return session.v2.index[missing_a_value].tolist()
 
 
 def derive_effective_objective(session: Session) -> tuple[list[str], str | None]:

@@ -20,6 +20,7 @@ from backend.models import (
     TradeSuggestion, TradeSuggestResponse, ComboParam,
 )
 from backend.math.position_optimization import check_team_eligibility
+from backend.services.build_agent import count_unscorable_players_as_replacement, list_unscorable_player_ids
 
 
 # ── Core trade analysis ──────────────────────────────────────────────────────
@@ -39,6 +40,13 @@ def run_trade_analyze(
 
     if abs(len(my_trade) - len(their_trade)) > 6:
         return TradeAnalyzeResponse(error="Too lopsided of a trade!")
+
+    unscorable_in_trade = set(my_trade + their_trade) & set(list_unscorable_player_ids(session))
+    if unscorable_in_trade:
+        names = ', '.join(session.player_registry[player_id].name for player_id in sorted(unscorable_in_trade))
+        return TradeAnalyzeResponse(
+            error=f'No projection covers every category for {names}, so a trade involving them cannot be scored.')
+    player_assignments = count_unscorable_players_as_replacement(session, player_assignments)
 
     n_iterations = session.current_settings['n_iterations']
     result = analyze_trade(session, player_assignments, my_team, my_trade, their_team, their_trade, n_iterations, position_check)
@@ -135,6 +143,8 @@ def run_trade_suggest(
 ) -> TradeSuggestResponse:
     """Public entry point for the trade/suggest endpoint."""
 
+    # A rostered player the league's categories cannot score is replacement level, not a trade piece.
+    player_assignments = count_unscorable_players_as_replacement(session, player_assignments)
     # Step 1: the neutral-board H-score ranking, computed once at build time
     # (populate_default_h_scores) and shared with auction anchoring and the throttle.
     general_values = session.agent.default_h_scores

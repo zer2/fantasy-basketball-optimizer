@@ -281,8 +281,9 @@ function renderBlendWeights(container: HTMLElement): void {
     container.append(weightLabel)
 
     const snowflakeSources: { id: string; label: string; prefKey: string; defaultValue: number }[] = [
-        { id: 'ps-w-espn',  label: 'ESPN',  prefKey: 'blend_w_espn',  defaultValue: 0.5 },
-        { id: 'ps-w-darko', label: 'DARKO', prefKey: 'blend_w_darko', defaultValue: 0.5 },
+        // DARKO starts at zero: its app has been down and its projections are stale (see docs/projections.md).
+        { id: 'ps-w-espn',  label: 'ESPN',  prefKey: 'blend_w_espn',  defaultValue: 1.0 },
+        { id: 'ps-w-darko', label: 'DARKO', prefKey: 'blend_w_darko', defaultValue: 0.0 },
     ]
 
     for (const source of snowflakeSources) {

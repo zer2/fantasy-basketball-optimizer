@@ -173,6 +173,14 @@ def combine_projections(
             raise ValueError(f'{key}: multiple rows resolve to the same player id(s): {duplicated}')
         sources[key] = source_frame
 
+    # A source lacking a column another source has fills it in from its own numbers wherever a ratio's
+    # identity allows (ESPN has no Field Goals Made or Assist to TO, but has FG% x FGA and Assists /
+    # Turnovers): the derived values are that source's own projection, nothing guessed.
+    union_columns = set().union(*(set(sources[k].columns) for k in source_keys if sources[k] is not None))
+    for key in source_keys:
+        if sources[key] is not None:
+            sources[key] = derive_missing_ratio_columns(sources[key], union_columns, sport_params)
+
     all_players = {
         p
         for k in source_keys
@@ -186,20 +194,14 @@ def combine_projections(
     )
     df = df.reindex(new_index)
 
-    # Drop players missing a column from every source. '_display_name' is exempt: it is
-    # registry material, not a blended stat, and a source that carries a player always
-    # names them.
-    blend_columns = [c for c in df.columns if c != '_display_name']
-    ineligible = (df[blend_columns].isna().groupby('Player').sum() == len(source_keys)).sum(axis=1) > 0
-    df = df[~df.index.get_level_values('Player').isin(ineligible.index[ineligible])]
-
-    df = df.groupby('Player').agg(
-        lambda x: (
-            np.ma.average(np.ma.MaskedArray(x, mask=np.isnan(x)), weights=weights)
-            if np.issubdtype(x.dtype, np.number)
-            else x.dropna().iloc[0]
-        )
-    )
+    # Every player some active source projects is kept, blended over the sources that have him (the
+    # masked average): dropping anyone a source lacked used to cut the pool to the sources'
+    # intersection -- at the 50/50 blend, every rookie DARKO did not yet carry. A stat no source
+    # projects for a player stays MISSING rather than becoming a number; whether that matters depends
+    # on the league's categories, which this pool (cached across category settings) does not know.
+    # Pipeline step 4 excludes the players a selected category cannot be scored for
+    # (build_agent.list_unscorable_player_ids).
+    df = df.groupby('Player').agg(lambda values: blend_source_values(values, weights))
 
     if 'Double Doubles' in df.columns:
         df['Double Doubles'] = df['Double Doubles'].astype(float)
@@ -213,14 +215,51 @@ def combine_projections(
     df['Position'] = mapped_positions.fillna(df['Position'])
 
     df['Position'] = df['Position'].fillna('NP')
-    stat_columns = [c for c in df.columns if c != '_display_name']
-    df[stat_columns] = df[stat_columns].fillna(0)
     # ROW ORDER IS LOAD-BEARING (see get_historical_data): the blend has always emitted a
     # name-sorted pool; groupby ordered it by id above, so restore name order here — while
     # the display column still has its collision-free blend name (renaming first would make
     # sort_values('Player') ambiguous against the id level of the same name).
     df = df.sort_values('_display_name')
     return df.rename(columns={'_display_name': 'Player'})
+
+
+def blend_source_values(
+    values: pd.Series
+    , weights: list[float]
+):
+    """One player's value for one column, from the sources that have it: numbers are averaged with the sources'
+    weights over the sources present, anything else is taken from the first source present. When no source has
+    the column for this player the result is missing (NaN) -- the caller decides what that means for each column."""
+    if np.issubdtype(values.dtype, np.number):
+        missing = np.isnan(values.to_numpy(dtype=float))
+        if missing.all():
+            return np.nan
+        return float(np.ma.average(np.ma.MaskedArray(values.to_numpy(dtype=float), mask=missing), weights=weights))
+    present = values.dropna()
+    return present.iloc[0] if len(present) > 0 else np.nan
+
+
+def derive_missing_ratio_columns(
+    source_frame: pd.DataFrame
+    , union_columns: set[str]
+    , sport_params: dict
+) -> pd.DataFrame:
+    """Fill in, from the source's own numbers, the columns another active source has and this one lacks, wherever
+    a ratio statistic's identity ratio = made / volume allows it: the made stat from ratio x volume (Field Goals
+    Made from FG% x FGA), or the ratio from made / volume (Assist to TO from Assists / Turnovers). A zero volume
+    makes the ratio 0 -- no attempts, no effect on the percentage. Only columns some source already has are
+    added, so the blend's set of statistics (and with it which categories a league can use) is unchanged."""
+    frame = source_frame.copy()
+    for ratio_stat, ratio_info in sport_params['ratio-statistics'].items():
+        made_stat, volume_stat = ratio_info['made-statistic'], ratio_info['volume-statistic']
+        if volume_stat not in frame.columns:
+            continue
+        if made_stat in union_columns and made_stat not in frame.columns and ratio_stat in frame.columns:
+            frame[made_stat] = frame[ratio_stat] * frame[volume_stat]
+        if ratio_stat in union_columns and ratio_stat not in frame.columns and made_stat in frame.columns:
+            volume = frame[volume_stat]
+            frame[ratio_stat] = (frame[made_stat] / volume.where(volume > 0)).fillna(0.0)
+    return frame
 
 
 # ── Projection data ───────────────────────────────────────────────────────────
