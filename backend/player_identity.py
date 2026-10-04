@@ -8,7 +8,7 @@ and are rendered only at display time.
 
 Name→id conversion therefore happens ONLY at the edges where names enter the system:
   - ingesting name-keyed sources (ESPN projections, uploaded projection CSVs), via
-    PLAYER_NAME_RESOLVER_VIEW (data_retrieval.get_player_name_resolver): every spelling
+    PLAYER_NAME_RESOLVER_VIEW (data_retrieval.get_player_name_resolvers): every spelling
     UNIFIED_PLAYER_TABLE knows, in any of its name columns, mapped to one NBA id -- a
     spelling shared by two players goes to the most recently active, rookies first (the
     rule is in scripts/player_name_resolver_view.sql);

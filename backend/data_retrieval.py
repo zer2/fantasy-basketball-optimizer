@@ -14,6 +14,7 @@ Ported from the original Streamlit data-retrieval module, but:
 from __future__ import annotations
 
 import logging
+import unicodedata
 from typing import Optional
 
 import numpy as np
@@ -298,14 +299,19 @@ def attach_player_ids_by_name(df: pd.DataFrame) -> pd.DataFrame:
     'player_id' column — the ingestion edge for name-keyed sources. Unresolved rows keep
     a null id; the caller decides between synthetic allocation (uploads) and loud
     warnings (curated sources)."""
-    resolver = get_player_name_resolver()
+    exact_resolver, accent_free_resolver = get_player_name_resolvers()
     df = df.copy()
-    df['player_id'] = df['Player'].map(resolver).astype('Int64')
+    # Exact spelling first, so nothing that matched before matches differently now; only a name with no exact
+    # match is tried without its accents (HTB writes 'Moussa Diabaté' where the table holds 'Moussa Diabate').
+    exact_ids = df['Player'].map(exact_resolver)
+    accent_free_ids = df['Player'].map(strip_accents).map(accent_free_resolver)
+    df['player_id'] = exact_ids.fillna(accent_free_ids).astype('Int64')
     return df
 
 
-def get_player_name_resolver() -> dict[str, int]:
-    """Every known spelling of every player -> NBA player id, from PLAYER_NAME_RESOLVER_VIEW.
+def get_player_name_resolvers() -> tuple[dict[str, int], dict[str, int]]:
+    """Every known spelling of every player -> NBA player id, from PLAYER_NAME_RESOLVER_VIEW: exactly as
+    spelled, and with accents stripped.
 
     Projections reach the app keyed by name, and from anywhere: ESPN, DARKO, Hashtag Basketball,
     Basketball Monster, a hand-edited file, or a blend of several, each spelling players its own
@@ -320,7 +326,21 @@ def get_player_name_resolver() -> dict[str, int]:
     if not view['PLAYER_NAME'].is_unique:
         duplicated = view.loc[view['PLAYER_NAME'].duplicated(), 'PLAYER_NAME'].tolist()
         raise ValueError(f'PLAYER_NAME_RESOLVER_VIEW lists these spellings more than once: {duplicated[:10]}')
-    return dict(zip(view['PLAYER_NAME'], view['NBA_PLAYER_ID'].astype(int)))
+    exact_resolver = dict(zip(view['PLAYER_NAME'], view['NBA_PLAYER_ID'].astype(int)))
+    # Two spellings that differ only in accents could belong to two players; the view's own rule decides
+    # between them -- most recently active, then latest career start, then the newer id -- so ranking the
+    # rows that way and keeping the first per accent-free spelling settles it the same way.
+    ranked = view.sort_values(['LAST_SEASON', 'FIRST_SEASON', 'NBA_PLAYER_ID'], ascending=False, na_position='last')
+    accent_free_resolver: dict[str, int] = {}
+    for name, nba_player_id in zip(ranked['PLAYER_NAME'], ranked['NBA_PLAYER_ID']):
+        accent_free_resolver.setdefault(strip_accents(name), int(nba_player_id))
+    return exact_resolver, accent_free_resolver
+
+
+def strip_accents(name: str) -> str:
+    """'Moussa Diabaté' -> 'Moussa Diabate': decompose each letter and drop the combining marks."""
+    return ''.join(character for character in unicodedata.normalize('NFKD', name)
+                   if not unicodedata.combining(character))
 
 
 # ── Canonical position eligibility ────────────────────────────────────────────
