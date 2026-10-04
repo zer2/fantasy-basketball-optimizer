@@ -12,231 +12,6 @@ import numpy as np
 import pandas as pd
 from backend.player_identity import RP_PLAYER_ID
 
-# ── helpers ────────────────────────────────────────────────────────────────────
-# The two category filters serve only process_player_data; get_category_level_rv is public
-# (algorithm_agents imports it).
-
-def _list_counting_stats(sport_params: dict, categories: list[str]) -> list[str]:
-    """Return counting statistics from sport_params that are in the active categories."""
-    return [c for c in sport_params['counting-statistics'] if c in categories]
-
-
-def _list_ratio_stats(sport_params: dict, categories: list[str]) -> list[str]:
-    """Return ratio statistics from sport_params that are in the active categories."""
-    return [c for c in sport_params['ratio-statistics'] if c in categories]
-
-
-def get_category_level_rv(rv: float
-                          , v: pd.Series
-                          , categories: list[str]) -> pd.Series:
-    rv_multiple = (rv / (len(categories) - 2)
-                   if 'Turnovers' in categories
-                   else rv / len(categories))
-    return pd.Series({
-        stat: -rv_multiple / v[stat] if stat == 'Turnovers' else rv_multiple / v[stat]
-        for stat in categories
-    })
-
-
-# ── coefficient calculation ────────────────────────────────────────────────────
-
-def calculate_coefficients(player_means: pd.DataFrame
-                            , representative_player_set: list
-                            , mean_of_variances: pd.Series
-                            , counting_stats: list[str]
-                            , ratio_stats: list[str]
-                            , sport_params: dict) -> pd.DataFrame:
-
-    var_of_means  = player_means.loc[representative_player_set, counting_stats].var(axis=0)
-    mean_of_means = player_means.loc[representative_player_set, counting_stats].mean(axis=0)
-
-    for ratio_stat, ratio_stat_info in sport_params['ratio-statistics'].items():
-        if ratio_stat in ratio_stats:
-            volume_statistic = ratio_stat_info['volume-statistic']
-
-            volume_mean_of_means = player_means.loc[representative_player_set, volume_statistic].mean()
-            mean_of_means.loc[volume_statistic] = volume_mean_of_means
-
-            agg_average = (
-                player_means.loc[representative_player_set, ratio_stat]
-                * player_means.loc[representative_player_set, volume_statistic]
-            ).mean() / volume_mean_of_means
-            mean_of_means.loc[ratio_stat] = agg_average
-
-            numerator = (
-                player_means.loc[representative_player_set, volume_statistic] / volume_mean_of_means
-                * (player_means.loc[representative_player_set, ratio_stat] - agg_average)
-            )
-            var_of_means.loc[ratio_stat] = numerator.var()
-
-    return pd.DataFrame({
-        'Mean of Means':      mean_of_means,
-        'Variance of Means':  var_of_means,
-        'Mean of Variances':  mean_of_variances.reindex(var_of_means.index),
-    })
-
-
-def calculate_coefficients_historical(weekly_df: pd.DataFrame
-                                       , representative_player_set: list
-                                       , sport_params: dict
-                                       , counting_stats: list[str]
-                                       , ratio_stats: list[str]
-                                       ) -> pd.DataFrame:
-    player_stats = weekly_df.groupby(level='Player').agg(['mean', 'var'])
-
-    mean_of_vars  = player_stats.loc[representative_player_set, (counting_stats, 'var')].mean(axis=0)
-    var_of_means  = player_stats.loc[representative_player_set, (counting_stats, 'mean')].var(axis=0)
-    mean_of_means = player_stats.loc[representative_player_set, (counting_stats, 'mean')].mean(axis=0)
-
-    for ratio_stat, ratio_stat_info in sport_params['ratio-statistics'].items():
-        if ratio_stat in ratio_stats:
-            volume_statistic = ratio_stat_info['volume-statistic']
-            made_statistic   = ratio_stat_info['made-statistic']
-
-            made_mean_of_means   = player_stats.loc[representative_player_set, (made_statistic, 'mean')].mean()
-            volume_mean_of_means = player_stats.loc[representative_player_set, (volume_statistic, 'mean')].mean()
-
-            mean_of_means.loc[volume_statistic] = volume_mean_of_means
-            ratio_agg_average = made_mean_of_means / volume_mean_of_means
-            mean_of_means.loc[ratio_stat] = ratio_agg_average
-
-            ratio       = player_stats.loc[:, (made_statistic, 'mean')] / player_stats.loc[:, (volume_statistic, 'mean')]
-            ratio_num   = player_stats.loc[:, (volume_statistic, 'mean')] / volume_mean_of_means * (ratio - ratio_agg_average)
-            var_of_means.loc[ratio_stat] = ratio_num.loc[representative_player_set].var()
-
-            weekly_df.loc[:, 'volume_adjusted_' + ratio_stat] = (
-                (weekly_df[made_statistic] - weekly_df[volume_statistic] * ratio_agg_average)
-                / volume_mean_of_means
-            )
-            ratio_mean_of_vars = (
-                weekly_df['volume_adjusted_' + ratio_stat]
-                .loc[representative_player_set]
-                .groupby('Player').var().mean()
-            )
-            mean_of_vars.loc[ratio_stat] = ratio_mean_of_vars
-
-    return pd.DataFrame({
-        'Mean of Means':     mean_of_means.droplevel(level=1),
-        'Variance of Means': var_of_means.droplevel(level=1),
-        'Mean of Variances': mean_of_vars.droplevel(level=1),
-    })
-
-
-def scale_tiebreaker_value(category_values, tiebreaker_position: int, most_categories_weight: float):
-    """Give the tiebreaker category the extra value the scoring rules give it, in place-safe form.
-
-    v is the value of a category per unit of x-score (g = x * v exactly), so a category that
-    counts twice in the majority half of the objective and once in the per-category half is worth
-    (1 + most_categories_weight) of an ordinary one. Everything that reads v inherits that: the
-    neutral weight vector a balanced team drafts to, the reference the anti-crowded-punt penalty
-    measures punt depth against, the field weights inside get_x_mu, and the x <-> g conversion.
-
-    Shared because v is built in two places — here and again in HAgent, which recomputes it from
-    the same coefficients — and the two must not drift apart. Takes and returns a plain array, so
-    the caller keeps whatever index it had.
-    """
-    scaled = np.asarray(category_values, dtype=float).copy()
-    scaled[tiebreaker_position] = scaled[tiebreaker_position] * (1 + most_categories_weight)
-    return scaled
-
-
-def calculate_scores_from_coefficients(player_means: pd.DataFrame
-                                        , coefficients: pd.DataFrame
-                                        , sport_params: dict
-                                        , alpha_weight: float
-                                        , beta_weight: float
-                                        , counting_stats: list[str]
-                                        , ratio_stats: list[str]
-                                        , categories: list[str]
-                                        , n_active: int) -> pd.DataFrame:
-
-    counting_mean    = coefficients.loc[counting_stats, 'Mean of Means']
-    counting_var_m   = coefficients.loc[counting_stats, 'Variance of Means']
-    counting_mean_v  = coefficients.loc[counting_stats, 'Mean of Variances']
-
-    denom    = (counting_var_m.values * alpha_weight + counting_mean_v.values * beta_weight) ** 0.5
-    num      = player_means.loc[:, counting_stats] - counting_mean
-    main_scores = num.divide(denom)
-
-    ratio_scores: dict = {}
-    for ratio_stat, ratio_stat_info in sport_params['ratio-statistics'].items():
-        if ratio_stat in ratio_stats:
-            volume_statistic = ratio_stat_info['volume-statistic']
-            denom_r = (
-                coefficients.loc[ratio_stat, 'Variance of Means'] * alpha_weight
-                + coefficients.loc[ratio_stat, 'Mean of Variances'] * beta_weight
-            ) ** 0.5
-            volume_average = coefficients.loc[volume_statistic, 'Mean of Means']
-            player_volume  = player_means.loc[:, volume_statistic]
-            # Team-denominator correction (the unpublished revision of the G-score paper):
-            # the paper's equation 4 approximates a team's attempt volume as
-            # n_active * V-bar regardless of who the player is. Without that
-            # approximation, a team fielding player p attempts
-            # (n_active - 1) * V-bar + V_p, so p's percentage impact is the original
-            # numerator times n_active * V-bar / ((n_active - 1) * V-bar + V_p) --
-            # a player's own volume slightly dampens their own percentage impact.
-            team_volume_correction = (
-                n_active * volume_average
-                / ((n_active - 1) * volume_average + player_volume)
-            )
-            num_r = (
-                player_volume / volume_average
-                * (player_means[ratio_stat] - coefficients.loc[ratio_stat, 'Mean of Means'])
-                * team_volume_correction
-            )
-            ratio_scores[ratio_stat] = num_r.divide(denom_r)
-
-    res = pd.concat(
-        [ratio_scores[r] for r in ratio_scores] + [main_scores], axis=1
-    )
-    res.columns = ratio_stats + counting_stats
-
-    for neg_stat in sport_params['negative-statistics']:
-        if neg_stat in res.columns:
-            res[neg_stat] = -res[neg_stat]
-
-    return res.fillna(0)[categories]
-
-
-def _weighted_cov_matrix(df: pd.DataFrame, weights: pd.Series) -> pd.DataFrame:
-    weighted_means = np.average(df, axis=0, weights=weights)
-    deviations     = df - weighted_means
-    weighted_cov   = np.dot(weights * deviations.T, deviations) / weights.sum()
-    return pd.DataFrame(weighted_cov, columns=df.columns, index=df.columns)
-
-
-def games_played_adjustment(scores: pd.DataFrame
-                             , replacement_games_rate: pd.Series
-                             , representative_player_set: list[str]
-                             , sport_params: dict
-                             , categories: list[str]
-                             , v: pd.Series = None) -> pd.DataFrame:
-
-    if v is None:
-        v = pd.Series({stat: 1 / len(categories) for stat in categories})
-
-    totals = scores.dot(v)
-    n_players = len(representative_player_set)
-    rv = totals.sort_values(ascending=False).iloc[n_players]
-    category_level_rv = get_category_level_rv(rv, v, categories)
-
-    replacement_player_value = (
-        np.array(category_level_rv.T).reshape(1, -1)
-        * np.array(replacement_games_rate).reshape(-1, 1)
-    )
-    adjusted_scores = scores + replacement_player_value
-    adjusted_scores = adjusted_scores - adjusted_scores.loc[representative_player_set].mean()
-    return adjusted_scores
-
-
-# Fraction of the top of the draftable (top-n_players) G-score pool to EXCLUDE when building the
-# position means. The remaining (weaker) players better represent the replacement-tier talent that
-# actually fills flex/late slots; the star-dominated full pool over-states how much value a stacked
-# position delivers, which pushed the optimiser to over-commit to a single position. Default 0.25
-# trims the top quartile (a mild shrink that stays net-positive without over-flattening the tilts).
-# 0.0 recovers the prior full-pool behaviour.
-_POSITION_MEAN_POOL_TOP_TRIM = 0.25
-
 
 # ── public pipeline steps ──────────────────────────────────────────────────────
 
@@ -522,3 +297,229 @@ def process_player_data(player_stats_v2: pd.DataFrame
     }
 
     return info
+
+
+# ── coefficient calculation ────────────────────────────────────────────────────
+
+# Fraction of the top of the draftable (top-n_players) G-score pool to EXCLUDE when building the
+# position means. The remaining (weaker) players better represent the replacement-tier talent that
+# actually fills flex/late slots; the star-dominated full pool over-states how much value a stacked
+# position delivers, which pushed the optimiser to over-commit to a single position. Default 0.25
+# trims the top quartile (a mild shrink that stays net-positive without over-flattening the tilts).
+# 0.0 recovers the prior full-pool behaviour.
+_POSITION_MEAN_POOL_TOP_TRIM = 0.25
+
+
+def calculate_coefficients(player_means: pd.DataFrame
+                            , representative_player_set: list
+                            , mean_of_variances: pd.Series
+                            , counting_stats: list[str]
+                            , ratio_stats: list[str]
+                            , sport_params: dict) -> pd.DataFrame:
+
+    var_of_means  = player_means.loc[representative_player_set, counting_stats].var(axis=0)
+    mean_of_means = player_means.loc[representative_player_set, counting_stats].mean(axis=0)
+
+    for ratio_stat, ratio_stat_info in sport_params['ratio-statistics'].items():
+        if ratio_stat in ratio_stats:
+            volume_statistic = ratio_stat_info['volume-statistic']
+
+            volume_mean_of_means = player_means.loc[representative_player_set, volume_statistic].mean()
+            mean_of_means.loc[volume_statistic] = volume_mean_of_means
+
+            agg_average = (
+                player_means.loc[representative_player_set, ratio_stat]
+                * player_means.loc[representative_player_set, volume_statistic]
+            ).mean() / volume_mean_of_means
+            mean_of_means.loc[ratio_stat] = agg_average
+
+            numerator = (
+                player_means.loc[representative_player_set, volume_statistic] / volume_mean_of_means
+                * (player_means.loc[representative_player_set, ratio_stat] - agg_average)
+            )
+            var_of_means.loc[ratio_stat] = numerator.var()
+
+    return pd.DataFrame({
+        'Mean of Means':      mean_of_means,
+        'Variance of Means':  var_of_means,
+        'Mean of Variances':  mean_of_variances.reindex(var_of_means.index),
+    })
+
+
+def calculate_coefficients_historical(weekly_df: pd.DataFrame
+                                       , representative_player_set: list
+                                       , sport_params: dict
+                                       , counting_stats: list[str]
+                                       , ratio_stats: list[str]
+                                       ) -> pd.DataFrame:
+    player_stats = weekly_df.groupby(level='Player').agg(['mean', 'var'])
+
+    mean_of_vars  = player_stats.loc[representative_player_set, (counting_stats, 'var')].mean(axis=0)
+    var_of_means  = player_stats.loc[representative_player_set, (counting_stats, 'mean')].var(axis=0)
+    mean_of_means = player_stats.loc[representative_player_set, (counting_stats, 'mean')].mean(axis=0)
+
+    for ratio_stat, ratio_stat_info in sport_params['ratio-statistics'].items():
+        if ratio_stat in ratio_stats:
+            volume_statistic = ratio_stat_info['volume-statistic']
+            made_statistic   = ratio_stat_info['made-statistic']
+
+            made_mean_of_means   = player_stats.loc[representative_player_set, (made_statistic, 'mean')].mean()
+            volume_mean_of_means = player_stats.loc[representative_player_set, (volume_statistic, 'mean')].mean()
+
+            mean_of_means.loc[volume_statistic] = volume_mean_of_means
+            ratio_agg_average = made_mean_of_means / volume_mean_of_means
+            mean_of_means.loc[ratio_stat] = ratio_agg_average
+
+            ratio       = player_stats.loc[:, (made_statistic, 'mean')] / player_stats.loc[:, (volume_statistic, 'mean')]
+            ratio_num   = player_stats.loc[:, (volume_statistic, 'mean')] / volume_mean_of_means * (ratio - ratio_agg_average)
+            var_of_means.loc[ratio_stat] = ratio_num.loc[representative_player_set].var()
+
+            weekly_df.loc[:, 'volume_adjusted_' + ratio_stat] = (
+                (weekly_df[made_statistic] - weekly_df[volume_statistic] * ratio_agg_average)
+                / volume_mean_of_means
+            )
+            ratio_mean_of_vars = (
+                weekly_df['volume_adjusted_' + ratio_stat]
+                .loc[representative_player_set]
+                .groupby('Player').var().mean()
+            )
+            mean_of_vars.loc[ratio_stat] = ratio_mean_of_vars
+
+    return pd.DataFrame({
+        'Mean of Means':     mean_of_means.droplevel(level=1),
+        'Variance of Means': var_of_means.droplevel(level=1),
+        'Mean of Variances': mean_of_vars.droplevel(level=1),
+    })
+
+
+def scale_tiebreaker_value(category_values, tiebreaker_position: int, most_categories_weight: float):
+    """Give the tiebreaker category the extra value the scoring rules give it, in place-safe form.
+
+    v is the value of a category per unit of x-score (g = x * v exactly), so a category that
+    counts twice in the majority half of the objective and once in the per-category half is worth
+    (1 + most_categories_weight) of an ordinary one. Everything that reads v inherits that: the
+    neutral weight vector a balanced team drafts to, the reference the anti-crowded-punt penalty
+    measures punt depth against, the field weights inside get_x_mu, and the x <-> g conversion.
+
+    Shared because v is built in two places — here and again in HAgent, which recomputes it from
+    the same coefficients — and the two must not drift apart. Takes and returns a plain array, so
+    the caller keeps whatever index it had.
+    """
+    scaled = np.asarray(category_values, dtype=float).copy()
+    scaled[tiebreaker_position] = scaled[tiebreaker_position] * (1 + most_categories_weight)
+    return scaled
+
+
+def calculate_scores_from_coefficients(player_means: pd.DataFrame
+                                        , coefficients: pd.DataFrame
+                                        , sport_params: dict
+                                        , alpha_weight: float
+                                        , beta_weight: float
+                                        , counting_stats: list[str]
+                                        , ratio_stats: list[str]
+                                        , categories: list[str]
+                                        , n_active: int) -> pd.DataFrame:
+
+    counting_mean    = coefficients.loc[counting_stats, 'Mean of Means']
+    counting_var_m   = coefficients.loc[counting_stats, 'Variance of Means']
+    counting_mean_v  = coefficients.loc[counting_stats, 'Mean of Variances']
+
+    denom    = (counting_var_m.values * alpha_weight + counting_mean_v.values * beta_weight) ** 0.5
+    num      = player_means.loc[:, counting_stats] - counting_mean
+    main_scores = num.divide(denom)
+
+    ratio_scores: dict = {}
+    for ratio_stat, ratio_stat_info in sport_params['ratio-statistics'].items():
+        if ratio_stat in ratio_stats:
+            volume_statistic = ratio_stat_info['volume-statistic']
+            denom_r = (
+                coefficients.loc[ratio_stat, 'Variance of Means'] * alpha_weight
+                + coefficients.loc[ratio_stat, 'Mean of Variances'] * beta_weight
+            ) ** 0.5
+            volume_average = coefficients.loc[volume_statistic, 'Mean of Means']
+            player_volume  = player_means.loc[:, volume_statistic]
+            # Team-denominator correction (the unpublished revision of the G-score paper):
+            # the paper's equation 4 approximates a team's attempt volume as
+            # n_active * V-bar regardless of who the player is. Without that
+            # approximation, a team fielding player p attempts
+            # (n_active - 1) * V-bar + V_p, so p's percentage impact is the original
+            # numerator times n_active * V-bar / ((n_active - 1) * V-bar + V_p) --
+            # a player's own volume slightly dampens their own percentage impact.
+            team_volume_correction = (
+                n_active * volume_average
+                / ((n_active - 1) * volume_average + player_volume)
+            )
+            num_r = (
+                player_volume / volume_average
+                * (player_means[ratio_stat] - coefficients.loc[ratio_stat, 'Mean of Means'])
+                * team_volume_correction
+            )
+            ratio_scores[ratio_stat] = num_r.divide(denom_r)
+
+    res = pd.concat(
+        [ratio_scores[r] for r in ratio_scores] + [main_scores], axis=1
+    )
+    res.columns = ratio_stats + counting_stats
+
+    for neg_stat in sport_params['negative-statistics']:
+        if neg_stat in res.columns:
+            res[neg_stat] = -res[neg_stat]
+
+    return res.fillna(0)[categories]
+
+
+def _weighted_cov_matrix(df: pd.DataFrame, weights: pd.Series) -> pd.DataFrame:
+    weighted_means = np.average(df, axis=0, weights=weights)
+    deviations     = df - weighted_means
+    weighted_cov   = np.dot(weights * deviations.T, deviations) / weights.sum()
+    return pd.DataFrame(weighted_cov, columns=df.columns, index=df.columns)
+
+
+def games_played_adjustment(scores: pd.DataFrame
+                             , replacement_games_rate: pd.Series
+                             , representative_player_set: list[str]
+                             , sport_params: dict
+                             , categories: list[str]
+                             , v: pd.Series = None) -> pd.DataFrame:
+
+    if v is None:
+        v = pd.Series({stat: 1 / len(categories) for stat in categories})
+
+    totals = scores.dot(v)
+    n_players = len(representative_player_set)
+    rv = totals.sort_values(ascending=False).iloc[n_players]
+    category_level_rv = get_category_level_rv(rv, v, categories)
+
+    replacement_player_value = (
+        np.array(category_level_rv.T).reshape(1, -1)
+        * np.array(replacement_games_rate).reshape(-1, 1)
+    )
+    adjusted_scores = scores + replacement_player_value
+    adjusted_scores = adjusted_scores - adjusted_scores.loc[representative_player_set].mean()
+    return adjusted_scores
+
+
+# ── helpers ────────────────────────────────────────────────────────────────────
+# The two category filters serve only process_player_data; get_category_level_rv is public
+# (algorithm_agents imports it).
+
+def _list_counting_stats(sport_params: dict, categories: list[str]) -> list[str]:
+    """Return counting statistics from sport_params that are in the active categories."""
+    return [c for c in sport_params['counting-statistics'] if c in categories]
+
+
+def _list_ratio_stats(sport_params: dict, categories: list[str]) -> list[str]:
+    """Return ratio statistics from sport_params that are in the active categories."""
+    return [c for c in sport_params['ratio-statistics'] if c in categories]
+
+
+def get_category_level_rv(rv: float
+                          , v: pd.Series
+                          , categories: list[str]) -> pd.Series:
+    rv_multiple = (rv / (len(categories) - 2)
+                   if 'Turnovers' in categories
+                   else rv / len(categories))
+    return pd.Series({
+        stat: -rv_multiple / v[stat] if stat == 'Turnovers' else rv_multiple / v[stat]
+        for stat in categories
+    })

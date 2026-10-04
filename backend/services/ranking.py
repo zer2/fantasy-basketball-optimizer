@@ -25,26 +25,6 @@ from backend.math.position_config import PositionConfig
 _FULL_ROSTER_RESULT_INDEX = ''
 
 
-class UnknownRosterPlayersError(ValueError):
-    """A rostered player is not in the current player pool.
-
-    Happens when a data-source change alters player identities (or removes players)
-    after a board was built against the previous pool. Surfaced as a 400 so the
-    user gets an actionable message instead of a KeyError-turned-500.
-    """
-
-
-class UnknownTeamError(ValueError):
-    """The team being evaluated for is not one of the teams on the board.
-
-    Happens when the seat and the board come from different identity sets -- connecting a live
-    platform replaces the generic team names with the league's own, and a seat still pointing at
-    'Team 1' is evaluated against a board keyed by the platform's names. Surfaced as a 400 for
-    the same reason as the sibling above: the alternative is a KeyError several frames deep in
-    the H-score solve, reported as 'Evaluation failed.' with nothing in it to act on.
-    """
-
-
 # ── Public entry point ────────────────────────────────────────────────────────
 
 def rank_candidates(
@@ -842,4 +822,23 @@ def _make_slot_names(position_config: PositionConfig) -> list[str]:
     ]
 
 
+# ── errors ────────────────────────────────────────────────────────────────────
 
+class UnknownRosterPlayersError(ValueError):
+    """A rostered player is not in the current player pool.
+
+    Happens when a data-source change alters player identities (or removes players)
+    after a board was built against the previous pool. Surfaced as a 400 so the
+    user gets an actionable message instead of a KeyError-turned-500.
+    """
+
+
+class UnknownTeamError(ValueError):
+    """The team being evaluated for is not one of the teams on the board.
+
+    Happens when the seat and the board come from different identity sets -- connecting a live
+    platform replaces the generic team names with the league's own, and a seat still pointing at
+    'Team 1' is evaluated against a board keyed by the platform's names. Surfaced as a 400 for
+    the same reason as the sibling above: the alternative is a KeyError several frames deep in
+    the H-score solve, reported as 'Evaluation failed.' with nothing in it to act on.
+    """

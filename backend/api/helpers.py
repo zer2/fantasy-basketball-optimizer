@@ -27,17 +27,6 @@ from backend.state.session import Session, get_session
 logger = logging.getLogger('fbbo.api')
 
 
-# ─── Errors ───────────────────────────────────────────────────────────────────
-
-def fail(status_code: int, message: str) -> HTTPException:
-    """Log the active exception server-side (with traceback) and return a client-safe error.
-
-    Tracebacks / internal details must never be sent in the response body.
-    """
-    logger.exception(message)
-    return HTTPException(status_code=status_code, detail=message)
-
-
 # ─── Dependencies ─────────────────────────────────────────────────────────────
 
 def require_session(session_id: str) -> Session:
@@ -53,20 +42,6 @@ def require_session(session_id: str) -> Session:
 
 
 # ─── Platforms ────────────────────────────────────────────────────────────────
-
-def build_credentials_for(platform: str, client_id: Optional[str]) -> Optional[dict]:
-    """Build the credentials an integration needs, or None. Yahoo needs a persisted OAuth
-    token directory keyed by client_id; an unauthenticated client_id fails noisily."""
-    if platform == 'Retrieve from Yahoo' and client_id:
-        if not has_yahoo_credentials(client_id):
-            raise HTTPException(status_code=401, detail='Not authenticated with Yahoo; complete the auth flow first.')
-        return {'auth_dir': yahoo_auth_dir(client_id)}
-    if platform == 'Retrieve from ESPN' and client_id:
-        if not has_espn_credentials(client_id):
-            raise HTTPException(status_code=401, detail='Not authenticated with ESPN; save your s2/SWID cookies first.')
-        return get_espn_credentials(client_id)   # {'s2': ..., 'swid': ...} -> spread into ESPNIntegration
-    return None
-
 
 def read_yahoo_app_credentials() -> tuple[str, str]:
     """The Yahoo *app* (developer) client id/secret, from the environment."""
@@ -119,3 +94,28 @@ def resolve_platform_config(
         player_name_column = integration.player_name_column,
         seat_names         = shape.team_names,
     )
+
+
+def build_credentials_for(platform: str, client_id: Optional[str]) -> Optional[dict]:
+    """Build the credentials an integration needs, or None. Yahoo needs a persisted OAuth
+    token directory keyed by client_id; an unauthenticated client_id fails noisily."""
+    if platform == 'Retrieve from Yahoo' and client_id:
+        if not has_yahoo_credentials(client_id):
+            raise HTTPException(status_code=401, detail='Not authenticated with Yahoo; complete the auth flow first.')
+        return {'auth_dir': yahoo_auth_dir(client_id)}
+    if platform == 'Retrieve from ESPN' and client_id:
+        if not has_espn_credentials(client_id):
+            raise HTTPException(status_code=401, detail='Not authenticated with ESPN; save your s2/SWID cookies first.')
+        return get_espn_credentials(client_id)   # {'s2': ..., 'swid': ...} -> spread into ESPNIntegration
+    return None
+
+
+# ─── Errors ───────────────────────────────────────────────────────────────────
+
+def fail(status_code: int, message: str) -> HTTPException:
+    """Log the active exception server-side (with traceback) and return a client-safe error.
+
+    Tracebacks / internal details must never be sent in the response body.
+    """
+    logger.exception(message)
+    return HTTPException(status_code=status_code, detail=message)

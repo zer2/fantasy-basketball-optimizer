@@ -29,35 +29,59 @@ _MIN_MATCHED_CORE_COLUMNS = 3
 _COLUMN_ALIASES_KEY = 'projection-column-aliases'
 
 
-def _normalize_projection_header(header) -> str:
-    """Header spellings differ only by case and padding far more often than by wording, so
-    both sides of an alias lookup are folded to one form."""
-    return str(header).strip().lower()
-
-
-def _map_columns_to_canonical(df_raw: pd.DataFrame, sport_params: dict) -> dict:
-    """{column in the file: canonical name} for every column the aliases recognize.
-
-    Columns that match nothing are left out (the parse drops them). A canonical name that
-    two of the file's columns both claim is taken by the first, so a file carrying e.g.
-    both 'PTS' and 'Points' cannot produce a duplicate column label downstream.
-    """
-    aliases = {_normalize_projection_header(alias): canonical
-               for alias, canonical in sport_params.get(_COLUMN_ALIASES_KEY, {}).items()}
-    mapping, claimed = {}, set()
-    for column in df_raw.columns:
-        canonical = aliases.get(_normalize_projection_header(column))
-        if canonical is not None and canonical not in claimed:
-            mapping[column] = canonical
-            claimed.add(canonical)
-    return mapping
-
-
 # A .xlsx is a ZIP archive, so every one begins with this signature. The older .xls is an
 # OLE2 compound file with a different one — detected only to say so plainly, since reading it
 # would need another engine and anything that can save .xls can also save .xlsx or .csv.
 _XLSX_SIGNATURE = b'PK\x03\x04'
+
+
 _XLS_SIGNATURE  = b'\xd0\xcf\x11\xe0'
+
+
+# Attempts hiding inside a ratio cell: sources that print a percentage with its makes and
+# attempts behind it — "0.583 (10.2/17.5)" — and ship no attempts column of their own.
+# Captures the second number, the attempts.
+_ATTEMPTS_IN_RATIO_CELL_PATTERN = r'\(\s*-?[\d.]+\s*/\s*(-?[\d.]+)\s*\)'
+
+
+def parse_projection_upload(upload_bytes: bytes, sport_params: dict) -> pd.DataFrame:
+    """Parse an uploaded projection file (.csv or .xlsx) into the canonical column set.
+
+    There is no format detection: each column is interpreted on its own through the alias
+    table (see 'projection-column-aliases' in parameters.yaml), so any source is readable
+    as long as its header spellings are known, and a file already written in canonical
+    names needs no aliases at all. Raises ValueError naming what could not be found when
+    the file does not read as a projection set.
+    """
+    df_raw = _read_projection_table(upload_bytes)
+    column_mapping  = _map_columns_to_canonical(df_raw, sport_params)
+    # Unrecognized columns keep their own names, so a file already using canonical names
+    # is understood without any alias matching at all.
+    renamed_columns = set(df_raw.rename(columns=column_mapping).columns)
+
+    missing_identity = [column for column in ('Player', 'Position')
+                        if column not in renamed_columns]
+    matched_cores    = [column for column in CORE_PROJECTION_COLUMNS
+                        if column in renamed_columns]
+    if not missing_identity and len(matched_cores) >= _MIN_MATCHED_CORE_COLUMNS:
+        # Every name the aliases can produce, so a file already written in canonical names
+        # keeps those columns even though they never went through the mapping.
+        canonical_columns = set(sport_params.get(_COLUMN_ALIASES_KEY, {}).values()) | {'Games Played %'}
+        return _parse_with_renamer(df_raw, column_mapping, canonical_columns, sport_params)
+
+    if missing_identity:
+        problem = f"no column for {' or '.join(missing_identity)}"
+    else:
+        missing_cores = [column for column in CORE_PROJECTION_COLUMNS
+                         if column not in renamed_columns]
+        problem = (f'only {len(matched_cores)} of {len(CORE_PROJECTION_COLUMNS)} core stats '
+                   f"were recognized (no {', '.join(missing_cores)})")
+    unrecognized = [column for column in df_raw.columns if column not in column_mapping]
+    raise ValueError(
+        f'File does not read as a projection set: {problem}. Headers that were not '
+        f"recognized: {', '.join(map(str, unrecognized))}. Add their spellings to "
+        f'{_COLUMN_ALIASES_KEY} to teach the parser this source.'
+    )
 
 
 def _read_projection_table(upload_bytes: bytes) -> pd.DataFrame:
@@ -114,76 +138,28 @@ def _decode_projection_text(csv_bytes: bytes) -> str:
     return csv_bytes.decode('latin-1')
 
 
-def parse_projection_upload(upload_bytes: bytes, sport_params: dict) -> pd.DataFrame:
-    """Parse an uploaded projection file (.csv or .xlsx) into the canonical column set.
+def _map_columns_to_canonical(df_raw: pd.DataFrame, sport_params: dict) -> dict:
+    """{column in the file: canonical name} for every column the aliases recognize.
 
-    There is no format detection: each column is interpreted on its own through the alias
-    table (see 'projection-column-aliases' in parameters.yaml), so any source is readable
-    as long as its header spellings are known, and a file already written in canonical
-    names needs no aliases at all. Raises ValueError naming what could not be found when
-    the file does not read as a projection set.
+    Columns that match nothing are left out (the parse drops them). A canonical name that
+    two of the file's columns both claim is taken by the first, so a file carrying e.g.
+    both 'PTS' and 'Points' cannot produce a duplicate column label downstream.
     """
-    df_raw = _read_projection_table(upload_bytes)
-    column_mapping  = _map_columns_to_canonical(df_raw, sport_params)
-    # Unrecognized columns keep their own names, so a file already using canonical names
-    # is understood without any alias matching at all.
-    renamed_columns = set(df_raw.rename(columns=column_mapping).columns)
-
-    missing_identity = [column for column in ('Player', 'Position')
-                        if column not in renamed_columns]
-    matched_cores    = [column for column in CORE_PROJECTION_COLUMNS
-                        if column in renamed_columns]
-    if not missing_identity and len(matched_cores) >= _MIN_MATCHED_CORE_COLUMNS:
-        # Every name the aliases can produce, so a file already written in canonical names
-        # keeps those columns even though they never went through the mapping.
-        canonical_columns = set(sport_params.get(_COLUMN_ALIASES_KEY, {}).values()) | {'Games Played %'}
-        return _parse_with_renamer(df_raw, column_mapping, canonical_columns, sport_params)
-
-    if missing_identity:
-        problem = f"no column for {' or '.join(missing_identity)}"
-    else:
-        missing_cores = [column for column in CORE_PROJECTION_COLUMNS
-                         if column not in renamed_columns]
-        problem = (f'only {len(matched_cores)} of {len(CORE_PROJECTION_COLUMNS)} core stats '
-                   f"were recognized (no {', '.join(missing_cores)})")
-    unrecognized = [column for column in df_raw.columns if column not in column_mapping]
-    raise ValueError(
-        f'File does not read as a projection set: {problem}. Headers that were not '
-        f"recognized: {', '.join(map(str, unrecognized))}. Add their spellings to "
-        f'{_COLUMN_ALIASES_KEY} to teach the parser this source.'
-    )
+    aliases = {_normalize_projection_header(alias): canonical
+               for alias, canonical in sport_params.get(_COLUMN_ALIASES_KEY, {}).items()}
+    mapping, claimed = {}, set()
+    for column in df_raw.columns:
+        canonical = aliases.get(_normalize_projection_header(column))
+        if canonical is not None and canonical not in claimed:
+            mapping[column] = canonical
+            claimed.add(canonical)
+    return mapping
 
 
-# Attempts hiding inside a ratio cell: sources that print a percentage with its makes and
-# attempts behind it — "0.583 (10.2/17.5)" — and ship no attempts column of their own.
-# Captures the second number, the attempts.
-_ATTEMPTS_IN_RATIO_CELL_PATTERN = r'\(\s*-?[\d.]+\s*/\s*(-?[\d.]+)\s*\)'
-
-
-def _recover_volumes_from_ratio_cells(df: pd.DataFrame, sport_params: dict) -> pd.DataFrame:
-    """Fill in a missing attempts column from the text of its percentage column.
-
-    Attempt volume is load-bearing: a ratio G-score weights the percentage deviation by it,
-    so a percentage without its volume cannot be scored at all. When a source carries that
-    volume only inside the percentage cell, take it from there rather than discard it with
-    the rest of the text. A file's own attempts column always wins — this fires only when
-    there is none. Only the attempts are recovered, never the makes: the projection path
-    does not use them, and emitting a column no other source carries would make the blend
-    drop every player that source lacks.
-    """
-    for ratio_stat, ratio_info in sport_params['ratio-statistics'].items():
-        volume_statistic = ratio_info['volume-statistic']
-        if (ratio_stat not in df.columns
-                or volume_statistic in df.columns
-                or df[ratio_stat].dtype != object):
-            continue
-        attempts = pd.to_numeric(
-            df[ratio_stat].astype(str).str.extract(_ATTEMPTS_IN_RATIO_CELL_PATTERN, expand=False),
-            errors='coerce',
-        )
-        if attempts.notna().any():
-            df[volume_statistic] = attempts
-    return df
+def _normalize_projection_header(header) -> str:
+    """Header spellings differ only by case and padding far more often than by wording, so
+    both sides of an alias lookup are folded to one form."""
+    return str(header).strip().lower()
 
 
 def _parse_with_renamer(
@@ -241,4 +217,30 @@ def _parse_with_renamer(
     if 'Player' in df.columns:
         df = df.set_index('Player')
 
+    return df
+
+
+def _recover_volumes_from_ratio_cells(df: pd.DataFrame, sport_params: dict) -> pd.DataFrame:
+    """Fill in a missing attempts column from the text of its percentage column.
+
+    Attempt volume is load-bearing: a ratio G-score weights the percentage deviation by it,
+    so a percentage without its volume cannot be scored at all. When a source carries that
+    volume only inside the percentage cell, take it from there rather than discard it with
+    the rest of the text. A file's own attempts column always wins — this fires only when
+    there is none. Only the attempts are recovered, never the makes: the projection path
+    does not use them, and emitting a column no other source carries would make the blend
+    drop every player that source lacks.
+    """
+    for ratio_stat, ratio_info in sport_params['ratio-statistics'].items():
+        volume_statistic = ratio_info['volume-statistic']
+        if (ratio_stat not in df.columns
+                or volume_statistic in df.columns
+                or df[ratio_stat].dtype != object):
+            continue
+        attempts = pd.to_numeric(
+            df[ratio_stat].astype(str).str.extract(_ATTEMPTS_IN_RATIO_CELL_PATTERN, expand=False),
+            errors='coerce',
+        )
+        if attempts.notna().any():
+            df[volume_statistic] = attempts
     return df

@@ -24,43 +24,19 @@ from scipy.special import ndtr, ndtri
 _INV_SQRT_2PI = 1.0 / np.sqrt(2.0 * np.pi)
 
 
-def _normal_pdf(x, scale=1.0):
-    z = x / scale
-    return _INV_SQRT_2PI / scale * np.exp(-0.5 * z * z)
-
-
-def _normal_cdf(x, scale=1.0):
-    return ndtr(x / scale)
-
-
-def _normal_ppf(q, scale=1.0):
-    return scale * ndtri(q)
-
-
-def _softmax_rows(logits):
-    """Row-wise softmax (each row is a probability distribution over that row's columns). Used to
-    parameterise the flex position shares: optimising in this unconstrained logit space keeps the
-    shares on the simplex automatically, so the share update needs no clip-to-[0,1] or renormalise
-    (those distort the step at the boundary and homogenise the survivors).
-
-    Subtracting the row max is purely numerical and has no effect on the result: softmax is
-    shift-invariant, so e^{z − c}/Σe^{z − c} = e^z/Σe^z — the common e^{−c} factor cancels between
-    numerator and denominator. Its only job is to keep exp() from overflowing on large logits."""
-    shifted = logits - logits.max(axis=1, keepdims=True)
-    exponentiated = np.exp(shifted)
-    return exponentiated / exponentiated.sum(axis=1, keepdims=True)
-
-
 # Learning rate for the softmax-logit flex-share optimiser. Larger than the old share-space 0.01
 # because a logit must move ~±4 to swing a share across [0, 1]; tuned so shares settle within the
 # gradient-iteration budget rather than still drifting at the final iteration.
 _SHARES_LEARNING_RATE = 0.3
+
+
 # Adam's per-coordinate step is capped at +/- the learning rate, so lr x n_iterations is a
 # travel budget in weight space. The truncated-max model's optima sit far from the neutral
 # start (a real punt moves a weight ~0.1 against neutral entries of ~0.11), so the rate is
 # 10x the value tuned for the simplified-form model, whose optima hugged neutral: at 0.001
 # the descent ran out of road and every build parked near its start, tilts half-formed.
 _CATEGORY_LEARNING_RATE = 0.01
+
 
 # Punt-seeding for the cold-start category weights (replaces the old heuristic init). Each seed
 # down-weights one category to this fraction of neutral. 0.9 was tuned for the simplified-form
@@ -69,9 +45,12 @@ _CATEGORY_LEARNING_RATE = 0.01
 # identities from noise) while sitting in the steepest part of the supply curve. 0.5 puts each
 # seed at a genuinely differentiated punt depth the scan can compare.
 _PUNT_SEED_FACTOR = 0.5
+
+
 # From this many of the drafter's own picks on, the roster has a real shape, so seed a single punt of
 # its weakest category. Earlier than that there is no reliable weakness, so multi-start over every punt.
 _WEAKNESS_SEED_MIN_ROSTER = 3
+
 
 # Per-format best-practice configuration, resolved per agent in __init__:
 #   Rotisserie:  lowvar seed (tilts weight off the noisy categories), regulariser on, unified stability v
@@ -81,6 +60,8 @@ _WEAKNESS_SEED_MIN_ROSTER = 3
 # request alone.
 # lowvar seed (Roto): exponent on the seed tilt that down-weights high-v (less stable) categories.
 _LOWVAR_TILT = 0.5
+
+
 # Robustness regulariser: each iteration soft-thresholds the category weights toward neutral v -- the
 # proximal step for an L1 penalty -lambda*||w-v||_1. L1 rewards balance without over-penalising a
 # committed punt the way L2 would, and its sparsity pins uncontested categories at v while letting a few
@@ -92,12 +73,16 @@ _LOWVAR_TILT = 0.5
 # defaults them to. lambda_c = 5% of each Adam step is the ratio testing settled on (as 0.00005
 # against the original 0.001 rate).
 _LAMBDA_C_DEFAULT = 0.05
+
+
 # lambda_c and lambda_p are denominated in per-iteration category steps: the proximal shrink competes with
 # Adam's step (capped at +/- the learning rate per coordinate), so a raw weight-unit lambda would
 # silently change meaning whenever the rate is recalibrated — the 0.001 -> 0.01 change for the
 # truncated-max model's longer travel distances would have made it 10x weaker. Tying the unit to
 # the rate keeps a sidebar 0.05 meaning "5% of each step" under any rate.
 REG_LAMBDA_UNIT = _CATEGORY_LEARNING_RATE
+
+
 # Optional guard (default 0 = off, clean L1 that may snap onto v): keep weights at least this far per
 # component from the w==v ray. Snapping onto v is only cosmetic for the truncated-max path (finite at
 # w == v via its rho clamp; the term_five 0/0 lived in the legacy simplified-form methods), so the
@@ -109,12 +94,9 @@ REG_LAMBDA_UNIT = _CATEGORY_LEARNING_RATE
 _FORCED_MINIMUM_BUDGET = 0.05
 
 
-class ForcedWeightsInfeasibleError(ValueError):
-    """The pinned category weights claim so much of the total that the free ones have no room.
-
-    Its own type so the API can answer 400 with the message (which names the offending categories)
-    rather than folding it into the evaluate route's blanket 500."""
 _REG_FLOOR = 0.0
+
+
 # Flex-position share regularisation: lambda_p is a fraction of the SHARES optimizer's own
 # per-iteration step, exactly as lambda_c is a fraction of the category step. The proximal
 # shrink acts on the MASTER shares — one softmax over all k base positions — so the step it
@@ -130,16 +112,22 @@ _REG_FLOOR = 0.0
 # Gaussian schedule lowers the bar as the roster fills. Values below 1 are a continuous
 # dial; 0.8 is (within 5%) the strength shipped as old-units 4.
 _LAMBDA_P_DEFAULT = 0.8
+
+
 # Gaussian (phi) reg-decay shape: lambda_k = peak*(phi(B k/n) - phi(B))/(phi(0)-phi(B)) -- peak on an
 # empty roster, decaying to exactly 0 at the final pick. B sets the concave shoulder (~ first n/B picks)
 # before the convex tail; B=4 puts the shoulder near pick 3 and matches the old cosine's total budget.
 _REG_SHAPE_B = 4.0
+
+
 # Correlation-correction refresh interval, mirroring the position-optimiser throttle: the
 # correction terms are recomputed on iterations where (iteration+1) % interval == 0 (plus
 # the cold start) and reused between — they drift slowly with the category weights, so a
 # small staleness buys back most of the correction's per-iteration cost. One-shot scoring
 # calls (full team, trades, auction values) always compute fresh.
 _MC_CORRELATION_REFRESH_INTERVAL = 4
+
+
 # Opponent modelling: instead of padding every opponent's future picks with a category-neutral
 # average, treat each opponent as a rational H-score drafter who punts. We track a per-opponent
 # mu_edge (the expected per-pick edge vector implied by their inferred category weights) and add
@@ -151,6 +139,8 @@ _MC_CORRELATION_REFRESH_INTERVAL = 4
 # opponent_model_confidence session parameter to 0 disables the whole feature and restores
 # byte-identical neutral-opponent behaviour.
 _OPPONENT_INFERENCE_ITERATIONS = 50
+
+
 # Build-time fictitious-play bootstrap: the base H-scores are recomputed several times, each pass
 # best-responding to the RUNNING AVERAGE of prior passes' builds rather than the latest one. Pure
 # best-response oscillates (every seat flips the same way each pass); averaging damps that and lets the
@@ -167,16 +157,22 @@ _OPPONENT_INFERENCE_ITERATIONS = 50
 # looked like a runaway), at 32 it holds a flat band and the belief-response gap drops
 # from 0.34 to 0.086 with the punt spread re-diversifying (measured at M=25, 60 iters).
 _OPPONENT_BOOTSTRAP_PASSES = 32
+
+
 # Rotisserie keeps the longer run: it uses the EMA field path (window 0), whose fixed-rate smoothing
 # stabilises more slowly than the window's 1/t fictitious-play steps — at 8 passes a 2024-25 top-12
 # Roto build hard-punts a category (breaking the minimal-punting floor), at 15 none do. Roto passes
 # face a single 11-column field, so its cost is linear in the pass count and the longer run is cheap.
 _OPPONENT_BOOTSTRAP_PASSES_ROTISSERIE = 15
+
+
 # Damping for the fixed-point field: each bootstrap pass nudges the committed field a fraction alpha
 # toward that pass's best-response (exponential smoothing), instead of a running mean. Smoothing
 # converges to a genuine fixed point (field == its own best-response — a committed equilibrium), whereas
 # a mean converges to a smeared blend of oscillating responses that erases specific punts.
 _OPPONENT_SMOOTHING = 0.3
+
+
 # Windowed fictitious play for the BOOTSTRAP PASSES ONLY (H2H formats). Each pass best-responds to the
 # raw fields of the last K passes stacked as separate opponents (11*K columns; the objective's mean over
 # the opponent axis weights them uniformly) instead of the single EMA-blended field above. At a mixed
@@ -202,6 +198,8 @@ _OPPONENT_SMOOTHING = 0.3
 # the widest punt spread recorded, M=20 0.053) at a third of the cost; a single
 # snapshot is the knife-edge the mixture argument warned about (M=25 gap 0.22).
 _SERVE_FIELD_STACK = 2
+
+
 # Descent iterations for the field-building bootstrap passes. These only need approximate opponent builds
 # (the field is smoothed and never exact anyway), so they run short; the final full-pool serve pass uses
 # the session's full n_iterations for accurate base H-scores.
@@ -223,6 +221,8 @@ _SERVE_FIELD_STACK = 2
 # mid M: four seats jumped basins between the final bootstrap pass and the serves,
 # leaving a 0.13 belief-response gap after every lane had already frozen).
 _SEED_INCUMBENT_MARGIN = 0.005
+
+
 # NOTE on early stopping (both levels measured 2026-09-04, so neither is rebuilt):
 # (1) A SELF-PLAY stop (end the windowed loop once committed builds stop switching
 # concession lanes and the window-averaged field drift settles) fired at pass ~9-15 —
@@ -244,6 +244,8 @@ _SEED_INCUMBENT_MARGIN = 0.005
 # configured confidence), and at or below the base min(C, base + ramp) never binds.
 # Every seat now runs at the configured confidence in all regimes.
 _MEAN_FIELD_CONFIDENCE_THRESHOLD = 0.5
+
+
 # How many disjoint groups a solve cycle splits the universe into (see the loop): each
 # pass solves one group, so 1/this of the field moves per pass.
 # NOTE (measured 2026-09-05, so it is not rebuilt): 3 groups (a third per pass) at the
@@ -252,6 +254,8 @@ _MEAN_FIELD_CONFIDENCE_THRESHOLD = 0.5
 # averaged belief needs proportionally more passes to recover the same effective sample
 # count and the saving cancels. Group size is not a latency lever.
 _SOLVE_GROUP_COUNT = 2
+
+
 # Mean-field budget (high-confidence self-play): every pass runs at the configured
 # confidence, and the belief is the Cesaro average of the committed fields — but the
 # accumulator RESTARTS once at the burn-in boundary, so the cold-start transient (the
@@ -271,7 +275,11 @@ _SOLVE_GROUP_COUNT = 2
 # A board that leans is a bad board at ANY latency, so there is no faster leaning tier;
 # the parked Chebyshev pick-model core is the path to making this cheap.
 _MEAN_FIELD_BURN_IN_PASSES = 32
+
+
 _MEAN_FIELD_TOTAL_PASSES   = 96
+
+
 # NOTE (measured 2026-09-05, so it is not rebuilt): staged finishing gated on
 # split-half agreement of the settled states does NOT work. The disagreement (mean abs
 # difference between the first-half and second-half averages of the post-burn-in
@@ -294,14 +302,24 @@ _MEAN_FIELD_TOTAL_PASSES   = 96
 # configuration stops at its own first clean horizon; at the cap the best horizon seen
 # is served, so a season that never fully clears still ends no worse than its best.
 _MEAN_FIELD_EXTENSION_PASSES     = 16
+
+
 _MEAN_FIELD_MAXIMUM_TOTAL_PASSES = 192
+
+
 _SERVED_FIELD_TOP_SEATS = 12
+
+
 _SERVED_FIELD_PUNT_RATE = 0.40
+
+
 # Burn-in passes only POSITION the field — their states are discarded from the belief —
 # so their convergence depth need not match the serve (user design 2026-09-05); they run
 # this fraction of the session iteration budget. The uniform-budget rule (see pass_iters)
 # still binds every pass whose state enters the belief.
 _MEAN_FIELD_BURN_IN_ITERATION_FRACTION = 0.5
+
+
 # NOTE on position throttling (measured 2026-09-04, so it is not rebuilt): an early-pass
 # solve stride (rosters re-solved every 10th iteration, cached between) engaged on 591 of
 # 1383 calls and changed NEITHER results (bit-identical boards) NOR time (0.76s vs 0.70s):
@@ -313,6 +331,8 @@ _MEAN_FIELD_BURN_IN_ITERATION_FRACTION = 0.5
 # pre-filter so the pass costs ~1/4 of a full-pool serve while the top-3N-by-Level-0-H
 # universe it selects is unaffected (populate startup time is user-visible).
 _LEVEL_ZERO_POOL = 150
+
+
 # Learning-rate scales for WARM-STARTED category descents, tiered by how far the optimum can plausibly
 # have moved since the stored weights were computed. A warm start begins inside an established basin, so
 # the descent only needs fine adjustment -- and on value-flat plateaus (near-tied builds), full-size Adam
@@ -329,27 +349,45 @@ _LEVEL_ZERO_POOL = 150
 #       mean-invariant for predicted players; variance/pool shifts are tiny), so barely adjust. This
 #       static tier is where the display-stability guarantees live.
 _WARM_START_LEARNING_RATE_SCALE = 1.0
+
+
 _WARM_START_STATIC_ROSTER_SCALE = 0.01
+
+
 from pathlib import Path
+
+
 from itertools import combinations
+
 
 # Anchored on this file so the reference CSVs load from any working directory.
 _DATA_DIR = Path(__file__).parents[1] / 'data'
+
 
 from backend.math.algorithm_helpers import (
     compute_win_probability,
     calculate_win_probability_and_tipping_points,
     calculate_correction_terms,
 )
+
+
 from backend.math.process_player_data import get_category_level_rv, scale_tiebreaker_value
+
+
 from backend.math.position_optimization import (
     optimize_positions_all_players,
     get_player_rows,
 )
+
+
 from backend.math.position_config import PositionConfig, build_position_config
+
+
 from backend.math.truncated_max_pick_model import (
     compute_expected_pick_tilts_and_jacobian,
 )
+
+
 from backend.player_identity import RP_PLAYER_ID
 
 
@@ -3076,6 +3114,40 @@ class HAgent:
                 * (sigma_d ** 2 * del_mu_d - mu_d * del_sigma_2_p / 2))
 
 
+def _normal_cdf(x, scale=1.0):
+    return ndtr(x / scale)
+
+
+def _normal_ppf(q, scale=1.0):
+    return scale * ndtri(q)
+
+
+class ForcedWeightsInfeasibleError(ValueError):
+    """The pinned category weights claim so much of the total that the free ones have no room.
+
+    Its own type so the API can answer 400 with the message (which names the offending categories)
+    rather than folding it into the evaluate route's blanket 500."""
+
+
+def _softmax_rows(logits):
+    """Row-wise softmax (each row is a probability distribution over that row's columns). Used to
+    parameterise the flex position shares: optimising in this unconstrained logit space keeps the
+    shares on the simplex automatically, so the share update needs no clip-to-[0,1] or renormalise
+    (those distort the step at the boundary and homogenise the survivors).
+
+    Subtracting the row max is purely numerical and has no effect on the result: softmax is
+    shift-invariant, so e^{z − c}/Σe^{z − c} = e^z/Σe^z — the common e^{−c} factor cancels between
+    numerator and denominator. Its only job is to keep exp() from overflowing on large logits."""
+    shifted = logits - logits.max(axis=1, keepdims=True)
+    exponentiated = np.exp(shifted)
+    return exponentiated / exponentiated.sum(axis=1, keepdims=True)
+
+
+def _normal_pdf(x, scale=1.0):
+    z = x / scale
+    return _INV_SQRT_2PI / scale * np.exp(-0.5 * z * z)
+
+
 # ── Adam optimiser (unchanged) ─────────────────────────────────────────────────
 
 class AdamOptimizer:
@@ -3094,4 +3166,3 @@ class AdamOptimizer:
         m_hat = self.m      / (1 - self.beta1 ** self.t)
         v_hat = self.v_adam / (1 - self.beta2 ** self.t)
         return self.learning_rate * m_hat / (np.sqrt(v_hat) + self.epsilon)
-

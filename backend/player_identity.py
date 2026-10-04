@@ -65,12 +65,6 @@ class PlayerIdentity:
     has_headshot: bool     # False for RP and synthetic ids (no NBA CDN image exists)
 
 
-def extract_last_name(full_name: str) -> str:
-    """'Nikola Jokic' -> 'Jokic'; single-word names return themselves ('RP' -> 'RP')."""
-    parts = full_name.split(' ')
-    return ' '.join(parts[1:]) if len(parts) > 1 else full_name
-
-
 def make_player_identity(
     player_id: int
     , name: str
@@ -88,6 +82,12 @@ def make_player_identity(
     )
 
 
+def extract_last_name(full_name: str) -> str:
+    """'Nikola Jokic' -> 'Jokic'; single-word names return themselves ('RP' -> 'RP')."""
+    parts = full_name.split(' ')
+    return ' '.join(parts[1:]) if len(parts) > 1 else full_name
+
+
 def make_replacement_player_identity() -> PlayerIdentity:
     """The registry entry for the pipeline's replacement-player sentinel."""
     return PlayerIdentity(
@@ -97,6 +97,7 @@ def make_replacement_player_identity() -> PlayerIdentity:
         positions    = [],
         has_headshot = False,
     )
+
 
 def allocate_synthetic_player_ids(unresolved_names: Iterable[str]) -> dict[str, int]:
     """Deterministic session-scoped ids for names nothing resolves: sorted names get

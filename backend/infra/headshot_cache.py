@@ -22,14 +22,6 @@ _NBA_HEADSHOT_URL_TEMPLATE = 'https://cdn.nba.com/headshots/nba/latest/260x190/{
 _logger = logging.getLogger('fbbo')
 
 
-class HeadshotFetchError(Exception):
-    """The NBA CDN could not be reached or answered with an error. The message is the
-    diagnosis: for transport failures it is the unwound exception cause chain, since a DNS
-    failure, a refused connection, a routing black hole and a TLS rejection are four
-    different infrastructure problems that are indistinguishable once the error is
-    swallowed."""
-
-
 # nba_player_id -> PNG bytes, or None for a confirmed no-image id (the CDN 404s some
 # historical players). ~600 active players x ~30KB ~= 20MB fully warm — fine in memory.
 # Transient fetch errors are NOT cached, so a network blip doesn't permanently blank a face.
@@ -37,6 +29,8 @@ class HeadshotFetchError(Exception):
 # warm set survive process restarts — dev auto-reloads and Cloud Run cold starts otherwise
 # wipe it and the next render trickles in hundreds of CDN round-trips in arrival order.
 _headshot_cache: dict[int, bytes | None] = {}
+
+
 # Unlike the Snowflake view cache (data freshness concerns make persistence opt-in via
 # DISK_CACHE_DIR), headshots are immutable public images — so without the env override
 # the cache still persists, in a gitignored local directory. A dev server otherwise
@@ -45,28 +39,6 @@ _HEADSHOT_DISK_CACHE_DIR = (
     Path(os.environ['DISK_CACHE_DIR']) / 'headshots'
     if 'DISK_CACHE_DIR' in os.environ else Path('.cache') / 'headshots'
 )
-
-
-def _read_headshot_from_disk(nba_player_id: int) -> bytes | None:
-    disk_path = _HEADSHOT_DISK_CACHE_DIR / f'{nba_player_id}.png'
-    if not disk_path.exists():
-        return None
-    return disk_path.read_bytes()
-
-
-def _write_headshot_to_disk(nba_player_id: int, image_bytes: bytes) -> None:
-    """Best effort. In production this directory is a mounted bucket, which can be read-only,
-    out of quota, or briefly unavailable through gcsfuse — and none of that is a reason to
-    deny the caller an image we are already holding. Caching is the optimisation; serving is
-    the job. Failures are logged, since a cache that never persists turns every cold start
-    into a full re-fetch and should not do so silently."""
-    try:
-        _HEADSHOT_DISK_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-        (_HEADSHOT_DISK_CACHE_DIR / f'{nba_player_id}.png').write_bytes(image_bytes)
-    except OSError as exc:
-        _logger.warning(
-            'Could not cache headshot %s under %s: %s',
-            nba_player_id, _HEADSHOT_DISK_CACHE_DIR, exc)
 
 
 def get_headshot(nba_player_id: int) -> bytes | None:
@@ -105,6 +77,36 @@ def get_headshot(nba_player_id: int) -> bytes | None:
             raise HeadshotFetchError(f'HTTP {cdn_response.status_code} from the NBA CDN')
 
     return _headshot_cache[nba_player_id]
+
+
+def _read_headshot_from_disk(nba_player_id: int) -> bytes | None:
+    disk_path = _HEADSHOT_DISK_CACHE_DIR / f'{nba_player_id}.png'
+    if not disk_path.exists():
+        return None
+    return disk_path.read_bytes()
+
+
+class HeadshotFetchError(Exception):
+    """The NBA CDN could not be reached or answered with an error. The message is the
+    diagnosis: for transport failures it is the unwound exception cause chain, since a DNS
+    failure, a refused connection, a routing black hole and a TLS rejection are four
+    different infrastructure problems that are indistinguishable once the error is
+    swallowed."""
+
+
+def _write_headshot_to_disk(nba_player_id: int, image_bytes: bytes) -> None:
+    """Best effort. In production this directory is a mounted bucket, which can be read-only,
+    out of quota, or briefly unavailable through gcsfuse — and none of that is a reason to
+    deny the caller an image we are already holding. Caching is the optimisation; serving is
+    the job. Failures are logged, since a cache that never persists turns every cold start
+    into a full re-fetch and should not do so silently."""
+    try:
+        _HEADSHOT_DISK_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        (_HEADSHOT_DISK_CACHE_DIR / f'{nba_player_id}.png').write_bytes(image_bytes)
+    except OSError as exc:
+        _logger.warning(
+            'Could not cache headshot %s under %s: %s',
+            nba_player_id, _HEADSHOT_DISK_CACHE_DIR, exc)
 
 
 def describe_cache() -> dict:

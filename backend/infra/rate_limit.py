@@ -65,106 +65,13 @@ class RateLimitPolicy:
     window_seconds: int
 
 
-def _parse_policy(
-    name: str
-    , raw_value: str
-) -> RateLimitPolicy:
-    """Parses a 'count/seconds' setting. Raises on anything malformed: a typo here would
-    otherwise silently fall back to a default and leave the deployment limited differently
-    than its configuration says."""
-    parts = raw_value.split('/')
-    if len(parts) != 2:
-        raise RuntimeError(f'RATE_LIMIT_{name.upper()}={raw_value!r} is not in "count/seconds" form.')
-    try:
-        max_requests, window_seconds = int(parts[0]), int(parts[1])
-    except ValueError:
-        raise RuntimeError(f'RATE_LIMIT_{name.upper()}={raw_value!r} has non-integer parts.')
-    if max_requests < 1 or window_seconds < 1:
-        raise RuntimeError(f'RATE_LIMIT_{name.upper()}={raw_value!r} must be positive.')
-    return RateLimitPolicy(name, max_requests, window_seconds)
-
-
 _policies: dict[str, RateLimitPolicy] = {}
+
+
 _limits_enabled = True
 
 
-def configure_rate_limits() -> None:
-    """Reads the limits from the environment. Called once at startup so malformed configuration
-    fails at boot rather than on some unlucky request, and again by tests that change the
-    environment."""
-    global _limits_enabled
-    _limits_enabled = os.environ.get('RATE_LIMITS_ENABLED', 'true').lower() not in ('0', 'false', 'no')
-    _policies.clear()
-    for name, (default_max, default_window) in _DEFAULT_POLICIES.items():
-        raw_value = os.environ.get(f'RATE_LIMIT_{name.upper()}', '').strip()
-        _policies[name] = (_parse_policy(name, raw_value) if raw_value
-                           else RateLimitPolicy(name, default_max, default_window))
-
-
-def rate_limits_enabled() -> bool:
-    return _limits_enabled
-
-
-def get_rate_limit_policy(name: str) -> RateLimitPolicy:
-    policy = _policies.get(name)
-    if policy is None:
-        raise RuntimeError(f'Rate limit policy {name!r} was never configured — '
-                           'configure_rate_limits() must run at startup.')
-    return policy
-
-
-def resolve_client_ip(
-    forwarded_for: Optional[str]
-    , direct_ip: Optional[str]
-) -> str:
-    """The caller's IP, read from X-Forwarded-For when a proxy set it.
-
-    Which entry is the real client depends on how many proxies append to the header, and the
-    leftmost entry is whatever the caller sent — trusting it lets one script rotate fake values
-    and evade the limit entirely. So we count TRUSTED_PROXY_HOPS entries in from the right
-    (default 1, which is Cloud Run appending the address it saw). Confirm the value for a given
-    deployment with GET /health/rate-limit, which echoes the chain it received.
-    """
-    if not forwarded_for:
-        return direct_ip or 'unknown'
-    chain = [entry.strip() for entry in forwarded_for.split(',') if entry.strip()]
-    if not chain:
-        return direct_ip or 'unknown'
-    hops = int(os.environ.get('TRUSTED_PROXY_HOPS', '1'))
-    # With one trusted hop the client is the last entry; with two, the one before it, and so on.
-    # A chain shorter than the configured hops means fewer proxies than expected, so the leftmost
-    # entry is the closest thing to a real client we have.
-    index = max(0, len(chain) - hops)
-    return chain[index]
-
-
 _LOOPBACK_ADDRESSES = frozenset({'127.0.0.1', '::1', 'localhost'})
-
-
-def request_is_local(request: Request) -> bool:
-    """Whether this request came from the machine running the server, which is exempt.
-
-    Limiting localhost would mean the test suites and the screenshot runs — which drive the app
-    far harder than any person does — tripping their own protection, and no attacker is on the
-    loopback interface. The exemption requires the absence of X-Forwarded-For as well as a
-    loopback peer: anything arriving through a proxy is remote traffic no matter what address the
-    proxy sits at, and a forwarded header claiming to be 127.0.0.1 is exactly what a bypass
-    attempt looks like.
-    """
-    if request.headers.get('x-forwarded-for'):
-        return False
-    return bool(request.client) and request.client.host in _LOOPBACK_ADDRESSES
-
-
-def identify_rate_limit_client(request: Request) -> str:
-    """Who this request is counted against: the signed-in account when there is one, otherwise
-    the caller's IP. Signing in therefore gives someone their own budget rather than sharing one
-    with everyone behind the same address (an office, a campus, a phone carrier's NAT)."""
-    user = request.session.get('user')
-    if user and 'sub' in user:
-        return 'user:' + hashlib.sha256(user['sub'].encode()).hexdigest()[:16]
-    return 'ip:' + resolve_client_ip(request.headers.get('x-forwarded-for'),
-                                     request.client.host if request.client else None)
 
 
 class SlidingWindowRateLimiter:
@@ -228,6 +135,42 @@ class SlidingWindowRateLimiter:
 _limiter = SlidingWindowRateLimiter()
 
 
+def configure_rate_limits() -> None:
+    """Reads the limits from the environment. Called once at startup so malformed configuration
+    fails at boot rather than on some unlucky request, and again by tests that change the
+    environment."""
+    global _limits_enabled
+    _limits_enabled = os.environ.get('RATE_LIMITS_ENABLED', 'true').lower() not in ('0', 'false', 'no')
+    _policies.clear()
+    for name, (default_max, default_window) in _DEFAULT_POLICIES.items():
+        raw_value = os.environ.get(f'RATE_LIMIT_{name.upper()}', '').strip()
+        _policies[name] = (_parse_policy(name, raw_value) if raw_value
+                           else RateLimitPolicy(name, default_max, default_window))
+
+
+def _parse_policy(
+    name: str
+    , raw_value: str
+) -> RateLimitPolicy:
+    """Parses a 'count/seconds' setting. Raises on anything malformed: a typo here would
+    otherwise silently fall back to a default and leave the deployment limited differently
+    than its configuration says."""
+    parts = raw_value.split('/')
+    if len(parts) != 2:
+        raise RuntimeError(f'RATE_LIMIT_{name.upper()}={raw_value!r} is not in "count/seconds" form.')
+    try:
+        max_requests, window_seconds = int(parts[0]), int(parts[1])
+    except ValueError:
+        raise RuntimeError(f'RATE_LIMIT_{name.upper()}={raw_value!r} has non-integer parts.')
+    if max_requests < 1 or window_seconds < 1:
+        raise RuntimeError(f'RATE_LIMIT_{name.upper()}={raw_value!r} must be positive.')
+    return RateLimitPolicy(name, max_requests, window_seconds)
+
+
+def rate_limits_enabled() -> bool:
+    return _limits_enabled
+
+
 def get_rate_limiter() -> SlidingWindowRateLimiter:
     return _limiter
 
@@ -254,3 +197,62 @@ def enforce_rate_limit(policy_name: str) -> Callable[[Request], None]:
                 headers={'Retry-After': str(max(1, round(wait_seconds)))},
             )
     return check_request_rate
+
+
+def request_is_local(request: Request) -> bool:
+    """Whether this request came from the machine running the server, which is exempt.
+
+    Limiting localhost would mean the test suites and the screenshot runs — which drive the app
+    far harder than any person does — tripping their own protection, and no attacker is on the
+    loopback interface. The exemption requires the absence of X-Forwarded-For as well as a
+    loopback peer: anything arriving through a proxy is remote traffic no matter what address the
+    proxy sits at, and a forwarded header claiming to be 127.0.0.1 is exactly what a bypass
+    attempt looks like.
+    """
+    if request.headers.get('x-forwarded-for'):
+        return False
+    return bool(request.client) and request.client.host in _LOOPBACK_ADDRESSES
+
+
+def get_rate_limit_policy(name: str) -> RateLimitPolicy:
+    policy = _policies.get(name)
+    if policy is None:
+        raise RuntimeError(f'Rate limit policy {name!r} was never configured — '
+                           'configure_rate_limits() must run at startup.')
+    return policy
+
+
+def identify_rate_limit_client(request: Request) -> str:
+    """Who this request is counted against: the signed-in account when there is one, otherwise
+    the caller's IP. Signing in therefore gives someone their own budget rather than sharing one
+    with everyone behind the same address (an office, a campus, a phone carrier's NAT)."""
+    user = request.session.get('user')
+    if user and 'sub' in user:
+        return 'user:' + hashlib.sha256(user['sub'].encode()).hexdigest()[:16]
+    return 'ip:' + resolve_client_ip(request.headers.get('x-forwarded-for'),
+                                     request.client.host if request.client else None)
+
+
+def resolve_client_ip(
+    forwarded_for: Optional[str]
+    , direct_ip: Optional[str]
+) -> str:
+    """The caller's IP, read from X-Forwarded-For when a proxy set it.
+
+    Which entry is the real client depends on how many proxies append to the header, and the
+    leftmost entry is whatever the caller sent — trusting it lets one script rotate fake values
+    and evade the limit entirely. So we count TRUSTED_PROXY_HOPS entries in from the right
+    (default 1, which is Cloud Run appending the address it saw). Confirm the value for a given
+    deployment with GET /health/rate-limit, which echoes the chain it received.
+    """
+    if not forwarded_for:
+        return direct_ip or 'unknown'
+    chain = [entry.strip() for entry in forwarded_for.split(',') if entry.strip()]
+    if not chain:
+        return direct_ip or 'unknown'
+    hops = int(os.environ.get('TRUSTED_PROXY_HOPS', '1'))
+    # With one trusted hop the client is the last entry; with two, the one before it, and so on.
+    # A chain shorter than the configured hops means fewer proxies than expected, so the leftmost
+    # entry is the closest thing to a real client we have.
+    index = max(0, len(chain) - hops)
+    return chain[index]

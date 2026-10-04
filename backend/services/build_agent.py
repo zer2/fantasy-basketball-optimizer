@@ -36,146 +36,32 @@ from backend.player_identity import (
 from backend.state.session import Session
 
 
-class InsufficientPlayerPoolError(Exception):
-    """The available player pool is too small to fill every roster in the league. This is a bad
-    league configuration (too few players for the number of teams x roster spots), not a server
-    fault, so the routes surface it as a 400."""
-
-
 # build_agent.py is backend/services/build_agent.py, so the project root is parents[2].
 _MEAN_OF_VARIANCES_PATH = Path(__file__).parents[2] / 'coefficient_exploration_output' / 'mean_of_variances.csv'
 
 
-def _load_mean_of_variances() -> pd.Series:
-    """Load empirical mean-of-variances for the most recent season from the
-    coefficient exploration output CSV.  The CSV has stats as rows and seasons
-    as columns (newest first); the first data column is the most recent season.
-    """
-    df = pd.read_csv(_MEAN_OF_VARIANCES_PATH, index_col=0)
-    return df.iloc[:, 0]
+# ── Full pipeline ─────────────────────────────────────────────────────────────
 
-
-# ── v0_clean cache ────────────────────────────────────────────────────────────
-# Caches the output of load_player_pool (loaded + processed player stats) independently
-# of session ID, keyed by data source parameters.  This avoids re-querying
-# Snowflake and re-processing the DataFrame every time a new session is created
-# with the same data source.
-
-_v0_cache: dict[tuple, tuple[float, pd.DataFrame]] = {}
-_v0_cache_lock = threading.Lock()
-_V0_CACHE_TTL = 24 * 3600  # 24 hours
-
-
-def clear_v0_cache() -> None:
-    """Evict all entries from the v0_clean in-memory cache."""
-    with _v0_cache_lock:
-        _v0_cache.clear()
-
-
-# ── helpers ───────────────────────────────────────────────────────────────────
-
-def _resolve_sport_params(session: Session) -> tuple[dict, dict, str]:
-    """Return (all_params, sport_params, sport) for the current session."""
-    all_params = load_all_params()
-    sport = session.current_settings['sport']
-    return all_params, all_params[sport], sport
+def build_agent(
+    session: Session,
+    from_step: int = 1,
+    csv_bytes: bytes | None = None,
+    uploaded_dfs: dict | None = None,
+) -> None:
+    """Re-run the pipeline starting from the given step number (1–5), leaving session.agent built."""
+    if from_step <= 1:
+        load_player_pool(session, csv_bytes=csv_bytes, uploaded_dfs=uploaded_dfs)
+    if from_step <= 2:
+        remove_injured_players(session)
+    if from_step <= 3:
+        apply_upsilon_adjustment(session)
+    if from_step <= 4:
+        build_scoring_info(session)
+    if from_step <= 5:
+        build_session_agent(session)
 
 
 # ── Step 1: load player data ──────────────────────────────────────────────────
-
-def _build_v0_cache_key(current_settings: dict) -> tuple | None:
-    """Return a hashable cache key for v0_clean based on data source params.
-
-    A projections blend is fully described by every source weight plus the ids of any
-    uploaded tables feeding it: uploads are stored immutably under their data_id, so the
-    id doubles as a content key. (Leaving the uploaded-source weights or the upload ids out of
-    the key — as an earlier version did — served stale blends when an upload's weight
-    changed, and could leak an uploaded blend into sessions that never uploaded anything.)
-    Returns None only for single-CSV mode, whose bytes arrive outside current_settings.
-    """
-    source_type = current_settings['data_source_type']
-    sport = current_settings['sport']
-    if source_type == 'historical':
-        return (sport, 'historical', current_settings['season'])
-    if source_type == 'projections':
-        blend_weights = current_settings['blend_weights']
-        custom_data_ids = current_settings.get('custom_data_ids') or []
-        weight_keys = tuple(sorted(blend_weights.items()))
-        upload_keys = tuple(sorted(custom_data_ids))
-        return (sport, 'projections', weight_keys, upload_keys)
-    return None
-
-
-def _resolve_single_csv_player_ids(parsed_csv: pd.DataFrame) -> pd.DataFrame:
-    """Bring a single uploaded CSV (name-indexed by parse_projection_upload) to the id-keyed
-    contract: resolve names via the unified table, keep unresolved rows under synthetic
-    ids, and return an id-indexed frame with the display 'Player' column retained."""
-
-    frame = attach_player_ids_by_name(parsed_csv.reset_index())
-    synthetic_ids = allocate_synthetic_player_ids(
-        frame.loc[frame['player_id'].isna(), 'Player'])
-    resolved = frame['player_id'].astype('object').fillna(frame['Player'].map(synthetic_ids))
-    frame = frame.drop(columns=['player_id'])
-    frame.index = pd.Index(resolved.astype(int), name='Player')
-    if frame.index.has_duplicates:
-        duplicated = frame.index[frame.index.duplicated()].tolist()
-        raise ValueError(f'Uploaded CSV: multiple rows resolve to the same player id(s): {duplicated}')
-    return frame
-
-
-def _build_player_registry(v0_with_names: pd.DataFrame) -> dict:
-    """One PlayerIdentity per pool row (from the id index + 'Player'/'Position' columns),
-    plus the replacement-player sentinel."""
-
-    registry = {
-        int(player_id): make_player_identity(int(player_id), str(name), position_value)
-        for player_id, name, position_value in zip(
-            v0_with_names.index, v0_with_names['Player'], v0_with_names['Position'])
-    }
-    registry[RP_PLAYER_ID] = make_replacement_player_identity()
-    return registry
-
-
-def _count_active(slot_counts: dict, n_picks: int) -> int:
-    """How many players are active at once: the slot total when a structure is set, else every pick.
-
-    Active rather than "starting", because there is nothing for them to start ahead of -- the
-    default structure is thirteen slots for thirteen picks, so every player a drafter holds is
-    fielded. The distinction that does exist is the injured-list slot, which holds a player who
-    cannot be fielded at all, and that is what this count leaves out.
-    """
-    return sum(slot_counts.values()) if slot_counts else n_picks
-
-
-def derive_effective_objective(session: Session) -> tuple[list[str], str | None]:
-    """The categories and tiebreaker the build can actually score, derived from the
-    REQUESTED objective in current_settings and the columns v2 actually carries.
-
-    A category needs its own column, and a ratio category also needs the volume column
-    that weights it (a percentage cannot be scored without the attempts behind it).
-    The narrowing can drop the very category chosen to break ties, or leave an odd
-    count where no tie can arise — either way the tiebreaker no longer refers to
-    anything the agent could resolve, so it comes back as None.
-
-    Deliberately a pure derivation, recomputed by every consumer (both build steps, the
-    evaluate path, the response serializers) rather than written back into
-    current_settings: the request snapshot keeps saying what the user REQUESTED, the
-    pipeline cache keys stay coherent with the request, and a category dropped for one
-    data source comes back by itself when a later patch restores its columns.
-    """
-    _, sport_params, _ = _resolve_sport_params(session)
-    available_columns = set(session.v2.columns)
-    ratio_statistics  = sport_params['ratio-statistics']
-    categories = [
-        category for category in session.current_settings['categories']
-        if category in available_columns
-        and ratio_statistics.get(category, {}).get('volume-statistic', category) in available_columns
-    ]
-    tiebreaker = session.current_settings['tiebreaker_category']
-    if tiebreaker not in categories or len(categories) % 2 == 1:
-        tiebreaker = None
-    return categories, tiebreaker
-
 
 def load_player_pool(
     session: Session,
@@ -251,6 +137,59 @@ def load_player_pool(
 
     session.player_registry = _build_player_registry(v0_with_names)
     session.v0_clean = v0_with_names.drop(columns=['Player'])
+
+
+def _build_v0_cache_key(current_settings: dict) -> tuple | None:
+    """Return a hashable cache key for v0_clean based on data source params.
+
+    A projections blend is fully described by every source weight plus the ids of any
+    uploaded tables feeding it: uploads are stored immutably under their data_id, so the
+    id doubles as a content key. (Leaving the uploaded-source weights or the upload ids out of
+    the key — as an earlier version did — served stale blends when an upload's weight
+    changed, and could leak an uploaded blend into sessions that never uploaded anything.)
+    Returns None only for single-CSV mode, whose bytes arrive outside current_settings.
+    """
+    source_type = current_settings['data_source_type']
+    sport = current_settings['sport']
+    if source_type == 'historical':
+        return (sport, 'historical', current_settings['season'])
+    if source_type == 'projections':
+        blend_weights = current_settings['blend_weights']
+        custom_data_ids = current_settings.get('custom_data_ids') or []
+        weight_keys = tuple(sorted(blend_weights.items()))
+        upload_keys = tuple(sorted(custom_data_ids))
+        return (sport, 'projections', weight_keys, upload_keys)
+    return None
+
+
+def _resolve_single_csv_player_ids(parsed_csv: pd.DataFrame) -> pd.DataFrame:
+    """Bring a single uploaded CSV (name-indexed by parse_projection_upload) to the id-keyed
+    contract: resolve names via the unified table, keep unresolved rows under synthetic
+    ids, and return an id-indexed frame with the display 'Player' column retained."""
+
+    frame = attach_player_ids_by_name(parsed_csv.reset_index())
+    synthetic_ids = allocate_synthetic_player_ids(
+        frame.loc[frame['player_id'].isna(), 'Player'])
+    resolved = frame['player_id'].astype('object').fillna(frame['Player'].map(synthetic_ids))
+    frame = frame.drop(columns=['player_id'])
+    frame.index = pd.Index(resolved.astype(int), name='Player')
+    if frame.index.has_duplicates:
+        duplicated = frame.index[frame.index.duplicated()].tolist()
+        raise ValueError(f'Uploaded CSV: multiple rows resolve to the same player id(s): {duplicated}')
+    return frame
+
+
+def _build_player_registry(v0_with_names: pd.DataFrame) -> dict:
+    """One PlayerIdentity per pool row (from the id index + 'Player'/'Position' columns),
+    plus the replacement-player sentinel."""
+
+    registry = {
+        int(player_id): make_player_identity(int(player_id), str(name), position_value)
+        for player_id, name, position_value in zip(
+            v0_with_names.index, v0_with_names['Player'], v0_with_names['Position'])
+    }
+    registry[RP_PLAYER_ID] = make_replacement_player_identity()
+    return registry
 
 
 # ── Step 2: remove injured players ────────────────────────────────────────────
@@ -342,9 +281,17 @@ def build_scoring_info(session: Session) -> None:
 # stays small; the session always receives its own copy, so draft-time mutation never
 # touches a cached entry.
 _AGENT_CACHE_MAX = 4
+
+
 _agent_cache: 'OrderedDict[str, object]' = OrderedDict()
+
+
 _agent_cache_lock = threading.Lock()
+
+
 agent_cache_hits = 0     # introspection for tests and ops; no behavior reads these
+
+
 agent_cache_misses = 0
 
 
@@ -352,12 +299,6 @@ agent_cache_misses = 0
 # team_names is cosmetic, and allow_force_weighting is applied per-evaluate to the built agent
 # (see services/ranking.py) because the pins deliberately do not enter the field build.
 _CACHE_KEY_IGNORED = ('team_names', 'allow_force_weighting')
-
-
-def _agent_cache_key(current_settings: dict) -> str:
-    keyed = {key: value for key, value in current_settings.items()
-             if key not in _CACHE_KEY_IGNORED}
-    return json.dumps(keyed, sort_keys=True, default=str)
 
 
 def clear_agent_cache() -> None:
@@ -431,23 +372,95 @@ def build_session_agent(session: Session) -> None:
             _agent_cache.popitem(last=False)
 
 
-# ── Full pipeline ─────────────────────────────────────────────────────────────
+def _agent_cache_key(current_settings: dict) -> str:
+    keyed = {key: value for key, value in current_settings.items()
+             if key not in _CACHE_KEY_IGNORED}
+    return json.dumps(keyed, sort_keys=True, default=str)
 
-def build_agent(
-    session: Session,
-    from_step: int = 1,
-    csv_bytes: bytes | None = None,
-    uploaded_dfs: dict | None = None,
-) -> None:
-    """Re-run the pipeline starting from the given step number (1–5), leaving session.agent built."""
-    if from_step <= 1:
-        load_player_pool(session, csv_bytes=csv_bytes, uploaded_dfs=uploaded_dfs)
-    if from_step <= 2:
-        remove_injured_players(session)
-    if from_step <= 3:
-        apply_upsilon_adjustment(session)
-    if from_step <= 4:
-        build_scoring_info(session)
-    if from_step <= 5:
-        build_session_agent(session)
 
+# ── v0_clean cache ────────────────────────────────────────────────────────────
+# Caches the output of load_player_pool (loaded + processed player stats) independently
+# of session ID, keyed by data source parameters.  This avoids re-querying
+# Snowflake and re-processing the DataFrame every time a new session is created
+# with the same data source.
+
+_v0_cache: dict[tuple, tuple[float, pd.DataFrame]] = {}
+
+
+_v0_cache_lock = threading.Lock()
+
+
+_V0_CACHE_TTL = 24 * 3600  # 24 hours
+
+
+def clear_v0_cache() -> None:
+    """Evict all entries from the v0_clean in-memory cache."""
+    with _v0_cache_lock:
+        _v0_cache.clear()
+
+
+# ── helpers ───────────────────────────────────────────────────────────────────
+
+def _count_active(slot_counts: dict, n_picks: int) -> int:
+    """How many players are active at once: the slot total when a structure is set, else every pick.
+
+    Active rather than "starting", because there is nothing for them to start ahead of -- the
+    default structure is thirteen slots for thirteen picks, so every player a drafter holds is
+    fielded. The distinction that does exist is the injured-list slot, which holds a player who
+    cannot be fielded at all, and that is what this count leaves out.
+    """
+    return sum(slot_counts.values()) if slot_counts else n_picks
+
+
+def derive_effective_objective(session: Session) -> tuple[list[str], str | None]:
+    """The categories and tiebreaker the build can actually score, derived from the
+    REQUESTED objective in current_settings and the columns v2 actually carries.
+
+    A category needs its own column, and a ratio category also needs the volume column
+    that weights it (a percentage cannot be scored without the attempts behind it).
+    The narrowing can drop the very category chosen to break ties, or leave an odd
+    count where no tie can arise — either way the tiebreaker no longer refers to
+    anything the agent could resolve, so it comes back as None.
+
+    Deliberately a pure derivation, recomputed by every consumer (both build steps, the
+    evaluate path, the response serializers) rather than written back into
+    current_settings: the request snapshot keeps saying what the user REQUESTED, the
+    pipeline cache keys stay coherent with the request, and a category dropped for one
+    data source comes back by itself when a later patch restores its columns.
+    """
+    _, sport_params, _ = _resolve_sport_params(session)
+    available_columns = set(session.v2.columns)
+    ratio_statistics  = sport_params['ratio-statistics']
+    categories = [
+        category for category in session.current_settings['categories']
+        if category in available_columns
+        and ratio_statistics.get(category, {}).get('volume-statistic', category) in available_columns
+    ]
+    tiebreaker = session.current_settings['tiebreaker_category']
+    if tiebreaker not in categories or len(categories) % 2 == 1:
+        tiebreaker = None
+    return categories, tiebreaker
+
+
+def _resolve_sport_params(session: Session) -> tuple[dict, dict, str]:
+    """Return (all_params, sport_params, sport) for the current session."""
+    all_params = load_all_params()
+    sport = session.current_settings['sport']
+    return all_params, all_params[sport], sport
+
+
+def _load_mean_of_variances() -> pd.Series:
+    """Load empirical mean-of-variances for the most recent season from the
+    coefficient exploration output CSV.  The CSV has stats as rows and seasons
+    as columns (newest first); the first data column is the most recent season.
+    """
+    df = pd.read_csv(_MEAN_OF_VARIANCES_PATH, index_col=0)
+    return df.iloc[:, 0]
+
+
+# ── errors ────────────────────────────────────────────────────────────────────
+
+class InsufficientPlayerPoolError(Exception):
+    """The available player pool is too small to fill every roster in the league. This is a bad
+    league configuration (too few players for the number of teams x roster spots), not a server
+    fault, so the routes surface it as a 400."""

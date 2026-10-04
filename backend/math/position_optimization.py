@@ -14,6 +14,105 @@ from scipy.optimize import linear_sum_assignment
 from backend.math.position_config import PositionConfig
 
 
+# ── public API ────────────────────────────────────────────────────────────────
+
+def optimize_positions_all_players(
+    candidate_player_array: np.ndarray
+    , position_rewards: np.ndarray
+    , team_so_far_array: np.ndarray
+    , position_shares: dict
+    , position_config: PositionConfig
+    , scale_down: bool = True
+    , active_count: int | None = None
+    , cached_rosters: np.ndarray | None = None
+    , priority_order: np.ndarray | None = None
+):
+    # The eligibility rows (candidate_player_array, team_so_far_array) are weight-independent, so the
+    # caller builds them once per evaluate via get_player_rows rather than once per gradient iteration.
+    n_total_picks       = sum(position_config.position_numbers.values())
+    n_remaining_players = n_total_picks - 1 - team_so_far_array.shape[0]
+    n_candidates        = candidate_player_array.shape[0]
+
+    reward_array = get_future_player_rows(position_rewards, position_config)
+
+    # Throttle: re-solve the roster assignment only for the top `active_count` candidates — ranked by
+    # `priority_order` (the cached default-H-score ranking supplied by the caller) — and reuse the
+    # previous iteration's assignment for the rest. The per-candidate Hungarian solve dominates the
+    # cost, and a lower-ranked candidate's optimal slots barely move between iterations. A full solve
+    # runs when there is no cache/ranking yet or active_count already covers everyone.
+    full_solve = (cached_rosters is None or active_count is None
+                  or priority_order is None or active_count >= n_candidates)
+
+    if full_solve:
+        rosters = np.array([
+            _optimize_positions_for_prospective_player(
+                player, reward_vector, team_so_far_array, n_remaining_players
+            )
+            for player, reward_vector in zip(candidate_player_array, reward_array)
+        ])
+    else:
+        # active_count can be 0 (a batch entirely past the global exact-solve tiers): every candidate
+        # reuses its cached roster, so there is nothing to re-solve.
+        active_indices = priority_order[:active_count]
+        rosters = cached_rosters.copy()
+        if len(active_indices) > 0:
+            rosters[active_indices] = np.array([
+                _optimize_positions_for_prospective_player(
+                    candidate_player_array[i], reward_array[i], team_so_far_array, n_remaining_players
+                )
+                for i in active_indices
+            ])
+
+    final_positions, flex_shares = get_position_array_from_res(
+        rosters, position_shares, n_remaining_players, position_config
+    )
+
+    if scale_down:
+        final_positions = final_positions / n_remaining_players
+
+    return rosters, final_positions, flex_shares
+
+
+def check_single_player_eligibility(
+    player: list
+    , team_so_far: list
+    , position_config: PositionConfig
+) -> bool:
+    position_numbers = position_config.position_numbers
+    n_total_picks    = sum(position_numbers.values())
+    n_base_positions = len(position_config.position_structure['base_list'])
+
+    position_rewards    = np.array([[0] * n_base_positions])
+    n_remaining_players = n_total_picks - 1 - len(team_so_far)
+    reward_vector       = get_future_player_rows(position_rewards, position_config)[0]
+    team_so_far_array   = (get_player_rows(team_so_far, position_config)
+                           if len(team_so_far) > 0
+                           else np.empty((0, n_total_picks)))
+    candidate_vector    = get_player_rows([player], position_config)[0]
+
+    all_res = _optimize_positions_for_prospective_player(
+        candidate_vector, reward_vector, team_so_far_array, n_remaining_players
+    )
+    return bool(all(all_res >= 0))
+
+
+def check_team_eligibility(team: list, position_config: PositionConfig) -> bool:
+    """Checks if a full team satisfies position constraints.
+
+    scipy's linear_sum_assignment raises ValueError when no feasible assignment
+    exists — that is the signal for "team is ineligible." Narrowed to ValueError
+    so genuine bugs (NaN/Inf in the cost matrix, TypeError, etc.) propagate.
+    """
+    if len(team) == 0:
+        return True
+    team_array = get_player_rows(team, position_config)
+    try:
+        linear_sum_assignment(team_array, maximize=True)
+        return True
+    except ValueError:
+        return False
+
+
 # ── internal helpers ──────────────────────────────────────────────────────────
 
 def get_future_player_rows(position_rewards: np.ndarray
@@ -145,103 +244,3 @@ def get_position_array_from_res(res: np.ndarray
         p: position_sums[p] for p in position_structure['flex_list']
     }
     return res_main, flex_shares_out
-
-
-# ── public API ────────────────────────────────────────────────────────────────
-
-def optimize_positions_all_players(
-    candidate_player_array: np.ndarray
-    , position_rewards: np.ndarray
-    , team_so_far_array: np.ndarray
-    , position_shares: dict
-    , position_config: PositionConfig
-    , scale_down: bool = True
-    , active_count: int | None = None
-    , cached_rosters: np.ndarray | None = None
-    , priority_order: np.ndarray | None = None
-):
-    # The eligibility rows (candidate_player_array, team_so_far_array) are weight-independent, so the
-    # caller builds them once per evaluate via get_player_rows rather than once per gradient iteration.
-    n_total_picks       = sum(position_config.position_numbers.values())
-    n_remaining_players = n_total_picks - 1 - team_so_far_array.shape[0]
-    n_candidates        = candidate_player_array.shape[0]
-
-    reward_array = get_future_player_rows(position_rewards, position_config)
-
-    # Throttle: re-solve the roster assignment only for the top `active_count` candidates — ranked by
-    # `priority_order` (the cached default-H-score ranking supplied by the caller) — and reuse the
-    # previous iteration's assignment for the rest. The per-candidate Hungarian solve dominates the
-    # cost, and a lower-ranked candidate's optimal slots barely move between iterations. A full solve
-    # runs when there is no cache/ranking yet or active_count already covers everyone.
-    full_solve = (cached_rosters is None or active_count is None
-                  or priority_order is None or active_count >= n_candidates)
-
-    if full_solve:
-        rosters = np.array([
-            _optimize_positions_for_prospective_player(
-                player, reward_vector, team_so_far_array, n_remaining_players
-            )
-            for player, reward_vector in zip(candidate_player_array, reward_array)
-        ])
-    else:
-        # active_count can be 0 (a batch entirely past the global exact-solve tiers): every candidate
-        # reuses its cached roster, so there is nothing to re-solve.
-        active_indices = priority_order[:active_count]
-        rosters = cached_rosters.copy()
-        if len(active_indices) > 0:
-            rosters[active_indices] = np.array([
-                _optimize_positions_for_prospective_player(
-                    candidate_player_array[i], reward_array[i], team_so_far_array, n_remaining_players
-                )
-                for i in active_indices
-            ])
-
-    final_positions, flex_shares = get_position_array_from_res(
-        rosters, position_shares, n_remaining_players, position_config
-    )
-
-    if scale_down:
-        final_positions = final_positions / n_remaining_players
-
-    return rosters, final_positions, flex_shares
-
-
-def check_single_player_eligibility(
-    player: list
-    , team_so_far: list
-    , position_config: PositionConfig
-) -> bool:
-    position_numbers = position_config.position_numbers
-    n_total_picks    = sum(position_numbers.values())
-    n_base_positions = len(position_config.position_structure['base_list'])
-
-    position_rewards    = np.array([[0] * n_base_positions])
-    n_remaining_players = n_total_picks - 1 - len(team_so_far)
-    reward_vector       = get_future_player_rows(position_rewards, position_config)[0]
-    team_so_far_array   = (get_player_rows(team_so_far, position_config)
-                           if len(team_so_far) > 0
-                           else np.empty((0, n_total_picks)))
-    candidate_vector    = get_player_rows([player], position_config)[0]
-
-    all_res = _optimize_positions_for_prospective_player(
-        candidate_vector, reward_vector, team_so_far_array, n_remaining_players
-    )
-    return bool(all(all_res >= 0))
-
-
-def check_team_eligibility(team: list, position_config: PositionConfig) -> bool:
-    """Checks if a full team satisfies position constraints.
-
-    scipy's linear_sum_assignment raises ValueError when no feasible assignment
-    exists — that is the signal for "team is ineligible." Narrowed to ValueError
-    so genuine bugs (NaN/Inf in the cost matrix, TypeError, etc.) propagate.
-    """
-    if len(team) == 0:
-        return True
-    team_array = get_player_rows(team, position_config)
-    try:
-        linear_sum_assignment(team_array, maximize=True)
-        return True
-    except ValueError:
-        return False
-

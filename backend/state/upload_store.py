@@ -40,10 +40,36 @@ _UPLOAD_DISK_DIR = (
 )
 
 
-def _upload_paths(data_id: str) -> tuple[Path, Path]:
-    """(csv bytes path, metadata path) for an upload. The csv stays raw bytes so it is
-    re-parsed exactly as it was received."""
-    return (_UPLOAD_DISK_DIR / f'{data_id}.csv', _UPLOAD_DISK_DIR / f'{data_id}.json')
+def store_upload(data_id: str, csv_bytes: bytes, n_players: int) -> None:
+    entry = {
+        'bytes':         csv_bytes,
+        'n_players':     n_players,
+        'last_accessed': time.time(),
+    }
+    with _upload_lock:
+        _evict_expired_uploads(entry['last_accessed'])
+        _upload_store[data_id] = entry
+        _write_upload_to_disk(data_id, entry)
+
+
+def _evict_expired_uploads(now: float) -> None:
+    """Drop every upload past its idle window, memory and disk. Called on store (the
+    same reclaim-on-write policy the session store uses), so abandoned uploads cannot
+    accumulate on disk indefinitely."""
+    expired = [data_id for data_id, entry in _upload_store.items()
+               if now - entry['last_accessed'] > UPLOAD_TTL]
+    for data_id in expired:
+        _discard_upload(data_id)
+
+    if not _UPLOAD_DISK_DIR.exists():
+        return
+    for meta_path in _UPLOAD_DISK_DIR.glob('*.json'):
+        try:
+            last_accessed = float(json.loads(meta_path.read_text(encoding='utf-8'))['last_accessed'])
+        except (OSError, ValueError, KeyError):
+            continue   # unreadable sidecar: left alone rather than guessed at
+        if now - last_accessed > UPLOAD_TTL:
+            _discard_upload(meta_path.stem)
 
 
 def _write_upload_to_disk(data_id: str, entry: dict) -> None:
@@ -56,17 +82,24 @@ def _write_upload_to_disk(data_id: str, entry: dict) -> None:
     }), encoding='utf-8')
 
 
-def _touch_upload_on_disk(data_id: str, last_accessed: float) -> None:
-    """Persist a refreshed access time so the sliding window survives a restart."""
-    _, meta_path = _upload_paths(data_id)
-    if not meta_path.exists():
-        return
-    try:
-        metadata = json.loads(meta_path.read_text(encoding='utf-8'))
-    except (OSError, ValueError):
-        return
-    metadata['last_accessed'] = last_accessed
-    meta_path.write_text(json.dumps(metadata), encoding='utf-8')
+def get_upload(data_id: str) -> Optional[dict]:
+    """The stored upload, or None when it is unknown or has gone idle past the TTL.
+    Reading refreshes the entry's clock (sliding window), so an upload backing an
+    active session stays alive for as long as that session keeps using it."""
+    now = time.time()
+    with _upload_lock:
+        entry = _upload_store.get(data_id)
+        if entry is None:
+            entry = _read_upload_from_disk(data_id)
+            if entry is None:
+                return None
+            _upload_store[data_id] = entry
+        if now - entry['last_accessed'] > UPLOAD_TTL:
+            _discard_upload(data_id)
+            return None
+        entry['last_accessed'] = now
+        _touch_upload_on_disk(data_id, now)
+        return entry
 
 
 def _read_upload_from_disk(data_id: str) -> Optional[dict]:
@@ -93,53 +126,20 @@ def _discard_upload(data_id: str) -> None:
         path.unlink(missing_ok=True)
 
 
-def _evict_expired_uploads(now: float) -> None:
-    """Drop every upload past its idle window, memory and disk. Called on store (the
-    same reclaim-on-write policy the session store uses), so abandoned uploads cannot
-    accumulate on disk indefinitely."""
-    expired = [data_id for data_id, entry in _upload_store.items()
-               if now - entry['last_accessed'] > UPLOAD_TTL]
-    for data_id in expired:
-        _discard_upload(data_id)
-
-    if not _UPLOAD_DISK_DIR.exists():
+def _touch_upload_on_disk(data_id: str, last_accessed: float) -> None:
+    """Persist a refreshed access time so the sliding window survives a restart."""
+    _, meta_path = _upload_paths(data_id)
+    if not meta_path.exists():
         return
-    for meta_path in _UPLOAD_DISK_DIR.glob('*.json'):
-        try:
-            last_accessed = float(json.loads(meta_path.read_text(encoding='utf-8'))['last_accessed'])
-        except (OSError, ValueError, KeyError):
-            continue   # unreadable sidecar: left alone rather than guessed at
-        if now - last_accessed > UPLOAD_TTL:
-            _discard_upload(meta_path.stem)
+    try:
+        metadata = json.loads(meta_path.read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return
+    metadata['last_accessed'] = last_accessed
+    meta_path.write_text(json.dumps(metadata), encoding='utf-8')
 
 
-def store_upload(data_id: str, csv_bytes: bytes, n_players: int) -> None:
-    entry = {
-        'bytes':         csv_bytes,
-        'n_players':     n_players,
-        'last_accessed': time.time(),
-    }
-    with _upload_lock:
-        _evict_expired_uploads(entry['last_accessed'])
-        _upload_store[data_id] = entry
-        _write_upload_to_disk(data_id, entry)
-
-
-def get_upload(data_id: str) -> Optional[dict]:
-    """The stored upload, or None when it is unknown or has gone idle past the TTL.
-    Reading refreshes the entry's clock (sliding window), so an upload backing an
-    active session stays alive for as long as that session keeps using it."""
-    now = time.time()
-    with _upload_lock:
-        entry = _upload_store.get(data_id)
-        if entry is None:
-            entry = _read_upload_from_disk(data_id)
-            if entry is None:
-                return None
-            _upload_store[data_id] = entry
-        if now - entry['last_accessed'] > UPLOAD_TTL:
-            _discard_upload(data_id)
-            return None
-        entry['last_accessed'] = now
-        _touch_upload_on_disk(data_id, now)
-        return entry
+def _upload_paths(data_id: str) -> tuple[Path, Path]:
+    """(csv bytes path, metadata path) for an upload. The csv stays raw bytes so it is
+    re-parsed exactly as it was received."""
+    return (_UPLOAD_DISK_DIR / f'{data_id}.csv', _UPLOAD_DISK_DIR / f'{data_id}.json')

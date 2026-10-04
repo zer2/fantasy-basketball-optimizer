@@ -18,66 +18,10 @@ from backend.platform_integration.base import PlatformConfig
 from backend.platform_integration.helpers import build_platform_player_id_lookup
 
 
-def refresh_platform_player_id_lookup(session: Session) -> None:
-    """Rebuild the session's platform-key -> player-id lookup from its current registry.
-
-    Precondition: a live platform is connected (session.platform_config is set) — there is nothing
-    to refresh otherwise, so callers guard on it. Lives here, not in build_agent, so the pipeline
-    stays platform-agnostic. Call after the pipeline runs when the player set may have changed
-    (session creation and data/injured patches, from_step <= 2); model/category/slot patches leave
-    the registry untouched.
-    """
-    session.platform_player_id_lookup = build_platform_player_id_lookup(
-        session.player_registry,
-        session.platform_config.player_name_column,
-        get_unified_player_table(),
-    )
-
-
-def normalize_objective_settings(current_settings: dict) -> None:
-    """Settle the Head-to-Head objective dial and tiebreaker against the format, in place.
-
-    Under Rotisserie the dial is pinned to None: that format ignores it, HAgent rejects a number
-    there, and the pipeline cache is keyed on the whole parameter snapshot — so a leftover slider
-    value would split the cache into entries that build identical Rotisserie agents. Under Head to
-    Head the dial is required, and its absence raises rather than defaulting, since guessing would
-    mean drafting to an objective the caller never chose.
-
-    The tiebreaker is pinned to None wherever it cannot bite — under Rotisserie, at dial 0 (each
-    category scored on its own has no ties to break), and with an odd number of categories, where
-    the majority is already decided. Pinned rather than rejected because a client may legitimately
-    keep the choice while the count is briefly odd, so that it returns when the count is even
-    again; what must not happen is that inert value splitting the cache.
-
-    Applied wherever current_settings is assembled or patched, so no caller has to remember.
-
-    Validation is layered, not duplicated: the LeagueSettings schema validator rejects
-    incoherent CREATE requests outright (422 — a client that names a tiebreaker outside its
-    categories should hear about it); this function normalizes MERGED state on create and
-    patch alike, lenient about settings that merely stopped applying mid-edit; and
-    the math layer re-checks pieces as leaf contracts for direct construction in tests
-    and experiments (HAgent.__init__, plus narrower checks in process_player_data and
-    algorithm_helpers). Removing any one layer loses a distinct guarantee.
-    """
-    if not current_settings['categories']:
-        raise ValueError('categories must be a non-empty list — a session cannot score nothing.')
-
-    if current_settings['scoring_format'] == 'Rotisserie':
-        current_settings['most_categories_weight'] = None
-        current_settings['tiebreaker_category']    = None
-        return
-
-    weight = current_settings['most_categories_weight']
-    if weight is None or not 0.0 <= weight <= 1.0:
-        raise ValueError('most_categories_weight must be between 0 and 1 for Head to Head '
-                         f'(0 = Each Category, 1 = Most Categories). Got {weight!r}.')
-
-    categories = current_settings['categories']
-    tiebreaker = current_settings['tiebreaker_category']
-    if tiebreaker is not None and (weight == 0
-                                   or len(categories) % 2 == 1
-                                   or tiebreaker not in categories):
-        current_settings['tiebreaker_category'] = None
+# How many previously built pipelines each session keeps (the current one is not counted).
+# Sized for the toggling-a-setting-back-and-forth pattern, small because each entry holds
+# the agent and every pipeline intermediate.
+_PIPELINE_CACHE_ENTRIES = 4
 
 
 def build_session(
@@ -105,23 +49,6 @@ def build_session(
         delete_session(session.id)
         raise
     return session
-
-
-# How many previously built pipelines each session keeps (the current one is not counted).
-# Sized for the toggling-a-setting-back-and-forth pattern, small because each entry holds
-# the agent and every pipeline intermediate.
-_PIPELINE_CACHE_ENTRIES = 4
-
-
-def _build_pipeline_cache_key(current_settings: dict) -> tuple:
-    """A hashable snapshot of the full parameter set that produced a pipeline build."""
-    def freeze(value):
-        if isinstance(value, dict):
-            return tuple(sorted((k, freeze(v)) for k, v in value.items()))
-        if isinstance(value, (list, tuple)):
-            return tuple(freeze(v) for v in value)
-        return value
-    return freeze(current_settings)
 
 
 def apply_patch(
@@ -188,3 +115,76 @@ def apply_patch(
     # or player_name_column (a platform_config was just set).
     if session.platform_config is not None and (from_step <= 2 or platform_config is not None):
         refresh_platform_player_id_lookup(session)
+
+
+def _build_pipeline_cache_key(current_settings: dict) -> tuple:
+    """A hashable snapshot of the full parameter set that produced a pipeline build."""
+    def freeze(value):
+        if isinstance(value, dict):
+            return tuple(sorted((k, freeze(v)) for k, v in value.items()))
+        if isinstance(value, (list, tuple)):
+            return tuple(freeze(v) for v in value)
+        return value
+    return freeze(current_settings)
+
+
+def normalize_objective_settings(current_settings: dict) -> None:
+    """Settle the Head-to-Head objective dial and tiebreaker against the format, in place.
+
+    Under Rotisserie the dial is pinned to None: that format ignores it, HAgent rejects a number
+    there, and the pipeline cache is keyed on the whole parameter snapshot — so a leftover slider
+    value would split the cache into entries that build identical Rotisserie agents. Under Head to
+    Head the dial is required, and its absence raises rather than defaulting, since guessing would
+    mean drafting to an objective the caller never chose.
+
+    The tiebreaker is pinned to None wherever it cannot bite — under Rotisserie, at dial 0 (each
+    category scored on its own has no ties to break), and with an odd number of categories, where
+    the majority is already decided. Pinned rather than rejected because a client may legitimately
+    keep the choice while the count is briefly odd, so that it returns when the count is even
+    again; what must not happen is that inert value splitting the cache.
+
+    Applied wherever current_settings is assembled or patched, so no caller has to remember.
+
+    Validation is layered, not duplicated: the LeagueSettings schema validator rejects
+    incoherent CREATE requests outright (422 — a client that names a tiebreaker outside its
+    categories should hear about it); this function normalizes MERGED state on create and
+    patch alike, lenient about settings that merely stopped applying mid-edit; and
+    the math layer re-checks pieces as leaf contracts for direct construction in tests
+    and experiments (HAgent.__init__, plus narrower checks in process_player_data and
+    algorithm_helpers). Removing any one layer loses a distinct guarantee.
+    """
+    if not current_settings['categories']:
+        raise ValueError('categories must be a non-empty list — a session cannot score nothing.')
+
+    if current_settings['scoring_format'] == 'Rotisserie':
+        current_settings['most_categories_weight'] = None
+        current_settings['tiebreaker_category']    = None
+        return
+
+    weight = current_settings['most_categories_weight']
+    if weight is None or not 0.0 <= weight <= 1.0:
+        raise ValueError('most_categories_weight must be between 0 and 1 for Head to Head '
+                         f'(0 = Each Category, 1 = Most Categories). Got {weight!r}.')
+
+    categories = current_settings['categories']
+    tiebreaker = current_settings['tiebreaker_category']
+    if tiebreaker is not None and (weight == 0
+                                   or len(categories) % 2 == 1
+                                   or tiebreaker not in categories):
+        current_settings['tiebreaker_category'] = None
+
+
+def refresh_platform_player_id_lookup(session: Session) -> None:
+    """Rebuild the session's platform-key -> player-id lookup from its current registry.
+
+    Precondition: a live platform is connected (session.platform_config is set) — there is nothing
+    to refresh otherwise, so callers guard on it. Lives here, not in build_agent, so the pipeline
+    stays platform-agnostic. Call after the pipeline runs when the player set may have changed
+    (session creation and data/injured patches, from_step <= 2); model/category/slot patches leave
+    the registry untouched.
+    """
+    session.platform_player_id_lookup = build_platform_player_id_lookup(
+        session.player_registry,
+        session.platform_config.player_name_column,
+        get_unified_player_table(),
+    )

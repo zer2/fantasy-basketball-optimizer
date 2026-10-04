@@ -25,33 +25,6 @@ from backend.infra.snowflake_connection import query, run_query
 from backend.player_identity import allocate_synthetic_player_ids
 
 
-# ── Player name mapping ───────────────────────────────────────────────────────
-
-def _map_player_names(df: pd.DataFrame, source_col: str) -> pd.DataFrame:
-    """Map source-specific player names to the canonical 'Player' column.
-
-    source_col is the column name in UNIFIED_PLAYER_TABLE whose values match
-    what's currently in df['Player']. The canonical name column in that table
-    is 'MASTER_PLAYER_NAME' (not 'Player').
-    """
-    unified_player_table = query('UNIFIED_PLAYER_TABLE')
-    mapper = (
-        unified_player_table.dropna(subset=[source_col])
-        .set_index(source_col)['MASTER_PLAYER_NAME']
-    )
-    df = df.copy()
-    df['Player'] = df['Player'].map(mapper).fillna(df['Player'])
-    return df
-
-
-def get_unified_player_table() -> pd.DataFrame:
-    """The single cross-platform player table (UNIFIED_PLAYER_TABLE), whose columns
-    include the canonical MASTER_PLAYER_NAME plus each bridge id/name (NBA_PLAYER_ID,
-    YAHOO_PLAYER_ID, FANTRAX_ID, ESPN_NAME, DARKO_NAME, ...). Used by platform
-    integrations to map roster ids/names to canonical."""
-    return query('UNIFIED_PLAYER_TABLE')
-
-
 # ── Weekly box scores ─────────────────────────────────────────────────────────
 
 def get_weekly_box_scores(season: str, sport_params: dict) -> pd.DataFrame:
@@ -89,6 +62,15 @@ def get_available_seasons() -> list[str]:
 
 # ── Historical data ───────────────────────────────────────────────────────────
 
+def get_specified_historical_stats(season: str, sport_params: dict) -> pd.DataFrame:
+    """Return player stats for a specific season, indexed by player id.
+
+    The 'Player' column carries the season row's native display name (registry material
+    popped off by load_player_pool); stats and 'Position' are the pipeline's v0 columns.
+    """
+    return get_historical_data(sport_params).loc[season].copy()
+
+
 def get_historical_data(sport_params: dict) -> pd.DataFrame:
     """Fetch full historical player data from Snowflake.
 
@@ -116,153 +98,6 @@ def get_historical_data(sport_params: dict) -> pd.DataFrame:
     df = df.set_index(['Season', 'NBA_PLAYER_ID'])
     df.index = df.index.set_names(['Season', 'Player'])
     return df
-
-
-def get_specified_historical_stats(season: str, sport_params: dict) -> pd.DataFrame:
-    """Return player stats for a specific season, indexed by player id.
-
-    The 'Player' column carries the season row's native display name (registry material
-    popped off by load_player_pool); stats and 'Position' are the pipeline's v0 columns.
-    """
-    return get_historical_data(sport_params).loc[season].copy()
-
-
-# ── Projection data ───────────────────────────────────────────────────────────
-
-def get_player_name_resolver() -> dict[str, int]:
-    """Every known spelling of every player -> NBA player id, from PLAYER_NAME_RESOLVER_VIEW.
-
-    Projections reach the app keyed by name, and from anywhere: ESPN, DARKO, Hashtag Basketball,
-    Basketball Monster, a hand-edited file, or a blend of several, each spelling players its own
-    way. So a name is looked up against every spelling UNIFIED_PLAYER_TABLE knows, in any of its
-    name columns. The view settles a spelling two players share (most recently active wins,
-    rookies first; scripts/player_name_resolver_view.sql) and leaves out rows with no NBA id, so a
-    name only they carry resolves to nothing, like a name never seen.
-    """
-    view = query('PLAYER_NAME_RESOLVER_VIEW')
-    # One row per spelling is the view's whole contract; a duplicate would make the lookup
-    # depend on row order, which is a broken view, not something to paper over here.
-    if not view['PLAYER_NAME'].is_unique:
-        duplicated = view.loc[view['PLAYER_NAME'].duplicated(), 'PLAYER_NAME'].tolist()
-        raise ValueError(f'PLAYER_NAME_RESOLVER_VIEW lists these spellings more than once: {duplicated[:10]}')
-    return dict(zip(view['PLAYER_NAME'], view['NBA_PLAYER_ID'].astype(int)))
-
-
-def attach_player_ids_by_name(df: pd.DataFrame) -> pd.DataFrame:
-    """Resolve df['Player'] (a source's own spellings) to NBA player ids in a nullable
-    'player_id' column — the ingestion edge for name-keyed sources. Unresolved rows keep
-    a null id; the caller decides between synthetic allocation (uploads) and loud
-    warnings (curated sources)."""
-    resolver = get_player_name_resolver()
-    df = df.copy()
-    df['player_id'] = df['Player'].map(resolver).astype('Int64')
-    return df
-
-
-def get_espn_projections(sport_params: dict) -> pd.DataFrame:
-    """Fetch ESPN projections from Snowflake, with 'player_id' resolved from ESPN names."""
-    n_games = sport_params['n_games']
-    df = query('ESPN_PROJECTION_VIEW')
-    df = df.rename(columns=sport_params['espn-renamer'])
-    df = attach_player_ids_by_name(df)      # resolve the raw ESPN spellings
-    df = _map_player_names(df, 'ESPN_NAME')  # display names stay master-mapped as today
-    df['Games Played %'] = df['Games Played'] / n_games
-    return df
-
-
-def get_darko_data(sport_params: dict) -> pd.DataFrame:
-    """Fetch DARKO projections from Snowflake, scaled from per-100 to per-game.
-    DARKO carries NBA_PLAYER_ID natively; position/minutes ride in from the ESPN table
-    joined by id (its names resolved through the unified table)."""
-    n_games = sport_params['n_games']
-
-    df = query('DARKO_VIEW')
-    df = df.rename(columns=sport_params['darko-renamer'])
-    df = df.apply(pd.to_numeric, errors='ignore')
-    df = _map_player_names(df, 'DARKO_NAME')
-    df['player_id'] = df['NBA_PLAYER_ID'].astype('Int64')
-    df = df.drop(columns=['NBA_PLAYER_ID']).sort_values('Player').fillna(0)
-
-    # Position / minutes / games come from ESPN, joined by resolved id.
-    # The VIEW, not the table: the table keeps every load ever made, and the view is the one that
-    # narrows to the most recent. They were the same thing for as long as the table held a single
-    # load, which is why reading the table worked until a second one landed -- at which point every
-    # player carried in both loads resolved two rows here and the merge below multiplied him.
-    extra = query('ESPN_PROJECTION_VIEW')[['ESPN_NAME', 'MINUTES_PLAYED', 'GAMES_PLAYED', 'POSITION']]
-    extra.columns = ['Player', 'Minutes', 'Games Played %', 'Position']
-    extra['Games Played %'] = extra['Games Played %'].astype(float) / n_games
-    extra = attach_player_ids_by_name(extra).dropna(subset=['player_id'])
-    extra = extra.drop(columns=['Player'])
-
-    df = df.merge(extra, on='player_id')
-    possessions_per_game = df['Pace'] / 100 * df['Minutes'] / 48
-
-    per_100_cols = {
-        'Points':               'Points/100',
-        'Rebounds':             'Rebounds/100',
-        'Assists':              'Assists/100',
-        'Steals':               'Steals/100',
-        'Blocks':               'Blocks/100',
-        'Threes':               'Threes/100',
-        'Turnovers':            'Turnovers/100',
-        'Free Throw Attempts':  'Free Throw Attempts/100',
-        'Field Goal Attempts':  'Field Goal Attempts/100',
-        'Three Attempts':       'Three Attempts/100',
-    }
-    for col, per100 in per_100_cols.items():
-        df[col] = df[per100] * possessions_per_game
-
-    df['Field Goals Made'] = (
-        df['Field Goal Attempts/100'] * df['Field Goal %'] * possessions_per_game
-    )
-    df['Assist to TO'] = df['Assists'] / df['Turnovers']
-
-    required = (
-        sport_params['counting-statistics']
-        + list(sport_params['ratio-statistics'].keys())
-        + [info['volume-statistic'] for info in sport_params['ratio-statistics'].values()]
-        + sport_params['other-columns']
-        + ['Player', 'player_id']
-    )
-    required = [c for c in required if c in df.columns]
-    return df[list(set(required))]
-
-
-# ── Canonical position eligibility ────────────────────────────────────────────
-
-def get_canonical_position_eligibility(sport_params: dict) -> pd.Series:
-    """Per-player position eligibility from Yahoo — the single authority for the blend.
-
-    Positions are never blended across projection sources: every source contributes
-    stats only, and eligibility comes from the latest season in
-    YAHOO_PLAYER_POSITION_ELIGIBILITY_TABLE. Composite slots (Util/G/F) are dropped
-    and base positions are emitted in base_list order, so a player's position identity
-    cannot depend on which sources are active, on a file's comma spacing, or on the
-    order a file lists positions in.
-
-    Returns a Series indexed by NBA player id with 'PG,SG'-style values — the join
-    path is pool id -> (unified table) -> YAHOO_PLAYER_ID -> eligibility rows.
-    """
-    base_order = {
-        position: rank
-        for rank, position in enumerate(sport_params['position_structure']['base_list'])
-    }
-
-    eligibility = query('YAHOO_PLAYER_POSITION_ELIGIBILITY_TABLE')
-    eligibility = eligibility[
-        eligibility['ELIGIBLE'] & eligibility['POSITION'].isin(base_order)
-    ]
-    eligibility = eligibility[eligibility['SEASON_ID'] == eligibility['SEASON_ID'].max()]
-
-    unified = get_unified_player_table()[['YAHOO_PLAYER_ID', 'NBA_PLAYER_ID']].dropna()
-    unified = unified.astype({'YAHOO_PLAYER_ID': 'int64', 'NBA_PLAYER_ID': 'int64'})
-    merged = eligibility.astype({'YAHOO_PLAYER_ID': 'int64'}).merge(unified, on='YAHOO_PLAYER_ID')
-
-    return (
-        merged.sort_values('POSITION', key=lambda column: column.map(base_order))
-              .groupby('NBA_PLAYER_ID')['POSITION']
-              .agg(','.join)
-    )
 
 
 # ── Blended projections ───────────────────────────────────────────────────────
@@ -385,3 +220,168 @@ def combine_projections(
     # sort_values('Player') ambiguous against the id level of the same name).
     df = df.sort_values('_display_name')
     return df.rename(columns={'_display_name': 'Player'})
+
+
+# ── Projection data ───────────────────────────────────────────────────────────
+
+def get_espn_projections(sport_params: dict) -> pd.DataFrame:
+    """Fetch ESPN projections from Snowflake, with 'player_id' resolved from ESPN names."""
+    n_games = sport_params['n_games']
+    df = query('ESPN_PROJECTION_VIEW')
+    df = df.rename(columns=sport_params['espn-renamer'])
+    df = attach_player_ids_by_name(df)      # resolve the raw ESPN spellings
+    df = _map_player_names(df, 'ESPN_NAME')  # display names stay master-mapped as today
+    df['Games Played %'] = df['Games Played'] / n_games
+    return df
+
+
+def get_darko_data(sport_params: dict) -> pd.DataFrame:
+    """Fetch DARKO projections from Snowflake, scaled from per-100 to per-game.
+    DARKO carries NBA_PLAYER_ID natively; position/minutes ride in from the ESPN table
+    joined by id (its names resolved through the unified table)."""
+    n_games = sport_params['n_games']
+
+    df = query('DARKO_VIEW')
+    df = df.rename(columns=sport_params['darko-renamer'])
+    df = df.apply(pd.to_numeric, errors='ignore')
+    df = _map_player_names(df, 'DARKO_NAME')
+    df['player_id'] = df['NBA_PLAYER_ID'].astype('Int64')
+    df = df.drop(columns=['NBA_PLAYER_ID']).sort_values('Player').fillna(0)
+
+    # Position / minutes / games come from ESPN, joined by resolved id.
+    # The VIEW, not the table: the table keeps every load ever made, and the view is the one that
+    # narrows to the most recent. They were the same thing for as long as the table held a single
+    # load, which is why reading the table worked until a second one landed -- at which point every
+    # player carried in both loads resolved two rows here and the merge below multiplied him.
+    extra = query('ESPN_PROJECTION_VIEW')[['ESPN_NAME', 'MINUTES_PLAYED', 'GAMES_PLAYED', 'POSITION']]
+    extra.columns = ['Player', 'Minutes', 'Games Played %', 'Position']
+    extra['Games Played %'] = extra['Games Played %'].astype(float) / n_games
+    extra = attach_player_ids_by_name(extra).dropna(subset=['player_id'])
+    extra = extra.drop(columns=['Player'])
+
+    df = df.merge(extra, on='player_id')
+    possessions_per_game = df['Pace'] / 100 * df['Minutes'] / 48
+
+    per_100_cols = {
+        'Points':               'Points/100',
+        'Rebounds':             'Rebounds/100',
+        'Assists':              'Assists/100',
+        'Steals':               'Steals/100',
+        'Blocks':               'Blocks/100',
+        'Threes':               'Threes/100',
+        'Turnovers':            'Turnovers/100',
+        'Free Throw Attempts':  'Free Throw Attempts/100',
+        'Field Goal Attempts':  'Field Goal Attempts/100',
+        'Three Attempts':       'Three Attempts/100',
+    }
+    for col, per100 in per_100_cols.items():
+        df[col] = df[per100] * possessions_per_game
+
+    df['Field Goals Made'] = (
+        df['Field Goal Attempts/100'] * df['Field Goal %'] * possessions_per_game
+    )
+    df['Assist to TO'] = df['Assists'] / df['Turnovers']
+
+    required = (
+        sport_params['counting-statistics']
+        + list(sport_params['ratio-statistics'].keys())
+        + [info['volume-statistic'] for info in sport_params['ratio-statistics'].values()]
+        + sport_params['other-columns']
+        + ['Player', 'player_id']
+    )
+    required = [c for c in required if c in df.columns]
+    return df[list(set(required))]
+
+
+def attach_player_ids_by_name(df: pd.DataFrame) -> pd.DataFrame:
+    """Resolve df['Player'] (a source's own spellings) to NBA player ids in a nullable
+    'player_id' column — the ingestion edge for name-keyed sources. Unresolved rows keep
+    a null id; the caller decides between synthetic allocation (uploads) and loud
+    warnings (curated sources)."""
+    resolver = get_player_name_resolver()
+    df = df.copy()
+    df['player_id'] = df['Player'].map(resolver).astype('Int64')
+    return df
+
+
+def get_player_name_resolver() -> dict[str, int]:
+    """Every known spelling of every player -> NBA player id, from PLAYER_NAME_RESOLVER_VIEW.
+
+    Projections reach the app keyed by name, and from anywhere: ESPN, DARKO, Hashtag Basketball,
+    Basketball Monster, a hand-edited file, or a blend of several, each spelling players its own
+    way. So a name is looked up against every spelling UNIFIED_PLAYER_TABLE knows, in any of its
+    name columns. The view settles a spelling two players share (most recently active wins,
+    rookies first; scripts/player_name_resolver_view.sql) and leaves out rows with no NBA id, so a
+    name only they carry resolves to nothing, like a name never seen.
+    """
+    view = query('PLAYER_NAME_RESOLVER_VIEW')
+    # One row per spelling is the view's whole contract; a duplicate would make the lookup
+    # depend on row order, which is a broken view, not something to paper over here.
+    if not view['PLAYER_NAME'].is_unique:
+        duplicated = view.loc[view['PLAYER_NAME'].duplicated(), 'PLAYER_NAME'].tolist()
+        raise ValueError(f'PLAYER_NAME_RESOLVER_VIEW lists these spellings more than once: {duplicated[:10]}')
+    return dict(zip(view['PLAYER_NAME'], view['NBA_PLAYER_ID'].astype(int)))
+
+
+# ── Canonical position eligibility ────────────────────────────────────────────
+
+def get_canonical_position_eligibility(sport_params: dict) -> pd.Series:
+    """Per-player position eligibility from Yahoo — the single authority for the blend.
+
+    Positions are never blended across projection sources: every source contributes
+    stats only, and eligibility comes from the latest season in
+    YAHOO_PLAYER_POSITION_ELIGIBILITY_TABLE. Composite slots (Util/G/F) are dropped
+    and base positions are emitted in base_list order, so a player's position identity
+    cannot depend on which sources are active, on a file's comma spacing, or on the
+    order a file lists positions in.
+
+    Returns a Series indexed by NBA player id with 'PG,SG'-style values — the join
+    path is pool id -> (unified table) -> YAHOO_PLAYER_ID -> eligibility rows.
+    """
+    base_order = {
+        position: rank
+        for rank, position in enumerate(sport_params['position_structure']['base_list'])
+    }
+
+    eligibility = query('YAHOO_PLAYER_POSITION_ELIGIBILITY_TABLE')
+    eligibility = eligibility[
+        eligibility['ELIGIBLE'] & eligibility['POSITION'].isin(base_order)
+    ]
+    eligibility = eligibility[eligibility['SEASON_ID'] == eligibility['SEASON_ID'].max()]
+
+    unified = get_unified_player_table()[['YAHOO_PLAYER_ID', 'NBA_PLAYER_ID']].dropna()
+    unified = unified.astype({'YAHOO_PLAYER_ID': 'int64', 'NBA_PLAYER_ID': 'int64'})
+    merged = eligibility.astype({'YAHOO_PLAYER_ID': 'int64'}).merge(unified, on='YAHOO_PLAYER_ID')
+
+    return (
+        merged.sort_values('POSITION', key=lambda column: column.map(base_order))
+              .groupby('NBA_PLAYER_ID')['POSITION']
+              .agg(','.join)
+    )
+
+
+# ── Player name mapping ───────────────────────────────────────────────────────
+
+def _map_player_names(df: pd.DataFrame, source_col: str) -> pd.DataFrame:
+    """Map source-specific player names to the canonical 'Player' column.
+
+    source_col is the column name in UNIFIED_PLAYER_TABLE whose values match
+    what's currently in df['Player']. The canonical name column in that table
+    is 'MASTER_PLAYER_NAME' (not 'Player').
+    """
+    unified_player_table = query('UNIFIED_PLAYER_TABLE')
+    mapper = (
+        unified_player_table.dropna(subset=[source_col])
+        .set_index(source_col)['MASTER_PLAYER_NAME']
+    )
+    df = df.copy()
+    df['Player'] = df['Player'].map(mapper).fillna(df['Player'])
+    return df
+
+
+def get_unified_player_table() -> pd.DataFrame:
+    """The single cross-platform player table (UNIFIED_PLAYER_TABLE), whose columns
+    include the canonical MASTER_PLAYER_NAME plus each bridge id/name (NBA_PLAYER_ID,
+    YAHOO_PLAYER_ID, FANTRAX_ID, ESPN_NAME, DARKO_NAME, ...). Used by platform
+    integrations to map roster ids/names to canonical."""
+    return query('UNIFIED_PLAYER_TABLE')
