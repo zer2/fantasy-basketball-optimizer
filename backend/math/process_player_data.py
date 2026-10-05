@@ -83,8 +83,9 @@ def process_player_data(player_stats_v2: pd.DataFrame
     coeff_first['Mean of Variances'] = coeff_first['Mean of Variances'] * chi_factor
 
     g_first = calculate_scores_from_coefficients(player_stats_v2, coeff_first, sport_params, 1, 1,
-                                                  counting_stats, ratio_stats, categories,
-                                                  n_active)
+                                                  counting_stats, ratio_stats, categories)
+    g_first = apply_team_volume_correction(g_first, player_stats_v2, coeff_first, sport_params,
+                                           ratio_stats, n_active)
     representative_player_set = (
         g_first.sum(axis=1).sort_values(ascending=False).index[:n_active * n_drafters]
     )
@@ -100,7 +101,8 @@ def process_player_data(player_stats_v2: pd.DataFrame
 
     mov = coefficients.loc[categories, 'Mean of Variances']
     vom = coefficients.loc[categories, 'Variance of Means']
-    # v is the x -> g conversion: g = x * v_original, exactly (the two score calls below differ
+    # v is the x -> g conversion: g = x * v_original before the per-player volume
+    # correction G-scores take for percentage categories (the two score calls below differ
     # only in whether Variance of Means joins the denominator). It is therefore also the statement
     # of what a category is WORTH per unit of x, which is where a tiebreaker belongs — worth twice
     # in the majority half of the objective and once in the per-category half, so (1 + weight).
@@ -127,11 +129,17 @@ def process_player_data(player_stats_v2: pd.DataFrame
     w = vom / mov
 
     g_scores = calculate_scores_from_coefficients(player_stats_v2, coefficients, sport_params, 1, 1,
-                                                   counting_stats, ratio_stats, categories,
-                                                   n_active)
+                                                   counting_stats, ratio_stats, categories)
+    # G-scores alone carry the per-player team-volume correction; X-scores stay uncorrected because the
+    # H-score agent models each team's volume itself (see apply_team_volume_correction). So g = x *
+    # v_original holds for counting categories only: a percentage G-score is corrected before the
+    # games-played adjustment, whose re-centring on the representative set then includes it, so it is
+    # not a fixed multiple of x * v_original. Anything adding x-space rows to G-scores (the H-score
+    # breakdown in ranking.py) converts with x * v_original instead of reading this table.
+    g_scores = apply_team_volume_correction(g_scores, player_stats_v2, coefficients, sport_params,
+                                            ratio_stats, n_active)
     x_scores = calculate_scores_from_coefficients(player_stats_v2, coefficients, sport_params, 0, 1,
-                                                   counting_stats, ratio_stats, categories,
-                                                   n_active)
+                                                   counting_stats, ratio_stats, categories)
 
     replacement_games_rate = (1 - player_stats_v2['Games Played %'] / 100) * psi
     g_scores = games_played_adjustment(g_scores, replacement_games_rate, representative_player_set,
@@ -161,13 +169,24 @@ def process_player_data(player_stats_v2: pd.DataFrame
     # them would state the same rule twice, in a form ("you win it by twice as much") that is not
     # what the rule says. The representative player set is left alone for the same reason: it
     # anchors the statistical baseline.
-    # The same factor already applied to v above, so g = x * v_original still holds exactly.
+    # The same factor already applied to v above, so the x -> g identity is unchanged by it.
     if tiebreaker_category is not None:
         g_scores[tiebreaker_category] = g_scores[tiebreaker_category] * (1 + most_categories_weight)
 
     g_scores.insert(loc=0, column='Total', value=g_scores.sum(axis=1))
     g_scores.sort_values('Total', ascending=False, inplace=True)
     x_scores = x_scores.loc[g_scores.index]
+
+    volume_units = calculate_volume_units(player_stats_v2, coefficients, sport_params, ratio_stats)
+    volume_units = volume_units.reindex(x_scores.index)
+    # The replacement player (D3 of percentage_volume_plan.md): a drafted player nobody could place
+    # stands for replacement level, so his volume is that of the players just past the draftable set
+    # -- the next round's worth after the top n_drafters * n_active by G-score.
+    replacement_tier = [player for player in g_scores.index[n_players:n_players + n_drafters]
+                        if player != RP_PLAYER_ID]
+    if not replacement_tier:
+        replacement_tier = [player for player in g_scores.index[-n_drafters:] if player != RP_PLAYER_ID]
+    volume_units.loc[RP_PLAYER_ID] = volume_units.loc[replacement_tier].mean()
 
     positions = player_stats_v2['Position'].str.split(',')
     position_structure = sport_params['position_structure']
@@ -206,9 +225,18 @@ def process_player_data(player_stats_v2: pd.DataFrame
     # would raise KeyError). Fall back to "no position data": position_means=None makes the agents
     # skip roster-slot assignment and evaluate.py show every candidate instead of dropping them all.
     # Without this the candidate table comes back empty for all-'NP' seasons (e.g. 1984-85).
+    # Volume beside the categories, for the volume-by-category covariance the future-pick model uses to
+    # project volume (Phase 2 of percentage_volume_plan.md). Renamed: the volume columns are keyed by
+    # their percentage category, which would collide with that category's X column.
+    volume_column_names = {ratio_stat: f'{ratio_stat} volume' for ratio_stat in volume_units.columns}
+    volume_beside_x = volume_units.rename(columns=volume_column_names)
     if position_means.index.intersection(base_position_list).empty:
         position_means      = None
         L_by_position       = np.array([x_scores[categories].cov()])
+        volume_covariance_by_position = np.array([
+            pd.concat([x_scores[categories], volume_beside_x], axis=1).cov()
+            .loc[list(volume_column_names.values()), categories]
+        ])
         average_round_value = None
     else:
         position_means = position_means.loc[base_position_list, :]
@@ -269,6 +297,8 @@ def process_player_data(player_stats_v2: pd.DataFrame
             )
             for position in base_position_list
         })
+        volume_covariance_by_position = calculate_volume_covariance_by_position(
+            full_pool, volume_beside_x, position_mean_weights, base_position_list, categories)
 
     # The replacement player gets a position row too, eligible for every base slot.
     #
@@ -294,6 +324,8 @@ def process_player_data(player_stats_v2: pd.DataFrame
         'Position-Means':      position_means,
         'L-by-Position':       L_by_position,
         'Average-Round-Value': average_round_value,
+        'Volume-Units':        volume_units,
+        'Volume-Covariance-by-Position': volume_covariance_by_position,
     }
 
     return info
@@ -410,6 +442,27 @@ def scale_tiebreaker_value(category_values, tiebreaker_position: int, most_categ
     return scaled
 
 
+def calculate_volume_units(player_means: pd.DataFrame
+                           , coefficients: pd.DataFrame
+                           , sport_params: dict
+                           , ratio_stats: list[str]) -> pd.DataFrame:
+    """Each player's VOLUME in every percentage category, relative to average: V / V-bar, the same V-bar
+    (the volume statistic's Mean of Means over the representative set) the percentage X-scores divide by.
+    A team of n average players totals n.
+
+    Relative volume rather than a volume X-score, (V - V-bar) / sigma_V: the model only ever uses
+    V / V-bar, and sigma_V would add a failure mode for nothing -- a pool whose volumes are all equal
+    (an upload listing one FGA figure for everyone) makes it zero and every X-score 0/0. Columns are
+    keyed by the percentage category, not the volume statistic: Turnovers is both a scored category
+    and Assist to TO's volume, and keying by the ratio category keeps the two apart."""
+    return pd.DataFrame({
+        ratio_stat: player_means[sport_params['ratio-statistics'][ratio_stat]['volume-statistic']]
+                    / coefficients.loc[sport_params['ratio-statistics'][ratio_stat]['volume-statistic'],
+                                       'Mean of Means']
+        for ratio_stat in ratio_stats
+    }, index=player_means.index, columns=ratio_stats)
+
+
 def calculate_scores_from_coefficients(player_means: pd.DataFrame
                                         , coefficients: pd.DataFrame
                                         , sport_params: dict
@@ -417,8 +470,7 @@ def calculate_scores_from_coefficients(player_means: pd.DataFrame
                                         , beta_weight: float
                                         , counting_stats: list[str]
                                         , ratio_stats: list[str]
-                                        , categories: list[str]
-                                        , n_active: int) -> pd.DataFrame:
+                                        , categories: list[str]) -> pd.DataFrame:
 
     counting_mean    = coefficients.loc[counting_stats, 'Mean of Means']
     counting_var_m   = coefficients.loc[counting_stats, 'Variance of Means']
@@ -438,21 +490,13 @@ def calculate_scores_from_coefficients(player_means: pd.DataFrame
             ) ** 0.5
             volume_average = coefficients.loc[volume_statistic, 'Mean of Means']
             player_volume  = player_means.loc[:, volume_statistic]
-            # Team-denominator correction (the unpublished revision of the G-score paper):
-            # the paper's equation 4 approximates a team's attempt volume as
-            # n_active * V-bar regardless of who the player is. Without that
-            # approximation, a team fielding player p attempts
-            # (n_active - 1) * V-bar + V_p, so p's percentage impact is the original
-            # numerator times n_active * V-bar / ((n_active - 1) * V-bar + V_p) --
-            # a player's own volume slightly dampens their own percentage impact.
-            team_volume_correction = (
-                n_active * volume_average
-                / ((n_active - 1) * volume_average + player_volume)
-            )
+            # Volume-weighted excess over the league rate ("excess makes"), per average volume. How a
+            # team's total volume dilutes this, and how it scales the weekly noise, is handled at the
+            # team level by the agent (algorithm_agents.apply_volume_awareness); G-scores take the
+            # per-player version afterwards (apply_team_volume_correction).
             num_r = (
                 player_volume / volume_average
                 * (player_means[ratio_stat] - coefficients.loc[ratio_stat, 'Mean of Means'])
-                * team_volume_correction
             )
             ratio_scores[ratio_stat] = num_r.divide(denom_r)
 
@@ -468,11 +512,67 @@ def calculate_scores_from_coefficients(player_means: pd.DataFrame
     return res.fillna(0)[categories]
 
 
+def calculate_volume_covariance_by_position(full_pool: pd.DataFrame
+                                            , volume_beside_x: pd.DataFrame
+                                            , position_mean_weights: pd.DataFrame
+                                            , base_position_list: list[str]
+                                            , categories: list[str]) -> np.ndarray:
+    """Per base position, the covariance of each player's volume (V / V-bar, one row per percentage
+    category) with his category X-scores, shape (n_positions, n_volume, n_categories).
+
+    Built exactly as L-by-Position is -- the same draftable pool, exploded over positions with the same
+    1 / n_positions weights, the same within-position weighted covariance -- so that combined with the
+    same slot weights it is the volume-by-category block of the joint covariance whose category block is
+    the pick model's L. Computed separately rather than by widening L's frame, so L stays untouched."""
+    volume_columns = list(volume_beside_x.columns)
+    joint_pool = full_pool.join(volume_beside_x)
+    joint_exploded = joint_pool.explode('Position').reset_index().set_index(['Player', 'Position'])
+    joint_exploded = joint_exploded[categories + volume_columns].astype(float)
+    joint_exploded = joint_exploded.sub(joint_exploded.mean(axis=0))
+    return np.array([
+        _weighted_cov_matrix(
+            joint_exploded.loc[pd.IndexSlice[:, position], :],
+            position_mean_weights.loc[pd.IndexSlice[:, position], position_mean_weights.columns[0]],
+        ).loc[volume_columns, categories].to_numpy()
+        for position in base_position_list
+    ])
+
+
 def _weighted_cov_matrix(df: pd.DataFrame, weights: pd.Series) -> pd.DataFrame:
     weighted_means = np.average(df, axis=0, weights=weights)
     deviations     = df - weighted_means
     weighted_cov   = np.dot(weights * deviations.T, deviations) / weights.sum()
     return pd.DataFrame(weighted_cov, columns=df.columns, index=df.columns)
+
+
+def apply_team_volume_correction(scores: pd.DataFrame
+                                 , player_means: pd.DataFrame
+                                 , coefficients: pd.DataFrame
+                                 , sport_params: dict
+                                 , ratio_stats: list[str]
+                                 , n_active: int) -> pd.DataFrame:
+    """Scale each percentage score by the team-volume correction (docs/gscores.md, addendum):
+    n_active * V-bar / ((n_active - 1) * V-bar + V_p), the dilution a player's own volume causes on an
+    otherwise-average team, in place of equation 4's assumption that team volume is n_active * V-bar
+    whoever the player is.
+
+    For G-scores only. It is the H-score agent's volume model (apply_volume_awareness) evaluated on a
+    team of average players, which is the team a G-score assumes; the agent tracks real teams' volume
+    itself, so its X-scores must stay uncorrected or the dilution would count twice.
+
+    A player with no volume figure already scores 0 in the category (calculate_scores_from_coefficients
+    fills it), and any factor leaves 0 at 0, so his factor is taken as 1 rather than letting the NaN
+    back in."""
+    corrected = scores.copy()
+    for ratio_stat in ratio_stats:
+        volume_statistic = sport_params['ratio-statistics'][ratio_stat]['volume-statistic']
+        volume_average = coefficients.loc[volume_statistic, 'Mean of Means']
+        correction_factor = (
+            n_active * volume_average
+            / ((n_active - 1) * volume_average + player_means[volume_statistic])
+        ).reindex(scores.index)
+        corrected[ratio_stat] = scores[ratio_stat] * correction_factor.where(scores[ratio_stat] != 0, 1)
+    return corrected
 
 
 def games_played_adjustment(scores: pd.DataFrame

@@ -20,6 +20,7 @@ from backend.data_retrieval import get_available_seasons, get_weekly_box_scores
 from backend.math.process_player_data import (
     calculate_coefficients_historical
     , calculate_scores_from_coefficients
+    , apply_team_volume_correction
 )
 
 
@@ -121,7 +122,16 @@ def compute_season_coefficients(
         , counting_stats = all_counting_stats
         , ratio_stats    = all_ratio_stats
         , categories     = all_categories
-        , n_active     = n_active
+    )
+    # The representative set is chosen by G-score, so the same correction process_player_data gives
+    # G-scores (keeps the two pipelines choosing the same players).
+    first_order_scores = apply_team_volume_correction(
+        first_order_scores
+        , player_means
+        , first_order_coefficients
+        , sport_params
+        , all_ratio_stats
+        , n_active
     )
     n_players = n_drafters * n_active
     representative_player_set = (

@@ -243,10 +243,10 @@ def test_season_mode_waiver():
     assert h_scores == sorted(h_scores, reverse=True), 'Waiver candidates not sorted by H-score'
 
     expected_waiver_top = [
-        ('Guerschon Yabusele',         52.1),
-        ('Mark Williams',              52.1),
-        ('Keyonte George',             52.0),
-        ('Gary Trent',                 52.1),
+        ('Guerschon Yabusele',          52.3),
+        ('Mark Williams',               52.3),
+        ('Keyonte George',              52.1),
+        ('Gary Trent',                  52.2),
     ]
     candidates_by_name = name_candidates(session, candidates)
     if os.environ.get('REGEN_GOLDENS'):

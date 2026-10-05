@@ -325,8 +325,37 @@ def _make_combo_df(
     post_diff_means_my   [:, :, ctx['their_col_in_my_view']]    += trade_deltas
     post_diff_means_their[:, :, ctx['my_col_in_their_view']]    -= trade_deltas
 
-    post_my_h_scores    = h_agent.compute_h_scores_batched(post_diff_means_my,    ctx['diff_vars_my'])
-    post_their_h_scores = h_agent.compute_h_scores_batched(post_diff_means_their, ctx['diff_vars_their'])
+    post_volume_my = post_volume_their = None
+    if ctx['volume_my'] is not None:
+        # The players exchanged move each side's percentage totals and season volume too.
+        index = h_agent.volume_category_indices
+        my_candidates    = sorted(my_name_to_index,    key=my_name_to_index.get)
+        their_candidates = sorted(their_name_to_index, key=their_name_to_index.get)
+        my_units_numpy    = h_agent.player_volume_units.loc[my_candidates].to_numpy()
+        their_units_numpy = h_agent.player_volume_units.loc[their_candidates].to_numpy()
+        sent_units     = np.array([my_units_numpy[[my_name_to_index[p] for p in sent]].sum(axis=0)
+                                   for sent in all_combos['My Trade']])
+        received_units = np.array([their_units_numpy[[their_name_to_index[p] for p in received]].sum(axis=0)
+                                   for received in all_combos['Their Trade']])
+        unit_deltas = received_units - sent_units                  # (n_combos, R): my side gains these
+        x_deltas    = trade_deltas[:, index]
+
+        def shift_volume_context(context, x_shift, unit_shift, counterparty_column, counterparty_shift):
+            opponent_units = np.repeat(context['opponent_units'], n_combos, axis=0)
+            opponent_units[:, :, counterparty_column] += counterparty_shift
+            return {'my_x_total':     context['my_x_total'] + x_shift,
+                    'my_units':       context['my_units'] + unit_shift,
+                    'opponent_units': opponent_units}
+
+        post_volume_my    = shift_volume_context(ctx['volume_my'],    x_deltas,  unit_deltas,
+                                                 ctx['their_col_in_my_view'], -unit_deltas)
+        post_volume_their = shift_volume_context(ctx['volume_their'], -x_deltas, -unit_deltas,
+                                                 ctx['my_col_in_their_view'],  unit_deltas)
+
+    post_my_h_scores    = h_agent.compute_h_scores_batched(post_diff_means_my,    ctx['diff_vars_my'],
+                                                           volume_context=post_volume_my)
+    post_their_h_scores = h_agent.compute_h_scores_batched(post_diff_means_their, ctx['diff_vars_their'],
+                                                           volume_context=post_volume_their)
 
     df = pd.DataFrame({
         'Send':        list(all_combos['My Trade']),
@@ -396,6 +425,33 @@ def _build_trade_context(
     baseline_diff_means_my    = build_baseline_diff_means(my_team)
     baseline_diff_means_their = build_baseline_diff_means(their_team)
 
+    # Percentage categories are scored on rates (see HAgent.apply_volume_awareness): each perspective needs
+    # its own absolute percentage totals and every team's season volume, unfilled slots at the generic level.
+    volume_my = volume_their = None
+    if h_agent.volume_categories:
+        generic_units, generic_x = h_agent.compute_generic_volume_levels(x_scores_available, players_chosen)
+        index = h_agent.volume_category_indices
+
+        def season_units(roster):
+            roster = [p for p in roster if p == p]
+            return (h_agent.player_volume_units.loc[roster].sum().to_numpy()
+                    + max(h_agent.n_picks - len(roster), 0) * generic_units)
+
+        team_units = {team: season_units(roster) for team, roster in player_assignments.items()}
+
+        def build_volume_context(drafter: str) -> dict:
+            roster = [p for p in player_assignments[drafter] if p == p]
+            others = [team for team in team_names if team != drafter]
+            return {
+                'my_x_total':     (team_sums[drafter][index]
+                                   + max(h_agent.n_picks - len(roster), 0) * generic_x).reshape(1, -1),
+                'my_units':       team_units[drafter].reshape(1, -1),
+                'opponent_units': np.stack([team_units[team] for team in others], axis=1)
+                                  .reshape(1, len(index), len(others)),
+            }
+
+        volume_my, volume_their = build_volume_context(my_team), build_volume_context(their_team)
+
     # diff_vars depend only on team sizes — constant for equal-size trades.
     diff_vars_my = np.vstack([
         h_agent.get_diff_var(len([p for p in player_assignments[team] if p == p]))
@@ -412,12 +468,14 @@ def _build_trade_context(
     their_players = [p for p in player_assignments[their_team] if p == p]
 
     pre_my_h = h_agent.compute_h_score_from_diff_means(
-        diff_means = baseline_diff_means_my,
-        diff_vars  = diff_vars_my,
+        diff_means     = baseline_diff_means_my,
+        diff_vars      = diff_vars_my,
+        volume_context = volume_my,
     )
     pre_their_h = h_agent.compute_h_score_from_diff_means(
-        diff_means = baseline_diff_means_their,
-        diff_vars  = diff_vars_their,
+        diff_means     = baseline_diff_means_their,
+        diff_vars      = diff_vars_their,
+        volume_context = volume_their,
     )
 
     # Column indices for the two trading teams in each perspective's diff_means.
@@ -433,4 +491,6 @@ def _build_trade_context(
         'pre_their_h':                 pre_their_h,
         'their_col_in_my_view':        their_col_in_my_view,
         'my_col_in_their_view':        my_col_in_their_view,
+        'volume_my':                   volume_my,
+        'volume_their':                volume_their,
     }
