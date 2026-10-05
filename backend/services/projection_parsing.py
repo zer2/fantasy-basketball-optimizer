@@ -55,19 +55,15 @@ def parse_projection_upload(upload_bytes: bytes, sport_params: dict) -> pd.DataF
     """
     df_raw = _read_projection_table(upload_bytes)
     column_mapping  = _map_columns_to_canonical(df_raw, sport_params)
-    # Unrecognized columns keep their own names, so a file already using canonical names
-    # is understood without any alias matching at all.
-    renamed_columns = set(df_raw.rename(columns=column_mapping).columns)
+    # Canonical names are aliases of themselves, so this covers a file already written in them.
+    renamed_columns = set(column_mapping.values())
 
     missing_identity = [column for column in ('Player', 'Position')
                         if column not in renamed_columns]
     matched_cores    = [column for column in CORE_PROJECTION_COLUMNS
                         if column in renamed_columns]
     if not missing_identity and len(matched_cores) >= _MIN_MATCHED_CORE_COLUMNS:
-        # Every name the aliases can produce, so a file already written in canonical names
-        # keeps those columns even though they never went through the mapping.
-        canonical_columns = set(sport_params.get(_COLUMN_ALIASES_KEY, {}).values()) | {'Games Played %'}
-        return _parse_with_renamer(df_raw, column_mapping, canonical_columns, sport_params)
+        return _parse_with_renamer(df_raw, column_mapping, sport_params)
 
     if missing_identity:
         problem = f"no column for {' or '.join(missing_identity)}"
@@ -141,12 +137,16 @@ def _decode_projection_text(csv_bytes: bytes) -> str:
 def _map_columns_to_canonical(df_raw: pd.DataFrame, sport_params: dict) -> dict:
     """{column in the file: canonical name} for every column the aliases recognize.
 
-    Columns that match nothing are left out (the parse drops them). A canonical name that
-    two of the file's columns both claim is taken by the first, so a file carrying e.g.
-    both 'PTS' and 'Points' cannot produce a duplicate column label downstream.
+    Every canonical name is an alias of itself, folded like the rest, so 'off rebounds' reads
+    as 'Off Rebounds' without the table having to list it. Columns that match nothing are left
+    out (the parse drops them). A canonical name that two of the file's columns both claim is
+    taken by the first, so a file carrying e.g. both 'PTS' and 'Points' cannot produce a
+    duplicate column label downstream.
     """
-    aliases = {_normalize_projection_header(alias): canonical
-               for alias, canonical in sport_params.get(_COLUMN_ALIASES_KEY, {}).items()}
+    alias_table = sport_params.get(_COLUMN_ALIASES_KEY, {})
+    aliases = {_normalize_projection_header(canonical): canonical for canonical in alias_table.values()}
+    aliases.update({_normalize_projection_header(alias): canonical
+                    for alias, canonical in alias_table.items()})
     mapping, claimed = {}, set()
     for column in df_raw.columns:
         canonical = aliases.get(_normalize_projection_header(column))
@@ -165,17 +165,16 @@ def _normalize_projection_header(header) -> str:
 def _parse_with_renamer(
     df_raw: pd.DataFrame
     , column_mapping: dict
-    , canonical_columns: set
     , sport_params: dict
 ) -> pd.DataFrame:
     """Rename this file's columns to canonical names, drop junk, coerce stats."""
-    df = df_raw.rename(columns=column_mapping)
-
-    # Keep only canonical columns. Unmapped extras (ranks, dollar values, minutes, ...)
-    # would otherwise join the blend's column union, where every player from the OTHER
-    # sources is "missing" them — and the blend drops any player missing any column
-    # across all sources, so a single junk column can wipe out the entire pool.
-    df = df[[column for column in df.columns if column in canonical_columns]].copy()
+    # Keep only the columns the mapping claimed. Unmapped extras (ranks, dollar values,
+    # minutes, ...) would otherwise join the blend's column union, where every player from
+    # the OTHER sources is "missing" them — and the blend drops any player missing any column
+    # across all sources, so a single junk column can wipe out the entire pool. A second
+    # column for an already-claimed name (both 'ORB' and 'Off Rebounds') is unmapped too, so
+    # it is dropped here rather than becoming a duplicate label.
+    df = df_raw[list(column_mapping)].rename(columns=column_mapping).copy()
 
     # Before the ratio cells are reduced to their leading number below, mine them for any
     # attempts column the file does not carry separately.
@@ -196,6 +195,7 @@ def _parse_with_renamer(
     stat_columns = [column for column in df.columns if column not in ('Player', 'Position')]
     df[stat_columns] = df[stat_columns].apply(coerce_stat_column)
     df = df.dropna(subset=stat_columns, how='all')
+    df = convert_percent_columns_to_fractions(df)
 
     if 'Games Played %' not in df.columns:
         if 'Games Played' in df.columns:
@@ -218,6 +218,27 @@ def _parse_with_renamer(
         df = df.set_index('Player')
 
     return df
+
+
+def convert_percent_columns_to_fractions(df: pd.DataFrame) -> pd.DataFrame:
+    """Read every share column -- the canonical names ending in '%' (Field Goal %, Free Throw %,
+    Three %, Games Played %) -- as a fraction from 0 to 1, whichever way the file wrote it.
+
+    Sources print shares both ways, 0.475 and 47.5, and the blend averages a file's numbers with
+    ESPN's fractions, so a column in percent units must be converted or it swamps every score. A
+    share written as a fraction can never exceed 1, so one value above 1 settles that the whole
+    column is in percent units. A value above 100 is not a share in either form, so the file is
+    refused rather than read as something it is not. (Assist to TO is a ratio, not a share, and can
+    exceed 1; its name has no '%'.)"""
+    converted = df.copy()
+    for column in [column for column in df.columns if str(column).endswith('%')]:
+        largest = converted[column].max()
+        if largest > 100:
+            raise ValueError(f"'{column}' has a value of {largest:g}, which is not a share in either form "
+                             f'(a fraction from 0 to 1, or a percentage from 0 to 100).')
+        if largest > 1:
+            converted[column] = converted[column] / 100
+    return converted
 
 
 def _recover_volumes_from_ratio_cells(df: pd.DataFrame, sport_params: dict) -> pd.DataFrame:

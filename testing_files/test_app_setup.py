@@ -7,6 +7,7 @@
 #   - POST /sessions   creates a session with expected defaults
 #   - POST /sessions/{id}/evaluate  returns a valid candidate list
 
+import numpy as np
 import pytest
 import yaml
 from fastapi.testclient import TestClient
@@ -403,6 +404,31 @@ def test_parse_projection_upload_reads_any_recognized_spelling():
         parse_projection_upload(unrelated_csv, params)
     assert 'Player' in str(exc_info.value), 'the error should name what could not be found'
     assert 'Ticker' in str(exc_info.value), "the error should list the file's unrecognized headers"
+
+
+def test_parse_projection_upload_reads_shares_as_fractions_either_way():
+    """Shooting percentages and games played % arrive as 0.475 or as 47.5 depending on the source;
+    both must land as fractions, since the blend averages them with ESPN's fractions. Assist to TO
+    is a ratio, not a share, and is never rescaled; a value above 100 is no share at all and refuses."""
+    from backend.services.projection_parsing import parse_projection_upload
+    params = _load_params()['NBA']
+    header = 'Player,Pos,gp%,pts,reb,ast,stl,fg%,fga,ft%,fta,3p%,3pa\n'
+
+    percent_units = parse_projection_upload((
+        header + 'Test Player,C,85,25.0,10.0,5.0,1.0,47.5,18.0,80,6.0,36.5,4.0\n'
+                 'Other Player,PG,60,15.0,4.0,7.0,1.5,44.0,12.0,90,3.0,38.0,6.0\n').encode(), params)
+    fractions = parse_projection_upload((
+        header + 'Test Player,C,0.85,25.0,10.0,5.0,1.0,0.475,18.0,0.8,6.0,0.365,4.0\n'
+                 'Other Player,PG,0.6,15.0,4.0,7.0,1.5,0.44,12.0,0.9,3.0,0.38,6.0\n').encode(), params)
+    for column in ('Field Goal %', 'Free Throw %', 'Three %', 'Games Played %'):
+        assert np.allclose(percent_units[column], fractions[column]), column
+    assert np.isclose(fractions.loc['Test Player', 'Field Goal %'], 0.475)
+    assert np.isclose(percent_units.loc['Test Player', 'Games Played %'], 0.85)
+    assert percent_units.loc['Test Player', 'Points'] == 25.0, 'counting stats are never rescaled'
+
+    with pytest.raises(ValueError, match='Field Goal %'):
+        parse_projection_upload((header + 'Test Player,C,85,25.0,10.0,5.0,1.0,475,18.0,80,6.0,36.5,4.0\n')
+                                .encode(), params)
 
 
 def test_projection_upload_accepts_xlsx():
