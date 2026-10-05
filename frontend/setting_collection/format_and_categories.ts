@@ -44,6 +44,9 @@ function readStoredFormatAndWeight(): { format: string; weight: number } {
     return { format: storedFormat, weight: storedWeight }
 }
 
+// The category multiselect's chip area, held rather than looked up by class: it is not the only multiselect on the
+// page (the injured-players list is another, and comes first), so a document-wide lookup found the wrong one.
+let categoryChipArea: Element | null = null
 // The chip-area observer, held so syncCategoriesFromBackend can discard the records its own edit queued: that edit is
 // the backend's, not the user's, and must not save prefs or fire a change.
 let categoryChipObserver: MutationObserver | null = null
@@ -124,17 +127,16 @@ export function renderFormatAndCategories(container: HTMLElement): void {
     weightRow.addEventListener('input', refreshTiebreakerControl)
 
     // Save categories on chip add/remove (observe DOM mutations on the chip area)
-    const inputArea = container.querySelector('.ms-input-area')
-    if (inputArea) {
-        categoryChipObserver = new MutationObserver(() => {
-            savePref('categories', [..._selectedCategories])
-            categoryValidationMsg.textContent = _selectedCategories.length === 0
-                ? 'Select at least one category.' : ''
-            refreshTiebreakerControl()
-            container.dispatchEvent(new Event('change', { bubbles: true }))
-        })
-        categoryChipObserver.observe(inputArea, { childList: true })
-    }
+    categoryChipArea = container.querySelector('.ms-input-area')
+    if (categoryChipArea === null) throw new Error('The category multiselect rendered without a chip area')
+    categoryChipObserver = new MutationObserver(() => {
+        savePref('categories', [..._selectedCategories])
+        categoryValidationMsg.textContent = _selectedCategories.length === 0
+            ? 'Select at least one category.' : ''
+        refreshTiebreakerControl()
+        container.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    categoryChipObserver.observe(categoryChipArea, { childList: true })
 }
 
 /**
@@ -151,12 +153,10 @@ export function syncCategoriesFromBackend(backendCategories: string[]): void {
     if (invalidIndices.length === 0) return
 
     // Remove stale chips from DOM first (chip order mirrors _selectedCategories)
-    const inputArea = document.querySelector('.ms-input-area')
-    if (inputArea) {
-        const chips = Array.from(inputArea.querySelectorAll<HTMLElement>('.ms-chip'))
-        for (const idx of invalidIndices) {
-            chips[idx]?.remove()
-        }
+    if (categoryChipArea === null) throw new Error('syncCategoriesFromBackend called before renderFormatAndCategories')
+    const chips = Array.from(categoryChipArea.querySelectorAll<HTMLElement>('.ms-chip'))
+    for (const idx of invalidIndices) {
+        chips[idx]?.remove()
     }
     // Mutate the live array in-place to match
     for (const idx of invalidIndices) {

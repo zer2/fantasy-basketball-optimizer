@@ -2,7 +2,8 @@
 // Mirrors player_stats_popover() in src/setting_collection/player_stats.py
 
 import { makeCustomSelect } from '../custom_select.js'
-import { makeWeightSlider } from '../helper_functions.js'
+import { makeWeightSlider, makeMultiSelectWidget, MultiSelectWidget } from '../helper_functions.js'
+import { getAllPlayerIdentities, REPLACEMENT_PLAYER_ID } from '../player_registry.js'
 import { uploadProjectionFile, getSeasons } from '../api/client.js'
 import { DataSource } from '../types.js'
 import { pref, savePref } from '../preferences.js'
@@ -41,6 +42,24 @@ interface StoredCustomUpload {
     statusText: string
     fileName: string | null
 }
+
+// The injured / excluded players: chosen from the current pool, whose registry each session build delivers.
+let injuredPlayersWidget: MultiSelectWidget | null = null
+
+/** Every player in the pool, as injured-list options. The registry includes players already marked injured -- they
+ *  leave the pool a step after it is built -- so a pick can always be seen and undone. A player the new pool lacks is
+ *  unpicked silently: nothing excludes him, and the backend skips an id it does not have anyway. */
+document.addEventListener('player-registry-updated', () => {
+    if (injuredPlayersWidget === null) return
+    const options = getAllPlayerIdentities()
+        .filter(identity => identity.player_id !== REPLACEMENT_PLAYER_ID)
+        .map(identity => ({
+            value: String(identity.player_id),
+            label: identity.positions.length > 0 ? `${identity.name} (${identity.positions.join(',')})` : identity.name,
+        }))
+        .sort((left, right) => left.label.localeCompare(right.label))
+    injuredPlayersWidget.setOptionsSilently(options)
+})
 
 const CUSTOM_UPLOADS_PREF = 'custom_uploads'
 const MAX_CUSTOM_UPLOADS = 5
@@ -101,6 +120,41 @@ export function markUploadedSourcesExpired(): boolean {
 // kicked off by switching the data source to Historical later.
 let _seasonsPromise: Promise<void> = Promise.resolve()
 
+// The data-source select and the sections it shows, held for limitDataSourcesToPlatform.
+let dataTypeSelect: ReturnType<typeof makeCustomSelect> | null = null
+let showSectionsForDataType: ((type: string) => void) | null = null
+
+const PROJECTIONS_OPTION = { value: 'projections', label: 'Projections' }
+const HISTORICAL_OPTION  = { value: 'historical',  label: 'Historical'  }
+
+/**
+ * Offers Historical only with your own data, as the Streamlit app did: a live platform means a draft
+ * or season being played now, which only projections describe -- a past season's stats would rank
+ * players for a year that is over. Switching to a live platform therefore moves a Historical source
+ * to Projections; switching back to your own data offers Historical again (without choosing it).
+ *
+ * `announceChange` sends the switch through the select's change event, which saves it and rebuilds
+ * the session like a choice made by hand. At start-up it is left quiet instead: no session exists
+ * yet, and the first one is built from the corrected source.
+ */
+export function limitDataSourcesToPlatform(
+    platform: string
+  , { announceChange }: { announceChange: boolean }
+): void {
+    if (dataTypeSelect === null || showSectionsForDataType === null) {
+        throw new Error('limitDataSourcesToPlatform called before renderPlayerStats')
+    }
+    const isOwnData = platform === 'Enter your own data'
+    const wasHistorical = dataTypeSelect.getValue() === 'historical'
+    dataTypeSelect.setOptions(isOwnData ? [PROJECTIONS_OPTION, HISTORICAL_OPTION] : [PROJECTIONS_OPTION])
+    if (isOwnData || !wasHistorical) return
+    if (announceChange) {
+        dataTypeSelect.setValue(PROJECTIONS_OPTION.value)
+    } else {
+        showSectionsForDataType(PROJECTIONS_OPTION.value)
+    }
+}
+
 /** Returns a promise that resolves once the seasons dropdown is ready (immediately when
  *  no fetch is needed or one has already completed). Anything that reads the data source
  *  must await this first: until the fetch lands there is no `ps-season` element, and
@@ -126,10 +180,7 @@ export function renderPlayerStats(container: HTMLElement): void {
 
     const typeSelect = makeCustomSelect(
         'ps-data-type',
-        [
-            { value: 'projections',   label: 'Projections'  },
-            { value: 'historical', label: 'Historical'  },
-        ],
+        [PROJECTIONS_OPTION, HISTORICAL_OPTION],
         pref('data_source_type', 'historical'),
     )
     typeSelect.element.addEventListener('change', () => savePref('data_source_type', typeSelect.getValue()))
@@ -179,10 +230,14 @@ export function renderPlayerStats(container: HTMLElement): void {
         }
     }
 
+    dataTypeSelect = typeSelect
+    showSectionsForDataType = (type: string) => {
+        projSection.style.display = type === 'projections' ? '' : 'none'
+        histSection.style.display = type === 'historical'  ? '' : 'none'
+    }
     typeSelect.element.addEventListener('change', () => {
         const type = typeSelect.getValue()
-        projSection.style.display = type === 'projections'    ? '' : 'none'
-        histSection.style.display = type === 'historical' ? '' : 'none'
+        showSectionsForDataType!(type)
         // Published so the change handlers that react to this same event can await the
         // fetch; without it they read ps-season before the dropdown exists. Cheap to
         // re-assign — loadSeasons returns immediately once the seasons are in.
@@ -201,15 +256,17 @@ export function renderPlayerStats(container: HTMLElement): void {
     injuredLabel.textContent = 'Injured / excluded players'
     container.append(injuredLabel)
 
-    const injuredInput = document.createElement('textarea')
-    injuredInput.id = 'ps-injured'
-    injuredInput.className = 'sidebar-input'
-    injuredInput.placeholder = 'One player name per line'
-    // Two rows: the box scrolls, and most leagues exclude nobody or a name or two, so the taller
-    // default was mostly empty space in a sidebar that has none to spare.
-    injuredInput.rows = 2
-    container.append(injuredInput)
-    
+    // Picked from the players in the pool rather than typed: a typed name that matched nobody (a missing accent, a
+    // missing position) excluded no one and said nothing. Empty until the first session delivers its registry.
+    injuredPlayersWidget = makeMultiSelectWidget('', [])
+    injuredPlayersWidget.element.id = 'ps-injured'
+    // The section rebuilds the session on any input inside it, and searching this list is not a change of anything.
+    injuredPlayersWidget.element.addEventListener('input', event => event.stopPropagation())
+    // A pick or a removal is: announced as a change, from the widget, like any other control in the section.
+    const widgetElement = injuredPlayersWidget.element
+    injuredPlayersWidget.onChange(() => widgetElement.dispatchEvent(new Event('change', { bubbles: true })))
+    container.append(widgetElement)
+
 }
 
 /** Renders the projection source weights: ESPN and DARKO sliders, then the custom
@@ -224,8 +281,9 @@ function renderBlendWeights(container: HTMLElement): void {
     container.append(weightLabel)
 
     const snowflakeSources: { id: string; label: string; prefKey: string; defaultValue: number }[] = [
-        { id: 'ps-w-espn',  label: 'ESPN',  prefKey: 'blend_w_espn',  defaultValue: 0.5 },
-        { id: 'ps-w-darko', label: 'DARKO', prefKey: 'blend_w_darko', defaultValue: 0.5 },
+        // DARKO starts at zero: its app has been down and its projections are stale (see docs/projections.md).
+        { id: 'ps-w-espn',  label: 'ESPN',  prefKey: 'blend_w_espn',  defaultValue: 1.0 },
+        { id: 'ps-w-darko', label: 'DARKO', prefKey: 'blend_w_darko', defaultValue: 0.0 },
     ]
 
     for (const source of snowflakeSources) {
@@ -382,7 +440,7 @@ function announceUploadChanged(uploadRow: HTMLElement): void {
  * Reads data source type, blend weights, and excluded player list from the DOM.
  * custom_data_ids are populated by the CSV upload handlers above.
  */
-export function getPlayerStatsSettings(): { data_source: DataSource; injured_players: string[] } {
+export function getPlayerStatsSettings(): { data_source: DataSource; injured_players: number[] } {
     const type = (document.getElementById('ps-data-type') as HTMLInputElement).value as DataSource['type']
 
     // Snowflake sources plus one entry per live upload, keyed by its data_id.
@@ -412,11 +470,8 @@ export function getPlayerStatsSettings(): { data_source: DataSource; injured_pla
         season,
     }
 
-    const injuredRaw = (document.getElementById('ps-injured') as HTMLTextAreaElement).value
-    const injured_players = injuredRaw
-        .split('\n')
-        .map(s => s.trim())
-        .filter(s => s.length > 0)
+    if (injuredPlayersWidget === null) throw new Error('getPlayerStatsSettings called before renderPlayerStats')
+    const injured_players = injuredPlayersWidget.getSelected().map(Number)
 
     return { data_source, injured_players }
 }

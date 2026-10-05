@@ -13,7 +13,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-    launchAppPage, loadApp, selectHistoricalSeason, expectCleanSession, waitAppSettled,
+    launchAppPage, loadApp, expectCleanSession, waitAppSettled,
     lockInDraftPick, setSelect,
 } from './helpers.mjs'
 
@@ -32,7 +32,10 @@ test('a superseded evaluate cannot repaint the board or the indicator', async t 
     const { page } = app
     try {
         await loadApp(app)
-        await selectHistoricalSeason(app, '2024-25')
+        // Projections, not a historical season: a live platform offers only projections, so starting from Historical
+        // would make the platform switch below also rebuild the session -- a second request racing the one held.
+        await setSelect(page, 'ps-data-type', 'Projections')
+        await waitAppSettled(app, { timeout: 120000 })
         expectCleanSession(app, 'initial load')
         const baseTopName = await readTopCandidateName(page)
         assert.ok(baseTopName, 'the base board should have a top candidate')

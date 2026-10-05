@@ -20,9 +20,47 @@ from backend.models import (
     TradeSuggestion, TradeSuggestResponse, ComboParam,
 )
 from backend.math.position_optimization import check_team_eligibility
+from backend.services.build_agent import count_unscorable_players_as_replacement, list_unscorable_player_ids
 
 
 # ── Core trade analysis ──────────────────────────────────────────────────────
+
+def run_trade_analyze(
+    session: Session
+    , player_assignments: dict[str, list[int]]
+    , my_team: str
+    , their_team: str
+    , my_trade: list[int]
+    , their_trade: list[int]
+    , position_check: bool = True
+) -> TradeAnalyzeResponse:
+    """Public entry point for the trade/analyze endpoint."""
+    if len(my_trade) == 0 or len(their_trade) == 0:
+        return TradeAnalyzeResponse(error='A trade must include at least one player from each team.')
+
+    if abs(len(my_trade) - len(their_trade)) > 6:
+        return TradeAnalyzeResponse(error="Too lopsided of a trade!")
+
+    unscorable_in_trade = set(my_trade + their_trade) & set(list_unscorable_player_ids(session))
+    if unscorable_in_trade:
+        names = ', '.join(session.player_registry[player_id].name for player_id in sorted(unscorable_in_trade))
+        return TradeAnalyzeResponse(
+            error=f'No projection covers every category for {names}, so a trade involving them cannot be scored.')
+    player_assignments = count_unscorable_players_as_replacement(session, player_assignments)
+
+    n_iterations = session.current_settings['n_iterations']
+    result = analyze_trade(session, player_assignments, my_team, my_trade, their_team, their_trade, n_iterations, position_check)
+
+    if result is None:
+        return TradeAnalyzeResponse(
+            error='Trade is impermissible because it violates position structure for at least one team.',
+        )
+
+    return TradeAnalyzeResponse(
+        your_team=TeamTradeResult(pre=result[1]['pre'], post=result[1]['post']),
+        their_team=TeamTradeResult(pre=result[2]['pre'], post=result[2]['post']),
+    )
+
 
 def analyze_trade(
     session: Session
@@ -91,247 +129,6 @@ def analyze_trade(
     }
 
 
-def run_trade_analyze(
-    session: Session
-    , player_assignments: dict[str, list[int]]
-    , my_team: str
-    , their_team: str
-    , my_trade: list[int]
-    , their_trade: list[int]
-    , position_check: bool = True
-) -> TradeAnalyzeResponse:
-    """Public entry point for the trade/analyze endpoint."""
-    if len(my_trade) == 0 or len(their_trade) == 0:
-        return TradeAnalyzeResponse(error='A trade must include at least one player from each team.')
-
-    if abs(len(my_trade) - len(their_trade)) > 6:
-        return TradeAnalyzeResponse(error="Too lopsided of a trade!")
-
-    n_iterations = session.current_settings['n_iterations']
-    result = analyze_trade(session, player_assignments, my_team, my_trade, their_team, their_trade, n_iterations, position_check)
-
-    if result is None:
-        return TradeAnalyzeResponse(
-            error='Trade is impermissible because it violates position structure for at least one team.',
-        )
-
-    return TradeAnalyzeResponse(
-        your_team=TeamTradeResult(pre=result[1]['pre'], post=result[1]['post']),
-        their_team=TeamTradeResult(pre=result[2]['pre'], post=result[2]['post']),
-    )
-
-
-# ── Fast trade evaluation ────────────────────────────────────────────────────
-
-def _build_trade_context(
-    h_agent: HAgent
-    , player_assignments: dict[str, list[int]]
-    , my_team: str
-    , their_team: str
-) -> dict:
-    """Pre-compute all quantities that are constant across every trade combo.
-
-    For complete rosters in a k-for-k trade:
-      - x_scores_available is identical pre- and post-trade (same pool, just swapped)
-      - diff_vars depend only on team sizes (unchanged by equal trades)
-      - Pre-trade H-scores are fixed regardless of which combo we evaluate
-      - Baseline diff_means change only in the single column corresponding to the
-        counterparty team — the delta is pure arithmetic per combo
-    """
-    team_names = list(player_assignments.keys())
-    n_drafters = len(player_assignments)
-
-    # Available player pool is the same for every combo (traded players are assigned
-    # to one team or the other regardless of which swap we evaluate).
-    players_chosen     = [p for roster in player_assignments.values() for p in roster if p == p]
-    x_scores_available = h_agent.x_scores[
-        ~h_agent.x_scores.index.isin(players_chosen)
-        & h_agent.x_scores.index.isin(h_agent.positions.index)
-    ]
-
-    # Pre-compute each team's raw stat sum once.
-    team_sums = {
-        team: np.array(h_agent.x_scores.loc[[p for p in roster if p == p]].sum(axis=0))
-        for team, roster in player_assignments.items()
-    }
-
-    def build_baseline_diff_means(drafter: str) -> np.ndarray:
-        """Construct the (1, n_categories, n_drafters-1) diff_means array for drafter."""
-        drafter_roster = [p for p in player_assignments[drafter] if p == p]
-        n_my           = len(drafter_roster)
-        # Compare complete teams at their actual size (n_my), not n_my + 1. A k-for-k trade adds no
-        # player, so padding opponents up to n_my + 1 would seat a phantom below-replacement player on
-        # each of them and inflate the H-score — the same phantom-+1 bug fixed in get_diff_distributions.
-        # mean_extra stays as the shortfall model (pads a short-handed opponent), a no-op when full.
-        extra_needed   = n_my * n_drafters - len(players_chosen)
-        mean_extra     = np.array(x_scores_available.iloc[:extra_needed].mean().fillna(0))
-
-        other_sums = np.vstack([
-            (team_sums[team] + max(n_my - len(player_assignments[team]), 0) * mean_extra)
-            .reshape(1, h_agent.n_categories, 1)
-            for team in team_names if team != drafter
-        ]).T  # (1, n_categories, n_drafters-1)
-
-        return (
-            team_sums[drafter].reshape(1, h_agent.n_categories, 1)
-            - other_sums.reshape(1, h_agent.n_categories, n_drafters - 1)
-        )
-
-    baseline_diff_means_my    = build_baseline_diff_means(my_team)
-    baseline_diff_means_their = build_baseline_diff_means(their_team)
-
-    # diff_vars depend only on team sizes — constant for equal-size trades.
-    diff_vars_my = np.vstack([
-        h_agent.get_diff_var(len([p for p in player_assignments[team] if p == p]))
-        for team in team_names if team != my_team
-    ]).T.reshape(1, h_agent.n_categories, n_drafters - 1)
-
-    diff_vars_their = np.vstack([
-        h_agent.get_diff_var(len([p for p in player_assignments[team] if p == p]))
-        for team in team_names if team != their_team
-    ]).T.reshape(1, h_agent.n_categories, n_drafters - 1)
-
-    # Pre-trade H-scores — constant across all combos, compute once.
-    my_players    = [p for p in player_assignments[my_team]    if p == p]
-    their_players = [p for p in player_assignments[their_team] if p == p]
-
-    pre_my_h = h_agent.compute_h_score_from_diff_means(
-        diff_means = baseline_diff_means_my,
-        diff_vars  = diff_vars_my,
-    )
-    pre_their_h = h_agent.compute_h_score_from_diff_means(
-        diff_means = baseline_diff_means_their,
-        diff_vars  = diff_vars_their,
-    )
-
-    # Column indices for the two trading teams in each perspective's diff_means.
-    their_col_in_my_view = [t for t in team_names if t != my_team].index(their_team)
-    my_col_in_their_view = [t for t in team_names if t != their_team].index(my_team)
-
-    return {
-        'baseline_diff_means_my':      baseline_diff_means_my,
-        'baseline_diff_means_their':   baseline_diff_means_their,
-        'diff_vars_my':                diff_vars_my,
-        'diff_vars_their':             diff_vars_their,
-        'pre_my_h':                    pre_my_h,
-        'pre_their_h':                 pre_their_h,
-        'their_col_in_my_view':        their_col_in_my_view,
-        'my_col_in_their_view':        my_col_in_their_view,
-    }
-
-
-# ── Combination generation ───────────────────────────────────────────────────
-
-def _get_combos(
-    players_with_weight: list[tuple[str, float]]
-    , n: int
-) -> list[tuple[list[str], float]]:
-    """Generate all n-player combinations with summed general values."""
-    combos = list(itertools.combinations(players_with_weight, n))
-    return [
-        (list(z[0] for z in m), sum(z[1] for z in m))
-        for m in combos
-    ]
-
-
-def _get_cross_combos(
-    n: int
-    , m: int
-    , my_players: list[str]
-    , their_players: list[str]
-    , general_values: pd.Series
-    , replacement_value: float
-    , value_threshold: float
-) -> pd.DataFrame:
-    """Generate filtered cross-product of (n-from-mine, m-from-theirs) combos.
-
-    Filters by absolute general-value differential within the threshold.
-    """
-    my_pw = [(p, general_values[p]) for p in my_players if p in general_values.index]
-    their_pw = [(p, general_values[p]) for p in their_players if p in general_values.index]
-
-    cross = list(itertools.product(_get_combos(my_pw, n), _get_combos(their_pw, m)))
-
-    if len(cross) == 0:
-        return pd.DataFrame(columns=['My Trade', 'My Value', 'Their Trade', 'Their Value'])
-
-    full = pd.DataFrame(cross)
-    separated = pd.concat([
-        pd.DataFrame(full[0].tolist(), index=full.index),
-        pd.DataFrame(full[1].tolist(), index=full.index),
-    ], axis=1)
-    separated.columns = ['My Trade', 'My Value', 'Their Trade', 'Their Value']
-
-    if n != m:
-        separated['My Value'] += replacement_value * (m - n)
-
-    diff = separated['My Value'] - separated['Their Value']
-    meets = abs(diff) <= value_threshold / 100  # threshold is in percentage terms
-
-    return separated[meets]
-
-
-def _make_combo_df(
-    h_agent: HAgent
-    , all_combos: pd.DataFrame
-    , my_team: str
-    , their_team: str
-    , player_assignments: dict[str, list[int]]
-    , my_x_numpy: np.ndarray
-    , their_x_numpy: np.ndarray
-    , my_name_to_index: dict[str, int]
-    , their_name_to_index: dict[str, int]
-) -> pd.DataFrame:
-    """Evaluate every trade combo in one vectorized pass and return sorted by Your Score.
-
-    For each combo, trade_delta = received_sum - sent_sum shifts diff_means on ALL
-    opponent columns (my roster improved vs every opponent), with an extra shift on
-    the counterparty column (their roster also weakened). Both perspectives are
-    computed in a single batched call to compute_h_scores_batched.
-    """
-    ctx = _build_trade_context(h_agent, player_assignments, my_team, their_team)
-
-    n_combos = len(all_combos)
-    if n_combos == 0:
-        return pd.DataFrame(columns=['Send', 'Receive', 'Your Score', 'Their Score'])
-
-    # Sum x_scores for each combo's sent / received players: (n_combos, n_categories)
-    # Uses numpy integer indexing to avoid per-combo pandas overhead.
-    # When all combos have the same size, builds a uniform 2D index array for a
-    # fully vectorized sum. When sizes are mixed (asymmetric), falls back to a
-    # per-row loop that still uses numpy rather than pandas.
-    sent_sizes     = set(len(sent)     for sent     in all_combos['My Trade'])
-    received_sizes = set(len(received) for received in all_combos['Their Trade'])
-
-    if len(sent_sizes) == 1 and len(received_sizes) == 1:
-        sent_index_array     = np.array([[my_name_to_index[p]    for p in sent]     for sent     in all_combos['My Trade']])
-        received_index_array = np.array([[their_name_to_index[p] for p in received] for received in all_combos['Their Trade']])
-        sent_sums     = my_x_numpy[sent_index_array].sum(axis=1)
-        received_sums = their_x_numpy[received_index_array].sum(axis=1)
-    else:
-        sent_sums     = np.array([my_x_numpy[   [my_name_to_index[p]    for p in sent]    ].sum(axis=0) for sent     in all_combos['My Trade']])
-        received_sums = np.array([their_x_numpy[[their_name_to_index[p] for p in received]].sum(axis=0) for received in all_combos['Their Trade']])
-    trade_deltas = received_sums - sent_sums  # (n_combos, n_categories)
-
-    # Build all post diff_means at once: (n_combos, n_categories, n_drafters-1)
-    post_diff_means_my    = ctx['baseline_diff_means_my']    + trade_deltas[:, :, np.newaxis]
-    post_diff_means_their = ctx['baseline_diff_means_their'] - trade_deltas[:, :, np.newaxis]
-
-    post_diff_means_my   [:, :, ctx['their_col_in_my_view']]    += trade_deltas
-    post_diff_means_their[:, :, ctx['my_col_in_their_view']]    -= trade_deltas
-
-    post_my_h_scores    = h_agent.compute_h_scores_batched(post_diff_means_my,    ctx['diff_vars_my'])
-    post_their_h_scores = h_agent.compute_h_scores_batched(post_diff_means_their, ctx['diff_vars_their'])
-
-    df = pd.DataFrame({
-        'Send':        list(all_combos['My Trade']),
-        'Receive':     list(all_combos['Their Trade']),
-        'Your Score':  post_my_h_scores    - ctx['pre_my_h'],
-        'Their Score': post_their_h_scores - ctx['pre_their_h'],
-    })
-    return df.sort_values('Your Score', ascending=False)
-
-
 # ── Suggestion orchestrator ──────────────────────────────────────────────────
 
 def run_trade_suggest(
@@ -346,6 +143,8 @@ def run_trade_suggest(
 ) -> TradeSuggestResponse:
     """Public entry point for the trade/suggest endpoint."""
 
+    # A rostered player the league's categories cannot score is replacement level, not a trade piece.
+    player_assignments = count_unscorable_players_as_replacement(session, player_assignments)
     # Step 1: the neutral-board H-score ranking, computed once at build time
     # (populate_default_h_scores) and shared with auction anchoring and the throttle.
     general_values = session.agent.default_h_scores
@@ -424,3 +223,274 @@ def run_trade_suggest(
     ]
 
     return TradeSuggestResponse(suggestions=suggestions)
+
+
+# ── Combination generation ───────────────────────────────────────────────────
+
+def _get_cross_combos(
+    n: int
+    , m: int
+    , my_players: list[str]
+    , their_players: list[str]
+    , general_values: pd.Series
+    , replacement_value: float
+    , value_threshold: float
+) -> pd.DataFrame:
+    """Generate filtered cross-product of (n-from-mine, m-from-theirs) combos.
+
+    Filters by absolute general-value differential within the threshold.
+    """
+    my_pw = [(p, general_values[p]) for p in my_players if p in general_values.index]
+    their_pw = [(p, general_values[p]) for p in their_players if p in general_values.index]
+
+    cross = list(itertools.product(_get_combos(my_pw, n), _get_combos(their_pw, m)))
+
+    if len(cross) == 0:
+        return pd.DataFrame(columns=['My Trade', 'My Value', 'Their Trade', 'Their Value'])
+
+    full = pd.DataFrame(cross)
+    separated = pd.concat([
+        pd.DataFrame(full[0].tolist(), index=full.index),
+        pd.DataFrame(full[1].tolist(), index=full.index),
+    ], axis=1)
+    separated.columns = ['My Trade', 'My Value', 'Their Trade', 'Their Value']
+
+    if n != m:
+        separated['My Value'] += replacement_value * (m - n)
+
+    diff = separated['My Value'] - separated['Their Value']
+    meets = abs(diff) <= value_threshold / 100  # threshold is in percentage terms
+
+    return separated[meets]
+
+
+def _get_combos(
+    players_with_weight: list[tuple[str, float]]
+    , n: int
+) -> list[tuple[list[str], float]]:
+    """Generate all n-player combinations with summed general values."""
+    combos = list(itertools.combinations(players_with_weight, n))
+    return [
+        (list(z[0] for z in m), sum(z[1] for z in m))
+        for m in combos
+    ]
+
+
+def _make_combo_df(
+    h_agent: HAgent
+    , all_combos: pd.DataFrame
+    , my_team: str
+    , their_team: str
+    , player_assignments: dict[str, list[int]]
+    , my_x_numpy: np.ndarray
+    , their_x_numpy: np.ndarray
+    , my_name_to_index: dict[str, int]
+    , their_name_to_index: dict[str, int]
+) -> pd.DataFrame:
+    """Evaluate every trade combo in one vectorized pass and return sorted by Your Score.
+
+    For each combo, trade_delta = received_sum - sent_sum shifts diff_means on ALL
+    opponent columns (my roster improved vs every opponent), with an extra shift on
+    the counterparty column (their roster also weakened). Both perspectives are
+    computed in a single batched call to compute_h_scores_batched.
+    """
+    ctx = _build_trade_context(h_agent, player_assignments, my_team, their_team)
+
+    n_combos = len(all_combos)
+    if n_combos == 0:
+        return pd.DataFrame(columns=['Send', 'Receive', 'Your Score', 'Their Score'])
+
+    # Sum x_scores for each combo's sent / received players: (n_combos, n_categories)
+    # Uses numpy integer indexing to avoid per-combo pandas overhead.
+    # When all combos have the same size, builds a uniform 2D index array for a
+    # fully vectorized sum. When sizes are mixed (asymmetric), falls back to a
+    # per-row loop that still uses numpy rather than pandas.
+    sent_sizes     = set(len(sent)     for sent     in all_combos['My Trade'])
+    received_sizes = set(len(received) for received in all_combos['Their Trade'])
+
+    if len(sent_sizes) == 1 and len(received_sizes) == 1:
+        sent_index_array     = np.array([[my_name_to_index[p]    for p in sent]     for sent     in all_combos['My Trade']])
+        received_index_array = np.array([[their_name_to_index[p] for p in received] for received in all_combos['Their Trade']])
+        sent_sums     = my_x_numpy[sent_index_array].sum(axis=1)
+        received_sums = their_x_numpy[received_index_array].sum(axis=1)
+    else:
+        sent_sums     = np.array([my_x_numpy[   [my_name_to_index[p]    for p in sent]    ].sum(axis=0) for sent     in all_combos['My Trade']])
+        received_sums = np.array([their_x_numpy[[their_name_to_index[p] for p in received]].sum(axis=0) for received in all_combos['Their Trade']])
+    trade_deltas = received_sums - sent_sums  # (n_combos, n_categories)
+
+    # Build all post diff_means at once: (n_combos, n_categories, n_drafters-1)
+    post_diff_means_my    = ctx['baseline_diff_means_my']    + trade_deltas[:, :, np.newaxis]
+    post_diff_means_their = ctx['baseline_diff_means_their'] - trade_deltas[:, :, np.newaxis]
+
+    post_diff_means_my   [:, :, ctx['their_col_in_my_view']]    += trade_deltas
+    post_diff_means_their[:, :, ctx['my_col_in_their_view']]    -= trade_deltas
+
+    post_volume_my = post_volume_their = None
+    if ctx['volume_my'] is not None:
+        # The players exchanged move each side's percentage totals and season volume too.
+        index = h_agent.volume_category_indices
+        my_candidates    = sorted(my_name_to_index,    key=my_name_to_index.get)
+        their_candidates = sorted(their_name_to_index, key=their_name_to_index.get)
+        my_units_numpy    = h_agent.player_volume_units.loc[my_candidates].to_numpy()
+        their_units_numpy = h_agent.player_volume_units.loc[their_candidates].to_numpy()
+        sent_units     = np.array([my_units_numpy[[my_name_to_index[p] for p in sent]].sum(axis=0)
+                                   for sent in all_combos['My Trade']])
+        received_units = np.array([their_units_numpy[[their_name_to_index[p] for p in received]].sum(axis=0)
+                                   for received in all_combos['Their Trade']])
+        unit_deltas = received_units - sent_units                  # (n_combos, R): my side gains these
+        x_deltas    = trade_deltas[:, index]
+
+        def shift_volume_context(context, x_shift, unit_shift, counterparty_column, counterparty_shift):
+            opponent_units = np.repeat(context['opponent_units'], n_combos, axis=0)
+            opponent_units[:, :, counterparty_column] += counterparty_shift
+            return {'my_x_total':     context['my_x_total'] + x_shift,
+                    'my_units':       context['my_units'] + unit_shift,
+                    'opponent_units': opponent_units}
+
+        post_volume_my    = shift_volume_context(ctx['volume_my'],    x_deltas,  unit_deltas,
+                                                 ctx['their_col_in_my_view'], -unit_deltas)
+        post_volume_their = shift_volume_context(ctx['volume_their'], -x_deltas, -unit_deltas,
+                                                 ctx['my_col_in_their_view'],  unit_deltas)
+
+    post_my_h_scores    = h_agent.compute_h_scores_batched(post_diff_means_my,    ctx['diff_vars_my'],
+                                                           volume_context=post_volume_my)
+    post_their_h_scores = h_agent.compute_h_scores_batched(post_diff_means_their, ctx['diff_vars_their'],
+                                                           volume_context=post_volume_their)
+
+    df = pd.DataFrame({
+        'Send':        list(all_combos['My Trade']),
+        'Receive':     list(all_combos['Their Trade']),
+        'Your Score':  post_my_h_scores    - ctx['pre_my_h'],
+        'Their Score': post_their_h_scores - ctx['pre_their_h'],
+    })
+    return df.sort_values('Your Score', ascending=False)
+
+
+# ── Fast trade evaluation ────────────────────────────────────────────────────
+
+def _build_trade_context(
+    h_agent: HAgent
+    , player_assignments: dict[str, list[int]]
+    , my_team: str
+    , their_team: str
+) -> dict:
+    """Pre-compute all quantities that are constant across every trade combo.
+
+    For complete rosters in a k-for-k trade:
+      - x_scores_available is identical pre- and post-trade (same pool, just swapped)
+      - diff_vars depend only on team sizes (unchanged by equal trades)
+      - Pre-trade H-scores are fixed regardless of which combo we evaluate
+      - Baseline diff_means change only in the single column corresponding to the
+        counterparty team — the delta is pure arithmetic per combo
+    """
+    team_names = list(player_assignments.keys())
+    n_drafters = len(player_assignments)
+
+    # Available player pool is the same for every combo (traded players are assigned
+    # to one team or the other regardless of which swap we evaluate).
+    players_chosen     = [p for roster in player_assignments.values() for p in roster if p == p]
+    x_scores_available = h_agent.x_scores[
+        ~h_agent.x_scores.index.isin(players_chosen)
+        & h_agent.x_scores.index.isin(h_agent.positions.index)
+    ]
+
+    # Pre-compute each team's raw stat sum once.
+    team_sums = {
+        team: np.array(h_agent.x_scores.loc[[p for p in roster if p == p]].sum(axis=0))
+        for team, roster in player_assignments.items()
+    }
+
+    def build_baseline_diff_means(drafter: str) -> np.ndarray:
+        """Construct the (1, n_categories, n_drafters-1) diff_means array for drafter."""
+        drafter_roster = [p for p in player_assignments[drafter] if p == p]
+        n_my           = len(drafter_roster)
+        # Compare complete teams at their actual size (n_my), not n_my + 1. A k-for-k trade adds no
+        # player, so padding opponents up to n_my + 1 would seat a phantom below-replacement player on
+        # each of them and inflate the H-score — the same phantom-+1 bug fixed in get_diff_distributions.
+        # mean_extra stays as the shortfall model (pads a short-handed opponent), a no-op when full.
+        extra_needed   = n_my * n_drafters - len(players_chosen)
+        mean_extra     = np.array(x_scores_available.iloc[:extra_needed].mean().fillna(0))
+
+        other_sums = np.vstack([
+            (team_sums[team] + max(n_my - len(player_assignments[team]), 0) * mean_extra)
+            .reshape(1, h_agent.n_categories, 1)
+            for team in team_names if team != drafter
+        ]).T  # (1, n_categories, n_drafters-1)
+
+        return (
+            team_sums[drafter].reshape(1, h_agent.n_categories, 1)
+            - other_sums.reshape(1, h_agent.n_categories, n_drafters - 1)
+        )
+
+    baseline_diff_means_my    = build_baseline_diff_means(my_team)
+    baseline_diff_means_their = build_baseline_diff_means(their_team)
+
+    # Percentage categories are scored on rates (see HAgent.apply_volume_awareness): each perspective needs
+    # its own absolute percentage totals and every team's season volume, unfilled slots at the generic level.
+    volume_my = volume_their = None
+    if h_agent.volume_categories:
+        generic_units, generic_x = h_agent.compute_generic_volume_levels(x_scores_available, players_chosen)
+        index = h_agent.volume_category_indices
+
+        def season_units(roster):
+            roster = [p for p in roster if p == p]
+            return (h_agent.player_volume_units.loc[roster].sum().to_numpy()
+                    + max(h_agent.n_picks - len(roster), 0) * generic_units)
+
+        team_units = {team: season_units(roster) for team, roster in player_assignments.items()}
+
+        def build_volume_context(drafter: str) -> dict:
+            roster = [p for p in player_assignments[drafter] if p == p]
+            others = [team for team in team_names if team != drafter]
+            return {
+                'my_x_total':     (team_sums[drafter][index]
+                                   + max(h_agent.n_picks - len(roster), 0) * generic_x).reshape(1, -1),
+                'my_units':       team_units[drafter].reshape(1, -1),
+                'opponent_units': np.stack([team_units[team] for team in others], axis=1)
+                                  .reshape(1, len(index), len(others)),
+            }
+
+        volume_my, volume_their = build_volume_context(my_team), build_volume_context(their_team)
+
+    # diff_vars depend only on team sizes — constant for equal-size trades.
+    diff_vars_my = np.vstack([
+        h_agent.get_diff_var(len([p for p in player_assignments[team] if p == p]))
+        for team in team_names if team != my_team
+    ]).T.reshape(1, h_agent.n_categories, n_drafters - 1)
+
+    diff_vars_their = np.vstack([
+        h_agent.get_diff_var(len([p for p in player_assignments[team] if p == p]))
+        for team in team_names if team != their_team
+    ]).T.reshape(1, h_agent.n_categories, n_drafters - 1)
+
+    # Pre-trade H-scores — constant across all combos, compute once.
+    my_players    = [p for p in player_assignments[my_team]    if p == p]
+    their_players = [p for p in player_assignments[their_team] if p == p]
+
+    pre_my_h = h_agent.compute_h_score_from_diff_means(
+        diff_means     = baseline_diff_means_my,
+        diff_vars      = diff_vars_my,
+        volume_context = volume_my,
+    )
+    pre_their_h = h_agent.compute_h_score_from_diff_means(
+        diff_means     = baseline_diff_means_their,
+        diff_vars      = diff_vars_their,
+        volume_context = volume_their,
+    )
+
+    # Column indices for the two trading teams in each perspective's diff_means.
+    their_col_in_my_view = [t for t in team_names if t != my_team].index(their_team)
+    my_col_in_their_view = [t for t in team_names if t != their_team].index(my_team)
+
+    return {
+        'baseline_diff_means_my':      baseline_diff_means_my,
+        'baseline_diff_means_their':   baseline_diff_means_their,
+        'diff_vars_my':                diff_vars_my,
+        'diff_vars_their':             diff_vars_their,
+        'pre_my_h':                    pre_my_h,
+        'pre_their_h':                 pre_their_h,
+        'their_col_in_my_view':        their_col_in_my_view,
+        'my_col_in_their_view':        my_col_in_their_view,
+        'volume_my':                   volume_my,
+        'volume_their':                volume_their,
+    }

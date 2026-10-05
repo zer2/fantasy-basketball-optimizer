@@ -16,15 +16,21 @@ test('sidebar input guards', async t => {
 
     const candidateRowsWith = (text) => page.locator('#hscoretable .playerheaderdiv', { hasText: text }).count()
 
-    async function setInjuredPlayers(namesText) {
-        const injuredInput = page.locator('#ps-injured')
-        await injuredInput.evaluate(el => { const d = el.closest('details'); if (d && !d.open) d.open = true })
-        await injuredInput.fill(namesText)
-        // Blur rather than dispatching a synthetic change: the blur fires the native change
-        // exactly once and clears the input's dirty flag — a synthetic dispatch leaves the
-        // flag set, so the browser fires a SECOND change when focus later moves elsewhere,
-        // re-running the player-stats apply mid-way through the next test step.
-        await injuredInput.evaluate(el => el.blur())
+    // The injured list is a multiselect of the pool's players: searched by typing, picked from its dropdown.
+    const injuredSearch = page.locator('#ps-injured .ms-input')
+    async function searchInjuredList(text) {
+        await injuredSearch.evaluate(el => { const d = el.closest('details'); if (d && !d.open) d.open = true })
+        await injuredSearch.click()
+        await injuredSearch.fill(text)
+    }
+    async function pickInjuredPlayer(name) {
+        await searchInjuredList(name)
+        await page.locator('#ps-injured .ms-option', { hasText: name }).first().click()
+        await injuredSearch.evaluate(el => el.blur())
+        await waitAppSettled(app)
+    }
+    async function unpickInjuredPlayer(name) {
+        await page.locator('#ps-injured .ms-chip', { hasText: name }).locator('.ms-chip-remove').click()
         await waitAppSettled(app)
     }
 
@@ -36,8 +42,7 @@ test('sidebar input guards', async t => {
         await t.test('an injured player leaves the candidate pool and returns when cleared', async () => {
             assert.ok(await candidateRowsWith('Nikola Jokic') > 0, 'Jokic should start in the candidate pool')
 
-            // The pool indexes players by their full display name ("Name (POS)").
-            await setInjuredPlayers('Nikola Jokic (C)')
+            await pickInjuredPlayer('Nikola Jokic')
             assert.equal(await candidateRowsWith('Nikola Jokic'), 0,
                          'an injured player should leave the candidate table')
             const pickOptions = await readDropdownOptionLabels(page, 'draft-pick-select-wrapper')
@@ -45,10 +50,24 @@ test('sidebar input guards', async t => {
                       'an injured player should leave the pick dropdown too')
             expectCleanSession(app, 'player marked injured')
 
-            await setInjuredPlayers('')
+            // Still offered after leaving the pool: the list is built from the registry, which keeps injured players.
+            assert.equal(await page.locator('#ps-injured .ms-chip', { hasText: 'Nikola Jokic' }).count(), 1)
+            await unpickInjuredPlayer('Nikola Jokic')
             assert.ok(await candidateRowsWith('Nikola Jokic') > 0,
                       'clearing the injured list should restore the player')
             expectCleanSession(app, 'injured list cleared')
+        })
+
+        await t.test('searching the injured list changes nothing', async () => {
+            // The Player Stats section rebuilds the session on any input inside it; typing a search is not a change.
+            const requestsBefore = app.sessionRequestLog.length
+            await searchInjuredList('Jok')
+            await page.waitForTimeout(1500)   // longer than the section's 800ms debounce
+            await injuredSearch.fill('')
+            await injuredSearch.evaluate(el => el.blur())
+            await waitAppSettled(app)
+            assert.deepEqual(app.sessionRequestLog.slice(requestsBefore), [], 'a search must not reach the backend')
+            expectCleanSession(app, 'injured list searched')
         })
 
         await t.test('invalid slot counts show the validation message and block the patch', async () => {

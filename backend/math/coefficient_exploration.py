@@ -20,7 +20,40 @@ from backend.data_retrieval import get_available_seasons, get_weekly_box_scores
 from backend.math.process_player_data import (
     calculate_coefficients_historical
     , calculate_scores_from_coefficients
+    , apply_team_volume_correction
 )
+
+
+def explore_all_seasons(
+    sport_params: dict
+    , n_drafters: int
+    , n_active: int
+    , seasons: list[str] | None = None
+) -> dict[str, dict]:
+    """Run coefficient exploration across all (or specified) historical seasons.
+
+    Args:
+        sport_params:     Full sport_params dict for the sport.
+        n_drafters: Number of drafters in the representative league.
+        n_active: Number of picks per drafter.
+        seasons:    Explicit list of season strings to run. If None, all
+                    available seasons from Snowflake are used.
+
+    Returns:
+        Dict mapping season string → result dict from compute_season_coefficients.
+    """
+    if seasons is None:
+        seasons = get_available_seasons()
+
+    return {
+        season: compute_season_coefficients(
+            get_weekly_box_scores(season, sport_params)
+            , sport_params
+            , n_drafters
+            , n_active
+        )
+        for season in seasons
+    }
 
 
 def compute_season_coefficients(
@@ -89,7 +122,16 @@ def compute_season_coefficients(
         , counting_stats = all_counting_stats
         , ratio_stats    = all_ratio_stats
         , categories     = all_categories
-        , n_active     = n_active
+    )
+    # The representative set is chosen by G-score, so the same correction process_player_data gives
+    # G-scores (keeps the two pipelines choosing the same players).
+    first_order_scores = apply_team_volume_correction(
+        first_order_scores
+        , player_means
+        , first_order_coefficients
+        , sport_params
+        , all_ratio_stats
+        , n_active
     )
     n_players = n_drafters * n_active
     representative_player_set = (
@@ -132,38 +174,6 @@ def compute_season_coefficients(
         'tau_sigma_ratio':            coefficients['Mean of Variances'] / coefficients['Variance of Means'],
         'correlations':               correlations,
         'representative_player_set':  representative_player_set,
-    }
-
-
-def explore_all_seasons(
-    sport_params: dict
-    , n_drafters: int
-    , n_active: int
-    , seasons: list[str] | None = None
-) -> dict[str, dict]:
-    """Run coefficient exploration across all (or specified) historical seasons.
-
-    Args:
-        sport_params:     Full sport_params dict for the sport.
-        n_drafters: Number of drafters in the representative league.
-        n_active: Number of picks per drafter.
-        seasons:    Explicit list of season strings to run. If None, all
-                    available seasons from Snowflake are used.
-
-    Returns:
-        Dict mapping season string → result dict from compute_season_coefficients.
-    """
-    if seasons is None:
-        seasons = get_available_seasons()
-
-    return {
-        season: compute_season_coefficients(
-            get_weekly_box_scores(season, sport_params)
-            , sport_params
-            , n_drafters
-            , n_active
-        )
-        for season in seasons
     }
 
 

@@ -24,43 +24,19 @@ from scipy.special import ndtr, ndtri
 _INV_SQRT_2PI = 1.0 / np.sqrt(2.0 * np.pi)
 
 
-def _normal_pdf(x, scale=1.0):
-    z = x / scale
-    return _INV_SQRT_2PI / scale * np.exp(-0.5 * z * z)
-
-
-def _normal_cdf(x, scale=1.0):
-    return ndtr(x / scale)
-
-
-def _normal_ppf(q, scale=1.0):
-    return scale * ndtri(q)
-
-
-def _softmax_rows(logits):
-    """Row-wise softmax (each row is a probability distribution over that row's columns). Used to
-    parameterise the flex position shares: optimising in this unconstrained logit space keeps the
-    shares on the simplex automatically, so the share update needs no clip-to-[0,1] or renormalise
-    (those distort the step at the boundary and homogenise the survivors).
-
-    Subtracting the row max is purely numerical and has no effect on the result: softmax is
-    shift-invariant, so e^{z − c}/Σe^{z − c} = e^z/Σe^z — the common e^{−c} factor cancels between
-    numerator and denominator. Its only job is to keep exp() from overflowing on large logits."""
-    shifted = logits - logits.max(axis=1, keepdims=True)
-    exponentiated = np.exp(shifted)
-    return exponentiated / exponentiated.sum(axis=1, keepdims=True)
-
-
 # Learning rate for the softmax-logit flex-share optimiser. Larger than the old share-space 0.01
 # because a logit must move ~±4 to swing a share across [0, 1]; tuned so shares settle within the
 # gradient-iteration budget rather than still drifting at the final iteration.
 _SHARES_LEARNING_RATE = 0.3
+
+
 # Adam's per-coordinate step is capped at +/- the learning rate, so lr x n_iterations is a
 # travel budget in weight space. The truncated-max model's optima sit far from the neutral
 # start (a real punt moves a weight ~0.1 against neutral entries of ~0.11), so the rate is
 # 10x the value tuned for the simplified-form model, whose optima hugged neutral: at 0.001
 # the descent ran out of road and every build parked near its start, tilts half-formed.
 _CATEGORY_LEARNING_RATE = 0.01
+
 
 # Punt-seeding for the cold-start category weights (replaces the old heuristic init). Each seed
 # down-weights one category to this fraction of neutral. 0.9 was tuned for the simplified-form
@@ -69,9 +45,9 @@ _CATEGORY_LEARNING_RATE = 0.01
 # identities from noise) while sitting in the steepest part of the supply curve. 0.5 puts each
 # seed at a genuinely differentiated punt depth the scan can compare.
 _PUNT_SEED_FACTOR = 0.5
-# From this many of the drafter's own picks on, the roster has a real shape, so seed a single punt of
-# its weakest category. Earlier than that there is no reliable weakness, so multi-start over every punt.
-_WEAKNESS_SEED_MIN_ROSTER = 3
+
+
+
 
 # Per-format best-practice configuration, resolved per agent in __init__:
 #   Rotisserie:  lowvar seed (tilts weight off the noisy categories), regulariser on, unified stability v
@@ -81,6 +57,8 @@ _WEAKNESS_SEED_MIN_ROSTER = 3
 # request alone.
 # lowvar seed (Roto): exponent on the seed tilt that down-weights high-v (less stable) categories.
 _LOWVAR_TILT = 0.5
+
+
 # Robustness regulariser: each iteration soft-thresholds the category weights toward neutral v -- the
 # proximal step for an L1 penalty -lambda*||w-v||_1. L1 rewards balance without over-penalising a
 # committed punt the way L2 would, and its sparsity pins uncontested categories at v while letting a few
@@ -92,12 +70,16 @@ _LOWVAR_TILT = 0.5
 # defaults them to. lambda_c = 5% of each Adam step is the ratio testing settled on (as 0.00005
 # against the original 0.001 rate).
 _LAMBDA_C_DEFAULT = 0.05
+
+
 # lambda_c and lambda_p are denominated in per-iteration category steps: the proximal shrink competes with
 # Adam's step (capped at +/- the learning rate per coordinate), so a raw weight-unit lambda would
 # silently change meaning whenever the rate is recalibrated — the 0.001 -> 0.01 change for the
 # truncated-max model's longer travel distances would have made it 10x weaker. Tying the unit to
 # the rate keeps a sidebar 0.05 meaning "5% of each step" under any rate.
 REG_LAMBDA_UNIT = _CATEGORY_LEARNING_RATE
+
+
 # Optional guard (default 0 = off, clean L1 that may snap onto v): keep weights at least this far per
 # component from the w==v ray. Snapping onto v is only cosmetic for the truncated-max path (finite at
 # w == v via its rho clamp; the term_five 0/0 lived in the legacy simplified-form methods), so the
@@ -109,12 +91,9 @@ REG_LAMBDA_UNIT = _CATEGORY_LEARNING_RATE
 _FORCED_MINIMUM_BUDGET = 0.05
 
 
-class ForcedWeightsInfeasibleError(ValueError):
-    """The pinned category weights claim so much of the total that the free ones have no room.
-
-    Its own type so the API can answer 400 with the message (which names the offending categories)
-    rather than folding it into the evaluate route's blanket 500."""
 _REG_FLOOR = 0.0
+
+
 # Flex-position share regularisation: lambda_p is a fraction of the SHARES optimizer's own
 # per-iteration step, exactly as lambda_c is a fraction of the category step. The proximal
 # shrink acts on the MASTER shares — one softmax over all k base positions — so the step it
@@ -130,16 +109,22 @@ _REG_FLOOR = 0.0
 # Gaussian schedule lowers the bar as the roster fills. Values below 1 are a continuous
 # dial; 0.8 is (within 5%) the strength shipped as old-units 4.
 _LAMBDA_P_DEFAULT = 0.8
+
+
 # Gaussian (phi) reg-decay shape: lambda_k = peak*(phi(B k/n) - phi(B))/(phi(0)-phi(B)) -- peak on an
 # empty roster, decaying to exactly 0 at the final pick. B sets the concave shoulder (~ first n/B picks)
 # before the convex tail; B=4 puts the shoulder near pick 3 and matches the old cosine's total budget.
 _REG_SHAPE_B = 4.0
+
+
 # Correlation-correction refresh interval, mirroring the position-optimiser throttle: the
 # correction terms are recomputed on iterations where (iteration+1) % interval == 0 (plus
 # the cold start) and reused between — they drift slowly with the category weights, so a
 # small staleness buys back most of the correction's per-iteration cost. One-shot scoring
 # calls (full team, trades, auction values) always compute fresh.
 _MC_CORRELATION_REFRESH_INTERVAL = 4
+
+
 # Opponent modelling: instead of padding every opponent's future picks with a category-neutral
 # average, treat each opponent as a rational H-score drafter who punts. We track a per-opponent
 # mu_edge (the expected per-pick edge vector implied by their inferred category weights) and add
@@ -151,6 +136,8 @@ _MC_CORRELATION_REFRESH_INTERVAL = 4
 # opponent_model_confidence session parameter to 0 disables the whole feature and restores
 # byte-identical neutral-opponent behaviour.
 _OPPONENT_INFERENCE_ITERATIONS = 50
+
+
 # Build-time fictitious-play bootstrap: the base H-scores are recomputed several times, each pass
 # best-responding to the RUNNING AVERAGE of prior passes' builds rather than the latest one. Pure
 # best-response oscillates (every seat flips the same way each pass); averaging damps that and lets the
@@ -167,16 +154,22 @@ _OPPONENT_INFERENCE_ITERATIONS = 50
 # looked like a runaway), at 32 it holds a flat band and the belief-response gap drops
 # from 0.34 to 0.086 with the punt spread re-diversifying (measured at M=25, 60 iters).
 _OPPONENT_BOOTSTRAP_PASSES = 32
+
+
 # Rotisserie keeps the longer run: it uses the EMA field path (window 0), whose fixed-rate smoothing
 # stabilises more slowly than the window's 1/t fictitious-play steps — at 8 passes a 2024-25 top-12
 # Roto build hard-punts a category (breaking the minimal-punting floor), at 15 none do. Roto passes
 # face a single 11-column field, so its cost is linear in the pass count and the longer run is cheap.
 _OPPONENT_BOOTSTRAP_PASSES_ROTISSERIE = 15
+
+
 # Damping for the fixed-point field: each bootstrap pass nudges the committed field a fraction alpha
 # toward that pass's best-response (exponential smoothing), instead of a running mean. Smoothing
 # converges to a genuine fixed point (field == its own best-response — a committed equilibrium), whereas
 # a mean converges to a smeared blend of oscillating responses that erases specific punts.
 _OPPONENT_SMOOTHING = 0.3
+
+
 # Windowed fictitious play for the BOOTSTRAP PASSES ONLY (H2H formats). Each pass best-responds to the
 # raw fields of the last K passes stacked as separate opponents (11*K columns; the objective's mean over
 # the opponent axis weights them uniformly) instead of the single EMA-blended field above. At a mixed
@@ -202,6 +195,8 @@ _OPPONENT_SMOOTHING = 0.3
 # the widest punt spread recorded, M=20 0.053) at a third of the cost; a single
 # snapshot is the knife-edge the mixture argument warned about (M=25 gap 0.22).
 _SERVE_FIELD_STACK = 2
+
+
 # Descent iterations for the field-building bootstrap passes. These only need approximate opponent builds
 # (the field is smoothed and never exact anyway), so they run short; the final full-pool serve pass uses
 # the session's full n_iterations for accurate base H-scores.
@@ -223,6 +218,8 @@ _SERVE_FIELD_STACK = 2
 # mid M: four seats jumped basins between the final bootstrap pass and the serves,
 # leaving a 0.13 belief-response gap after every lane had already frozen).
 _SEED_INCUMBENT_MARGIN = 0.005
+
+
 # NOTE on early stopping (both levels measured 2026-09-04, so neither is rebuilt):
 # (1) A SELF-PLAY stop (end the windowed loop once committed builds stop switching
 # concession lanes and the window-averaged field drift settles) fired at pass ~9-15 —
@@ -244,6 +241,8 @@ _SEED_INCUMBENT_MARGIN = 0.005
 # configured confidence), and at or below the base min(C, base + ramp) never binds.
 # Every seat now runs at the configured confidence in all regimes.
 _MEAN_FIELD_CONFIDENCE_THRESHOLD = 0.5
+
+
 # How many disjoint groups a solve cycle splits the universe into (see the loop): each
 # pass solves one group, so 1/this of the field moves per pass.
 # NOTE (measured 2026-09-05, so it is not rebuilt): 3 groups (a third per pass) at the
@@ -252,6 +251,8 @@ _MEAN_FIELD_CONFIDENCE_THRESHOLD = 0.5
 # averaged belief needs proportionally more passes to recover the same effective sample
 # count and the saving cancels. Group size is not a latency lever.
 _SOLVE_GROUP_COUNT = 2
+
+
 # Mean-field budget (high-confidence self-play): every pass runs at the configured
 # confidence, and the belief is the Cesaro average of the committed fields — but the
 # accumulator RESTARTS once at the burn-in boundary, so the cold-start transient (the
@@ -271,7 +272,11 @@ _SOLVE_GROUP_COUNT = 2
 # A board that leans is a bad board at ANY latency, so there is no faster leaning tier;
 # the parked Chebyshev pick-model core is the path to making this cheap.
 _MEAN_FIELD_BURN_IN_PASSES = 32
+
+
 _MEAN_FIELD_TOTAL_PASSES   = 96
+
+
 # NOTE (measured 2026-09-05, so it is not rebuilt): staged finishing gated on
 # split-half agreement of the settled states does NOT work. The disagreement (mean abs
 # difference between the first-half and second-half averages of the post-burn-in
@@ -294,14 +299,24 @@ _MEAN_FIELD_TOTAL_PASSES   = 96
 # configuration stops at its own first clean horizon; at the cap the best horizon seen
 # is served, so a season that never fully clears still ends no worse than its best.
 _MEAN_FIELD_EXTENSION_PASSES     = 16
+
+
 _MEAN_FIELD_MAXIMUM_TOTAL_PASSES = 192
+
+
 _SERVED_FIELD_TOP_SEATS = 12
+
+
 _SERVED_FIELD_PUNT_RATE = 0.40
+
+
 # Burn-in passes only POSITION the field — their states are discarded from the belief —
 # so their convergence depth need not match the serve (user design 2026-09-05); they run
 # this fraction of the session iteration budget. The uniform-budget rule (see pass_iters)
 # still binds every pass whose state enters the belief.
 _MEAN_FIELD_BURN_IN_ITERATION_FRACTION = 0.5
+
+
 # NOTE on position throttling (measured 2026-09-04, so it is not rebuilt): an early-pass
 # solve stride (rosters re-solved every 10th iteration, cached between) engaged on 591 of
 # 1383 calls and changed NEITHER results (bit-identical boards) NOR time (0.76s vs 0.70s):
@@ -313,45 +328,59 @@ _MEAN_FIELD_BURN_IN_ITERATION_FRACTION = 0.5
 # pre-filter so the pass costs ~1/4 of a full-pool serve while the top-3N-by-Level-0-H
 # universe it selects is unaffected (populate startup time is user-visible).
 _LEVEL_ZERO_POOL = 150
-# Learning-rate scales for WARM-STARTED category descents, tiered by how far the optimum can plausibly
-# have moved since the stored weights were computed. A warm start begins inside an established basin, so
-# the descent only needs fine adjustment -- and on value-flat plateaus (near-tied builds), full-size Adam
-# steps wander a full step-length per evaluate regardless of how converged the start is, visibly flipping
-# the displayed build between evaluates. Small steps pin the plateau AND converge better in
-# genuine-change cases (the gain there comes from the board, not from weight travel; measured
-# H 52.37 -> 52.51 on the Jokic-joins-my-team case). Three tiers:
-#   cold start (no stored weights)              -> full rate: must travel from a generic punt seed.
-#   warm, MY roster changed since storage       -> full rate: a real pick decision needs full
-#       adaptation -- running this tier at 1/10th measurably cost drafting strength in the all-H-field
-#       awareness validation (aware-field gain -0.0015 at 0.1 vs +0.0008 at 1.0, the no-regret
-#       equilibrium level), so only the warm INIT and the regulariser exemption apply here.
-#   warm, MY roster unchanged since storage     -> 1/100th: only the field moved (opponent picks are
-#       mean-invariant for predicted players; variance/pool shifts are tiny), so barely adjust. This
-#       static tier is where the display-stability guarantees live.
-_WARM_START_LEARNING_RATE_SCALE = 1.0
+
+
+# Learning-rate scale for WARM-STARTED category descents, which happen only on an empty roster, from each
+# candidate's frozen self-play build (see the start policy in get_h_scores). The board there is the one the build
+# was computed on (only the field can have moved), so the descent should barely move: on value-flat plateaus
+# (near-tied builds) full-size Adam steps wander a full step-length per evaluate regardless of how converged the
+# start is, visibly flipping the displayed build between evaluates. Cold starts run at the full rate.
 _WARM_START_STATIC_ROSTER_SCALE = 0.01
+
+
 from pathlib import Path
+
+
 from itertools import combinations
+
 
 # Anchored on this file so the reference CSVs load from any working directory.
 _DATA_DIR = Path(__file__).parents[1] / 'data'
+
 
 from backend.math.algorithm_helpers import (
     compute_win_probability,
     calculate_win_probability_and_tipping_points,
     calculate_correction_terms,
 )
+
+
 from backend.math.process_player_data import get_category_level_rv, scale_tiebreaker_value
+
+
 from backend.math.position_optimization import (
     optimize_positions_all_players,
     get_player_rows,
 )
+
+
 from backend.math.position_config import PositionConfig, build_position_config
+
+
 from backend.math.truncated_max_pick_model import (
-    compute_expected_pick_tilt_jacobian,
-    compute_expected_pick_tilts,
+    compute_expected_pick_tilts_and_jacobian,
 )
+
+
 from backend.player_identity import RP_PLAYER_ID
+
+
+# A team's projected volume in a percentage category, as a fraction of a typical team's, is kept at or
+# above this floor before it divides anything (k = V_typ / V_team; see apply_volume_awareness). Real
+# rosters sit within roughly 0.7-1.4 of typical, nowhere near it; the floor exists so that no input --
+# a near-empty roster padded with a low-volume generic level, a future descent that tilts volume
+# hard -- can drive V_team to zero or below and turn the win probability into nonsense.
+_MINIMUM_TEAM_VOLUME_FRACTION = 0.25
 
 
 class HAgent:
@@ -656,6 +685,32 @@ class HAgent:
             ]
             v = np.sqrt(mov / (mov + vom))
 
+        # Volume-aware percentage categories (percentage_volume_plan.md). A percentage category is won on
+        # the RATE a team posts, so a team's total volume both dilutes its excess makes and scales its
+        # weekly noise; apply_volume_awareness turns each category differential into that rate gap. Each
+        # player's volume enters relative to average, V / V-bar, keyed by the
+        # PERCENTAGE category (Turnovers is both a category and Assist to TO's volume).
+        volume_units = info['Volume-Units']
+        self.volume_categories = list(volume_units.columns)
+        self.volume_category_indices = np.array(
+            [list(self.x_scores.columns).index(category) for category in self.volume_categories], dtype=int)
+        self.player_volume_units = volume_units.loc[self.x_scores.index]
+        # Volume through the future-pick model (Phase 2 of the plan). The pick model treats a player as a
+        # Gaussian category vector z with covariance L; volume joins it with cross-covariance Sigma_vc
+        # (same pool, same within-position estimate, same slot weights as L). Under that joint Gaussian
+        # E[volume | z] = B z with B = Sigma_vc L^-1, and every selection the model makes depends on z
+        # alone, so a pick's expected volume tilt is exactly B times its expected category tilt -- for my
+        # future picks and for every opponent's alike. (n_volume, n_categories); B maps X to volume units.
+        # The pseudo-inverse, not a solve: L is singular when a category does not vary across the pool
+        # (an upload listing one value for everyone), and for a singular Gaussian Sigma_vc L^+ z is still
+        # exactly the conditional expectation -- a direction with no variance carries no information.
+        volume_covariance = (
+            np.array(info['Volume-Covariance-by-Position']).reshape(
+                1, L_by_position.shape[1], len(self.volume_categories), self.n_categories)
+            * L_weights
+        ).sum(axis=1)[0]
+        self.volume_tilt_matrix = volume_covariance @ np.linalg.pinv(self.L[0], hermitian=True)
+
         # A tiebreaker is worth (1 + most_categories_weight) of an ordinary category, and v is what
         # a category is worth per unit of x-score — so the neutral vector itself carries it, and
         # everything reading v (punt depth, the field weights in get_x_mu, the descent's starting
@@ -822,7 +877,7 @@ class HAgent:
         # diff_means/diff_vars/sigma_2_m broadcast against the candidate batch. With opponent modelling on,
         # diff_means is candidate-DEPENDENT (N, n_cat, n_drafters-1) for candidates that are themselves a
         # seated anchor — self-exclusion swaps their own team out of the field (see get_diff_distributions).
-        diff_means, diff_vars, sigma_2_m, opponent_future_tilts = self.get_diff_distributions(
+        diff_means, diff_vars, sigma_2_m, opponent_future_tilts, volume_field = self.get_diff_distributions(
             player_assignments, drafter, x_scores_available, cash_remaining_per_team,
             candidate_batch=list(x_scores_batch.index),
         )
@@ -850,70 +905,34 @@ class HAgent:
             x_scores_batch_mod    = corrected_strength - diff_means.mean(axis=2)
             x_scores_batch_array  = np.expand_dims(x_scores_batch_mod, axis=2)
 
+        # Built after the beth correction, so a candidate's own percentage X here is the same corrected
+        # value that enters the differential (the correction itself stays in X space: it maps a raw
+        # candidate strength to a corrected one, and the volume treatment applies on top).
+        volume_context = (None if volume_field is None else self._build_volume_context(
+            my_players, n_players_selected, x_scores_batch_array, x_scores_batch.index, volume_field))
+
         # initial_category_weights / initial_shares are a TEST-INJECTION hook only (the multistart_*
         # diagnostics set them to force a specific start); production never writes them. Real warm
         # starts live in _team_states / _player_frozen_weights below.
         if self.initial_category_weights is None:
-            # Warm start (opponent model on). Weights track the OVERALL BUILD far more than the marginal
-            # candidate, so once the roster has a real shape (>= _WEAKNESS_SEED_MIN_ROSTER, the same
-            # threshold the cold start uses) every candidate starts from this drafter's own team-level
-            # entry -- the same per-team store the opponents live in, updated by this drafter's previous
-            # evaluate (or by inference, if this seat was an opponent until a perspective switch). Below
-            # that the candidate still largely IS the build (and the empty-board entry may reflect a
-            # candidate that was never actually picked), so each candidate starts from its own frozen
-            # self-play weights (the per-player table snapshotted at populate). Both paths start descents
-            # inside an established basin, which removes the cold seed-scan's near-tie vacillation (midway
-            # stalls that showed up as sudden dollar dips). The stores are absent with the model off and
-            # reset before every bootstrap pass, so gate-off behaviour and the populate fixed-point are
-            # untouched; uncovered cases fall through to the cold-start seeding below.
+            # Start policy: a warm start only on an EMPTY roster, from each candidate's own frozen self-play build
+            # (the per-player table snapshotted at populate) -- the serve pass and pre-draft browsing, which must
+            # reproduce the served builds, and the replay of a seat's first pick. Every later solve, the drafter's
+            # own evaluates and the opponent model's replays alike, COLD multi-starts over the full seed menu
+            # (_select_starting_weights), so a build is always the best the roster supports.
+            #
+            # It used to warm-start from the seat's stored identity from the third pick on, and every replay too,
+            # at a 1/100 polish rate. An identity began as the seat's first pick's build and could then move only
+            # about 5% of neutral per pick, so it never left that build's basin: a KAT team that added Durant and
+            # Markkanen stayed punt-blocks (H 50.2) when punting assists was worth 53.4 for every top candidate.
+            # Learning identities from a pinned start is learning them from a poor standard.
             warm_start_weights = None
             warm_start_shares  = None   # flex shares are PAIRED with the weights: same source, same rows
             self._partial_warm_start_rows = None
             self._warm_start_row_rate_scales = None   # per-row learning-rate multipliers (None = all cold)
-            team_state = self._team_states.get(drafter) if self.models_opponents else None
-            # HYBRID start policy for a drafter's own evaluates: the first few picks (roster below
-            # _WEAKNESS_SEED_MIN_ROSTER) COLD multi-start via the punt seed scan — the strategic
-            # window where re-balancing is cheap and exploration pays — and from the third pick on,
-            # every candidate warm-starts from the drafter's own team entry (its identity). Inference
-            # replays use the entry at ANY roster size: the pick being explained is known, so "the
-            # Wemby team that added Duren" starts from the Wemby identity, never a fresh Duren-led
-            # derivation. Entries are always identity-true (committed anchor build or a replay of
-            # actual picks; evaluates never write them). Measured at opponent_model_confidence 0.5 over
-            # full 12-seat drafts: early punt-set re-balancing 44% vs 28% warm-only, late-round
-            # stability equal to warm-only (21% vs 19%), 12/12 distinct final builds, no herding.
-            # CAUTION: the cold window is only herd-safe on a softened field — at rationality 1.0 the
-            # equilibrium is knife-edge and cold solves crowd into its one open punt lane.
-            team_entry_applies = (n_players_selected >= _WEAKNESS_SEED_MIN_ROSTER
-                                  or self._opponent_inference_active)
-            if (team_entry_applies and team_state is not None
-                    and team_state['category_weights'] is not None):
-                # Tier by staleness: an unchanged roster means only the field moved since the entry was
-                # stored, so the optimum has barely moved and the descent should barely move either.
-                # Inference replays always land here (the eager refresh keys each entry to exactly the
-                # replay view's roster), which is what damps in-draft best-response herding: a build
-                # moves by one polish step per pick, never a full re-derivation.
-                roster_unchanged = team_state['roster_key'] == frozenset(my_players)
-                warm_scale = (_WARM_START_STATIC_ROSTER_SCALE if roster_unchanged
-                              else _WARM_START_LEARNING_RATE_SCALE)
-                warm_start_weights = np.array([team_state['category_weights']] * len(x_scores_batch))
-                self._warm_start_row_rate_scales = np.full(len(x_scores_batch), warm_scale)
-                if team_state['position_shares'] is not None:
-                    warm_start_shares = {
-                        pos_code: pd.DataFrame(
-                            np.tile(team_state['position_shares'][pos_code], (len(x_scores_batch), 1)),
-                            columns=pos_info['bases'],
-                        )
-                        for pos_code, pos_info in self.position_structure['flex'].items()
-                    }
-            elif (self._player_frozen_weights is not None
-                  and (n_players_selected == 0 or self._opponent_inference_active)):
-                # Frozen rows were computed on the EMPTY board, so they warm-start only the
-                # unchanged-context cases: empty-roster evaluates (the serve pass and pre-draft
-                # browsing, which must reproduce the served builds) and inference replay views.
-                # A drafter with 1-2 picks deliberately falls through to the COLD punt seed scan —
-                # the hybrid policy's exploration window (see the team-entry comment above).
-                warm_scale = (_WARM_START_STATIC_ROSTER_SCALE if n_players_selected == 0
-                              else _WARM_START_LEARNING_RATE_SCALE)
+            if self._player_frozen_weights is not None and n_players_selected == 0:
+                # Frozen rows were computed on the EMPTY board, so they warm-start only the unchanged-context case.
+                warm_scale = _WARM_START_STATIC_ROSTER_SCALE
                 stored_for_batch = self._player_frozen_weights.reindex(x_scores_batch.index)
                 covered          = ~stored_for_batch.isna().to_numpy().any(axis=1)
                 # Shares come from the same serve result as the weights, so coverage is identical.
@@ -1044,6 +1063,7 @@ class HAgent:
             candidate_priority,
             candidate_offset,
             opponent_future_tilts=opponent_future_tilts,
+            volume_context=volume_context,
         )
 
         # NOTE: evaluates deliberately write NOTHING to _team_states. The store is a pure function of
@@ -1090,7 +1110,6 @@ class HAgent:
                 list(self.x_scores.columns),
             )
             replacement_value_by_category = np.array(replacement_value_by_category).reshape(self.n_categories, 1)
-
             # Rational-opponent modelling (auction), parallel to the draft. An EMPTY seat with a predicted
             # first buy is modelled as having ALREADY bought it: the anchor's real stats are priced into the
             # score diff and its estimated price is deducted from the seat's cash, so the field does not jump
@@ -1248,6 +1267,15 @@ class HAgent:
                         diff_means[candidate_index, :, slot] = column_values
                         opponent_tilt_columns[candidate_index, :, slot] = column_tilt
 
+            # Volume as in the draft: rosters plus the generic level per open slot. Blind to money (D6 of
+            # percentage_volume_plan.md): a seat with more cash left will likely buy higher-volume players,
+            # but converting money into volume is separate modelling, not yet done.
+            volume_field = (self._build_opponent_volume_field(
+                player_assignments, drafter, opponent_teams, field_snapshots, model_opponents,
+                x_scores_available, players_chosen, candidate_batch,
+                opponent_tilt_columns)
+                if self.volume_categories else None)
+
         else:
             # While the roster still has room a candidate is being added, so the drafter's team grows to
             # len+1 and opponents are modelled at that size (shortfalls padded with the expected next-pick
@@ -1355,6 +1383,13 @@ class HAgent:
                         diff_means[candidate_index, :, slot] = spare_column
                         opponent_tilt_columns[candidate_index, :, slot] = spare_tilt
 
+            # Nothing to do when no percentage category is in play.
+            volume_field = (self._build_opponent_volume_field(
+                player_assignments, drafter, opponent_teams, field_snapshots, model_opponents,
+                x_scores_available, players_chosen, candidate_batch,
+                opponent_tilt_columns)
+                if self.volume_categories else None)
+
         diff_vars = np.vstack([
             self.get_diff_var(len([p for p in player_assignments[team] if p == p]))
             for team in team_names if team != drafter
@@ -1379,11 +1414,202 @@ class HAgent:
         # reattribution between rows; the objective sums both terms and is untouched.
         opponent_future_tilts = opponent_tilt_columns.mean(axis=2)               # (1|N, n_cat)
 
-        return diff_means, diff_vars, sigma_2_m, opponent_future_tilts
+        return diff_means, diff_vars, sigma_2_m, opponent_future_tilts, volume_field
+
+    def _build_opponent_volume_field(self
+                                     , player_assignments
+                                     , drafter
+                                     , opponent_teams
+                                     , field_snapshots
+                                     , model_opponents
+                                     , x_scores_available
+                                     , players_chosen
+                                     , candidate_batch
+                                     , opponent_tilt_columns):
+        """Each opponent column's full-season volume in every percentage category, in units of an
+        average player's (so a typical team totals n_picks), plus the generic level an unfilled slot is
+        expected to bring.
+
+        A seat's expected future category tilt (opponent_tilt_columns, (1|N, n_cat, n_opp_total), the
+        tilt its totals carry) brings a volume tilt with it: B times the category tilt (see
+        volume_tilt_matrix in __init__). A seat building toward points and away from FT% is projected to
+        keep drafting volume accordingly.
+
+        The columns follow the diff columns exactly, in the draft and the auction alike: one block per
+        field snapshot, one column per opponent; a seat that has drafted is its real roster, an empty seat
+        its predicted anchor (assigned by _assign_empty_seat_anchors, as both branches do), and a candidate
+        who IS a predicted anchor sees that column swapped for the spare anchor (self-exclusion). Unfilled
+        slots are filled to n_picks at the generic level, independently of how far the totals pad: the
+        rate a team posts is over its whole season's attempts. The generic level is the mean over the
+        players the rest of the draft will plausibly take -- the top remaining-picks of the available pool
+        (D2 of percentage_volume_plan.md).
+
+        Returns {'opponent_units': (1|N, R, n_opp_total), 'generic_units': (R,), 'generic_x': (R,)}."""
+        generic_units, generic_x = self.compute_generic_volume_levels(x_scores_available, players_chosen)
+
+        def team_units(roster):
+            roster = [player for player in roster if player == player]
+            filled = self.player_volume_units.loc[roster].sum().to_numpy()
+            return filled + max(self.n_picks - len(roster), 0) * generic_units
+
+        seat_anchors = [
+            self._assign_empty_seat_anchors(player_assignments, drafter, None if snapshot is None else snapshot[1])
+            if model_opponents else ({}, None)
+            for snapshot in field_snapshots
+        ]
+
+        columns = []
+        for empty_slot_player, _ in seat_anchors:
+            for team in opponent_teams:
+                roster = [player for player in player_assignments[team] if player == player]
+                if not roster and team in empty_slot_player:
+                    roster = [empty_slot_player[team]]
+                columns.append(team_units(roster))
+        opponent_units = np.stack(columns, axis=1).reshape(1, len(self.volume_categories), len(columns))
+
+        # Self-exclusion, mirroring get_diff_distributions: the affected candidate faces the spare anchor.
+        if candidate_batch is not None:
+            for snapshot_index, (empty_slot_player, spare_anchor) in enumerate(seat_anchors):
+                if spare_anchor is None or not empty_slot_player:
+                    continue
+                slot_offset = snapshot_index * len(opponent_teams)
+                player_to_slot = {player: opponent_teams.index(team) + slot_offset
+                                  for team, player in empty_slot_player.items()}
+                affected = {index: player_to_slot[player]
+                            for index, player in enumerate(candidate_batch) if player in player_to_slot}
+                if not affected:
+                    continue
+                if opponent_units.shape[0] == 1:
+                    opponent_units = np.repeat(opponent_units, len(candidate_batch), axis=0)
+                spare_units = team_units([spare_anchor])
+                for candidate_index, slot in affected.items():
+                    opponent_units[candidate_index, :, slot] = spare_units
+
+        opponent_units = opponent_units + np.einsum('rc,nco -> nro', self.volume_tilt_matrix, opponent_tilt_columns)
+        return {'opponent_units': opponent_units, 'generic_units': generic_units, 'generic_x': generic_x}
+
+    def compute_generic_volume_levels(self
+                                      , x_scores_available
+                                      , players_chosen) -> tuple[np.ndarray, np.ndarray]:
+        """What an unfilled roster slot is expected to bring in each percentage category: (volume in
+        average-player units, percentage X), averaged over the players the rest of the draft will
+        plausibly take -- the top remaining-picks of the available pool, which x_scores_available lists
+        best first (D2 of percentage_volume_plan.md)."""
+        remaining_picks = max(self.n_drafters * self.n_picks - len(players_chosen), 1)
+        draftable = x_scores_available.index[:remaining_picks]
+        return (self.player_volume_units.loc[draftable].mean().to_numpy(),
+                x_scores_available.loc[draftable, self.volume_categories].mean().to_numpy())
+
+    def _build_volume_context(self
+                              , my_players
+                              , n_players_selected
+                              , x_scores_batch_array
+                              , candidate_index
+                              , volume_field):
+        """The drafter's side of the volume treatment, per candidate: the team's absolute season total in
+        each percentage category (before its expected future tilt, which the objective adds) and its
+        season volume in average-player units. Phase 1 of the plan: future picks enter at the generic
+        level, so volume does not depend on the category weights."""
+        index = self.volume_category_indices
+        future_slots = max(self.n_picks - n_players_selected - 1, 0)
+        roster_x = self.x_scores.loc[my_players, self.volume_categories].sum().to_numpy()
+        roster_units = self.player_volume_units.loc[my_players].sum().to_numpy()
+        candidate_x = x_scores_batch_array[:, index, 0]
+        candidate_units = self.player_volume_units.loc[candidate_index].to_numpy()
+        return {
+            'my_x_base':      roster_x + candidate_x + future_slots * volume_field['generic_x'],
+            'my_units':       roster_units + candidate_units + future_slots * volume_field['generic_units'],
+            'roster_x':       roster_x.reshape(1, -1),
+            'roster_units':   roster_units.reshape(1, -1),
+            'opponent_units': volume_field['opponent_units'],
+        }
+
+    def apply_volume_awareness(self
+                               , x_diff_array
+                               , diff_vars
+                               , my_x_total
+                               , my_units
+                               , opponent_units):
+        """Turn each percentage category's differential and variance into the rate gap a team actually
+        plays for (percentage_volume_plan.md, section 2).
+
+        With k = V_typ / V_team (V_typ = n_picks average players' volume), a team's rate deviation is
+        proportional to X * k, and its weekly noise in X units has variance n_picks / k. So against an
+        opponent B
+
+            gap      = X_A k_A - X_B k_B  =  k_B * diff + X_A * (k_A - k_B)      (X_B = X_A - diff)
+            variance = n (k_A + k_B)  +  k_B^2 * (draft uncertainty of B's unfilled slots)
+
+        where the draft term is today's diff_vars less its 2n weekly part: B's unknown future X enters
+        the gap multiplied by k_B. At k_A = k_B = 1 both reduce to today's differential and variance.
+        Counting categories pass through untouched.
+
+        my_x_total: (N, R) my team's absolute season total in each percentage category.
+        my_units:   (N, R) my season volume, average-player units; opponent_units (1|N, R, O) likewise.
+        Returns (differential, variance, my_k): the arrays the objective reads, now (N, C, O) both, and
+        my k (N, R), the derivative of each gap with respect to my own X (the gradient's chain factor).
+        """
+        index = self.volume_category_indices
+        n = self.n_picks
+        floor = _MINIMUM_TEAM_VOLUME_FRACTION * n
+        my_k = n / np.maximum(my_units, floor)                                   # (N, R)
+        opponent_k = n / np.maximum(opponent_units, floor)                        # (1|N, R, O)
+
+        n_rows = max(x_diff_array.shape[0], my_k.shape[0], opponent_k.shape[0])
+        shape = (n_rows, x_diff_array.shape[1], x_diff_array.shape[2])
+        differential = np.broadcast_to(x_diff_array, shape).astype(float, copy=True)
+        variance = np.broadcast_to(diff_vars, shape).astype(float, copy=True)
+
+        my_k_column = my_k[:, :, None]
+        ratio_diff = differential[:, index, :]
+        differential[:, index, :] = (opponent_k * ratio_diff
+                                     + my_x_total[:, :, None] * (my_k_column - opponent_k))
+        draft_uncertainty = variance[:, index, :] - 2 * n
+        variance[:, index, :] = n * (my_k_column + opponent_k) + opponent_k ** 2 * draft_uncertainty
+        return differential, variance, my_k
+
+    def chain_volume_into_pdf_weights(self
+                                      , pdf_weights
+                                      , cell_weights
+                                      , differential
+                                      , variance
+                                      , my_x_total
+                                      , my_units
+                                      , my_k):
+        """The objective's derivative with respect to MY category X, through the volume transform.
+
+        cell_weights (N, C, O) are dO/d(gap) per category and opponent, the variance held fixed;
+        pdf_weights (N, C) their sum over opponents. Two routes from my X to the objective:
+
+          directly: a percentage gap moves with my own X at rate k_A, whichever the opponent;
+          through my volume: my future X tilt F brings volume B F (U_A = base + B F), moving k_A,
+          and k_A enters both the gap (d gap / d k_A = X_A) and the variance (d var / d k_A = n).
+
+        Every format's objective sees a cell only through z = gap / sqrt(var), so
+        dO/d(var) = dO/d(gap) * (-gap / (2 var)) cell by cell. With dk_A/dU_A = -k_A^2 / n (zero
+        where the team-volume floor binds), the volume route is a weight per volume dimension, and
+        B^T carries it back onto the categories. The result multiplies del_full and the position
+        means exactly as pdf_weights did, because both F routes run through the same future tilt."""
+        index = self.volume_category_indices
+        n = self.n_picks
+        chained = np.array(np.broadcast_to(pdf_weights, (my_k.shape[0], pdf_weights.shape[1])),
+                           dtype=float, copy=True)
+        chained[:, index] *= my_k
+
+        ratio_cells = cell_weights[:, index, :]
+        ratio_gaps = differential[:, index, :]
+        ratio_variances = variance[:, index, :]
+        floor = _MINIMUM_TEAM_VOLUME_FRACTION * n
+        d_k_d_units = np.where(my_units > floor, -my_k ** 2 / n, 0.0)               # (N, R)
+        d_objective_d_k = (my_x_total * ratio_cells.sum(axis=2)
+                           - n * (ratio_cells * ratio_gaps / (2 * ratio_variances)).sum(axis=2))
+        volume_weights = d_k_d_units * d_objective_d_k                               # (N, R)
+        return chained + volume_weights @ self.volume_tilt_matrix
 
     def compute_h_score_from_diff_means(self
                                          , diff_means: np.ndarray
-                                         , diff_vars: np.ndarray) -> float:
+                                         , diff_vars: np.ndarray
+                                         , volume_context: dict | None = None) -> float:
         """Fast H-score for a complete (n_picks) roster given pre-computed diff_means.
 
         Mirrors the n_players_selected == n_picks branch of perform_iterations:
@@ -1399,6 +1625,10 @@ class HAgent:
         else:
             sigma_2_m = None
 
+        if volume_context is not None:
+            diff_means, diff_vars, _ = self.apply_volume_awareness(
+                diff_means, diff_vars, volume_context['my_x_total'], volume_context['my_units'],
+                volume_context['opponent_units'])
         cdf_estimates = self.get_cdf(diff_means, diff_vars)
         score = self.get_objective_and_pdf_weights(
             diff_means, diff_vars, cdf_estimates, None, sigma_2_m,
@@ -1408,7 +1638,8 @@ class HAgent:
 
     def compute_h_scores_batched(self
                                   , diff_means_batch: np.ndarray
-                                  , diff_vars: np.ndarray) -> np.ndarray:
+                                  , diff_vars: np.ndarray
+                                  , volume_context: dict | None = None) -> np.ndarray:
         """Vectorized H-score for a batch of complete-roster diff_means.
 
         Equivalent to calling compute_h_score_from_diff_means N times but in a
@@ -1427,6 +1658,10 @@ class HAgent:
         else:
             sigma_2_m = None
 
+        if volume_context is not None:
+            diff_means_batch, diff_vars, _ = self.apply_volume_awareness(
+                diff_means_batch, diff_vars, volume_context['my_x_total'], volume_context['my_units'],
+                volume_context['opponent_units'])
         cdf_estimates = self.get_cdf(diff_means_batch, diff_vars)
         return self.get_objective_and_pdf_weights(
             diff_means_batch, diff_vars, cdf_estimates, None, sigma_2_m,
@@ -1671,13 +1906,13 @@ class HAgent:
                                  , team_so_far_array
                                  , n_players_selected
                                  , sigma_2_m
-                                 , pitching_preference):
-        """Choose the cold-start category-weight init per candidate (replaces the old heuristic).
-
-        Each seed gently punts one category to _PUNT_SEED_FACTOR of neutral. Once the drafter holds
-        _WEAKNESS_SEED_MIN_ROSTER+ players the roster has a real shape, so seed the single punt of its
-        weakest category (same for every candidate). Earlier -- no reliable weakness -- multi-start:
-        score one punt per category and keep, per candidate, the one with the best pre-descent objective.
+                                 , pitching_preference
+                                 , volume_context=None):
+        """Choose the cold-start category-weight init per candidate (replaces the old heuristic): multi-start
+        over the seed menu below, keeping, per candidate, the seed with the best pre-descent objective. Each
+        punt seed gently punts one category to _PUNT_SEED_FACTOR of neutral. Used at every roster size: a
+        single seed on the roster's weakest category (as from the third pick, formerly) commits the build to
+        one basin before the descent can compare it with the others.
         """
         neutral      = self.get_starting_category_weights()
         n_candidates = x_scores_batch_array.shape[0]
@@ -1686,10 +1921,6 @@ class HAgent:
             weights = neutral.copy()
             weights[category_index] *= _PUNT_SEED_FACTOR
             return weights / weights.sum()
-
-        if len(self.players) >= _WEAKNESS_SEED_MIN_ROSTER:
-            weakest = int(np.argmin(self.x_scores.loc[self.players].sum(axis=0).to_numpy()))
-            return self._project_forced_weights(np.array([gentle_punt(weakest)] * n_candidates))
 
         # The full seed menu, identical for every self-play pass and the serves (a menu the
         # serve has and the passes lack lets the serve discover lanes the field never
@@ -1723,7 +1954,7 @@ class HAgent:
                     matrix, position_shares, diff_means, diff_vars,
                     x_scores_batch_array, candidate_player_array, team_so_far_array,
                     n_players_selected, sigma_2_m, 0, pitching_preference,
-                    correction_mode='skip',
+                    correction_mode='skip', volume_context=volume_context,
                 )['Score']
                 for matrix in seed_matrices
             ])
@@ -1828,7 +2059,8 @@ class HAgent:
                            , n_iterations
                            , candidate_priority=None
                            , candidate_offset=0
-                           , opponent_future_tilts=None):
+                           , opponent_future_tilts=None
+                           , volume_context=None):
 
         # Stale correction terms must never leak across boards or candidate batches.
         self._correction_cache = None
@@ -1915,7 +2147,7 @@ class HAgent:
                 category_weights = self._select_starting_weights(
                     position_shares, diff_means, diff_vars, x_scores_batch_array,
                     candidate_player_array, team_so_far_array, n_players_selected,
-                    sigma_2_m, pitching_preference,
+                    sigma_2_m, pitching_preference, volume_context=volume_context,
                 )
                 # Mixed warm start: rows with stored converged weights (set by get_h_scores when the
                 # frozen table only partially covers the batch) override their cold seeds.
@@ -1957,6 +2189,7 @@ class HAgent:
                     category_weights, position_shares, diff_means, diff_vars,
                     x_scores_batch_array, candidate_player_array, team_so_far_array,
                     n_players_selected, sigma_2_m, iteration, pitching_preference,
+                    volume_context=volume_context,
                 )
 
                 score               = gradient_result['Score']
@@ -2052,9 +2285,14 @@ class HAgent:
 
         elif (n_players_selected == self.n_picks - 1) or (not self.dynamic and n_players_selected < self.n_picks):
             x_diff_array   = diff_means + x_scores_batch_array
-            cdf_estimates  = self.get_cdf(x_diff_array, diff_vars)
+            scored_vars    = diff_vars
+            if volume_context is not None:
+                x_diff_array, scored_vars, _ = self.apply_volume_awareness(
+                    x_diff_array, diff_vars, volume_context['my_x_base'], volume_context['my_units'],
+                    volume_context['opponent_units'])
+            cdf_estimates  = self.get_cdf(x_diff_array, scored_vars)
             score          = self.get_objective_and_pdf_weights(
-                x_diff_array, diff_vars, cdf_estimates, None, sigma_2_m,
+                x_diff_array, scored_vars, cdf_estimates, None, sigma_2_m,
                 calculate_pdf_weights=False,
             )
             rosters              = None
@@ -2062,9 +2300,14 @@ class HAgent:
             category_weights_current = None
 
         elif n_players_selected == self.n_picks:
-            cdf_estimates  = self.get_cdf(diff_means, diff_vars)
+            scored_diffs, scored_vars = diff_means, diff_vars
+            if volume_context is not None:
+                scored_diffs, scored_vars, _ = self.apply_volume_awareness(
+                    diff_means, diff_vars, volume_context['roster_x'], volume_context['roster_units'],
+                    volume_context['opponent_units'])
+            cdf_estimates  = self.get_cdf(scored_diffs, scored_vars)
             score          = self.get_objective_and_pdf_weights(
-                diff_means, diff_vars, cdf_estimates, None, sigma_2_m,
+                scored_diffs, scored_vars, cdf_estimates, None, sigma_2_m,
                 calculate_pdf_weights=False,
             )
             result_index             = ['']
@@ -2086,9 +2329,20 @@ class HAgent:
             drop_potentials_array = np.expand_dims(np.array(drop_potentials), axis=2)
             diff_means_mod = diff_means - drop_potentials_array
 
-            cdf_estimates  = self.get_cdf(diff_means_mod, diff_vars)
+            scored_vars = diff_vars
+            if volume_context is not None:
+                # Each drop option is its own team: its percentage totals and volume lose the dropped.
+                dropped_units = np.vstack([
+                    self.player_volume_units.loc[list(players_to_remove)].sum().to_numpy()
+                    for players_to_remove in combinations(my_players, extra_players)
+                ])
+                dropped_x = drop_potentials[self.volume_categories].to_numpy()
+                diff_means_mod, scored_vars, _ = self.apply_volume_awareness(
+                    diff_means_mod, diff_vars, volume_context['roster_x'] - dropped_x,
+                    volume_context['roster_units'] - dropped_units, volume_context['opponent_units'])
+            cdf_estimates  = self.get_cdf(diff_means_mod, scored_vars)
             score          = self.get_objective_and_pdf_weights(
-                diff_means_mod, diff_vars, cdf_estimates, None, sigma_2_m,
+                diff_means_mod, scored_vars, cdf_estimates, None, sigma_2_m,
                 calculate_pdf_weights=False,
             )
             result_index             = drop_potentials.index
@@ -2191,7 +2445,8 @@ class HAgent:
                                     , sigma_2_m
                                     , iteration
                                     , pitching_preference=None
-                                    , correction_mode='full'):
+                                    , correction_mode='full'
+                                    , volume_context=None):
 
         if self.position_means is not None:
             position_rewards = self.get_position_priorities_from_category_weights(category_weights)
@@ -2233,16 +2488,11 @@ class HAgent:
             # applied to one side only it is a fictitious handicap (measured: it printed
             # itself onto the Rotisserie board at pinned confidence 1.0). Field reaction
             # belongs in the pick model's pool composition (a price), not a level.
-            expected_future_diff_single = (
-                compute_expected_pick_tilts(
-                    category_weights, L[0], self.v, self.pick_pool_size)
-                + position_mu
-            )
-            del_full = (
-                (self.n_picks - 1 - n_players_selected)
-                * compute_expected_pick_tilt_jacobian(
-                    category_weights, L[0], self.v, self.pick_pool_size)
-            )
+            # One pass for both: they share the expected-max core, the costly part of the model.
+            expected_pick_tilts, expected_pick_tilt_jacobian = compute_expected_pick_tilts_and_jacobian(
+                category_weights, L[0], self.v, self.pick_pool_size)
+            expected_future_diff_single = expected_pick_tilts + position_mu
+            del_full = (self.n_picks - 1 - n_players_selected) * expected_pick_tilt_jacobian
 
         # MLB: unsupported and unreachable — see the MLB note in __init__.
         elif self.sport == 'MLB':
@@ -2292,14 +2542,28 @@ class HAgent:
         ).reshape(-1, self.n_categories, 1)
 
         x_diff_array  = diff_means + x_scores_batch_array + expected_future_diff
+        if volume_context is not None:
+            # My absolute season total = roster + candidate + generic future level (the base) + the
+            # expected future tilt, which is exactly what the descent moves. My season volume likewise:
+            # the base (roster + candidate + generic level) + the volume my future tilt brings, B times it.
+            my_x_total = (volume_context['my_x_base']
+                          + expected_future_diff[:, self.volume_category_indices, 0])
+            my_units = (volume_context['my_units']
+                        + expected_future_diff[:, :, 0] @ self.volume_tilt_matrix.T)
+            x_diff_array, diff_vars, my_k = self.apply_volume_awareness(
+                x_diff_array, diff_vars, my_x_total, my_units, volume_context['opponent_units'])
         pdf_estimates = self.get_pdf(x_diff_array, diff_vars)
         cdf_estimates = self.get_cdf(x_diff_array, diff_vars)
 
-        score, pdf_weights = self.get_objective_and_pdf_weights(
+        score, cell_weights = self.get_objective_and_pdf_weights(
             x_diff_array, diff_vars, cdf_estimates, pdf_estimates, sigma_2_m,
             calculate_pdf_weights=True,
             correction_mode=correction_mode, iteration=iteration,
         )
+        pdf_weights = cell_weights.sum(axis=2)
+        if volume_context is not None:
+            pdf_weights = self.chain_volume_into_pdf_weights(
+                pdf_weights, cell_weights, x_diff_array, diff_vars, my_x_total, my_units, my_k)
 
         category_gradient = np.einsum('ai,aik -> ak', pdf_weights, del_full)
 
@@ -2352,7 +2616,10 @@ class HAgent:
                                        , correction_mode='full'
                                        , iteration=None):
         """The objective for this session's format, and (optionally) its gradient with respect
-        to the category differentials.
+        to the category differentials, per cell: shape (N, C, O), the partial with respect to each
+        category's differential against each opponent column. Summed over opponents it is the
+        per-category gradient; kept per cell because the volume treatment needs each cell's own
+        derivative (chain_volume_into_pdf_weights).
 
         Head to Head is a spectrum rather than two formats: most_categories_weight is how much
         of the objective is the probability of taking the majority, the rest being the average
@@ -2453,7 +2720,8 @@ class HAgent:
             pdf_weights = pdf_weights + (
                 -z_scores * correction_terms['m_phi'] + correction_terms['probability_gradient']
             ) * pdf_estimates
-        return objective, pdf_weights.mean(axis=2)
+        # Per cell; the objective averages over the opponent columns, so each carries 1 / n_columns.
+        return objective, pdf_weights / pdf_weights.shape[2]
 
     def get_objective_and_pdf_weights_ec(self
                                           , cdf_estimates
@@ -2461,17 +2729,16 @@ class HAgent:
                                           , calculate_pdf_weights=False):
         """Average per-category win probability, and its exact gradient.
 
-        The consumer contracts only the category axis, so a returned weight must be the
-        objective's partial with respect to one category's differential, summed over opponents.
-        Averaging over opponents supplies that axis' 1/n_opponents; the division below supplies
-        the 1/n_categories that the objective's category mean introduces and the per-category
-        partials do not carry. Without it these weights are the gradient of the SUM over
-        categories -- n_categories times too large, which is invisible under Adam on its own but
-        would silently dominate any blend with Most Categories, whose weights are exact.
+        A returned weight is the objective's partial with respect to one cell's differential (one
+        category against one opponent column). The objective averages over both axes, so each cell
+        carries 1/n_columns and 1/n_categories. Without the category factor these weights would be
+        the gradient of the SUM over categories -- n_categories times too large, which is invisible
+        under Adam on its own but would silently dominate any blend with Most Categories, whose
+        weights are exact.
         """
         objective = cdf_estimates.mean(axis=2).mean(axis=1)
         if calculate_pdf_weights:
-            return objective, pdf_estimates.mean(axis=2) / self.n_categories
+            return objective, pdf_estimates / (pdf_estimates.shape[2] * self.n_categories)
         return objective
 
     def get_objective_and_pdf_weights_rotisserie(self
@@ -2480,8 +2747,7 @@ class HAgent:
                                                    , cdf_estimates
                                                    , pdf_estimates
                                                    , sigma_2_m
-                                                   , calculate_pdf_weights=False
-                                                   , test_mode=False):
+                                                   , calculate_pdf_weights=False):
         diff_means   = x_diff_array / np.sqrt(diff_vars)
         pdf_estimates = _normal_pdf(diff_means)
         f = self.get_f(pdf_estimates)
@@ -2501,18 +2767,26 @@ class HAgent:
             del_sigma_2_d = self.get_del_sigma_2_d(diff_means, self.rho, pdf_estimates, cdf_estimates, f, self.n_drafters)
             del_mu_d      = self.get_del_mu_d(self.n_drafters, pdf_estimates)
             gradient      = self.get_del_v(sigma_d, del_mu_d, mu_d, del_sigma_2_d)
-            gradient      = gradient * np.sqrt(diff_vars)
-            if test_mode:
-                return gradient
-            return objective, gradient.sum(axis=2)
+            # get_del_v differentiates with respect to the z-scores (x / sqrt(var)), so the derivative with
+            # respect to x divides by sqrt(var). This used to MULTIPLY, which returned the true gradient
+            # times each category's variance: invisible while the variances were near-uniform (a common
+            # factor Adam absorbs), but the volume-aware percentage categories spread them (n(k_A + k_B)),
+            # which would have tilted the descent toward or away from those categories.
+            gradient      = gradient / np.sqrt(diff_vars)
+            return objective, gradient
         return objective
 
     def get_pdf(self, x_diff_array, diff_vars):
+        if diff_vars.shape[0] != 1:
+            # Per-candidate variances (the volume-aware percentage categories): broadcast directly.
+            return _normal_pdf(x_diff_array, scale=np.sqrt(diff_vars))
         r = x_diff_array.reshape(x_diff_array.shape[0], x_diff_array.shape[1] * x_diff_array.shape[2])
         v = diff_vars.reshape(diff_vars.shape[1] * diff_vars.shape[2])
         return _normal_pdf(r, scale=np.sqrt(v)).reshape(x_diff_array.shape)
 
     def get_cdf(self, x_diff_array, diff_vars):
+        if diff_vars.shape[0] != 1:
+            return _normal_cdf(x_diff_array, scale=np.sqrt(diff_vars))
         r = x_diff_array.reshape(x_diff_array.shape[0], x_diff_array.shape[1] * x_diff_array.shape[2])
         v = diff_vars.reshape(diff_vars.shape[1] * diff_vars.shape[2])
         return _normal_cdf(r, scale=np.sqrt(v)).reshape(x_diff_array.shape)
@@ -3029,9 +3303,12 @@ class HAgent:
         return f_part + g1 - g2
 
     def get_h_m(self, sigma_c, n_managers):
+        # sigma_c is one team's (n_cat,) or a batch of them (N, n_cat) -- the trade-suggest path scores
+        # every combo at once. The batched form used to fail outright (an einsum written for one vector),
+        # so Rotisserie trade suggestions errored; '...' carries the batch axis through unchanged.
         s_mod = sigma_c ** 2 + 1
-        sigma_matrix = np.sqrt(np.einsum('a,b -> ab', s_mod, s_mod))
-        first = n_managers / sigma_matrix - (2 / sigma_matrix) * np.identity(len(sigma_c))
+        sigma_matrix = np.sqrt(np.einsum('...a,...b -> ...ab', s_mod, s_mod))
+        first = n_managers / sigma_matrix - (2 / sigma_matrix) * np.identity(sigma_c.shape[-1])
         return (n_managers - 1) / (2 * np.pi) * first
 
     def get_v(self, mu_d, sigma_d):
@@ -3057,8 +3334,8 @@ class HAgent:
 
     def get_sigma_2_m(self, sigma_c, h_m, rho, n_managers):
         s2 = sigma_c ** 2
-        c1 = (n_managers - 1) * np.arccos(s2 / (1 + s2)).sum() / (2 * np.pi)
-        c2 = (rho * h_m).sum(axis=(1, 2)) / 2
+        c1 = (n_managers - 1) * np.arccos(s2 / (1 + s2)).sum(axis=-1) / (2 * np.pi)
+        c2 = (rho * h_m).sum(axis=(-2, -1)) / 2
         return c1 + c2
 
     #ZR: Equation 33 in the Rotisserie paper is wrong: 
@@ -3082,6 +3359,40 @@ class HAgent:
                 * (sigma_d ** 2 * del_mu_d - mu_d * del_sigma_2_p / 2))
 
 
+def _normal_cdf(x, scale=1.0):
+    return ndtr(x / scale)
+
+
+def _normal_ppf(q, scale=1.0):
+    return scale * ndtri(q)
+
+
+class ForcedWeightsInfeasibleError(ValueError):
+    """The pinned category weights claim so much of the total that the free ones have no room.
+
+    Its own type so the API can answer 400 with the message (which names the offending categories)
+    rather than folding it into the evaluate route's blanket 500."""
+
+
+def _softmax_rows(logits):
+    """Row-wise softmax (each row is a probability distribution over that row's columns). Used to
+    parameterise the flex position shares: optimising in this unconstrained logit space keeps the
+    shares on the simplex automatically, so the share update needs no clip-to-[0,1] or renormalise
+    (those distort the step at the boundary and homogenise the survivors).
+
+    Subtracting the row max is purely numerical and has no effect on the result: softmax is
+    shift-invariant, so e^{z − c}/Σe^{z − c} = e^z/Σe^z — the common e^{−c} factor cancels between
+    numerator and denominator. Its only job is to keep exp() from overflowing on large logits."""
+    shifted = logits - logits.max(axis=1, keepdims=True)
+    exponentiated = np.exp(shifted)
+    return exponentiated / exponentiated.sum(axis=1, keepdims=True)
+
+
+def _normal_pdf(x, scale=1.0):
+    z = x / scale
+    return _INV_SQRT_2PI / scale * np.exp(-0.5 * z * z)
+
+
 # ── Adam optimiser (unchanged) ─────────────────────────────────────────────────
 
 class AdamOptimizer:
@@ -3100,4 +3411,3 @@ class AdamOptimizer:
         m_hat = self.m      / (1 - self.beta1 ** self.t)
         v_hat = self.v_adam / (1 - self.beta2 ** self.t)
         return self.learning_rate * m_hat / (np.sqrt(v_hat) + self.epsilon)
-

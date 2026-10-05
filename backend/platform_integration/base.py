@@ -57,14 +57,14 @@ class PlatformSelections:
     """Current selections pulled from a platform — draft board, season rosters, or
     auction.
 
-    `player_assignments` maps each team to its list of canonical 'Name (POS)'
-    players (the shape /evaluate expects). `injured_players` lists players the
-    platform flags as out (Season Mode only); empty otherwise. `costs` is populated
+    `player_assignments` maps each team to its list of player ids (the shape /evaluate
+    expects). `injured_players` lists the ids of players the platform flags as out
+    (Season Mode only); empty otherwise. `costs` is populated
     only for auctions: costs[team][i] is the price paid for player_assignments[team][i].
     """
     player_assignments: dict[str, list[int]]
     status:             str
-    injured_players:    list[str]
+    injured_players:    list[int]
     costs:              Optional[dict[str, list[float]]] = None
 
 

@@ -17,32 +17,12 @@ from backend.models import (
 from backend.math.algorithm_helpers import auction_value_adjuster
 from backend.player_identity import FULL_ROSTER_SCORE_PLAYER_ID
 from backend.infra.server_timing import record_phase
-from backend.services.build_agent import derive_effective_objective
+from backend.services.build_agent import count_unscorable_players_as_replacement, derive_effective_objective
 from backend.math.position_config import PositionConfig
 
 # The engine's internal index for the one result row of a full-roster evaluate
 # (algorithm_agents.get_h_scores, n_players_selected == n_picks branch).
 _FULL_ROSTER_RESULT_INDEX = ''
-
-
-class UnknownRosterPlayersError(ValueError):
-    """A rostered player is not in the current player pool.
-
-    Happens when a data-source change alters player identities (or removes players)
-    after a board was built against the previous pool. Surfaced as a 400 so the
-    user gets an actionable message instead of a KeyError-turned-500.
-    """
-
-
-class UnknownTeamError(ValueError):
-    """The team being evaluated for is not one of the teams on the board.
-
-    Happens when the seat and the board come from different identity sets -- connecting a live
-    platform replaces the generic team names with the league's own, and a seat still pointing at
-    'Team 1' is evaluated against a board keyed by the platform's names. Surfaced as a 400 for
-    the same reason as the sibling above: the alternative is a KeyError several frames deep in
-    the H-score solve, reported as 'Evaluation failed.' with nothing in it to act on.
-    """
 
 
 # ── Public entry point ────────────────────────────────────────────────────────
@@ -76,6 +56,8 @@ def rank_candidates(
     Returns:
         EvaluateResponse containing the iteration count and ranked Candidate list.
     """
+    # A rostered player the league's categories cannot score is replacement level, not an error.
+    player_assignments = count_unscorable_players_as_replacement(session, player_assignments)
     info           = session.agent.info
     h_agent              = session.agent
     current_settings = session.current_settings
@@ -367,9 +349,11 @@ def _build_candidates(
     # numpy below, then the batch builders only assemble Pydantic models — no per-player
     # arithmetic, rounding, or label lookup remains inside any loop.
 
-    # Per-candidate own G-scores, sorted order, shape (n_players, n_cat).
-    g_scores_for_candidates = (
-        player_g_scores.reindex(sorted_index)[categories].fillna(0.0).values.astype(float)
+    # Per-candidate own contribution in G-score units, sorted order, shape (n_players, n_cat). Taken as
+    # x * original_v rather than from the G-scores table: the table carries the per-player team-volume
+    # correction, which the diff rows (x-score space, from the agent) do not, and the rows must add up.
+    own_contributions_for_candidates = (
+        h_agent.x_scores.reindex(sorted_index)[categories].fillna(0.0).values.astype(float) * original_v
     )
     # Team / future differential matrices in x-score space, or None when the dynamic
     # optimiser did not produce them (last pick, dynamic=False). None selects the
@@ -416,7 +400,7 @@ def _build_candidates(
     # Batch-build the three expand-view tables for every candidate rank at once.
     g_score_rows_by_rank = _build_g_score_rows(
         candidate_last_names
-        , g_scores_for_candidates
+        , own_contributions_for_candidates
         , team_diff_matrix
         , future_diff_matrix
         , original_v
@@ -486,7 +470,7 @@ def _build_candidates(
 
 def _build_g_score_rows(
     candidate_last_names: list[str]
-    , own_g_scores: np.ndarray
+    , own_contributions: np.ndarray
     , team_diff_matrix: np.ndarray | None
     , future_diff_matrix: np.ndarray | None
     , original_v: np.ndarray
@@ -497,7 +481,7 @@ def _build_g_score_rows(
     Ported from the original Streamlit candidate-table builder.
 
     The table always ends with a 'Total diff' row = current team diff + this
-    player's own G-scores.  Depending on whether a future component was
+    player's own contribution.  Depending on whether a future component was
     computed, the layout is either 3 rows (no future) or 4 rows (with future).
     The layout is uniform across candidates — team_diff_matrix / future_diff_matrix
     are present-or-absent for the whole result, never per player — so it is chosen
@@ -535,20 +519,22 @@ def _build_g_score_rows(
 
     Both diff DataFrames store values in x-score space (divided by v during
     computation).  Multiplying by original_v converts them back to G-score
-    units so they are comparable to the player_g_scores values.  original_v
-    is the exact conversion factor between x-score and G-score space
+    units.  The player's own row is converted the same way (x * original_v), not
+    read from the G-scores table, because the table's percentage scores carry the
+    per-player team-volume correction and the diff rows do not.  original_v
+    is the conversion factor between x-score and uncorrected G-score space
     (original_v = sqrt(mov/vom) for Rotisserie, sqrt(mov/(mov+vom)) for H2H).
     The algorithm's v is original_v rescaled to sum to 1; original_v is used
     here instead because G-score display is in the original units.
 
-    Note: res['Diff'] does NOT include the candidate player's own G-scores;
-    own_g_scores must be added explicitly to form the Total row.
+    Note: res['Diff'] does NOT include the candidate player's own contribution;
+    own_contributions must be added explicitly to form the Total row.
 
     Args:
         candidate_last_names: Per-rank last name used for the player's own row label.
         categories:           Ordered list of scoring category names.
-        own_g_scores:         G-score matrix for all candidates, shape (n_players, n_cat).
-                              Zeros where a player was absent from the G-scores table.
+        own_contributions:    x * original_v for all candidates, shape (n_players, n_cat).
+                              Zeros where a player was absent from the X-scores table.
         team_diff_matrix:     res['Diff'] matrix, shape (n_players, n_cat), or None when
                               the dynamic optimiser did not run (e.g., last pick).
         future_diff_matrix:   res['Future-Diff'] matrix, shape (n_players, n_cat), or None
@@ -560,11 +546,11 @@ def _build_g_score_rows(
         One list of GScoreRow objects per candidate rank: either 3 rows (no future)
         or 4 rows (with future).
     """
-    n_players, n_categories = own_g_scores.shape
+    n_players, n_categories = own_contributions.shape
 
     # Player's own G-score row, rounded once for the whole pool.
-    own_values = np.round(own_g_scores, 2).tolist()
-    own_totals = np.round(own_g_scores.sum(axis=1), 2).tolist()
+    own_values = np.round(own_contributions, 2).tolist()
+    own_totals = np.round(own_contributions.sum(axis=1), 2).tolist()
 
     if team_diff_matrix is None:
         # Fallback when the diff wasn't computed (last pick or dynamic=False):
@@ -584,7 +570,7 @@ def _build_g_score_rows(
     total_diff = team_diff_matrix.astype(float) * original_v
     # Total diff always equals team differential + candidate's own contribution — the
     # single source of truth for the Total row regardless of the future component.
-    total_diff_with_player = total_diff + own_g_scores
+    total_diff_with_player = total_diff + own_contributions
     total_values = np.round(total_diff_with_player, 2).tolist()
     total_totals = np.round(total_diff_with_player.sum(axis=1), 2).tolist()
 
@@ -842,4 +828,23 @@ def _make_slot_names(position_config: PositionConfig) -> list[str]:
     ]
 
 
+# ── errors ────────────────────────────────────────────────────────────────────
 
+class UnknownRosterPlayersError(ValueError):
+    """A rostered player is not in the current player pool.
+
+    Happens when a data-source change alters player identities (or removes players)
+    after a board was built against the previous pool. Surfaced as a 400 so the
+    user gets an actionable message instead of a KeyError-turned-500.
+    """
+
+
+class UnknownTeamError(ValueError):
+    """The team being evaluated for is not one of the teams on the board.
+
+    Happens when the seat and the board come from different identity sets -- connecting a live
+    platform replaces the generic team names with the league's own, and a seat still pointing at
+    'Team 1' is evaluated against a board keyed by the platform's names. Surfaced as a 400 for
+    the same reason as the sibling above: the alternative is a KeyError several frames deep in
+    the H-score solve, reported as 'Evaluation failed.' with nothing in it to act on.
+    """

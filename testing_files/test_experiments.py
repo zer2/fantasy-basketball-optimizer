@@ -68,14 +68,14 @@ _SECTION_EXPLANATIONS = {
     'Punt diversity (top-12 anchors)':
         'For each of the top 12 players of a season, the build the self-play process predicts a team '
         'drafted around that player would commit to, expressed by its PUNTED categories (expected win '
-        'rate under 40%). Hard punts (under 20%, marked with !) are abandoned categories; soft punts '
-        '(20-40%) are de-emphasised. The breakdown shows how many of the 12 share each punt combination. '
+        'rate under 40%). Hard punts (under 15%, marked with !) are abandoned categories; soft punts '
+        '(15-40%) are de-emphasised. The breakdown shows how many of the 12 share each punt combination. '
         'Healthy: several distinct combinations per season; one combination shared by everyone means the '
         'opponent model has collapsed and the app steers every drafter into the same build.',
-    'Rotisserie punting (hard <20% / soft 20-40% expected win rate)':
+    'Rotisserie punting (hard <15% / soft 15-40% expected win rate)':
         'Rotisserie scores every standings point, so abandoning a category is (mostly) irrational there. '
-        'Hard punt = a top-12 build expecting to win a category under 20% of the time (want ZERO); soft '
-        'punt = 20-40% (a mild lean; a few are fine). Also shown: the single weakest category '
+        'Hard punt = a top-12 build expecting to win a category under 15% of the time (want ZERO); soft '
+        'punt = 15-40% (a mild lean; a few are fine). Also shown: the single weakest category '
         'expectation across the 12 builds. H2H formats, by contrast, punt hard on purpose.',
     'Predicted-pick stability (EC; opponent takes its predicted player)':
         'Evaluate all candidates, let an opponent take exactly the player the model already predicted '
@@ -382,9 +382,9 @@ def sessions():
 
 
 # Punt classification, in expected category WIN RATE (the percentages shown in the app):
-#   hard punt: < 20% -- the build has abandoned the category
-#   soft punt: 20-40% -- deliberately de-emphasised but not abandoned
-_HARD_PUNT_RATE = 0.20
+#   hard punt: < 15% -- the build has abandoned the category
+#   soft punt: 15-40% -- deliberately de-emphasised but not abandoned
+_HARD_PUNT_RATE = 0.15
 _SOFT_PUNT_RATE = 0.40
 
 
@@ -455,7 +455,7 @@ def test_roto_minimal_punting(sessions, auction):
         weakest_player, weakest_rates = min(rows, key=lambda pr: float(np.min(pr[1])))
         weakest_idx = int(np.argmin(weakest_rates))
         weakest_cat = _SHORT_CATEGORY.get(categories[weakest_idx], categories[weakest_idx])
-        _record_row('Rotisserie punting (hard <20% / soft 20-40% expected win rate)',
+        _record_row('Rotisserie punting (hard <15% / soft 15-40% expected win rate)',
                     ['Season', 'Mode', 'Hard', 'Soft', 'Weakest category', 'Weakest rate', 'Player'],
                     [season, mode, hard_count, soft_count, weakest_cat,
                      f'{100 * float(np.min(weakest_rates)):.0f}%',
@@ -471,7 +471,7 @@ def test_roto_minimal_punting(sessions, auction):
         )
         # Soft counts measure roster SHAPE as much as strategy: an auction anchor's expected team is a
         # star plus budget-priced fill, which mechanically spreads category win rates wider than a
-        # snake-draft expectation and parks more of them in the 20-40% band without any punt intent.
+        # snake-draft expectation and parks more of them in the 15-40% band without any punt intent.
         # The near-zero hard floor above is the real Roto property; the soft ceilings only catch
         # egregious drift (draft measured <=21/season; auction measured ~47 on the widest season, 2020-21).
         soft_ceiling = (5 if auction else 2) * len(rows)

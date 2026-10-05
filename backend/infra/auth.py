@@ -40,6 +40,7 @@ oauth.register(
     client_kwargs={'scope': 'openid email profile'},
 )
 
+
 def session_secret_key() -> str:
     """The key that signs the login session cookie. Required, with no fallback: a per-process
     random key would silently break logins across restarts / multiple instances (a process
@@ -59,6 +60,11 @@ def session_https_only() -> bool:
     return os.environ.get('SESSION_HTTPS_ONLY', '').lower() in ('1', 'true', 'yes')
 
 
+def email_is_allowed(email: str) -> bool:
+    allow = _allowed_emails()
+    return allow is None or email.lower() in allow
+
+
 def _allowed_emails() -> Optional[set[str]]:
     # A (non-secret) allowlist of emails; environment config, not a secret.
     raw = os.environ.get('AUTH_ALLOWED_EMAILS', '').strip()
@@ -67,9 +73,11 @@ def _allowed_emails() -> Optional[set[str]]:
     return {email.strip().lower() for email in raw.split(',') if email.strip()}
 
 
-def email_is_allowed(email: str) -> bool:
-    allow = _allowed_emails()
-    return allow is None or email.lower() in allow
+def current_user_key(request: Request) -> str:
+    """Filesystem-safe per-user key (a hash of the Google sub) for the credential store.
+    Derived from the session server-side, so a client can never name another user's key.
+    401s when not signed in — use on endpoints that always require a logged-in user."""
+    return _key_for(get_current_user(request))
 
 
 def get_current_user(request: Request) -> dict:
@@ -80,20 +88,13 @@ def get_current_user(request: Request) -> dict:
     return user
 
 
-def _key_for(user: dict) -> str:
-    return hashlib.sha256(user['sub'].encode()).hexdigest()[:32]
-
-
-def current_user_key(request: Request) -> str:
-    """Filesystem-safe per-user key (a hash of the Google sub) for the credential store.
-    Derived from the session server-side, so a client can never name another user's key.
-    401s when not signed in — use on endpoints that always require a logged-in user."""
-    return _key_for(get_current_user(request))
-
-
 def current_user_key_optional(request: Request) -> Optional[str]:
     """Like current_user_key but returns None instead of 401 when not signed in. Used by
     endpoints that work for 'Enter your own data' without auth but require it for a live
     platform (the caller enforces that)."""
     user = request.session.get('user')
     return _key_for(user) if user else None
+
+
+def _key_for(user: dict) -> str:
+    return hashlib.sha256(user['sub'].encode()).hexdigest()[:32]

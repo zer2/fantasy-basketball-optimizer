@@ -436,6 +436,16 @@ An example of the multi-starting process which is used for the first few picks.
 
 Punting is less common in Rotisserie, so gradient descent does not start at a punt. Instead it starts at a neutral position, slightly tilted towards categories that are robust like Points and Assists. That's where the Rotisserie algorithm generally wants to go, since it thinks it can rely more on luck for the unstable categories like Steals and Turnovers. 
 
+### Percentage category adjustment 
+
+The percentage categories cannot be described purely by value differences between teams- volume matters too, when it comes to calculating a probability of winning. A team that has moderate value in a percentage statistic on few attempts has the influence of that value amplified, since there are a smaller number of attempts to dilute the value. Teams with few attempts also have higher variance in general, roughly inversely proportional to their number of attempts. 
+
+This is not accounted for in the original version of H-scoring, which implicitly assumes that all teams are shooting the average number of attempts based on the set of fantasy-relevant players. 
+
+The website's version of H-scoring accounts for volume by scaling the gaps between teams by an adjustment for their volume. Scaling factors are calculated as typical volume over the team's expected team volume. Raw X-scores (the unit of value underlying H-scoring) are then multiplied by that scaling factor, and variance in matchups is inflated by a factor of the average of the scaling factors between the opposing teams. 
+
+Expected volumes are based on players already taken, plus an estimate of the total volume of future players picked. For future players, the algorithm starts with the average volume of players it expects to be taken, and adds a tilt based on category weighting, computed alongside the other tilts. 
+
 ### Constant categorical variance
 
 H-scoring does not model category variance based on players. Instead, it assumes that week-to-week variance is the same for all matchups. This is not always accurate, especially when a team is punting a category

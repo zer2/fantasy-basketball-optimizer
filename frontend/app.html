@@ -42,6 +42,12 @@
                         <div id="right-header"></div>
                         <div id="tab-row">
                             <div id="seat-selector-container" style="display:none"></div>
+                            <div id="candidate-search-container" style="display:none">
+                                <div class="seat-selector-row">
+                                    <label class="pick-control-label" for="candidate-search">Find player</label>
+                                    <input id="candidate-search" type="search" placeholder="Name" autocomplete="off">
+                                </div>
+                            </div>
                             <!-- Hidden until applyLayout() runs show('eval-indicator'). Without this the
                                  indicator briefly paints in its raw HTML position before the sidebar/layout
                                  settles, so the user sees "Starting..." (or "Updating...") flash at the wrong spot. -->

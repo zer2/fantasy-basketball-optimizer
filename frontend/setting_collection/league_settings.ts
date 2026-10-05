@@ -368,6 +368,7 @@ export function renderLeagueSettings(container: HTMLElement): void {
                 // Enables the live-layout Refresh Analysis button, for as long as the controls
                 // still describe this league in this mode.
                 connectedTo = describeSelection()
+                lockLeagueShapeWhileConnected()
                 // Patch the session with the platform's config (drives the draft-state poll +
                 // name lookup) and counts. Routed through an event so this module doesn't import
                 // the session layer (which imports this one — would be a cycle).
@@ -388,11 +389,24 @@ export function renderLeagueSettings(container: HTMLElement): void {
         connectCell.style.display    = isOwnData ? 'none' : ''
         refreshConnectControls()
         if (!isOwnData || mode !== 'Draft Mode') trrCheckbox.checked = false
+        lockLeagueShapeWhileConnected()
+    }
+
+    // A connected league's size is the platform's, read at connect: editing it would rebuild the session for a board
+    // shape the polled draft does not have. Locked while the connection holds; any change that ends the connection
+    // (another platform, mode or league -- the same comparison isPlatformConnected makes) unlocks it again.
+    function lockLeagueShapeWhileConnected(): void {
+        const connected = isPlatformConnected()
+        for (const input of [nDraftersInput, nPicksInput]) {
+            input.disabled = connected
+            input.title    = connected ? 'Set by the connected league' : ''
+        }
     }
 
     updateVisibility()
     modeSelect.element.addEventListener('change', updateVisibility)
     platformSelect.element.addEventListener('change', updateVisibility)
+    document.addEventListener(PLATFORM_SELECTION_CHANGED, lockLeagueShapeWhileConnected)
 }
 
 /** The current mode alone. A light accessor for paths that only need the mode:

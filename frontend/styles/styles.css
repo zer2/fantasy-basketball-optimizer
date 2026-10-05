@@ -406,6 +406,12 @@ html { font-size: clamp(16px, 0.93vw, 20px); }
     outline: 1px solid light-dark(#999999, #666688);
 }
 
+/* Disabled (e.g. drafters / picks while a league is connected): greyed, inert. */
+.sidebar-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 .sidebar-input[type=number]::-webkit-inner-spin-button,
 .sidebar-input[type=number]::-webkit-outer-spin-button {
     -webkit-appearance: none;
@@ -1527,6 +1533,37 @@ tr {
     margin-left: auto;
 }
 
+/* Player search: shares the row's free space with the seat selector, between it and the eval indicator, and
+   wears the seat selector's look (the same label style beside a box drawn like .cs-trigger). */
+#candidate-search-container {
+    flex: 1;
+    min-width: 0;
+    margin: 0 12px;
+}
+
+#candidate-search {
+    flex: 1;
+    min-width: 0;
+    min-height: 28px;
+    box-sizing: border-box;
+    padding: 4px 8px;
+    background-color: light-dark(#fafafa, #181923);
+    color: light-dark(#333333, lightgrey);
+    border: 1px solid light-dark(#e5e5e5, #3d3d55);
+    border-radius: 4px;
+    font-family: "Source Sans 3";
+    font-size: 0.8rem;
+    outline: none;
+}
+
+#candidate-search:focus {
+    outline: 1px solid light-dark(#999999, #666688);
+}
+
+#candidate-search::placeholder {
+    color: #888;
+}
+
 .pick-btn.active {
     background: light-dark(#e5e5e5, #3d3d55);
     border-color: light-dark(#aaaaaa, #555577);
@@ -1816,6 +1853,14 @@ tr {
     }
     .pick-control-buttons .pick-btn {
         flex: 1;
+    }
+    /* The player search keeps its box but drops its label on mobile, where the tab row has no room for both. */
+    #candidate-search-container {
+        margin: 0 6px;
+        min-width: 4rem;
+    }
+    #candidate-search-container .pick-control-label {
+        display: none;
     }
     /* Shrink the seat selector on mobile — at flex: 1 it grows to fill the tab
        row, pushing the eval indicator and action buttons off-screen. */

@@ -26,60 +26,22 @@ import snowflake.connector
 from backend.infra.secret_config import get_secret
 
 
-# ── Connection ─────────────────────────────────────────────────────────────────
-
-_con: Optional[snowflake.connector.SnowflakeConnection] = None
-_con_expires_at: float = 0.0
-_con_lock = threading.Lock()
-_CON_TTL = 3600  # 1 hour
-
-_SNOWFLAKE_KEYS = ('SNOWFLAKE_ACCOUNT', 'SNOWFLAKE_USER', 'SNOWFLAKE_PASSWORD',
-                   'SNOWFLAKE_DATABASE', 'SNOWFLAKE_SCHEMA')
-
-
-def _snowflake_creds() -> dict[str, str | None]:
-    """Read Snowflake credentials via the shared resolver (env first, then secrets.toml)."""
-    return {key: get_secret(key) for key in _SNOWFLAKE_KEYS}
-
-
-def _get_connection() -> snowflake.connector.SnowflakeConnection:
-    global _con, _con_expires_at
-    with _con_lock:
-        if _con is None or time.time() > _con_expires_at:
-            creds = _snowflake_creds()
-            _con = snowflake.connector.connect(
-                account  = creds['SNOWFLAKE_ACCOUNT'],
-                user     = creds['SNOWFLAKE_USER'],
-                password = creds['SNOWFLAKE_PASSWORD'],
-                database = creds['SNOWFLAKE_DATABASE'],
-                schema   = creds['SNOWFLAKE_SCHEMA'],
-            )
-            _con_expires_at = time.time() + _CON_TTL
-        return _con
-
-
-def run_query(sql: str) -> pd.DataFrame:
-    """Execute arbitrary SQL on the shared connection and return the result (uncached)."""
-    return _get_connection().cursor().execute(sql).fetch_pandas_all()
-
-
 # ── Query cache ───────────────────────────────────────────────────────────────
 
 _cache: dict[str, tuple[float, pd.DataFrame]] = {}
+
+
 _cache_lock = threading.Lock()
+
+
 _CACHE_TTL = 24 * 3600  # 24 hours
+
 
 # If set, Parquet files are read/written here before falling back to Snowflake.
 # In production this is the GCS bucket mount path (e.g. /cache).
 _DISK_CACHE_DIR: Path | None = (
     Path(os.environ['DISK_CACHE_DIR']) if 'DISK_CACHE_DIR' in os.environ else None
 )
-
-
-def _disk_cache_path(view_name: str) -> Path | None:
-    if _DISK_CACHE_DIR is None:
-        return None
-    return _DISK_CACHE_DIR / f'{view_name}.parquet'
 
 
 def query(view_name: str) -> pd.DataFrame:
@@ -110,6 +72,12 @@ def query(view_name: str) -> pd.DataFrame:
     return df.copy()
 
 
+def _disk_cache_path(view_name: str) -> Path | None:
+    if _DISK_CACHE_DIR is None:
+        return None
+    return _DISK_CACHE_DIR / f'{view_name}.parquet'
+
+
 def peek(view_name: str) -> pd.DataFrame | None:
     """The cached frame for view_name if present and unexpired, else None — it NEVER loads.
 
@@ -125,3 +93,47 @@ def peek(view_name: str) -> pd.DataFrame | None:
         if entry is not None and time.time() - entry[0] < _CACHE_TTL:
             return entry[1]
     return None
+
+
+# ── Connection ─────────────────────────────────────────────────────────────────
+
+_con: Optional[snowflake.connector.SnowflakeConnection] = None
+
+
+_con_expires_at: float = 0.0
+
+
+_con_lock = threading.Lock()
+
+
+_CON_TTL = 3600  # 1 hour
+
+
+_SNOWFLAKE_KEYS = ('SNOWFLAKE_ACCOUNT', 'SNOWFLAKE_USER', 'SNOWFLAKE_PASSWORD',
+                   'SNOWFLAKE_DATABASE', 'SNOWFLAKE_SCHEMA')
+
+
+def run_query(sql: str) -> pd.DataFrame:
+    """Execute arbitrary SQL on the shared connection and return the result (uncached)."""
+    return _get_connection().cursor().execute(sql).fetch_pandas_all()
+
+
+def _get_connection() -> snowflake.connector.SnowflakeConnection:
+    global _con, _con_expires_at
+    with _con_lock:
+        if _con is None or time.time() > _con_expires_at:
+            creds = _snowflake_creds()
+            _con = snowflake.connector.connect(
+                account  = creds['SNOWFLAKE_ACCOUNT'],
+                user     = creds['SNOWFLAKE_USER'],
+                password = creds['SNOWFLAKE_PASSWORD'],
+                database = creds['SNOWFLAKE_DATABASE'],
+                schema   = creds['SNOWFLAKE_SCHEMA'],
+            )
+            _con_expires_at = time.time() + _CON_TTL
+        return _con
+
+
+def _snowflake_creds() -> dict[str, str | None]:
+    """Read Snowflake credentials via the shared resolver (env first, then secrets.toml)."""
+    return {key: get_secret(key) for key in _SNOWFLAKE_KEYS}

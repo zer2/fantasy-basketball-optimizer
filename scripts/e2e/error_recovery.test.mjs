@@ -38,24 +38,6 @@ test('error handling and recovery', async t => {
         await selectHistoricalSeason(app, '2025-26')
         expectCleanSession(app, 'initial load')
 
-        await t.test('nonsense injured names are ignored without disturbing the pool', async () => {
-            const rowsBefore = await candidateRowCount()
-            const injuredInput = page.locator('#ps-injured')
-            await injuredInput.evaluate(el => { const d = el.closest('details'); if (d && !d.open) d.open = true })
-            await injuredInput.fill('Notareal Player (C)\nAnother Fake (PG)')
-            await injuredInput.evaluate(el => el.blur())
-            await waitAppSettled(app)
-
-            assert.equal(await candidateRowCount(), rowsBefore,
-                         'unknown injured names should be ignored, leaving the pool intact')
-            expectCleanSession(app, 'nonsense injured names')
-
-            await injuredInput.fill('')
-            await injuredInput.evaluate(el => el.blur())
-            await waitAppSettled(app)
-            expectCleanSession(app, 'injured names cleared')
-        })
-
         await t.test('a degenerate but sum-valid position structure is a legal configuration', async () => {
             const originalSlotCounts = {}
             for (const id of SLOT_INPUT_IDS) {

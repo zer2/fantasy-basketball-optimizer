@@ -93,51 +93,6 @@ _CORROBORATION_URLS = {
 _INJURED_POSITIONS = {'IL', 'IL+'}
 
 
-def _read_corroborating_endpoints(access_token: str) -> dict[str, str]:
-    """{label: HTTP status or error} for each corroborating endpoint, for the failure log only.
-
-    Never raises: this runs while reporting a failure, so a second failure here must not replace
-    the reason being reported.
-    """
-    statuses: dict[str, str] = {}
-    for label, url in _CORROBORATION_URLS.items():
-        try:
-            response = requests.get(
-                url,
-                headers={'Authorization': f'Bearer {access_token}'},
-                timeout=20,
-            )
-            # The WWW-Authenticate challenge is the part that says WHY a bearer token was refused:
-            # 'insufficient_scope' means Yahoo accepted the token and withheld a permission, while
-            # 'invalid_token' means it rejected the token itself. The status code alone conflates
-            # the two. It is a standard error header, and carries no secret.
-            challenge = response.headers.get('WWW-Authenticate', '')
-            statuses[label] = f'{response.status_code} {challenge}'.strip()
-        except requests.RequestException as request_error:
-            statuses[label] = f'{type(request_error).__name__}'
-    return statuses
-
-
-def _pad_with_open_seats(joined_names: list[str], n_drafters: int) -> list[str]:
-    """One name per seat: the teams that have joined, then a placeholder for each empty seat.
-
-    Yahoo names unclaimed teams "Team N", so these are deliberately worded differently — a
-    placeholder here means "nobody has taken this seat yet", and it is replaced by the real name
-    on the next connect once someone does.
-    """
-    seats = list(joined_names)
-    taken = set(seats)
-    for seat_number in range(len(seats) + 1, n_drafters + 1):
-        label = f'Open seat {seat_number}'
-        collision = 2
-        while label in taken:
-            label = f'Open seat {seat_number} ({collision})'
-            collision += 1
-        seats.append(label)
-        taken.add(label)
-    return seats
-
-
 class YahooIntegration(PlatformIntegration):
     # Organized by workflow, like fantrax.py: metadata → auth → connection → roster/draft.
 
@@ -609,3 +564,48 @@ class YahooIntegration(PlatformIntegration):
             costs.setdefault(team_name, []).append(float(raw_cost) if raw_cost is not None else None)
 
         return player_assignments, costs
+
+
+def _read_corroborating_endpoints(access_token: str) -> dict[str, str]:
+    """{label: HTTP status or error} for each corroborating endpoint, for the failure log only.
+
+    Never raises: this runs while reporting a failure, so a second failure here must not replace
+    the reason being reported.
+    """
+    statuses: dict[str, str] = {}
+    for label, url in _CORROBORATION_URLS.items():
+        try:
+            response = requests.get(
+                url,
+                headers={'Authorization': f'Bearer {access_token}'},
+                timeout=20,
+            )
+            # The WWW-Authenticate challenge is the part that says WHY a bearer token was refused:
+            # 'insufficient_scope' means Yahoo accepted the token and withheld a permission, while
+            # 'invalid_token' means it rejected the token itself. The status code alone conflates
+            # the two. It is a standard error header, and carries no secret.
+            challenge = response.headers.get('WWW-Authenticate', '')
+            statuses[label] = f'{response.status_code} {challenge}'.strip()
+        except requests.RequestException as request_error:
+            statuses[label] = f'{type(request_error).__name__}'
+    return statuses
+
+
+def _pad_with_open_seats(joined_names: list[str], n_drafters: int) -> list[str]:
+    """One name per seat: the teams that have joined, then a placeholder for each empty seat.
+
+    Yahoo names unclaimed teams "Team N", so these are deliberately worded differently — a
+    placeholder here means "nobody has taken this seat yet", and it is replaced by the real name
+    on the next connect once someone does.
+    """
+    seats = list(joined_names)
+    taken = set(seats)
+    for seat_number in range(len(seats) + 1, n_drafters + 1):
+        label = f'Open seat {seat_number}'
+        collision = 2
+        while label in taken:
+            label = f'Open seat {seat_number} ({collision})'
+            collision += 1
+        seats.append(label)
+        taken.add(label)
+    return seats

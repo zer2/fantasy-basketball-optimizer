@@ -120,7 +120,7 @@ export interface SessionRequest {
     slot_counts: Record<string, number>
     model_settings: ModelSettings
     data_source: DataSource
-    injured_players: string[]
+    injured_players: number[]
     my_team_id?: string   // provided by seat selector in main content, not sidebar
 }
 

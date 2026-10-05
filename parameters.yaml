@@ -147,6 +147,9 @@ NBA:
     gp : Games Played
     games : Games Played
     games played : Games Played
+    gp% : Games Played %
+    gp pct : Games Played %
+    g% : Games Played %
     # ── Counting stats ──
     p/g : Points
     pts : Points
@@ -158,28 +161,37 @@ NBA:
     trb : Rebounds
     rpg : Rebounds
     rebounds : Rebounds
+    rebs : Rebounds
     dr/g : Def Rebounds
     dreb : Def Rebounds
+    drb : Def Rebounds
     or/g : Off Rebounds
     oreb : Off Rebounds
+    orb : Off Rebounds
     a/g : Assists
     ast : Assists
     apg : Assists
     assists : Assists
+    asts : Assists
     s/g : Steals
     stl : Steals
     spg : Steals
     steals : Steals
+    stls : Steals
     b/g : Blocks
     blk : Blocks
     bpg : Blocks
     blocks : Blocks
+    blks : Blocks
     to/g : Turnovers
     to : Turnovers
     tov : Turnovers
     turnovers : Turnovers
+    tos : Turnovers
     3/g : Threes
     3pm : Threes
+    3p : Threes
+    3ptm : Threes
     threes : Threes
     2d/g : Double Doubles
     dd : Double Doubles
@@ -197,6 +209,7 @@ NBA:
     3pt% : Three %
     3a/g : Three Attempts
     3pa : Three Attempts
+    3pta : Three Attempts
   espn-renamer:
     ESPN_NAME : Player
     GAMES_PLAYED : Games Played

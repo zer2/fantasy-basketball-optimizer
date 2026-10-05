@@ -196,7 +196,7 @@ def test_ec_gradients():
         _, pdf_weights = H.get_objective_and_pdf_weights_ec(
             cdf_estimates, pdf_estimates, calculate_pdf_weights=True
         )
-        return pdf_weights
+        return pdf_weights.sum(axis=2)
 
     for x_diff in x_diff_list:
         _check_gradient_aggregate(x_diff, ec_objective, ec_gradient)
@@ -228,7 +228,7 @@ def test_mc_gradients():
         _, pdf_weights = H.get_objective_and_pdf_weights_mc(
             x_diff_array, diff_vars, cdf_estimates, pdf_estimates, calculate_pdf_weights=True
         )
-        return pdf_weights
+        return pdf_weights.sum(axis=2)
 
     for x_diff in x_diff_list:
         finite_difference_tolerance = 2e-4 if H.mc_correlation_enabled else 1e-7
@@ -272,7 +272,7 @@ def test_objective_gradients():
                 x_diff_array, diff_vars, cdf_estimates, None, sigma_2_m
                 , calculate_pdf_weights=True
             )
-            return gradient
+            return gradient.sum(axis=2)
 
         _check_gradient_aggregate(x_diff, rotisserie_objective, rotisserie_gradient)
 
@@ -310,8 +310,9 @@ def test_each_category_gradient_matches_its_objective_in_absolute_scale():
         return agent.get_objective_and_pdf_weights_ec(cdf_estimates, pdf_estimates)
 
     cdf_estimates, pdf_estimates = _objective_inputs(_OBJECTIVE_TEST_DIFFS)
-    _, analytic_weights = agent.get_objective_and_pdf_weights_ec(
+    _, analytic_cell_weights = agent.get_objective_and_pdf_weights_ec(
         cdf_estimates, pdf_estimates, calculate_pdf_weights=True)
+    analytic_weights = analytic_cell_weights.sum(axis=2)
 
     step = 1e-4
     for category in range(_OBJECTIVE_TEST_DIFFS.shape[1]):

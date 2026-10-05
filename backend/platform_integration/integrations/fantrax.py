@@ -46,30 +46,6 @@ _PLAYER_ID_FIELDS = ('id', 'scorerId', 'playerId')
 _STATUS_FIELDS    = ('status', 'statusId', 'rosterStatus')
 
 
-def to_unified_fantrax_id(raw_id: str) -> str:
-    """The id as UNIFIED_PLAYER_TABLE.FANTRAX_ID spells it, which is wrapped in asterisks.
-
-    The Beta API returns a bare id ('03e75'); the unified table stores '*03e75*'. Of this
-    league's 1806 pool ids, none matched as-is and 947 matched once wrapped -- so without this
-    every player falls through to the replacement-level id and no roster is ever recognised.
-    Already-wrapped input is left alone, so the two spellings can never be double-wrapped.
-    """
-    return raw_id if raw_id.startswith('*') and raw_id.endswith('*') else f'*{raw_id}*'
-
-
-def read_roster_field(item: dict, candidates: tuple[str, ...], what: str) -> Optional[str]:
-    """The first of `candidates` this roster item carries, or None when it carries none.
-
-    Returning None for a missing STATUS is meaningful -- plenty of leagues have no reserve
-    concept -- so the caller decides whether absence is tolerable. For a player id it is not,
-    and fetch_roster_player_id raises rather than silently dropping the player.
-    """
-    for field in candidates:
-        if field in item:
-            return str(item[field])
-    return None
-
-
 class FantraxIntegration(PlatformIntegration):
     # Organized by workflow, not by visibility: each public operation is grouped
     # with the private _fetch_* helpers it uses (metadata → connection → roster).
@@ -238,3 +214,27 @@ class FantraxIntegration(PlatformIntegration):
     ) -> Optional[PlatformSelections]:
         """Fantrax has no auction support, so this always returns None (matches Streamlit)."""
         return None
+
+
+def read_roster_field(item: dict, candidates: tuple[str, ...], what: str) -> Optional[str]:
+    """The first of `candidates` this roster item carries, or None when it carries none.
+
+    Returning None for a missing STATUS is meaningful -- plenty of leagues have no reserve
+    concept -- so the caller decides whether absence is tolerable. For a player id it is not,
+    and fetch_roster_player_id raises rather than silently dropping the player.
+    """
+    for field in candidates:
+        if field in item:
+            return str(item[field])
+    return None
+
+
+def to_unified_fantrax_id(raw_id: str) -> str:
+    """The id as UNIFIED_PLAYER_TABLE.FANTRAX_ID spells it, which is wrapped in asterisks.
+
+    The Beta API returns a bare id ('03e75'); the unified table stores '*03e75*'. Of this
+    league's 1806 pool ids, none matched as-is and 947 matched once wrapped -- so without this
+    every player falls through to the replacement-level id and no roster is ever recognised.
+    Already-wrapped input is left alone, so the two spellings can never be double-wrapped.
+    """
+    return raw_id if raw_id.startswith('*') and raw_id.endswith('*') else f'*{raw_id}*'

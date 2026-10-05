@@ -14,6 +14,11 @@ from scipy.stats import norm
 import numpy as np
 from itertools import combinations
 
+
+# Node machinery for the evaluation-space correction, cached per category count.
+_CORRECTION_NODE_CACHE: dict[int, tuple] = {}
+
+
 def auction_value_adjuster(raw_values_unselected: pd.Series
                             , n_remaining_players: int
                             , remaining_cash: int
@@ -76,52 +81,6 @@ def get_tie_grid(n_categories: int) -> np.ndarray:
     return np.expand_dims(grid, axis=2)
 
 
-def category_scoring_weights(
-    n_categories: int
-    , tiebreaker_index: Optional[int]
-) -> list[int]:
-    """How many points each category is worth in the matchup count.
-
-    Every category is worth one, except a designated tiebreaker, which is worth two. That is what
-    a tiebreaker category means: with an even number of categories a 4-4 matchup is a tie, and
-    doubling one category makes the total odd so the matchup always has a winner — the one who
-    took the tiebreaker. Only the tie case changes; a genuine majority still wins either way.
-
-    An odd number of categories is refused rather than accommodated: there is no tie to break, and
-    doubling one category would make the total even, reintroducing the very ties a tiebreaker
-    exists to remove (and leaving the tipping points below, which assume an odd total, wrong by a
-    tie term). Callers decide what a tiebreaker means for an odd count; this is not the place to
-    guess.
-    """
-    if tiebreaker_index is None:
-        return [1] * n_categories
-    if not 0 <= tiebreaker_index < n_categories:
-        raise ValueError(f'tiebreaker_index {tiebreaker_index} is outside the '
-                         f'{n_categories} categories.')
-    if n_categories % 2 == 1:
-        raise ValueError(f'A tiebreaker needs an even number of categories to break a tie; '
-                         f'got {n_categories}.')
-    return [2 if index == tiebreaker_index else 1 for index in range(n_categories)]
-
-
-def win_threshold(scoring_weights: list[int]) -> int:
-    """Points needed to win the matchup: more than half of what is on offer."""
-    return sum(scoring_weights) // 2 + 1
-
-
-def _accumulate_win_counts(
-    distribution: np.ndarray
-    , win_probability_slice: np.ndarray
-    , weight: int
-) -> np.ndarray:
-    """Fold one category into a win-count distribution, shifting by what it is worth."""
-    n_players, size, n_columns = distribution.shape
-    updated = np.zeros((n_players, size + weight, n_columns))
-    updated[:, :size, :]  += distribution * (1 - win_probability_slice)
-    updated[:, weight:, :] += distribution * win_probability_slice
-    return updated
-
-
 def compute_win_probability(
     probs: np.ndarray
     , tiebreaker_index: Optional[int] = None
@@ -156,165 +115,6 @@ def compute_win_probability(
     return result
 
 
-def _build_win_count_prefix_suffix(
-    probs: np.ndarray
-    , tiebreaker_index: Optional[int] = None
-):
-    """Build prefix and suffix DP tables for win-count distributions.
-
-    Each prefix[i] has shape (n_players, points+1, n_opponents) where entry [p, k, o]
-    is the probability of winning exactly k points from the first i categories — one point
-    each, or two for a tiebreaker category.
-    Suffix tables mirror this from the right.
-    This is the same polynomial-multiplication DP that combinatorial_calculation
-    uses recursively, expressed here as explicit tables so we can do leave-one-out
-    convolutions for every category in one pass.
-    """
-    n_players, n_categories, n_opponents = probs.shape
-    scoring_weights = category_scoring_weights(n_categories, tiebreaker_index)
-
-    prefix = [None] * (n_categories + 1)
-    prefix[0] = np.ones((n_players, 1, n_opponents))
-    for i in range(n_categories):
-        prefix[i + 1] = _accumulate_win_counts(
-            prefix[i], probs[:, i, :][:, np.newaxis, :], scoring_weights[i])
-
-    suffix = [None] * (n_categories + 1)
-    suffix[n_categories] = np.ones((n_players, 1, n_opponents))
-    for i in range(n_categories - 1, -1, -1):
-        suffix[i] = _accumulate_win_counts(
-            suffix[i + 1], probs[:, i, :][:, np.newaxis, :], scoring_weights[i])
-
-    return prefix, suffix
-
-
-def _leave_one_out_probability(
-    prefix_table: np.ndarray
-    , suffix_table: np.ndarray
-    , target_points: int
-) -> np.ndarray:
-    """P(the categories either side of the excluded one contribute exactly target_points)."""
-    total = np.zeros((prefix_table.shape[0], prefix_table.shape[2]))
-    if target_points < 0:
-        return total
-    for taken_before in range(min(target_points + 1, prefix_table.shape[1])):
-        taken_after = target_points - taken_before
-        if 0 <= taken_after < suffix_table.shape[1]:
-            total += prefix_table[:, taken_before, :] * suffix_table[:, taken_after, :]
-    return total
-
-
-def _bracket_targets(n_categories_total: int) -> tuple[int, int, float]:
-    """Win-count targets and scale for the correlation-correction bracket.
-
-    The bracket is the mixed second difference of the matchup objective with respect
-    to a pair of category win probabilities. With the majority threshold
-    v = n//2 + 1 it reduces to a difference of two point masses:
-
-        odd n:   P(= v-2) - P(= v-1),           scale 1
-        even n:  (P(= t-2) - P(= t)) / 2,       t = n//2 (ties count half)
-
-    Targets are indexed on the win count of the REMAINING categories, so they depend
-    only on the original total n, never on how many categories were left out.
-    """
-    if n_categories_total % 2 == 1:
-        return n_categories_total // 2 - 1, n_categories_total // 2, 1.0
-    return n_categories_total // 2 - 2, n_categories_total // 2, 0.5
-
-
-def _bracket_target_weights(n_categories_total: int) -> tuple[tuple[int, float], ...]:
-    """The bracket as (target, weight) pairs on the remaining categories' win count."""
-    lower_target, upper_target, scale = _bracket_targets(n_categories_total)
-    return ((lower_target, scale), (upper_target, -scale))
-
-
-def _bracket_derivative_target_weights(n_categories_total: int) -> tuple[tuple[int, float], ...]:
-    """(target, weight) pairs for ∂(bracket)/∂p of one more removed category.
-
-    Differentiating each mass with respect to a remaining category's win
-    probability shifts it into a first difference: ∂P(W = t)/∂p = P(W' = t-1) - P(W' = t)
-    with W' excluding that category too. Applied to the bracket's (target, weight)
-    pairs this yields a second-difference stencil.
-    """
-    derivative: dict[int, float] = {}
-    for target, weight in _bracket_target_weights(n_categories_total):
-        derivative[target - 1] = derivative.get(target - 1, 0.0) + weight
-        derivative[target]     = derivative.get(target, 0.0) - weight
-    return tuple(sorted(derivative.items()))
-
-
-def _leave_one_out_mass_combination(probs: np.ndarray
-                                     , target_weights: tuple[tuple[int, float], ...]) -> np.ndarray:
-    """sum_t weight_t * P(W_-c = target_t) for every left-out category c.
-
-    Built from the same prefix/suffix DP tables as calculate_tipping_points.
-    Shapes: probs (n_players, n_columns, n_opponents) -> same shape out.
-    """
-    n_players, n_columns, n_opponents = probs.shape
-    prefix, suffix = _build_win_count_prefix_suffix(probs)
-
-    def leave_one_out_mass(column_index: int, target: int) -> np.ndarray:
-        mass = np.zeros((n_players, n_opponents))
-        if target < 0:
-            return mass
-        pre = prefix[column_index]
-        suf = suffix[column_index + 1]
-        for wins_before in range(min(target + 1, pre.shape[1])):
-            wins_after = target - wins_before
-            if 0 <= wins_after < suf.shape[1]:
-                mass += pre[:, wins_before, :] * suf[:, wins_after, :]
-        return mass
-
-    combination = np.zeros_like(probs)
-    for column_index in range(n_columns):
-        for target, weight in target_weights:
-            combination[:, column_index, :] += weight * leave_one_out_mass(column_index, target)
-    return combination
-
-
-def _stack_single_exclusions(probs: np.ndarray) -> np.ndarray:
-    """All n single-category exclusions of probs, stacked into the players axis.
-
-    (n_players, n_columns, n_opponents) -> (n_columns * n_players, n_columns - 1,
-    n_opponents), ordered so row block e holds probs with column e removed. Lets
-    every exclusion share one DP pass instead of one pass per exclusion — the DP
-    cost is dominated by python-level loop steps, not arithmetic.
-    """
-    n_players, n_columns, n_opponents = probs.shape
-    remaining_indices = np.array(
-        [[c for c in range(n_columns) if c != excluded] for excluded in range(n_columns)]
-    )   # (n_columns, n_columns - 1)
-    stacked = probs[:, remaining_indices, :]               # (n_players, n_columns, n_columns-1, n_opponents)
-    return stacked.transpose(1, 0, 2, 3).reshape(
-        n_columns * n_players, n_columns - 1, n_opponents
-    )
-
-
-def _pair_mass_combination(probs: np.ndarray
-                            , target_weights: tuple[tuple[int, float], ...]) -> np.ndarray:
-    """sum_t weight_t * P(W_-ij = target_t) for every left-out pair (i, j).
-
-    All single exclusions are stacked into the players axis so the leave-one-out
-    machinery runs over every remaining column in one prefix/suffix pass. Exact —
-    no divided differences, so pairs with equal win probabilities (common
-    mid-draft) need no regularization. Symmetric in (i, j) with a zero, unused
-    diagonal.
-
-    Shapes: probs (n_players, n_columns, n_opponents)
-            -> (n_players, n_columns, n_columns, n_opponents).
-    """
-    n_players, n_columns, n_opponents = probs.shape
-    combined = _leave_one_out_mass_combination(
-        _stack_single_exclusions(probs), target_weights
-    ).reshape(n_columns, n_players, n_columns - 1, n_opponents)
-
-    pair_matrix = np.zeros((n_players, n_columns, n_columns, n_opponents))
-    for excluded in range(n_columns):
-        remaining = [c for c in range(n_columns) if c != excluded]
-        pair_matrix[:, remaining, excluded, :] = combined[excluded]
-    return pair_matrix
-
-
 def calculate_pair_bracket_matrix(probs: np.ndarray) -> np.ndarray:
     """Exact leave-two-out bracket matrix B for the correlation correction.
 
@@ -331,8 +131,54 @@ def calculate_pair_bracket_matrix(probs: np.ndarray) -> np.ndarray:
     return _pair_mass_combination(probs, _bracket_target_weights(probs.shape[1]))
 
 
-# Node machinery for the evaluation-space correction, cached per category count.
-_CORRECTION_NODE_CACHE: dict[int, tuple] = {}
+def calculate_correction_terms(probs: np.ndarray
+                                , correlation_off_diagonal: np.ndarray
+                                , standard_pdf: np.ndarray
+                                , calculate_gradient: bool = False):
+    """Correlation correction and (optionally) its probability-gradient — fast path.
+
+    Works in polynomial-evaluation space: every win-count polynomial is represented
+    by its values at fixed complex nodes, where building the full product is a prod,
+    removing a category is POINTWISE division (no long-division carry, hence no
+    sequential scans), and coefficient-space stencil reads are fixed weighted sums
+    over the node values. Runs in single precision: unlike the coefficient-space
+    recursions (which amplify rounding step by step and need float64), the node
+    formulation has uniformly bounded conditioning — divisors stay ≥ ~0.16 and the
+    transform is DFT-like — so complex64 costs ~1e-7 relative error while halving
+    the memory traffic that dominates the runtime.
+
+    Validated against the prefix/suffix per-pair reference (calculate_pair_bracket_matrix
+    and calculate_correction_probability_gradient): worst deviation ~1e-8 absolute on
+    corrections of magnitude ~1e-1.
+    """
+    n_players, n_categories, n_opponents = probs.shape
+    nodes, bracket_weights, derivative_weights = _correction_node_machinery(n_categories)
+
+    probs_single = probs.astype(np.float32)
+    pdf_single = standard_pdf.astype(np.float32)
+    correlation_single = correlation_off_diagonal.astype(np.float32)
+
+    # factor values f_c(x_k) = 1 − p_c + p_c x_k, shape (a, n, k, o)
+    p = probs_single[:, :, np.newaxis, :]
+    factor_values = (1 - p + p * nodes.reshape(1, 1, -1, 1)).astype(np.complex64)
+
+    full_values = factor_values.prod(axis=1)                                  # F at nodes
+    leave_one_out_values = full_values[:, np.newaxis, :, :] / factor_values   # Q rows at nodes
+    mixture_values = np.einsum('ij,aio,aiko->ajko',
+                               correlation_single, pdf_single, leave_one_out_values)
+    pair_aggregate_values = mixture_values / factor_values                    # T at nodes
+
+    m_phi = np.einsum('acko,k->aco', pair_aggregate_values, bracket_weights).real
+    correction = 0.5 * (pdf_single * m_phi).sum(axis=1)
+
+    if not calculate_gradient:
+        return correction, m_phi, None
+
+    all_pairs_values = np.einsum('ajo,ajko->ako', pdf_single, pair_aggregate_values)
+    own_pair_values = pdf_single[:, :, np.newaxis, :] * pair_aggregate_values
+    triple_values = (all_pairs_values[:, np.newaxis, :, :] - 2 * own_pair_values) / factor_values
+    probability_gradient = 0.5 * np.einsum('amko,k->amo', triple_values, derivative_weights).real
+    return correction, m_phi, probability_gradient
 
 
 def _correction_node_machinery(n_categories: int) -> tuple:
@@ -388,56 +234,6 @@ def _correction_node_machinery(n_categories: int) -> tuple:
     return machinery
 
 
-def calculate_correction_terms(probs: np.ndarray
-                                , correlation_off_diagonal: np.ndarray
-                                , standard_pdf: np.ndarray
-                                , calculate_gradient: bool = False):
-    """Correlation correction and (optionally) its probability-gradient — fast path.
-
-    Works in polynomial-evaluation space: every win-count polynomial is represented
-    by its values at fixed complex nodes, where building the full product is a prod,
-    removing a category is POINTWISE division (no long-division carry, hence no
-    sequential scans), and coefficient-space stencil reads are fixed weighted sums
-    over the node values. Runs in single precision: unlike the coefficient-space
-    recursions (which amplify rounding step by step and need float64), the node
-    formulation has uniformly bounded conditioning — divisors stay ≥ ~0.16 and the
-    transform is DFT-like — so complex64 costs ~1e-7 relative error while halving
-    the memory traffic that dominates the runtime.
-
-    Validated against the prefix/suffix per-pair reference (calculate_pair_bracket_matrix
-    and calculate_correction_probability_gradient): worst deviation ~1e-8 absolute on
-    corrections of magnitude ~1e-1.
-    """
-    n_players, n_categories, n_opponents = probs.shape
-    nodes, bracket_weights, derivative_weights = _correction_node_machinery(n_categories)
-
-    probs_single = probs.astype(np.float32)
-    pdf_single = standard_pdf.astype(np.float32)
-    correlation_single = correlation_off_diagonal.astype(np.float32)
-
-    # factor values f_c(x_k) = 1 − p_c + p_c x_k, shape (a, n, k, o)
-    p = probs_single[:, :, np.newaxis, :]
-    factor_values = (1 - p + p * nodes.reshape(1, 1, -1, 1)).astype(np.complex64)
-
-    full_values = factor_values.prod(axis=1)                                  # F at nodes
-    leave_one_out_values = full_values[:, np.newaxis, :, :] / factor_values   # Q rows at nodes
-    mixture_values = np.einsum('ij,aio,aiko->ajko',
-                               correlation_single, pdf_single, leave_one_out_values)
-    pair_aggregate_values = mixture_values / factor_values                    # T at nodes
-
-    m_phi = np.einsum('acko,k->aco', pair_aggregate_values, bracket_weights).real
-    correction = 0.5 * (pdf_single * m_phi).sum(axis=1)
-
-    if not calculate_gradient:
-        return correction, m_phi, None
-
-    all_pairs_values = np.einsum('ajo,ajko->ako', pdf_single, pair_aggregate_values)
-    own_pair_values = pdf_single[:, :, np.newaxis, :] * pair_aggregate_values
-    triple_values = (all_pairs_values[:, np.newaxis, :, :] - 2 * own_pair_values) / factor_values
-    probability_gradient = 0.5 * np.einsum('amko,k->amo', triple_values, derivative_weights).real
-    return correction, m_phi, probability_gradient
-
-
 def calculate_correction_probability_gradient(probs: np.ndarray
                                                , correlation_off_diagonal: np.ndarray
                                                , standard_pdf: np.ndarray) -> np.ndarray:
@@ -475,6 +271,117 @@ def calculate_correction_probability_gradient(probs: np.ndarray
             reduced_correlation, second_differences[excluded], reduced_pdf, reduced_pdf,
         )
     return gradient
+
+
+def _bracket_derivative_target_weights(n_categories_total: int) -> tuple[tuple[int, float], ...]:
+    """(target, weight) pairs for ∂(bracket)/∂p of one more removed category.
+
+    Differentiating each mass with respect to a remaining category's win
+    probability shifts it into a first difference: ∂P(W = t)/∂p = P(W' = t-1) - P(W' = t)
+    with W' excluding that category too. Applied to the bracket's (target, weight)
+    pairs this yields a second-difference stencil.
+    """
+    derivative: dict[int, float] = {}
+    for target, weight in _bracket_target_weights(n_categories_total):
+        derivative[target - 1] = derivative.get(target - 1, 0.0) + weight
+        derivative[target]     = derivative.get(target, 0.0) - weight
+    return tuple(sorted(derivative.items()))
+
+
+def _bracket_target_weights(n_categories_total: int) -> tuple[tuple[int, float], ...]:
+    """The bracket as (target, weight) pairs on the remaining categories' win count."""
+    lower_target, upper_target, scale = _bracket_targets(n_categories_total)
+    return ((lower_target, scale), (upper_target, -scale))
+
+
+def _bracket_targets(n_categories_total: int) -> tuple[int, int, float]:
+    """Win-count targets and scale for the correlation-correction bracket.
+
+    The bracket is the mixed second difference of the matchup objective with respect
+    to a pair of category win probabilities. With the majority threshold
+    v = n//2 + 1 it reduces to a difference of two point masses:
+
+        odd n:   P(= v-2) - P(= v-1),           scale 1
+        even n:  (P(= t-2) - P(= t)) / 2,       t = n//2 (ties count half)
+
+    Targets are indexed on the win count of the REMAINING categories, so they depend
+    only on the original total n, never on how many categories were left out.
+    """
+    if n_categories_total % 2 == 1:
+        return n_categories_total // 2 - 1, n_categories_total // 2, 1.0
+    return n_categories_total // 2 - 2, n_categories_total // 2, 0.5
+
+
+def _pair_mass_combination(probs: np.ndarray
+                            , target_weights: tuple[tuple[int, float], ...]) -> np.ndarray:
+    """sum_t weight_t * P(W_-ij = target_t) for every left-out pair (i, j).
+
+    All single exclusions are stacked into the players axis so the leave-one-out
+    machinery runs over every remaining column in one prefix/suffix pass. Exact —
+    no divided differences, so pairs with equal win probabilities (common
+    mid-draft) need no regularization. Symmetric in (i, j) with a zero, unused
+    diagonal.
+
+    Shapes: probs (n_players, n_columns, n_opponents)
+            -> (n_players, n_columns, n_columns, n_opponents).
+    """
+    n_players, n_columns, n_opponents = probs.shape
+    combined = _leave_one_out_mass_combination(
+        _stack_single_exclusions(probs), target_weights
+    ).reshape(n_columns, n_players, n_columns - 1, n_opponents)
+
+    pair_matrix = np.zeros((n_players, n_columns, n_columns, n_opponents))
+    for excluded in range(n_columns):
+        remaining = [c for c in range(n_columns) if c != excluded]
+        pair_matrix[:, remaining, excluded, :] = combined[excluded]
+    return pair_matrix
+
+
+def _leave_one_out_mass_combination(probs: np.ndarray
+                                     , target_weights: tuple[tuple[int, float], ...]) -> np.ndarray:
+    """sum_t weight_t * P(W_-c = target_t) for every left-out category c.
+
+    Built from the same prefix/suffix DP tables as calculate_tipping_points.
+    Shapes: probs (n_players, n_columns, n_opponents) -> same shape out.
+    """
+    n_players, n_columns, n_opponents = probs.shape
+    prefix, suffix = _build_win_count_prefix_suffix(probs)
+
+    def leave_one_out_mass(column_index: int, target: int) -> np.ndarray:
+        mass = np.zeros((n_players, n_opponents))
+        if target < 0:
+            return mass
+        pre = prefix[column_index]
+        suf = suffix[column_index + 1]
+        for wins_before in range(min(target + 1, pre.shape[1])):
+            wins_after = target - wins_before
+            if 0 <= wins_after < suf.shape[1]:
+                mass += pre[:, wins_before, :] * suf[:, wins_after, :]
+        return mass
+
+    combination = np.zeros_like(probs)
+    for column_index in range(n_columns):
+        for target, weight in target_weights:
+            combination[:, column_index, :] += weight * leave_one_out_mass(column_index, target)
+    return combination
+
+
+def _stack_single_exclusions(probs: np.ndarray) -> np.ndarray:
+    """All n single-category exclusions of probs, stacked into the players axis.
+
+    (n_players, n_columns, n_opponents) -> (n_columns * n_players, n_columns - 1,
+    n_opponents), ordered so row block e holds probs with column e removed. Lets
+    every exclusion share one DP pass instead of one pass per exclusion — the DP
+    cost is dominated by python-level loop steps, not arithmetic.
+    """
+    n_players, n_columns, n_opponents = probs.shape
+    remaining_indices = np.array(
+        [[c for c in range(n_columns) if c != excluded] for excluded in range(n_columns)]
+    )   # (n_columns, n_columns - 1)
+    stacked = probs[:, remaining_indices, :]               # (n_players, n_columns, n_columns-1, n_opponents)
+    return stacked.transpose(1, 0, 2, 3).reshape(
+        n_columns * n_players, n_columns - 1, n_opponents
+    )
 
 
 def calculate_tipping_points(
@@ -595,3 +502,97 @@ def calculate_win_probability_and_tipping_points(
         tipping_points[:, c, :] = derivative
 
     return win_probability, tipping_points
+
+
+def win_threshold(scoring_weights: list[int]) -> int:
+    """Points needed to win the matchup: more than half of what is on offer."""
+    return sum(scoring_weights) // 2 + 1
+
+
+def _build_win_count_prefix_suffix(
+    probs: np.ndarray
+    , tiebreaker_index: Optional[int] = None
+):
+    """Build prefix and suffix DP tables for win-count distributions.
+
+    Each prefix[i] has shape (n_players, points+1, n_opponents) where entry [p, k, o]
+    is the probability of winning exactly k points from the first i categories — one point
+    each, or two for a tiebreaker category.
+    Suffix tables mirror this from the right.
+    This is the same polynomial-multiplication DP that combinatorial_calculation
+    uses recursively, expressed here as explicit tables so we can do leave-one-out
+    convolutions for every category in one pass.
+    """
+    n_players, n_categories, n_opponents = probs.shape
+    scoring_weights = category_scoring_weights(n_categories, tiebreaker_index)
+
+    prefix = [None] * (n_categories + 1)
+    prefix[0] = np.ones((n_players, 1, n_opponents))
+    for i in range(n_categories):
+        prefix[i + 1] = _accumulate_win_counts(
+            prefix[i], probs[:, i, :][:, np.newaxis, :], scoring_weights[i])
+
+    suffix = [None] * (n_categories + 1)
+    suffix[n_categories] = np.ones((n_players, 1, n_opponents))
+    for i in range(n_categories - 1, -1, -1):
+        suffix[i] = _accumulate_win_counts(
+            suffix[i + 1], probs[:, i, :][:, np.newaxis, :], scoring_weights[i])
+
+    return prefix, suffix
+
+
+def category_scoring_weights(
+    n_categories: int
+    , tiebreaker_index: Optional[int]
+) -> list[int]:
+    """How many points each category is worth in the matchup count.
+
+    Every category is worth one, except a designated tiebreaker, which is worth two. That is what
+    a tiebreaker category means: with an even number of categories a 4-4 matchup is a tie, and
+    doubling one category makes the total odd so the matchup always has a winner — the one who
+    took the tiebreaker. Only the tie case changes; a genuine majority still wins either way.
+
+    An odd number of categories is refused rather than accommodated: there is no tie to break, and
+    doubling one category would make the total even, reintroducing the very ties a tiebreaker
+    exists to remove (and leaving the tipping points below, which assume an odd total, wrong by a
+    tie term). Callers decide what a tiebreaker means for an odd count; this is not the place to
+    guess.
+    """
+    if tiebreaker_index is None:
+        return [1] * n_categories
+    if not 0 <= tiebreaker_index < n_categories:
+        raise ValueError(f'tiebreaker_index {tiebreaker_index} is outside the '
+                         f'{n_categories} categories.')
+    if n_categories % 2 == 1:
+        raise ValueError(f'A tiebreaker needs an even number of categories to break a tie; '
+                         f'got {n_categories}.')
+    return [2 if index == tiebreaker_index else 1 for index in range(n_categories)]
+
+
+def _accumulate_win_counts(
+    distribution: np.ndarray
+    , win_probability_slice: np.ndarray
+    , weight: int
+) -> np.ndarray:
+    """Fold one category into a win-count distribution, shifting by what it is worth."""
+    n_players, size, n_columns = distribution.shape
+    updated = np.zeros((n_players, size + weight, n_columns))
+    updated[:, :size, :]  += distribution * (1 - win_probability_slice)
+    updated[:, weight:, :] += distribution * win_probability_slice
+    return updated
+
+
+def _leave_one_out_probability(
+    prefix_table: np.ndarray
+    , suffix_table: np.ndarray
+    , target_points: int
+) -> np.ndarray:
+    """P(the categories either side of the excluded one contribute exactly target_points)."""
+    total = np.zeros((prefix_table.shape[0], prefix_table.shape[2]))
+    if target_points < 0:
+        return total
+    for taken_before in range(min(target_points + 1, prefix_table.shape[1])):
+        taken_after = target_points - taken_before
+        if 0 <= taken_after < suffix_table.shape[1]:
+            total += prefix_table[:, taken_before, :] * suffix_table[:, taken_after, :]
+    return total

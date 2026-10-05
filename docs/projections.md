@@ -12,13 +12,48 @@ The default for player statistics is to use forward-looking projections.
 
 ![Projection source weights](img/projections.png)
 
-The default projection source is a 50/50 split between ESPN's free forecasts and a modified version of DARKO. The website's version of DARKO projections takes games played and total minutes from the ESPN forecasts, and combines those with DARKO pace and per-possession projections to get per-game projections. This is necessary because DARKO does not forecast games played, and its minute forecasts are designed for the next game only, which is not ideal for fantasy. 
+The projection sources are ESPN's free forecasts and a modified version of DARKO. The default is ESPN alone (DARKO at 0%), because the DARKO projections are stale.
 
-**Note as of August 2026: the ESPN forecasting page currently has bugs, and for that reason the ESPN projections have not been updated since October. The DARKO app projections have also been down. So right now, the default forecasts are very stale**
+he website's version of DARKO projections takes games played and total minutes from the ESPN forecasts, and combines those with DARKO pace and per-possession projections to get per-game projections. This is necessary because DARKO does not forecast games played, and its minute forecasts are designed for the next game only, which is not ideal for fantasy. 
 
 The weights are always re-scaled so they add up to 100%. E.g. if DARKO is set to 75% while ESPN is still at 50%, that re-scales to 60% DARKO and 40% ESPN. 
 
-Any other set of projections can be uploaded and included in the blend, as either a CSV or an Excel file. There is no list of supported providers: the website reads each column on its own and recognizes the common ways each statistic is labelled, so most exports work as downloaded. If a file is missing a category, which is common for non-standard categories like Double Doubles, that category can still be used if at least one other projection set has the category. The category will just ignore the weight of the projection that does not have it. 
+Categories can only be used when at least one source has projections for that category. 
+
+Players are blended over the sources that project them, so generally a player that only exists in one source can still have a projection. The exception is when one of the included categories is absent from some sources: if a player is not included in any projection with the necessary category, they will be excluded. 
+
+Any other set of projections can be uploaded and included in the blend, as either a CSV or an Excel file. There is no list of supported providers: the website reads each column on its own and recognizes the common ways each statistic is labelled, so most exports work as downloaded. 
+
+**Recognized column names**
+
+| Column | Recognized aliases | Required |
+|---|---|---|
+| Player | Player, name, player name | Always |
+| Position | Position, pos | Always |
+| Games Played | Games Played, g, gp, games | One of these two |
+| Games Played % | Games Played %, gp%, gp pct, g% | One of these two |
+| Points | Points, p/g, pts, ppg | At least three of these seven |
+| Rebounds | Rebounds, r/g, reb, treb, trb, rpg, rebs | At least three of these seven |
+| Assists | Assists, a/g, ast, apg, asts | At least three of these seven |
+| Steals | Steals, s/g, stl, spg, stls | At least three of these seven |
+| Blocks | Blocks, b/g, blk, bpg, blks | At least three of these seven |
+| Turnovers | Turnovers, to/g, to, tov, tos | At least three of these seven |
+| Threes | Threes, 3/g, 3pm, 3p, 3ptm | At least three of these seven |
+| Off Rebounds | Off Rebounds, or/g, oreb, orb | No |
+| Def Rebounds | Def Rebounds, dr/g, dreb, drb | No |
+| Double Doubles | Double Doubles, 2d/g, dd | No |
+| Field Goal % | Field Goal %, fg%, fg pct | No |
+| Field Goal Attempts | Field Goal Attempts, fga/g, fga | With Field Goal % |
+| Free Throw % | Free Throw %, ft%, ft pct | No |
+| Free Throw Attempts | Free Throw Attempts, fta/g, fta | With Free Throw % |
+| Three % | Three %, 3%, 3p%, 3pt% | No |
+| Three Attempts | Three Attempts, 3a/g, 3pa, 3pta | With Three % |
+
+
+
+For percentage rates like "Field Goal %", it is possible to include attempts in the same column, by formatting it "Rate (Success/Attempts)". Percentages can be input either as pure percentages, from 0 to 100, or rations, from 0 to 1. 
+
+"Games Played" is a count of games and is converted to a share of an 82-game season. "Games Played %" is an alternative that is read as a percentage.
 
 One note of caution: be careful to download projections for all players instead of just the top players. During a draft, another drafter may take a player outside of the limited projection list, and the website will only have projections for them if they have been provided. 
 

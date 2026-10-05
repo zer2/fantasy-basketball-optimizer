@@ -77,13 +77,17 @@ class Session:
     # Per session (not global) so different sessions still run fully in parallel.
     lock: threading.Lock = field(default_factory=threading.Lock)
 
+
 # ── Store ────────────────────────────────────────────────────────────────────
 # Grouped here rather than above Session because the _store annotation below is
 # evaluated at import time, so Session must already be defined.
 
 SESSION_TTL = 4 * 3600  # seconds
 
+
 _store: dict[str, Session] = {}
+
+
 _lock = threading.Lock()
 
 
@@ -91,16 +95,6 @@ _lock = threading.Lock()
 # Public API is in CRUD order (create / get / delete); _evict_expired_sessions
 # leads because it belongs beside create_session, its only caller (same
 # workflow-over-visibility grouping the platform integrations use).
-
-def _evict_expired_sessions(now: float) -> None:
-    """Remove every session past its TTL. Caller must hold _lock."""
-    expired_ids = [
-        session_id for session_id, session in _store.items()
-        if now - session.last_accessed > SESSION_TTL
-    ]
-    for session_id in expired_ids:
-        del _store[session_id]
-
 
 def create_session() -> Session:
     session_id = uuid.uuid4().hex[:8]
@@ -114,6 +108,16 @@ def create_session() -> Session:
         _evict_expired_sessions(time.time())
         _store[session_id] = session
     return session
+
+
+def _evict_expired_sessions(now: float) -> None:
+    """Remove every session past its TTL. Caller must hold _lock."""
+    expired_ids = [
+        session_id for session_id, session in _store.items()
+        if now - session.last_accessed > SESSION_TTL
+    ]
+    for session_id in expired_ids:
+        del _store[session_id]
 
 
 def get_session(session_id: str) -> Optional[Session]:
