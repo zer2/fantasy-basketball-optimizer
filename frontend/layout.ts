@@ -10,6 +10,7 @@ import { renderWaiverControls } from './data_entry/season/season_waiver.js'
 import { getAuctionState }     from './data_entry/auction_state.js'
 import { getDraftState }       from './data_entry/draft_state.js'
 import { renderTeamGScoreTable } from './table/gscore_table.js'
+import { filterCandidatesByName } from './table/player_table.js'
 import { getLeagueSettings, isPlatformConnected, PLATFORM_SELECTION_CHANGED } from './setting_collection/league_settings.js'
 import { getCurrentSeat } from './app_state.js'
 import {
@@ -39,6 +40,10 @@ function refreshActiveTeamPanel(): void {
 // The three things that change what the panel should say: the full-team H-score result landing
 // (dispatched after the evaluate await resolves), the seat changing (including under autopilot),
 // and a platform poll bringing in a board with more picks on it than the last one.
+// The player search narrows the candidate table as the user types (see filterCandidatesByName).
+const candidateSearchInput = document.getElementById('candidate-search') as HTMLInputElement
+candidateSearchInput.addEventListener('input', () => filterCandidatesByName(candidateSearchInput.value))
+
 document.addEventListener('full-team-result-updated', refreshActiveTeamPanel)
 document.addEventListener('seat-changed', refreshActiveTeamPanel)
 document.addEventListener(LIVE_BOARD_UPDATED, refreshActiveTeamPanel)
@@ -190,6 +195,7 @@ function showSeasonLayout(): void {
     hide('left-panel')
     hide('seat-selector-container')
     hide('eval-indicator')
+    hide('candidate-search-container')
 
     // Clear sub-header so the tab bar from draft/auction mode doesn't bleed in
     const rightSubHeader = document.getElementById('right-sub-header')!
@@ -312,9 +318,11 @@ function activateDraftTab(tabId: string): void {
     })
     if (tabId === 'candidates') {
         show('hscoretable')
+        show('candidate-search-container')
         hide('draft-gscore')
     } else {
         hide('hscoretable')
+        hide('candidate-search-container')
         show('draft-gscore')
         refreshDraftGScore()
     }
@@ -327,9 +335,11 @@ function activateAuctionTab(tabId: string): void {
     })
     if (tabId === 'candidates') {
         show('hscoretable')
+        show('candidate-search-container')
         hide('auction-gscore')
     } else {
         hide('hscoretable')
+        hide('candidate-search-container')
         show('auction-gscore')
         refreshAuctionGScore()
     }

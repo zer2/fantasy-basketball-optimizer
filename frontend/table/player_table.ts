@@ -29,6 +29,7 @@ import { getShortCategoryNames } from '../app_state.js'
 import { isMobileViewport } from '../helper_functions.js'
 import { buildFullPlayerDisplayHtml } from '../player_display.js'
 import { buildForcedWeightsRow } from './force_weights.js'
+import { getRegistryEntry } from '../player_registry.js'
 
 const table = document.getElementById('hscoretable') as HTMLTableElement
 
@@ -83,6 +84,9 @@ let bottomSpacer: HTMLTableRowElement | null = null
 // data rows define makes the browser lay the table out with that many columns under table-layout:fixed,
 // squishing the real columns. Set from renderCtx (player col + score col(s) + one per category).
 let columnCount = 1
+// The player search (#candidate-search), normalised by normalizeSearchText; '' shows every candidate. Kept apart
+// from the rows, like the open panels, so a rebuild (a live-draft poll re-ranking the table) keeps the search.
+let candidateSearchText = ''
 // Id of a candidate to visually mark (the waiver drop-player highlight), or null. Applied by
 // renderWindow to whichever windowed row matches, so it survives scrolling under virtualization.
 let highlightedPlayerId: number | null = null
@@ -350,6 +354,25 @@ function setSpacerHeight(spacer: HTMLTableRowElement, px: number): void {
 
 // ── Windowed rendering ────────────────────────────────────────────────────────
 
+/** Lower-cased, accents stripped, outer spaces trimmed: 'Jokić' and 'jokic' both search as 'jokic'. */
+function normalizeSearchText(text: string): string {
+    return text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim()
+}
+
+/** The candidates the search lets through, in H-score order: every candidate when there is no search. */
+function listShownCandidates(): CandidateRow[] {
+    if (candidateSearchText === '') return candidateRows
+    return candidateRows.filter(candidate =>
+        normalizeSearchText(getRegistryEntry(candidate.player.player_id).name).includes(candidateSearchText))
+}
+
+/** Narrows the candidate table to the players whose name contains `query` (case and accents ignored). */
+export function filterCandidatesByName(query: string): void {
+    candidateSearchText = normalizeSearchText(query)
+    windowDirty = true
+    renderWindow()
+}
+
 /** Measures one collapsed row's height by briefly attaching the first display row. */
 function ensureRowHeight(): void {
     if (rowHeight > 0 || candidateRows.length === 0 || !tbodyEl) return
@@ -366,7 +389,8 @@ function renderWindow(): void {
     ensureRowHeight()
     if (rowHeight === 0) return
 
-    const n = candidateRows.length
+    const shownRows = listShownCandidates()
+    const n = shownRows.length
 
     // Viewport, expressed relative to the top of the candidate rows. Uses only viewport-relative geometry
     // (getBoundingClientRect + innerHeight), so it is correct whichever element actually scrolls — here the
@@ -379,7 +403,7 @@ function renderWindow(): void {
     // Cumulative pixel offset of each row's top. Off[i] = height of rows [0, i). Cheap for a few hundred rows.
     const off = new Array<number>(n + 1)
     off[0] = 0
-    for (let i = 0; i < n; i++) off[i + 1] = off[i] + rowHeight + candidateRows[i].expandedHeight
+    for (let i = 0; i < n; i++) off[i + 1] = off[i] + rowHeight + shownRows[i].expandedHeight
 
     // First row whose bottom is below the viewport top; last whose top is above the viewport bottom.
     let start = n
@@ -391,7 +415,8 @@ function renderWindow(): void {
 
     if (start === renderedStart && end === renderedEnd && !windowDirty) return
 
-    const reserveTail = totalCandidates > n ? (totalCandidates - n) * rowHeight : 0
+    // The not-yet-streamed tail is reserved only for the full list: how many of it a search will let through is unknown.
+    const reserveTail = candidateSearchText === '' && totalCandidates > n ? (totalCandidates - n) * rowHeight : 0
     if (topSpacer === null)    topSpacer    = makeSpacerRow()
     if (bottomSpacer === null) bottomSpacer = makeSpacerRow()
     setSpacerHeight(topSpacer, off[start])
@@ -400,7 +425,7 @@ function renderWindow(): void {
     tbodyEl.replaceChildren()
     tbodyEl.appendChild(topSpacer)
     for (let i = start; i < end; i++) {
-        const candidate = candidateRows[i]
+        const candidate = shownRows[i]
         const headerCell = candidate.displayRow.firstElementChild as HTMLElement | null
         headerCell?.classList.toggle('waiver-drop-highlight',
                                      highlightedPlayerId !== null && candidate.player.player_id === highlightedPlayerId)
@@ -418,7 +443,7 @@ function renderWindow(): void {
     // for a later render, rather than redrawing for nothing.
     let measuredAny = false
     for (let i = start; i < end; i++) {
-        const candidate = candidateRows[i]
+        const candidate = shownRows[i]
         if (candidate.expanded && candidate.expandedHeight === 0) {
             candidate.expandedHeight = candidate.expandRow.offsetHeight
             measuredAny = measuredAny || candidate.expandedHeight > 0
@@ -430,12 +455,13 @@ function renderWindow(): void {
     }
 }
 
-/** Scrolls the document so candidate `idx` sits ~30% down the viewport (works with the document scroller). */
+/** Scrolls the document so shown candidate `idx` sits ~30% down the viewport (works with the document scroller). */
 function scrollCandidateIntoView(idx: number): void {
     ensureRowHeight()
     if (rowHeight === 0 || !tbodyEl) return
+    const shownRows = listShownCandidates()
     let off = 0
-    for (let i = 0; i < idx; i++) off += rowHeight + candidateRows[i].expandedHeight
+    for (let i = 0; i < idx; i++) off += rowHeight + shownRows[i].expandedHeight
     const bodyTopDoc = tbodyEl.getBoundingClientRect().top + window.scrollY
     window.scrollTo({ top: Math.max(0, bodyTopDoc + off - window.innerHeight * 0.3), behavior: 'auto' })
 }
@@ -446,7 +472,7 @@ function scrollCandidateIntoView(idx: number): void {
 export function highlightCandidate(playerId: number | null): void {
     highlightedPlayerId = playerId
     if (playerId !== null) {
-        const idx = candidateRows.findIndex(candidate => candidate.player.player_id === playerId)
+        const idx = listShownCandidates().findIndex(candidate => candidate.player.player_id === playerId)
         if (idx >= 0) scrollCandidateIntoView(idx)
     }
     windowDirty = true

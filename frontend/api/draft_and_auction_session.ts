@@ -428,7 +428,16 @@ export function startLivePolling(): void {
     if (livePollTimer !== null || !shouldPollLiveBoard()) return
     livePollGeneration += 1
     livePollFailuresInARow = 0
-    scheduleLivePoll(livePollGeneration, LIVE_POLL_INTERVAL_MS)
+    scheduleLivePoll(livePollGeneration, LIVE_POLL_INTERVAL_MS, false)
+}
+
+/** Starts polling with a catch-up poll right away rather than after the usual wait: coming back to the tab shows
+ *  "Updating..." at once and ends on a fresh evaluate, so the user sees the board brought up to date. */
+function startLivePollingImmediately(): void {
+    if (livePollTimer !== null || !shouldPollLiveBoard()) return
+    livePollGeneration += 1
+    livePollFailuresInARow = 0
+    scheduleLivePoll(livePollGeneration, 0, true)
 }
 
 export function stopLivePolling(): void {
@@ -437,44 +446,71 @@ export function stopLivePolling(): void {
     livePollGeneration += 1
 }
 
-/** A live league is connected in a mode that drafts, there is a session, and someone can see the page. */
+/** A live league is connected in a mode that drafts, there is a session, and either the tab is in view or the user's
+ *  last pick is still to come. Polling stops while the tab is hidden and catches up the moment it is shown, so a board
+ *  on screen is visibly current: a background update would finish unseen, leaving no way to tell a current board from
+ *  a stale one. The exception is the user's last pick: platforms stop answering once a draft ends (Yahoo's draft
+ *  results return errors from then on), so a user who comes back later could never see their final team. Polling
+ *  therefore carries on in the background until that pick shows up, evaluates the finished team, and then stops. */
 function shouldPollLiveBoard(): boolean {
     return getLeagueSettings().platform !== 'Enter your own data'
         && getMode() !== 'Season Mode'
         && isPlatformConnected()
         && getSessionId() !== null
-        && document.visibilityState === 'visible'
+        && (document.visibilityState === 'visible' || isUsersLastPickPending())
+}
+
+/** The latest board shows the user's team one player short of a full roster: their next pick is their last. */
+function isUsersLastPickPending(): boolean {
+    const seat = getCurrentSeat()
+    if (seat === null || livePlayerAssignments === null || !(seat in livePlayerAssignments)) return false
+    return livePlayerAssignments[seat].length === getLeagueSettings().n_picks - 1
 }
 
 function scheduleLivePoll(
     generation: number
   , delayMs: number
+  , catchingUp: boolean
 ): void {
-    livePollTimer = setTimeout(() => { pollLiveBoardForChanges(generation) }, delayMs)
+    livePollTimer = setTimeout(() => { pollLiveBoardForChanges(generation, catchingUp) }, delayMs)
 }
 
-async function pollLiveBoardForChanges(generation: number): Promise<void> {
+/** One poll of the live board; a changed board is stored and re-evaluated. A catching-up poll (the first after the tab
+ *  comes back into view) shows "Updating..." from the moment it starts, before the platform has answered, and always
+ *  ends on an evaluate, changed board or not: the spinner settling to "Updated" is how the user knows the board on
+ *  screen is current. The fresh evaluate also repaints anything an evaluate left unfinished while the tab was away. */
+async function pollLiveBoardForChanges(
+    generation: number
+  , catchingUp: boolean
+): Promise<void> {
     if (!shouldPollLiveBoard()) { stopLivePolling(); return }
     const mode = getMode()
     try {
-        const state = await withSessionRetry(() => fetchDraftState(getSessionId()!, mode))
+        const fetchLiveBoard = () => withSessionRetry(() => fetchDraftState(getSessionId()!, mode))
+        // No onSuccess: a catch-up hands the display straight to the evaluate below.
+        const state = catchingUp
+            ? await withDisplayOwnership({ busy: 'evaluating', onFailure: 'idle' }, fetchLiveBoard)
+            : await fetchLiveBoard()
         if (generation !== livePollGeneration) return
         livePollFailuresInARow = 0
         // The draft is over and the room gone: keep the final board's results, and stop asking.
-        if (isRoomClosedAfterPicks(state.player_assignments)) { stopLivePolling(); return }
-        const boardChanged = describeLiveBoard(state.player_assignments, state.remaining_cash)
-            !== describeLiveBoard(livePlayerAssignments, liveRemainingCash)
+        const roomClosed = isRoomClosedAfterPicks(state.player_assignments)
+        const boardChanged = !roomClosed
+            && describeLiveBoard(state.player_assignments, state.remaining_cash)
+               !== describeLiveBoard(livePlayerAssignments, liveRemainingCash)
         if (boardChanged) {
             setLivePlayerAssignments(state.player_assignments, state.remaining_cash)
             document.dispatchEvent(new Event(LIVE_BOARD_UPDATED))
+        }
+        if (boardChanged || catchingUp) {
             runEvaluate().catch(err => {
                 if (err.name === 'AbortError') return   // a newer board's evaluate replaced it
-                console.error('Evaluate after a live board change failed:', err)
+                console.error('Evaluate after a live board poll failed:', err)
                 showFailureInTable(err)
             })
         }
-        if (isLiveBoardFull(state.player_assignments)) { stopLivePolling(); return }
-        scheduleLivePoll(generation, LIVE_POLL_INTERVAL_MS)
+        if (roomClosed || isLiveBoardFull(state.player_assignments)) { stopLivePolling(); return }
+        scheduleLivePoll(generation, LIVE_POLL_INTERVAL_MS, false)
     } catch (err) {
         if (generation !== livePollGeneration) return
         // An expired or revoked authorization is not going to fix itself: say so and stop, and
@@ -489,7 +525,7 @@ async function pollLiveBoardForChanges(generation: number): Promise<void> {
         livePollFailuresInARow += 1
         const backoffMs = Math.min(LIVE_POLL_INTERVAL_MS * 2 ** livePollFailuresInARow, LIVE_POLL_MAX_BACKOFF_MS)
         console.warn(`Live draft poll failed (${livePollFailuresInARow} in a row); retrying in ${backoffMs} ms:`, err)
-        scheduleLivePoll(generation, backoffMs)
+        scheduleLivePoll(generation, backoffMs, false)
     }
 }
 
@@ -525,11 +561,9 @@ function isLiveBoardFull(assignments: Record<string, number[]>): boolean {
     return picksMade >= n_drafters * n_picks
 }
 
-// Nobody is watching a hidden tab, so polling it costs platform requests for nothing; the poll
-// picks up again, at once, when the page is shown.
 document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') startLivePolling()
-    else stopLivePolling()
+    if (document.visibilityState === 'visible') startLivePollingImmediately()
+    else if (!shouldPollLiveBoard()) stopLivePolling()   // carries on only while the user's last pick is pending
 })
 
 // Naming another league ends the connection as far as polling is concerned: polling on would keep

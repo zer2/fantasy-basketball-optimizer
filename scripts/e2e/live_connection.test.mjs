@@ -109,6 +109,114 @@ test('the status follows the connection', async t => {
     }
 })
 
+test("a connected league's size is locked until the connection ends", async () => {
+    // Drafters and picks are the platform's, read at connect; editing them rebuilt the session for a board shape the
+    // polled draft does not have.
+    const app = await launchAppPage()
+    const { page } = app
+    const isLocked = async () => [
+        await page.locator('#ls-n-drafters').isDisabled(),
+        await page.locator('#ls-n-picks').isDisabled(),
+    ]
+    try {
+        await loadApp(app)
+        await stubLivePlatform(page, { availableModes: ALL_MODES })
+        await setSelect(page, 'ls-platform', 'Retrieve from Yahoo')
+        await waitAppSettled(app, { timeout: 120000 })
+        assert.deepEqual(await isLocked(), [false, false], 'unlocked before connecting')
+
+        await connectYahooLeague(app, '12345')
+        assert.deepEqual(await isLocked(), [true, true], 'locked while connected')
+
+        await typeYahooLeagueId(page, '67890')
+        assert.deepEqual(await isLocked(), [false, false], 'unlocked once another league is named')
+        await typeYahooLeagueId(page, '12345')
+        assert.deepEqual(await isLocked(), [true, true], 'locked again when the connected league is named again')
+        expectCleanSession(app, 'size lock')
+    } finally {
+        await app.close()
+    }
+})
+
+test('coming back to the tab shows the board being brought up to date', async () => {
+    // Polling stops while the tab is hidden. Coming back must show "Updating..." at once and settle on "Updated" -- even
+    // when no pick was made meanwhile, since that settling is how the user knows the board on screen is current.
+    const app = await launchAppPage()
+    const { page } = app
+    try {
+        await loadApp(app)
+        await stubLivePlatform(page, { availableModes: ALL_MODES })
+        await connectYahooLeague(app, '12345')
+        const indicatorStates = await page.evaluate(() => new Promise(resolve => {
+            const indicator = document.getElementById('eval-indicator')
+            const seen = []
+            new MutationObserver(() => seen.push(indicator.textContent)).observe(indicator, { childList: true, characterData: true, subtree: true })
+            const setVisibility = state => {
+                Object.defineProperty(document, 'visibilityState', { value: state, configurable: true })
+                document.dispatchEvent(new Event('visibilitychange'))
+            }
+            setVisibility('hidden')
+            setVisibility('visible')
+            const waitForSettled = () => seen.at(-1) === 'Updated' ? resolve(seen) : setTimeout(waitForSettled, 50)
+            setTimeout(waitForSettled, 50)
+        }))
+        assert.equal(indicatorStates[0], 'Updating...', `the spinner must start first, saw ${JSON.stringify(indicatorStates)}`)
+        assert.equal(indicatorStates.at(-1), 'Updated')
+        expectCleanSession(app, 'returned to the tab')
+    } finally {
+        await app.close()
+    }
+})
+
+test("while the user's last pick is pending, the board is followed in the background", async () => {
+    // Platforms stop answering once a draft ends, so a user who leaves for the platform's tab on their last pick and
+    // comes back after the draft could never see their final team. Polling carries on in the background just for
+    // that pick, then stops.
+    const app = await launchAppPage()
+    const { page } = app
+    const requestsSince = (start, fragment) =>
+        app.sessionRequestLog.slice(start).filter(entry => entry.includes(fragment)).length
+    const setVisibility = state => page.evaluate(visibility => {
+        Object.defineProperty(document, 'visibilityState', { value: visibility, configurable: true })
+        document.dispatchEvent(new Event('visibilitychange'))
+    }, state)
+    // Real players, twelve a team: every seat (whichever is the user's) is one short of a 13-player roster.
+    const players = [1626157, 201142, 1628374, 1627783, 1629636, 1630202, 1628969, 1641717, 1641764, 1642349, 1630591,
+                     1642263, 1628983, 201935, 202695, 1630217, 1627826, 1628384, 1626181, 1643407, 1628392, 1630180,
+                     202710, 1642856, 1628415, 1630162, 1630567, 1631096, 1628991, 1630700, 1642851, 1641709, 1629651,
+                     1630245, 1629674, 1631099, 1631221, 1627832, 203999, 1626164, 1628389, 1627759, 1629638, 1642276,
+                     203497, 1630166, 1628404, 1629614]
+    const lastPicks = [1642273, 1631217, 1630174, 1629029]
+    const boardWith = picksMade => Object.fromEntries(LEAGUE_TEAMS.map((team, index) => [
+        team, [...players.slice(index * 12, index * 12 + 12), ...(index < picksMade ? [lastPicks[index]] : [])]]))
+    try {
+        await loadApp(app)
+        const platformBoard = await stubLivePlatform(page, { availableModes: ALL_MODES })
+        await connectYahooLeague(app, '12345')
+        platformBoard.assignments = boardWith(0)
+        await page.waitForFunction(() => document.getElementById('eval-indicator').textContent === 'Updated',
+                                   null, { timeout: 120000 })
+        await page.waitForTimeout(3000)   // the twelve-player board has been polled and evaluated
+
+        await setVisibility('hidden')
+        const start = app.sessionRequestLog.length
+        await page.waitForTimeout(3000)
+        assert.ok(requestsSince(start, '/draft-state') >= 1, 'polling must carry on while the last pick is pending')
+
+        platformBoard.assignments = boardWith(LEAGUE_TEAMS.length)   // every last pick made, the user's included
+        await page.waitForTimeout(4000)
+        assert.ok(requestsSince(start, '/evaluate') >= 1, 'the finished team must be evaluated in the background')
+        const settled = app.sessionRequestLog.length
+        await page.waitForTimeout(4000)
+        assert.equal(requestsSince(settled, '/draft-state'), 0, 'once the last pick is in, a hidden tab stops polling')
+        await setVisibility('visible')
+        await waitAppSettled(app, { timeout: 120000 })
+        expectCleanSession(app, 'last pick followed in the background')
+    } finally {
+        await app.close()
+    }
+})
+
 test('a live platform uses projections: Historical is offered only with your own data', async () => {
     // As in the Streamlit app. A live platform is a draft or season being played now, which a past season's stats
     // would rank for a year that is over (a user drafting from Historical data saw a board that made no sense).

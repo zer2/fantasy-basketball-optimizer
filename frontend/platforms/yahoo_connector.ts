@@ -6,7 +6,7 @@
 
 import { makeCustomSelect } from '../custom_select.js'
 import { makeLabel } from '../helper_functions.js'
-import { fetchLeagues, fetchYahooAuthUrl, submitYahooToken, PlatformLeague } from '../api/client.js'
+import { fetchLeagues, fetchYahooAuthUrl, submitYahooToken, PlatformLeague, HTTPError } from '../api/client.js'
 import { PlatformConnector, ConnectStatus } from './connector.js'
 import { makeConnectorDialog } from './connector_dialog.js'
 
@@ -195,6 +195,20 @@ export function makeYahooConnector(status: ConnectStatus): PlatformConnector {
         dialog.close()
     }
 
+    /** The token from an earlier authorization is kept server-side (per signed-in user), so a reload has not lost it:
+     *  listing the leagues finds out. With a token, the leagues fill in and the button offers to re-authenticate;
+     *  without one (a 401), the controls stay as they are and "Authenticate with Yahoo" is the way in. */
+    async function restoreStoredAuthorization(): Promise<void> {
+        try {
+            await loadLeagues()
+        } catch (err) {
+            if (err instanceof HTTPError && err.status === 401) return
+            status.showError(`Could not list your Yahoo leagues: ${(err as Error).message}`)
+            return
+        }
+        authButton.textContent = 'Re-authenticate with Yahoo'
+    }
+
     authButton.addEventListener('click', () => {
         setDialogProgress('')
         dialog.open()
@@ -243,6 +257,7 @@ export function makeYahooConnector(status: ConnectStatus): PlatformConnector {
         },
         // Switching away from Yahoo closes the handshake dialog; it is meaningless over another
         // platform's controls, and a modal left open would block them.
+        onSelected() { restoreStoredAuthorization() },
         onDeselected() { dialog.close() },
     }
 }
