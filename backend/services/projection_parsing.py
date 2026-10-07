@@ -1,4 +1,4 @@
-"""Parsing an uploaded projection file (.csv or .xlsx) into the canonical column set.
+"""Parsing an uploaded projection file (.csv, .xlsx or .xls) into the canonical column set.
 
 Extracted from build_agent so the pipeline orchestrator and the file-format concerns —
 alias mapping, spreadsheet signature sniffing, charset detection, ratio-cell volume
@@ -30,12 +30,33 @@ _COLUMN_ALIASES_KEY = 'projection-column-aliases'
 
 
 # A .xlsx is a ZIP archive, so every one begins with this signature. The older .xls is an
-# OLE2 compound file with a different one — detected only to say so plainly, since reading it
-# would need another engine and anything that can save .xls can also save .xlsx or .csv.
+# OLE2 compound file with a different one, and is read with xlrd: Basketball Monster's export,
+# among others, is a genuine .xls (written by the MyXls library), not HTML under that name.
 _XLSX_SIGNATURE = b'PK\x03\x04'
 
 
 _XLS_SIGNATURE  = b'\xd0\xcf\x11\xe0'
+
+
+# A name split over two columns, joined into 'Player'.
+_SPLIT_NAME_COLUMNS = {'First Name', 'Last Name'}
+
+# Columns a file may lack but carry the parts of. Each is built only when the file has no column
+# of its own: rebounds from their two halves, points from the makes (two per field goal, one more
+# per three, one per free throw), and each percentage from its makes and attempts.
+_DERIVED_CORES = {'Rebounds': {'Off Rebounds', 'Def Rebounds'},
+                  'Points': {'Field Goals Made', 'Threes', 'Free Throws Made'}}
+_DERIVED_SHARES = {'Field Goal %': ('Field Goals Made', 'Field Goal Attempts'),
+                   'Free Throw %': ('Free Throws Made', 'Free Throw Attempts'),
+                   'Three %': ('Threes', 'Three Attempts')}
+
+# SEASON TOTALS. Some sources project a season's totals, not per-game numbers. No per-game
+# projection can exceed a single game's record, so one value above these ceilings settles that
+# the whole file is totals, to be divided by games played. Minutes decide it when the file has
+# them (nobody averages an hour a game); otherwise any counting stat does.
+_MAX_MINUTES_PER_GAME = 60.0
+_MAX_PER_GAME = {'Points': 100.0, 'Rebounds': 60.0, 'Assists': 35.0, 'Steals': 15.0, 'Blocks': 20.0,
+                 'Threes': 20.0, 'Turnovers': 20.0, 'Field Goal Attempts': 70.0, 'Free Throw Attempts': 40.0}
 
 
 # Attempts hiding inside a ratio cell: sources that print a percentage with its makes and
@@ -45,7 +66,7 @@ _ATTEMPTS_IN_RATIO_CELL_PATTERN = r'\(\s*-?[\d.]+\s*/\s*(-?[\d.]+)\s*\)'
 
 
 def parse_projection_upload(upload_bytes: bytes, sport_params: dict) -> pd.DataFrame:
-    """Parse an uploaded projection file (.csv or .xlsx) into the canonical column set.
+    """Parse an uploaded projection file (.csv, .xlsx or .xls) into the canonical column set.
 
     There is no format detection: each column is interpreted on its own through the alias
     table (see 'projection-column-aliases' in parameters.yaml), so any source is readable
@@ -58,18 +79,21 @@ def parse_projection_upload(upload_bytes: bytes, sport_params: dict) -> pd.DataF
     # Canonical names are aliases of themselves, so this covers a file already written in them.
     renamed_columns = set(column_mapping.values())
 
-    missing_identity = [column for column in ('Player', 'Position')
-                        if column not in renamed_columns]
+    # A player is named by one column or by first and last name split over two. Position is
+    # optional: positions come from the canonical eligibility (data_retrieval), so a file
+    # without them loses nothing but the fallback for players that table does not know.
+    has_player_name = 'Player' in renamed_columns or _SPLIT_NAME_COLUMNS <= renamed_columns
+    derivable_cores = {core for core, parts in _DERIVED_CORES.items() if parts <= renamed_columns}
     matched_cores    = [column for column in CORE_PROJECTION_COLUMNS
-                        if column in renamed_columns]
-    if not missing_identity and len(matched_cores) >= _MIN_MATCHED_CORE_COLUMNS:
+                        if column in renamed_columns or column in derivable_cores]
+    if has_player_name and len(matched_cores) >= _MIN_MATCHED_CORE_COLUMNS:
         return _parse_with_renamer(df_raw, column_mapping, sport_params)
 
-    if missing_identity:
-        problem = f"no column for {' or '.join(missing_identity)}"
+    if not has_player_name:
+        problem = 'no column for Player (nor First Name and Last Name)'
     else:
         missing_cores = [column for column in CORE_PROJECTION_COLUMNS
-                         if column not in renamed_columns]
+                         if column not in renamed_columns and column not in derivable_cores]
         problem = (f'only {len(matched_cores)} of {len(CORE_PROJECTION_COLUMNS)} core stats '
                    f"were recognized (no {', '.join(missing_cores)})")
     unrecognized = [column for column in df_raw.columns if column not in column_mapping]
@@ -94,9 +118,10 @@ def _read_projection_table(upload_bytes: bytes) -> pd.DataFrame:
         except Exception as exc:
             raise ValueError(f'Could not read this spreadsheet: {type(exc).__name__}: {exc}')
     if upload_bytes.startswith(_XLS_SIGNATURE):
-        raise ValueError(
-            'This is an older .xls spreadsheet, which cannot be read directly. '
-            'Save it as .xlsx or .csv and upload again.')
+        try:
+            return pd.read_excel(io.BytesIO(upload_bytes), engine='xlrd')
+        except Exception as exc:
+            raise ValueError(f'Could not read this spreadsheet: {type(exc).__name__}: {exc}')
     return pd.read_csv(io.StringIO(_decode_projection_text(upload_bytes)))
 
 
@@ -157,9 +182,10 @@ def _map_columns_to_canonical(df_raw: pd.DataFrame, sport_params: dict) -> dict:
 
 
 def _normalize_projection_header(header) -> str:
-    """Header spellings differ only by case and padding far more often than by wording, so
-    both sides of an alias lookup are folded to one form."""
-    return str(header).strip().lower()
+    """Header spellings differ only by case, padding and word separators far more often than by
+    wording, so both sides of an alias lookup are folded to one form: lower case, underscores
+    read as spaces (field_goals_attempted is 'field goals attempted'), runs of spaces as one."""
+    return ' '.join(str(header).replace('_', ' ').lower().split())
 
 
 def _parse_with_renamer(
@@ -192,9 +218,13 @@ def _parse_with_renamer(
                 r'^\s*(-?(?:\d+\.?\d*|\.\d+))(?![A-Za-z])', expand=False)
         return pd.to_numeric(column, errors='coerce')
 
-    stat_columns = [column for column in df.columns if column not in ('Player', 'Position')]
+    identity_columns = {'Player', 'Position'} | _SPLIT_NAME_COLUMNS
+    stat_columns = [column for column in df.columns if column not in identity_columns]
     df[stat_columns] = df[stat_columns].apply(coerce_stat_column)
     df = df.dropna(subset=stat_columns, how='all')
+    df = _join_split_name(df)
+    df = _derive_missing_columns(df)
+    df = _convert_season_totals_to_per_game(df, sport_params)
     df = convert_percent_columns_to_fractions(df)
 
     if 'Games Played %' not in df.columns:
@@ -211,12 +241,65 @@ def _parse_with_renamer(
     # Raw games played is only an intermediate for the % above. Left in, it becomes an
     # upload-only column in the blend's union, and the blend's coverage rule (a player
     # must have every column covered by some source that carries them) would then drop
-    # every player the upload doesn't cover — a partial upload would gut the pool.
-    df = df.drop(columns=['Games Played'], errors='ignore')
+    # every player the upload doesn't cover — a partial upload would gut the pool. Minutes are
+    # the same: read only to tell season totals from per-game numbers.
+    df = df.drop(columns=['Games Played', 'Minutes'], errors='ignore')
 
     if 'Player' in df.columns:
         df = df.set_index('Player')
 
+    return df
+
+
+def _join_split_name(df: pd.DataFrame) -> pd.DataFrame:
+    """'Player' from First Name and Last Name when the file names players over two columns. A
+    file with a Player column of its own keeps it; the parts are dropped either way."""
+    if 'Player' not in df.columns and _SPLIT_NAME_COLUMNS <= set(df.columns):
+        first = df['First Name'].fillna('').astype(str).str.strip()
+        last = df['Last Name'].fillna('').astype(str).str.strip()
+        df = df.assign(Player=(first + ' ' + last).str.strip())
+    return df.drop(columns=[column for column in _SPLIT_NAME_COLUMNS if column in df.columns])
+
+
+def _derive_missing_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Build the columns a file lacks from the parts it carries (_DERIVED_CORES, _DERIVED_SHARES).
+    A column the file has is never overwritten. A percentage with no attempts is 0, as the app's
+    loaders write it: the attempts weighting makes it inert."""
+    df = df.copy()
+    if 'Rebounds' not in df.columns and _DERIVED_CORES['Rebounds'] <= set(df.columns):
+        df['Rebounds'] = df['Off Rebounds'] + df['Def Rebounds']
+    if 'Points' not in df.columns and _DERIVED_CORES['Points'] <= set(df.columns):
+        df['Points'] = 2 * df['Field Goals Made'] + df['Threes'] + df['Free Throws Made']
+    for share, (made, attempts) in _DERIVED_SHARES.items():
+        if share not in df.columns and made in df.columns and attempts in df.columns:
+            df[share] = (df[made] / df[attempts].where(df[attempts] > 0)).fillna(0.0)
+    return df
+
+
+def _convert_season_totals_to_per_game(df: pd.DataFrame, sport_params: dict) -> pd.DataFrame:
+    """Divide a season-totals file by games played (see _MAX_PER_GAME). Every count is divided --
+    the counting stats, the attempts, the makes, the minutes; shares and games are not. A totals
+    file without games cannot be put per game and is refused; a player projected for no games has
+    no per-game numbers and is dropped."""
+    if 'Minutes' in df.columns:
+        totals = df['Minutes'].max() > _MAX_MINUTES_PER_GAME
+    else:
+        totals = any(df[column].max() > ceiling for column, ceiling in _MAX_PER_GAME.items()
+                     if column in df.columns)
+    if not totals:
+        return df
+    if 'Games Played' not in df.columns:
+        raise ValueError('These numbers are season totals (no player could average them per game), '
+                         'but the file has no games-played column to divide them by.')
+    volume_columns = {info['volume-statistic'] for info in sport_params['ratio-statistics'].values()}
+    counts = [column for column in df.columns
+              if column in sport_params['counting-statistics'] or column in volume_columns or column == 'Minutes']
+    played = df['Games Played'] > 0
+    if (~played).any():
+        logging.getLogger('fbbo').info('Season-totals upload: dropping %d player(s) projected for no games',
+                                       int((~played).sum()))
+    df = df[played].copy()
+    df[counts] = df[counts].div(df['Games Played'], axis=0)
     return df
 
 

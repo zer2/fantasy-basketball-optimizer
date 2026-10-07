@@ -139,14 +139,17 @@ test("a connected league's size is locked until the connection ends", async () =
 })
 
 test('coming back to the tab shows the board being brought up to date', async () => {
-    // Polling stops while the tab is hidden. Coming back must show "Updating..." at once and settle on "Updated" -- even
-    // when no pick was made meanwhile, since that settling is how the user knows the board on screen is current.
+    // A hidden tab keeps polling, more slowly. Coming back must show "Updating..." at once and settle on "Updated" --
+    // even when no pick was made meanwhile, since that settling is how the user knows the board on screen is current.
+    // A board that background polling already kept current is only flashed, not re-evaluated.
     const app = await launchAppPage()
     const { page } = app
     try {
         await loadApp(app)
         await stubLivePlatform(page, { availableModes: ALL_MODES })
         await connectYahooLeague(app, '12345')
+        await page.waitForTimeout(3000)   // the first polls have answered: the board on screen is current
+        const evaluatesBefore = app.sessionRequestLog.filter(entry => entry.includes('/evaluate')).length
         const indicatorStates = await page.evaluate(() => new Promise(resolve => {
             const indicator = document.getElementById('eval-indicator')
             const seen = []
@@ -162,16 +165,18 @@ test('coming back to the tab shows the board being brought up to date', async ()
         }))
         assert.equal(indicatorStates[0], 'Updating...', `the spinner must start first, saw ${JSON.stringify(indicatorStates)}`)
         assert.equal(indicatorStates.at(-1), 'Updated')
+        const evaluatesAfter = app.sessionRequestLog.filter(entry => entry.includes('/evaluate')).length
+        assert.equal(evaluatesAfter, evaluatesBefore, 'an unchanged, current board is flashed, not re-evaluated')
         expectCleanSession(app, 'returned to the tab')
     } finally {
         await app.close()
     }
 })
 
-test("while the user's last pick is pending, the board is followed in the background", async () => {
-    // Platforms stop answering once a draft ends, so a user who leaves for the platform's tab on their last pick and
-    // comes back after the draft could never see their final team. Polling carries on in the background just for
-    // that pick, then stops.
+test('a hidden tab keeps following the draft, through the last pick', async () => {
+    // A hidden tab polls every few seconds, so the board is current on coming back. That matters most for the last
+    // pick: platforms stop answering once a draft ends, so a user who leaves for the platform's tab on their last pick
+    // and comes back after the draft could otherwise never see their final team. Once the board is full, it stops.
     const app = await launchAppPage()
     const { page } = app
     const requestsSince = (start, fragment) =>
@@ -200,15 +205,15 @@ test("while the user's last pick is pending, the board is followed in the backgr
 
         await setVisibility('hidden')
         const start = app.sessionRequestLog.length
-        await page.waitForTimeout(3000)
-        assert.ok(requestsSince(start, '/draft-state') >= 1, 'polling must carry on while the last pick is pending')
+        await page.waitForTimeout(7000)   // longer than the hidden-tab interval (5 s)
+        assert.ok(requestsSince(start, '/draft-state') >= 1, 'polling must carry on while the tab is hidden')
 
         platformBoard.assignments = boardWith(LEAGUE_TEAMS.length)   // every last pick made, the user's included
-        await page.waitForTimeout(4000)
+        await page.waitForTimeout(8000)
         assert.ok(requestsSince(start, '/evaluate') >= 1, 'the finished team must be evaluated in the background')
         const settled = app.sessionRequestLog.length
-        await page.waitForTimeout(4000)
-        assert.equal(requestsSince(settled, '/draft-state'), 0, 'once the last pick is in, a hidden tab stops polling')
+        await page.waitForTimeout(7000)
+        assert.equal(requestsSince(settled, '/draft-state'), 0, 'once the board is full, a hidden tab stops polling')
         await setVisibility('visible')
         await waitAppSettled(app, { timeout: 120000 })
         expectCleanSession(app, 'last pick followed in the background')

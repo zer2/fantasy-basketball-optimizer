@@ -26,12 +26,17 @@ Any other set of projections can be uploaded and included in the blend, as eithe
 
 **Recognized column names**
 
+<!-- CLAUDE DRAFT (2026-10-07): alias lists completed from parameters.yaml (projection-column-aliases); new rows for Minutes, Field Goals Made and Free Throws Made. Underscores in a header read as spaces, so field_goals_attempted matches "field goals attempted". -->
+
 | Column | Recognized aliases | Required |
 |---|---|---|
-| Player | Player, name, player name | Always |
-| Position | Position, pos | Always |
-| Games Played | Games Played, g, gp, games | One of these two |
-| Games Played % | Games Played %, gp%, gp pct, g% | One of these two |
+| Player | Player, name, player name | If no first name/last name column |
+| Player First Name | First Name, first name, firstname, player first name | If no full name column |
+| Player Last Name | Last Name, last name, lastname, player last name, surname | If no full name column |
+| Position | Position, pos | No, default to Yahoo |
+| Games Played | Games Played, g, gp, games | If no Games Played % column|
+| Games Played % | Games Played %, gp%, gp pct, g% | If no Games Played column|
+| Minutes | Minutes, min, mpg, m/g | No |
 | Points | Points, p/g, pts, ppg | At least three of these seven |
 | Rebounds | Rebounds, r/g, reb, treb, trb, rpg, rebs | At least three of these seven |
 | Assists | Assists, a/g, ast, apg, asts | At least three of these seven |
@@ -39,17 +44,17 @@ Any other set of projections can be uploaded and included in the blend, as eithe
 | Blocks | Blocks, b/g, blk, bpg, blks | At least three of these seven |
 | Turnovers | Turnovers, to/g, to, tov, tos | At least three of these seven |
 | Threes | Threes, 3/g, 3pm, 3p, 3ptm | At least three of these seven |
-| Off Rebounds | Off Rebounds, or/g, oreb, orb | No |
-| Def Rebounds | Def Rebounds, dr/g, dreb, drb | No |
-| Double Doubles | Double Doubles, 2d/g, dd | No |
+| Off Rebounds | Off Rebounds, or/g, oreb, orb, offensive rebounds | No |
+| Def Rebounds | Def Rebounds, dr/g, dreb, drb, defensive rebounds | No |
+| Double Doubles | Double Doubles, 2d/g, dd, double doubles | No |
 | Field Goal % | Field Goal %, fg%, fg pct | No |
-| Field Goal Attempts | Field Goal Attempts, fga/g, fga | With Field Goal % |
+| Field Goals Made | Field Goals Made, fgm, fgm/g, field goals | No |
+| Field Goal Attempts | Field Goal Attempts, fga/g, fga, field goals attempted | With Field Goal % |
 | Free Throw % | Free Throw %, ft%, ft pct | No |
-| Free Throw Attempts | Free Throw Attempts, fta/g, fta | With Free Throw % |
+| Free Throws Made | Free Throws Made, ftm, ftm/g, free throws | No |
+| Free Throw Attempts | Free Throw Attempts, fta/g, fta, free throws attempted | With Free Throw % |
 | Three % | Three %, 3%, 3p%, 3pt% | No |
-| Three Attempts | Three Attempts, 3a/g, 3pa, 3pta | With Three % |
-
-
+| Three Attempts | Three Attempts, 3a/g, 3pa, 3pta, threes attempted | With Three % |
 
 For percentage rates like "Field Goal %", it is possible to include attempts in the same column, by formatting it "Rate (Success/Attempts)". Percentages can be input either as pure percentages, from 0 to 100, or rations, from 0 to 1. 
 

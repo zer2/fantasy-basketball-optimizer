@@ -133,16 +133,25 @@ NBA:
   # one entry covers PTS / pts / Pts. Canonical names (the right-hand side) are always
   # understood, so a file already written in them needs no aliases at all. Unrecognized
   # columns are dropped, and stats a file simply lacks stay absent (sources that pair
-  # projections with a league export only that league's categories). To teach the parser a
-  # new source, add its spellings here — nothing else needs to change.
+  # projections with a league export only that league's categories). Underscores read as
+  # spaces, so 'field goals attempted' also covers field_goals_attempted. To teach the parser
+  # a new source, add its spellings here — nothing else needs to change.
   projection-column-aliases:
-    # ── Identity ──
+    # ── Identity ── (a file may split the name: First Name and Last Name are joined into
+    # Player; Position is optional, taken from the canonical eligibility when absent)
     name : Player
     player : Player
     player name : Player
+    first name : First Name
+    firstname : First Name
+    player first name : First Name
+    last name : Last Name
+    lastname : Last Name
+    player last name : Last Name
+    surname : Last Name
     pos : Position
     position : Position
-    # ── Games ──
+    # ── Games and minutes ── (minutes only tells season totals from per-game numbers)
     g : Games Played
     gp : Games Played
     games : Games Played
@@ -150,6 +159,10 @@ NBA:
     gp% : Games Played %
     gp pct : Games Played %
     g% : Games Played %
+    min : Minutes
+    mpg : Minutes
+    m/g : Minutes
+    minutes : Minutes
     # ── Counting stats ──
     p/g : Points
     pts : Points
@@ -165,9 +178,11 @@ NBA:
     dr/g : Def Rebounds
     dreb : Def Rebounds
     drb : Def Rebounds
+    defensive rebounds : Def Rebounds
     or/g : Off Rebounds
     oreb : Off Rebounds
     orb : Off Rebounds
+    offensive rebounds : Off Rebounds
     a/g : Assists
     ast : Assists
     apg : Assists
@@ -195,21 +210,37 @@ NBA:
     threes : Threes
     2d/g : Double Doubles
     dd : Double Doubles
-    # ── Ratio stats and the volumes they are weighted by ──
+    double doubles : Double Doubles
+    # ── Ratio stats, their makes, and the volumes they are weighted by ── (a file with makes
+    # and attempts but no percentage gets the percentage from them; points from makes)
     fg% : Field Goal %
     fg pct : Field Goal %
+    fgm : Field Goals Made
+    fgm/g : Field Goals Made
+    field goals : Field Goals Made
+    field goals made : Field Goals Made
     fga/g : Field Goal Attempts
     fga : Field Goal Attempts
+    field goals attempted : Field Goal Attempts
+    field goal attempts : Field Goal Attempts
     ft% : Free Throw %
     ft pct : Free Throw %
+    ftm : Free Throws Made
+    ftm/g : Free Throws Made
+    free throws : Free Throws Made
+    free throws made : Free Throws Made
     fta/g : Free Throw Attempts
     fta : Free Throw Attempts
+    free throws attempted : Free Throw Attempts
+    free throw attempts : Free Throw Attempts
     3% : Three %
     3p% : Three %
     3pt% : Three %
     3a/g : Three Attempts
     3pa : Three Attempts
     3pta : Three Attempts
+    threes attempted : Three Attempts
+    three attempts : Three Attempts
   espn-renamer:
     ESPN_NAME : Player
     GAMES_PLAYED : Games Played

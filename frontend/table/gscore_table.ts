@@ -38,7 +38,18 @@ export function renderTeamGScoreTable(
 ): void {
     container.innerHTML = ''
     const categories = getSelectedCategories()
-    if (playerIds.length === 0) return
+    if (playerIds.length === 0) {
+        // Said rather than left blank: an empty panel reads as a failure to load. In a one-cell table of the panel's own
+        // style, as the candidate table shows "Your team is full.", so the two messages look alike.
+        const messageTable = document.createElement('table')
+        messageTable.className = 'panel-table panel-table--rounded'
+        messageTable.style.width = '100%'
+        const messageCell = messageTable.createTBody().insertRow().insertCell()
+        messageCell.className = 'table-message'
+        messageCell.textContent = 'No players on your team yet.'
+        container.appendChild(messageTable)
+        return
+    }
     const rows = playerIds.map(getGScoreRowOrThrow)
 
     const tbl = document.createElement('table')
