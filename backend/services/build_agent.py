@@ -26,7 +26,8 @@ from pathlib import Path
 
 from backend.parameters import load_all_params
 from backend.services.projection_parsing import parse_projection_upload
-from backend.data_retrieval import attach_player_ids_by_name, combine_projections, get_specified_historical_stats
+from backend.data_retrieval import (attach_player_ids_by_name, combine_projections, get_canonical_position_eligibility,
+                                    get_specified_historical_stats)
 from backend.math.algorithm_agents import HAgent
 from backend.math.process_player_data import drop_injured_players, make_upsilon_adjustment, process_player_data
 from backend.player_identity import (
@@ -98,7 +99,8 @@ def load_player_pool(
 
     if v0_with_names is None:
         if source_type == 'csv':
-            v0_with_names = _resolve_single_csv_player_ids(parse_projection_upload(csv_bytes, sport_params))
+            v0_with_names = _fill_missing_positions(
+                _resolve_single_csv_player_ids(parse_projection_upload(csv_bytes, sport_params)), sport_params)
 
         elif source_type == 'historical':
 
@@ -177,6 +179,20 @@ def _resolve_single_csv_player_ids(parsed_csv: pd.DataFrame) -> pd.DataFrame:
         duplicated = frame.index[frame.index.duplicated()].tolist()
         raise ValueError(f'Uploaded CSV: multiple rows resolve to the same player id(s): {duplicated}')
     return frame
+
+
+def _fill_missing_positions(
+    v0_with_names: pd.DataFrame
+    , sport_params: dict
+) -> pd.DataFrame:
+    """Positions for an uploaded file that carries none: the canonical eligibility the blend uses
+    (data_retrieval.get_canonical_position_eligibility), 'NP' for a player that table lacks -- as
+    the blend fills them. A file with positions keeps its own."""
+    if 'Position' in v0_with_names.columns:
+        return v0_with_names
+    canonical_positions = get_canonical_position_eligibility(sport_params)
+    positions = pd.Series(v0_with_names.index.map(canonical_positions), index=v0_with_names.index)
+    return v0_with_names.assign(Position=positions.fillna('NP'))
 
 
 def _build_player_registry(v0_with_names: pd.DataFrame) -> dict:

@@ -337,7 +337,7 @@ function appendCustomUploadRow(
     // Spreadsheets are as common as CSVs here: people copy a projection table into Excel and
     // upload what they saved. The backend decides format from the file's own signature, so
     // this only widens the picker.
-    uploadInput.accept = '.csv,.xlsx'
+    uploadInput.accept = '.csv,.xlsx,.xls'
     uploadInput.className = 'sidebar-file-input'
 
     // The file input's own text ("No file chosen", or the filename) is drawn by the browser

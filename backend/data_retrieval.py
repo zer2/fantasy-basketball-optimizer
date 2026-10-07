@@ -210,9 +210,11 @@ def combine_projections(
     # player is known, so identity is stable across any combination of active sources.
     # A source's own Position survives only for players the canonical table lacks —
     # who, in practice, exist in that source alone, so no identity conflict is possible.
+    # A source may carry no Position at all (an upload without one), in which case the canonical
+    # table alone decides.
     canonical_positions = get_canonical_position_eligibility(sport_params)
     mapped_positions = pd.Series(df.index.map(canonical_positions), index=df.index)
-    df['Position'] = mapped_positions.fillna(df['Position'])
+    df['Position'] = mapped_positions.fillna(df['Position']) if 'Position' in df.columns else mapped_positions
 
     df['Position'] = df['Position'].fillna('NP')
     # ROW ORDER IS LOAD-BEARING (see get_historical_data): the blend has always emitted a
