@@ -255,15 +255,15 @@ The position structure used by the algorithm — also shown in the [detailed dro
 
 It is important to note that this position structure should not necessarily be the same as the league's position structure. The league position structure might include bench slots which players can be moved in and out of on a day-to-day basis to make their games count. Players sitting on that kind of bench do matter, so long as the team is balanced enough in terms of position to accommodate all the players who are active on a given day. Those bench slots should be included as Utilities, or perhaps extra Guards or Forwards to ensure adequate balance. The proper configuration will depend on the rules of a league and some degree of personal preference. 
 
-## Limitations and corrections
+## Corrections
 
-H-scoring as presented in the papers has numerous limitations. The website does have some procedures in place to mitigate these limitations, but they are imperfect and not comprehensive. 
+H-scoring as presented in the papers has numerous limitations. The website has additional procedures to mitigate some of them.
 
-### Reliance on one projection set 
+### Reducing over-confidence in the projection set 
 
 H-scoring as described by the papers is fully reliant on a single set of projections. If another drafter takes a player projected to be a poor performer highly, the algorithm will not "doubt itself" and consider the possibility that its projections for that player are too low. It will assume that pick was a poor choice and the drafter who took it will have a bad team. 
 
-This inability to doubt itself makes the algorithm overconfident, believing that its own team is very strong, when its own projections are not necessarily better than those implicitly used by other drafters. As a practical matter this can lead the algorithm to think its team is so strong that the only way to improve is to "un-punt" categories it has given up on, which is probably a bad idea in practice. 
+This inability to doubt itself can make the algorithm overconfident, believing that its own team is very strong, when its own projections are not necessarily better than those implicitly used by other drafters. As a practical matter this can lead the algorithm to think its team is so strong that the only way to improve is to "un-punt" categories it has given up on, which is probably a bad idea in practice. 
 
 The papers assume that player projections are all known and agreed upon by all the drafters, so they don't address this issue. However, it is so important in practice that the website has its own logic to address it. 
 
@@ -383,7 +383,7 @@ The justification for this adjustment is a Bayesian model for updating expectati
     w^* = \left[ I_{n \times n} + \frac{\beth}{ n^2}\mathbf{1}_{n \times n}  \right]^{-1} \left[ w + \frac{\beth}{2n} \mathbf{1}_n \right ]
     $$
 
-### Only one strategy is evaluated 
+### Incentivizing flexible builds 
 
 Fantasy basketball analysts often advocate for taking the best player available for the first few picks, and waiting until later to commit to a punt. The idea is to start flexibly, and decide which categories to punt based on which star players end up on the team. A manager would not want to commit to e.g. punting blocks before a star shot-blocker falls into their lap. 
 
@@ -391,7 +391,7 @@ Ideally, the algorithm would model a probability distribution of how circumstanc
 
 In general, the flexibility of a strategy is highly related to the degree of punting it involves. A drafter who is only softly planning on punting blocks is likely able to take advantage of a surprising shot-blocker more easily than a drafter planning on hard-punting the category. This motivates a regime of rewarding balance for early picks. The algorithm does this with a technique called regularization, which adds a small penalty for moving category weights into H-scores. The algorithm can still plan on a punt, but regularization incentivizes it to punt less harshly, and to choose players who rely less on punting specific categories for their value. This allows the algorithm to more easily pivot if the draft proceeds in a surprising way. 
 
-The strength of that pull is the λ_c (lambda) parameter in the sidebar, which defaults to 0.05. Raising it makes early picks hedge harder: weights stay nearer balanced, and the algorithm prefers players whose value does not depend on any one punt landing. Lowering it lets the algorithm commit sooner, which pays off when the punt it picks is the right one and costs flexibility when it is not. Setting it to zero removes the pull entirely, leaving the algorithm free to commit from the first pick. There is also a corresponding λ_p for flex position shares, which defaults to 0.8. 
+The strength of that pull is the $λ_c$ (lambda) parameter in the sidebar, which defaults to 0.05. Raising it makes early picks hedge harder: weights stay nearer balanced, and the algorithm prefers players whose value does not depend on any one punt landing. Lowering it lets the algorithm commit sooner, which pays off when the punt it picks is the right one and costs flexibility when it is not. Setting it to zero removes the pull entirely, leaving the algorithm free to commit from the first pick. There is also a corresponding $λ_p$ for flex position shares, which defaults to 0.8. 
 
 Both λs are scaled by a diminishing factor as the draft goes on. This ensures that regularization applies most for early picks; once the algorithm settles on a strategy, it stops applying as much. 
 
@@ -402,7 +402,7 @@ Both λs are scaled by a diminishing factor as the draft goes on. This ensures t
 
     The flex position regularizer has the same scheduler, just scaled up because the flex position numbers tend to vary more. 
 
-### No model of other managers
+### Adjusting for other managers' strategies 
 
 The internal logic of the paper's version of H-scoring does not understand that other drafters may also be trying to punt categories. This will lead to inaccurate projections of other teams and inaccurate projections of which players will be available in later rounds.
 
@@ -421,22 +421,22 @@ Testing confirms that the prediction adjustment improves the performance of H-sc
 A demonstration of the self-play process that runs before a draft.
 ///
 
-### Gradient descent optimizes locally
+### Checking multiple potential builds 
 
-A fundamental limitation of gradient descent is that it only looks for nearby peaks, potentially missing peaks that are further away. In fantasy basketball terms, it can optimize a build but not evaluate the idea of totally switching to a new build. 
+A fundamental limitation of gradient descent is that it only looks for nearby peaks, potentially missing peaks that are further away. In fantasy basketball terms, it can optimize a build but not evaluate the idea of totally switching to a new build. This means that basic H-scoring can get stuck in one strategy and miss others that would be more promising if it explored them. 
 
-For Each Category and Most Categories, the website mitigates this flaw by choosing its starting point carefully for the first few picks. It checks the objective function in the direction of each punt, and starts its hill-climbing in the neighborhood that scores the best. In practice, this usually aligns the algorithm with the best possible punt. For picks after the first few, it is no longer necessary to prove every punt, because the team already has a defined shape. The algorithm instead starts with the build it settled on for its previous pick. 
+For Each Category and Most Categories, the website mitigates this flaw by choosing its starting point carefully. It checks the objective function in the direction of each punt, and starts its hill-climbing in the neighborhood that scores the best. In practice, this usually aligns the algorithm with the best possible punt. 
 
 <video controls preload="metadata" width="100%" poster="../videos/seed-menu-poster.jpg">
       <source src="../videos/seed-menu.mp4" type="video/mp4">
 </video>
 /// caption
-An example of the multi-starting process which is used for the first few picks.
+An example of the multi-starting process which is used for the first few picks. 
 ///
 
 Punting is less common in Rotisserie, so gradient descent does not start at a punt. Instead it starts at a neutral position, slightly tilted towards categories that are robust like Points and Assists. That's where the Rotisserie algorithm generally wants to go, since it thinks it can rely more on luck for the unstable categories like Steals and Turnovers. 
 
-### Percentage category adjustment 
+### Adjusting percentage categories for volume
 
 The percentage categories cannot be described purely by value differences between teams- volume matters too, when it comes to calculating a probability of winning. A team that has moderate value in a percentage statistic on few attempts has the influence of that value amplified, since there are a smaller number of attempts to dilute the value. Teams with few attempts also have higher variance in general, roughly inversely proportional to their number of attempts. 
 
@@ -445,6 +445,10 @@ This is not accounted for in the original version of H-scoring, which implicitly
 The website's version of H-scoring accounts for volume by scaling the gaps between teams by an adjustment for their volume. Scaling factors are calculated as typical volume over the team's expected team volume. Raw X-scores (the unit of value underlying H-scoring) are then multiplied by that scaling factor, and variance in matchups is inflated by a factor of the average of the scaling factors between the opposing teams. 
 
 Expected volumes are based on players already taken, plus an estimate of the total volume of future players picked. For future players, the algorithm starts with the average volume of players it expects to be taken, and adds a tilt based on category weighting, computed alongside the other tilts. 
+
+## Other limitations 
+
+Some limitations remain intrinsic to the model, at least so far. 
 
 ### Constant categorical variance
 
