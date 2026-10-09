@@ -7,7 +7,7 @@ import { setBasePlayerResults, setCandidatePlayerResults, getCandidatePlayerResu
 import {
     getLeagueSettings, getPlatformConfig, getMode, DraftMode, isPlatformConnected, PLATFORM_SELECTION_CHANGED,
 } from '../setting_collection/league_settings.js'
-import { getSlotCounts } from '../setting_collection/slot_counts.js'
+import { getActiveSlotCount, getSlotCounts } from '../setting_collection/slot_counts.js'
 import { getDraftState } from '../data_entry/draft_state.js'
 import { getAuctionState } from '../data_entry/auction_state.js'
 import { defaultTeamLabel } from '../data_entry/team_labels.js'
@@ -264,8 +264,10 @@ async function evaluateSeat(seat: string, forAutopilot = false): Promise<number 
                 basePlayersBySession.set(getSessionId()!, candidatesToPlayerResults(baseResp.candidates))
             }
 
+            // Full once the ACTIVE slots are filled: picks past them are perma-bench, which the backend does not
+            // score (services/ranking.split_off_bench), so there is nothing left to rank for.
             const myTeamSize = (evalReq.player_assignments[seat] ?? []).length
-            if (myTeamSize >= getLeagueSettings().n_picks) {
+            if (myTeamSize >= getActiveSlotCount()) {
                 latestFullTeamResult = null
                 const fullTeamResp = await evaluate(getSessionId()!, evalReq, signal)
                 if (fullTeamResp.candidates.length > 0) {

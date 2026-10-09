@@ -354,6 +354,15 @@ document.addEventListener('forced-weights-changed', () => { applyForcedWeights()
 
 const slotSection = createSection(sidebarSections, 'Position Parameters')
 renderSlotCounts(slotSection)
+// The perma-bench count completes the slot check (slots + bench = picks), so changing it can make valid a picks change
+// that was held back while the check failed: send the league settings then, as a picks change would have (16 picks set
+// before 3 bench slots otherwise left the session at the old pick count).
+document.getElementById('sc-bench-slots')!.addEventListener('change', () => {
+    revalidateSlotCounts()
+    if (!isSlotCountsValid()) return
+    const { n_drafters, n_picks, cash_per_team } = getLeagueSettings()
+    applyLeagueSettings(4, { league: { n_drafters, n_picks, cash_per_team }, slot_counts: getSlotCounts() })
+})
 const applySlotCounts = makeApplyChain('Position parameters apply')
 addApplyBtn(slotSection, async () => {
     if (!isSlotCountsValid()) return
