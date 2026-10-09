@@ -36,6 +36,16 @@ _cache_lock = threading.Lock()
 
 _CACHE_TTL = 24 * 3600  # 24 hours
 
+# Views kept until refreshed by hand (the user, 2026-10-08): past seasons do not change, so expiring them only re-queries
+# the same rows. To refresh one: delete its Parquet file from the disk cache (DISK_CACHE_DIR; the GCS mount in
+# production) and restart the server instances, which drops the in-memory copy.
+_NEVER_EXPIRING_VIEWS = {'HISTORICAL_SEASONAL_AVERAGES_VIEW'}
+
+
+def _is_fresh(view_name: str, age_seconds: float) -> bool:
+    """Whether a cached copy of view_name this old may be served: always for _NEVER_EXPIRING_VIEWS, else within _CACHE_TTL."""
+    return view_name in _NEVER_EXPIRING_VIEWS or age_seconds < _CACHE_TTL
+
 
 # If set, Parquet files are read/written here before falling back to Snowflake.
 # In production this is the GCS bucket mount path (e.g. /cache).
@@ -45,16 +55,17 @@ _DISK_CACHE_DIR: Path | None = (
 
 
 def query(view_name: str) -> pd.DataFrame:
-    """Fetch a full view from Snowflake with a 24-hour in-memory and disk cache."""
+    """Fetch a full view from Snowflake with an in-memory and disk cache: 24 hours, or until refreshed by hand for
+    _NEVER_EXPIRING_VIEWS."""
     with _cache_lock:
         entry = _cache.get(view_name)
-        if entry is not None and time.time() - entry[0] < _CACHE_TTL:
+        if entry is not None and _is_fresh(view_name, time.time() - entry[0]):
             return entry[1].copy()
 
     disk_path = _disk_cache_path(view_name)
     if disk_path is not None and disk_path.exists():
         age = time.time() - disk_path.stat().st_mtime
-        if age < _CACHE_TTL:
+        if _is_fresh(view_name, age):
             df = pd.read_parquet(disk_path)
             with _cache_lock:
                 _cache[view_name] = (time.time() - age, df)
@@ -90,7 +101,7 @@ def peek(view_name: str) -> pd.DataFrame | None:
     """
     with _cache_lock:
         entry = _cache.get(view_name)
-        if entry is not None and time.time() - entry[0] < _CACHE_TTL:
+        if entry is not None and _is_fresh(view_name, time.time() - entry[0]):
             return entry[1]
     return None
 

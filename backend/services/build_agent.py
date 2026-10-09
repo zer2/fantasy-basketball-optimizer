@@ -94,7 +94,9 @@ def load_player_pool(
     if cache_key is not None:
         with _v0_cache_lock:
             entry = _v0_cache.get(cache_key)
-            if entry is not None and time.time() - entry[0] < _V0_CACHE_TTL:
+            # A historical season's pool is kept until the server restarts (the user, 2026-10-08): past seasons do not
+            # change. A projections blend keeps the 24-hour expiry, since projections move day to day.
+            if entry is not None and (cache_key[1] == 'historical' or time.time() - entry[0] < _V0_CACHE_TTL):
                 v0_with_names = entry[1].copy()
 
     if v0_with_names is None:
@@ -409,7 +411,7 @@ _v0_cache: dict[tuple, tuple[float, pd.DataFrame]] = {}
 _v0_cache_lock = threading.Lock()
 
 
-_V0_CACHE_TTL = 24 * 3600  # 24 hours
+_V0_CACHE_TTL = 24 * 3600  # 24 hours, for projections blends; historical pools never expire (see load_player_pool)
 
 
 def clear_v0_cache() -> None:
