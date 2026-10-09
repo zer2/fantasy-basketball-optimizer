@@ -25,6 +25,21 @@ from backend.math.position_config import PositionConfig
 _FULL_ROSTER_RESULT_INDEX = ''
 
 
+def split_off_bench(
+    player_assignments: dict[str, list[int]]
+    , n_active: int
+) -> tuple[dict[str, list[int]], list[int]]:
+    """Each team's first `n_active` players, in the order the board lists them (draft order; purchase order in an
+    auction), and every player past them: its perma-bench (the user's perma-bench slots: picks per drafter beyond the
+    slot total). Bench players are rostered but never fielded, so the team is scored on its active players alone, as
+    the Streamlit app did for drafts (selections[0:n_starters]); auctions follow the same rule (the user, 2026-10-08),
+    the money spent on bench players still coming out of the remaining budget. Returns (the active rosters, the
+    benched player ids)."""
+    active = {team: players[:n_active] for team, players in player_assignments.items()}
+    benched = [player for players in player_assignments.values() for player in players[n_active:]]
+    return active, benched
+
+
 # ── Public entry point ────────────────────────────────────────────────────────
 
 def rank_candidates(
@@ -91,6 +106,11 @@ def rank_candidates(
             + ', '.join(missing_display)
             + '. The data-source change altered the pool; clear the board or restore the previous sources.'
         )
+
+    # Perma-bench: each team's picks past its active slots are bench, not scored (split_off_bench); they stay
+    # unavailable as candidates, since they are on a roster all the same.
+    player_assignments, benched_players = split_off_bench(player_assignments, h_agent.n_picks)
+    exclusion_list = list(exclusion_list) + benched_players
 
     # ── Candidate batching (draft/waiver only) ────────────────────────────────
     # Slice the available pool by the agent's default (neutral-board) ranking so the top-ranked players

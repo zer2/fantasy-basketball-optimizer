@@ -91,8 +91,9 @@ export function renderSlotCounts(container: HTMLElement): void {
     validationMsg.className = 'sidebar-error'
     container.append(validationMsg)
 
-    // Update validation on any input change
+    // Update validation on any input change, the perma-bench count included
     grid.addEventListener('input', () => validateSlotCounts(validationMsg))
+    benchInput.addEventListener('input', () => validateSlotCounts(validationMsg))
     validateSlotCounts(validationMsg)
 }
 
@@ -118,10 +119,11 @@ function makeSlotRow(pos: string, defaultValue: number): HTMLElement {
     return row
 }
 
-/** The slot total and the picks-per-drafter it must equal. A missing sport config or a
- *  missing input element is a programmer error and throws (fail noisily); NaN values from
- *  in-progress typing are a user state and flow through for the callers to judge. */
-function readSlotTotalAndPicks(): { total: number; nPicks: number } {
+/** The slot total, the perma-bench count, and the picks-per-drafter the two must add up to. A
+ *  missing sport config or a missing input element is a programmer error and throws (fail
+ *  noisily); NaN values from in-progress typing are a user state and flow through for the
+ *  callers to judge. */
+function readSlotTotalAndPicks(): { total: number; bench: number; nPicks: number } {
     const config = getSportConfig()
     if (!config) throw new Error('Sport config not loaded')
     const counts = getSlotCountsFromPositions(
@@ -129,34 +131,48 @@ function readSlotTotalAndPicks(): { total: number; nPicks: number } {
     const total = Object.values(counts).reduce((a, b) => a + b, 0)
     const nPicksEl = document.getElementById('ls-n-picks') as HTMLInputElement | null
     if (!nPicksEl) throw new Error('ls-n-picks element not found')
-    return { total, nPicks: parseInt(nPicksEl.value) }
+    const benchEl = document.getElementById('sc-bench-slots') as HTMLInputElement | null
+    if (!benchEl) throw new Error('sc-bench-slots element not found')
+    return { total, bench: parseInt(benchEl.value), nPicks: parseInt(nPicksEl.value) }
 }
 
 /**
- * Validates that the sum of all slot counts equals picks-per-drafter.
+ * Validates that the slot counts plus the perma-bench slots equal picks-per-drafter: every
+ * pick fills either a position slot or a bench spot (the Streamlit app's rule). Before
+ * 2026-10-08 the bench was left out of the sum, so a 13-slot, 3-bench, 16-pick league was
+ * told its slots fell short.
  * Writes an error message to `msgEl` if mismatched, or clears it if valid.
  */
 function validateSlotCounts(msgEl: HTMLElement): void {
-    const { total, nPicks } = readSlotTotalAndPicks()
-    if (isNaN(total) || isNaN(nPicks)) return
-    if (total > nPicks) {
-        msgEl.textContent = `Slot total (${total}) exceeds picks per drafter (${nPicks}).`
-    } else if (total < nPicks) {
-        msgEl.textContent = `Slot total (${total}) is less than picks per drafter (${nPicks}). Increase slot counts or reduce picks.`
+    const { total, bench, nPicks } = readSlotTotalAndPicks()
+    if (isNaN(total) || isNaN(bench) || isNaN(nPicks)) return
+    const spots = total + bench
+    const breakdown = bench > 0 ? `Slot total (${total}) plus perma-bench (${bench})` : `Slot total (${total})`
+    if (spots > nPicks) {
+        msgEl.textContent = `${breakdown} exceeds picks per drafter (${nPicks}).`
+    } else if (spots < nPicks) {
+        msgEl.textContent = `${breakdown} is less than picks per drafter (${nPicks}). Increase slot counts, add bench slots or reduce picks.`
     } else {
         msgEl.textContent = ''
     }
 }
 
 /**
- * Returns true if the current slot count total equals the current picks-per-drafter value.
+ * Returns true if the current slot count total plus the perma-bench slots equals the current
+ * picks-per-drafter value.
  * Call this before applying slot count or n_picks changes to the backend. Throws (rather
  * than quietly answering false) when the config or the inputs are missing — those are
  * programmer errors, not invalid user input.
  */
 export function isSlotCountsValid(): boolean {
-    const { total, nPicks } = readSlotTotalAndPicks()
-    return total === nPicks
+    const { total, bench, nPicks } = readSlotTotalAndPicks()
+    return total + bench === nPicks
+}
+
+/** How many of a team's picks are active -- the slot total; picks past it are perma-bench. The
+ *  backend scores each team on its first this-many picks (services/ranking.split_off_bench). */
+export function getActiveSlotCount(): number {
+    return Object.values(getSlotCounts()).reduce((a, b) => a + b, 0)
 }
 
 /**
