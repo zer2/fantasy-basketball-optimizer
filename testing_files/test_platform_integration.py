@@ -58,6 +58,34 @@ def test_build_platform_player_id_lookup_filters_to_registry_and_yields_rp():
     assert lookup.get('nobody', RP_PLAYER_ID) == RP_PLAYER_ID
 
 
+def test_connect_patch_sets_the_lookup_before_the_rebuild(monkeypatch):
+    # The draft-state poll runs without the session lock, so it can land during the rebuild a connect's
+    # patch runs. The lookup used to be built only after that rebuild: a poll in between found the config
+    # and no lookup, and crashed (502, 2026-10-09 -- three polls during a twenty-second self-play).
+    from backend.services import session_management
+    from backend.state.session import Session
+
+    monkeypatch.setattr(session_management, 'get_unified_player_table', _fantrax_unified_table)
+    lookup_when_the_rebuild_ran = []
+    monkeypatch.setattr(session_management, 'build_agent',
+                        lambda session, **_: lookup_when_the_rebuild_ran.append(session.platform_player_id_lookup))
+    session = Session(
+        id='s1',
+        current_settings={'scoring_format': 'Rotisserie', 'categories': ['Points'],
+                          'most_categories_weight': None, 'tiebreaker_category': None},
+        player_registry=_player_registry(),
+    )
+    config = PlatformConfig(platform='Retrieve from Fantrax', league_id='L', division_id=None,
+                            teams_dict={'Ann': '1'}, player_name_column='FANTRAX_ID', seat_names=['Ann'])
+
+    session_management.apply_patch(session, patch={}, from_step=4, platform_config=config,
+                                   csv_bytes=None, uploaded_dfs=None)
+
+    assert lookup_when_the_rebuild_ran == [{'j01': _JOKIC_ID, 'b02': _ADEBAYO_ID, 'h03': _HARDEN_ID}], \
+        'the lookup must be in place beside the config while the rebuild runs'
+    assert session.platform_player_id_lookup['j01'] == _JOKIC_ID
+
+
 # ── Team-name dedup (the Fantrax bug fix) ─────────────────────────────────────
 
 def test_deduplicate_team_names_disambiguates():

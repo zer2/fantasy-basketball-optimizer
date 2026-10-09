@@ -332,6 +332,48 @@ test('a connected draft is followed without clicking Refresh', async t => {
     }
 })
 
+test('choosing a seat while the connection is still reaching the session waits for it', async () => {
+    // Connect answers at once, but the session update it sends can queue behind a rebuild for many seconds, and the
+    // board cannot be polled until that update lands. Choosing a seat meanwhile evaluated at once, polled, and painted
+    // "Session is not connected to a live platform" over the table (2026-10-09, in a real mock draft).
+    const app = await launchAppPage()
+    const { page } = app
+    const PATCH_DELAY_MS = 4000
+    try {
+        await loadApp(app)
+        await stubLivePlatform(page, { availableModes: ALL_MODES })
+        await setSelect(page, 'ls-platform', 'Retrieve from Yahoo')
+        await waitAppSettled(app, { timeout: 120000 })
+        // Holds up only the update that carries the connection, the way a queued rebuild would. Registered after the
+        // stub's own session route, so it runs first (Playwright matches the newest route first) and the stub still
+        // strips the platform fields and records the connection when the delayed request goes through.
+        await page.route(url => /^\/sessions\/[^/]+$/.test(url.pathname), async route => {
+            const request = route.request()
+            if (request.method() === 'PATCH' && request.postDataJSON().platform_config != null) {
+                await new Promise(resolve => setTimeout(resolve, PATCH_DELAY_MS))
+            }
+            await route.fallback()
+        })
+        await typeYahooLeagueId(page, '12345')
+        await page.locator('#ls-connect-btn').click()
+        await page.locator('#ls-n-drafters').evaluate(
+            (input, count) => new Promise(resolve => {
+                const check = () => input.value === String(count) ? resolve() : setTimeout(check, 50)
+                check()
+            }), LEAGUE_TEAMS.length)
+        await setSelect(page, 'seat-select', 'Bob')   // while the delayed update is still in flight
+        await page.waitForTimeout(PATCH_DELAY_MS + 1000)
+        await waitAppSettled(app, { timeout: 120000 })
+        assert.equal(await page.locator('#hscoretable .table-message-error').count(), 0,
+                     'the seat change must not paint the not-connected refusal')
+        assert.ok(await page.locator('#hscoretable .playerheaderdiv').count() > 0, 'the board must be up')
+        assert.notEqual(await indicatorText(page), 'Unconnected')
+        expectCleanSession(app, 'seat chosen during the connect update')
+    } finally {
+        await app.close()
+    }
+})
+
 test('when the platform stops reporting a finished draft, its results stay up', async () => {
     // A Yahoo mock room stops returning its results once the draft ends, and the integration reads "no results" as
     // "not started": an empty board. Polled as-is, it replaced the final analysis with base rankings.

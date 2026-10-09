@@ -9,19 +9,9 @@ import { makeLabel } from '../helper_functions.js'
 import { fetchLeagues, fetchYahooAuthUrl, submitYahooToken, PlatformLeague, HTTPError } from '../api/client.js'
 import { PlatformConnector, ConnectStatus } from './connector.js'
 import { makeConnectorDialog } from './connector_dialog.js'
+import { extractYahooLeagueId } from './yahoo_league_id.js'
 
 const PLATFORM = 'Retrieve from Yahoo'
-
-/** The league id out of whatever the user pasted: a bare id, or a Yahoo URL like
- *  https://basketball.fantasysports.yahoo.com/nba/12345 whose last numeric segment is the league.
- *  Anything else is returned trimmed and unchanged, so a wrong value fails at Yahoo with a message
- *  about that value rather than being silently reinterpreted here. */
-function extractLeagueId(raw: string): string {
-    const trimmed = raw.trim()
-    if (!trimmed.includes('/')) return trimmed
-    const numericSegments = trimmed.split(/[/?#]/).filter(segment => /^\d+$/.test(segment))
-    return numericSegments.length > 0 ? numericSegments[numericSegments.length - 1] : trimmed
-}
 
 /** A league's dropdown label: its name and NBA season. Yahoo renews a league every year under the same name and lists
  *  every season the account has played, so names alone read as a column of duplicates ('Ducks+' four times). Yahoo
@@ -56,7 +46,7 @@ export function makeYahooConnector(status: ConnectStatus): PlatformConnector {
     leagueIdInput.type        = 'text'
     leagueIdInput.id          = 'ls-yahoo-league-id'
     leagueIdInput.className   = 'sidebar-input'
-    leagueIdInput.placeholder = 'e.g. 12345, or paste the draft URL'
+    leagueIdInput.placeholder = 'e.g. 12345, or paste the draft or lobby URL'
     element.append(leagueIdInput)
 
     // The two ways of naming a league are exclusive, and the screen has to say which one is in use: a typed id wins
@@ -249,7 +239,7 @@ export function makeYahooConnector(status: ConnectStatus): PlatformConnector {
         getSelection() {
             // A typed id wins over the dropdown: it is the only way to reach a mock draft, and
             // someone who has just typed one means it.
-            const typed = extractLeagueId(leagueIdInput.value)
+            const typed = extractYahooLeagueId(leagueIdInput.value)
             if (typed) return { league_id: typed, division_id: null }
             const leagueId = leagueSelect.getValue() ?? ''
             if (!leagueId) return null
