@@ -46,13 +46,13 @@ The website's calculations take a number of user-configurable parameters, availa
 | Parameter | Controls | Explained in |
 |---|---|---|
 | M (pool size) | How many reasonable players are available per pick in the future pick model. Effectively, a punting aggressiveness dial  | [H-scoring → H-scoring parameters](hscores.md#h-scoring-parameters) |
-| C (confidence) | Confidence in other drafters using an H-scoring like algorithm. 0 -> neutral, 1 -> using H-scoring | [H-scoring → No model of other managers](hscores.md#no-model-of-other-managers) |
-| λ (lambda) | How strongly early-round category weights are held near balanced, preserving room to pivot | [H-scoring → Only one strategy is evaluated](hscores.md#only-one-strategy-is-evaluated) |
+| C (confidence) | Confidence in other drafters using an H-scoring like algorithm. 0 -> neutral, 1 -> using H-scoring | [H-scoring → Adjusting for other managers' strategies](hscores.md#adjusting-for-other-managers-strategies) |
+| λ (lambda) | How strongly early-round category weights are held near balanced, preserving room to pivot | [H-scoring → Incentivizing flexible builds](hscores.md#incentivizing-flexible-builds) |
 | Weight pinning | Whether category weights can be fixed by hand, in boxes at the top of the H-score table. Categories left on "auto" are optimized as normal | [H-scoring → Category weights](hscores.md#category-weights) |
 | Number of iterations | How long the H-scoring algorithm runs | [H-scoring → H-scoring parameters](hscores.md#h-scoring-parameters) |
 | Position requirements | The roster/position structure a team must satisfy | [H-scoring → Position structure](hscores.md#position-structure) |
 | υ, ψ (upsilon, psi) | How projections account for injuries and replacement players | [Player Stats → Injury handling](projections.md#injury-handling) |
-| ℶ (beth) | How strongly a team's projected strength is regressed toward average | [H-scoring → Reliance on one projection set](hscores.md#reliance-on-one-projection-set) |
+| ℶ (beth) | How strongly a team's projected strength is regressed toward average | [H-scoring → Reducing over-confidence in the projection set](hscores.md#reducing-over-confidence-in-the-projection-set) |
 | χ, ℵ (chi, aleph) | Rotisserie projection uncertainty and cross-category correlation | [Player Stats → Projection uncertainty](projections.md#projection-uncertainty) |
 | $S_\sigma$ (S-sigma) | The spread of auction dollar values across a season (SAVOR) | [Auction Mode → The SAVOR adjustment](auctions.md#the-savor-adjustment) |
 | Trade thresholds | Which candidate trades are considered and shown | [Season Mode → Trade suggestions](season.md#trade-suggestions) |
