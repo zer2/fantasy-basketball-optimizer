@@ -171,6 +171,13 @@ export const SEASON_PLATFORM_CONNECTED = 'season-platform-connected'
 // rerun the later pipeline steps (4-5); platform_config itself is merely stored on the
 // session — no pipeline step reads it. Driven by an event so league_settings doesn't import
 // this module (it imports league_settings — a cycle).
+// The session update a connection sends, while it is in flight. The board cannot be polled until it lands: the
+// server refuses the draft state of a session that carries no platform config. A connection is recorded on screen
+// the moment Connect answers, so an evaluate started between then and the update landing -- the user choosing their
+// seat, say -- would poll at once and paint "Session is not connected to a live platform" (seen 2026-10-09, when a
+// rebuild from an earlier settings change held the update up for fourteen seconds). Such an evaluate waits here.
+let platformConnectPatchInFlight: Promise<void> | null = null
+
 document.addEventListener('platform-connected', () => {
     // A fresh connection invalidates any polled board from the previous league. This is not
     // automatic: reconnecting to a different league on the SAME platform never touches the
@@ -181,12 +188,17 @@ document.addEventListener('platform-connected', () => {
     // ...and the poll of the previous league with it; it restarts below, once this league's board is loaded.
     stopLivePolling()
     const { platform, n_drafters, n_picks, cash_per_team } = getLeagueSettings()
-    createOrPatchSession(4, {
+    const connectPatch = createOrPatchSession(4, {
         league: { n_drafters, n_picks, cash_per_team },
         slot_counts: getSlotCounts(),
         platform,
         platform_config: getPlatformConfig(),
     })
+    // Settled, not resolved: a waiting evaluate polls either way, and a failed update's poll says what is wrong
+    // ("not connected") better than the update's own error repeated would.
+    platformConnectPatchInFlight = connectPatch.then(() => undefined, () => undefined)
+        .finally(() => { platformConnectPatchInFlight = null })
+    connectPatch
         .then(() => {
             // Connecting is the moment the league's board becomes readable, so evaluate it here
             // rather than leaving the table empty until something else happens to trigger a run.
@@ -235,6 +247,9 @@ async function evaluateSeat(seat: string, forAutopilot = false): Promise<number 
                 // platform poll instead of a manual board. Polling here when there is nothing
                 // stored covers the first evaluate after a connection; Refresh Analysis is then
                 // the way to pick up picks made SINCE, not a precondition for evaluating at all.
+                if (livePlayerAssignments === null && platformConnectPatchInFlight !== null) {
+                    await platformConnectPatchInFlight
+                }
                 const assignments = livePlayerAssignments ?? await pollLiveDraftState(mode)
                 evalReq = (mode === 'Auction Mode')
                     ? { player_assignments: assignments, my_team_id: seat, remaining_cash: liveRemainingCash ?? undefined }

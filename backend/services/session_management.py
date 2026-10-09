@@ -97,6 +97,13 @@ def apply_patch(
     if platform_config is not None:
         session.platform_config = platform_config
         session.current_settings['team_names'] = list(platform_config.teams_dict.keys())
+        # The lookup goes on beside the config, before the rebuild below, not after it. The draft-state poll
+        # does not take the session lock (a poll should not wait out a rebuild), so it can run between
+        # here and the end of this call -- and a config without its lookup there crashed the poll (502,
+        # 2026-10-09: three polls during the twenty-second self-play of a connect's own patch). The
+        # registry this reads is the current one, which a patch from step 3 on leaves alone; a patch
+        # that rebuilds the registry refreshes the lookup again once it has.
+        refresh_platform_player_id_lookup(session)
 
     patched_pipeline_key = _build_pipeline_cache_key(session.current_settings)
     cached_pipeline = session.pipeline_cache.get(patched_pipeline_key)
@@ -111,9 +118,9 @@ def apply_patch(
     else:
         build_agent(session, from_step=from_step, csv_bytes=csv_bytes, uploaded_dfs=uploaded_dfs)
 
-    # Rebuild the lookup when either of its inputs changed: the player set (from_step <= 2)
-    # or player_name_column (a platform_config was just set).
-    if session.platform_config is not None and (from_step <= 2 or platform_config is not None):
+    # Rebuild the lookup when the player set changed (from_step <= 2); a new platform_config had
+    # its lookup built above, from a registry this patch did not touch.
+    if session.platform_config is not None and from_step <= 2:
         refresh_platform_player_id_lookup(session)
 
 
