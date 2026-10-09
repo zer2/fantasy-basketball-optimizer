@@ -21,6 +21,12 @@ xlrd>=2.0              # reads .xls projection uploads (2.0 on reads only that o
 numexpr
 statsmodels
 snowflake-connector-python
+# The query disk cache reads and writes Parquet (infra/snowflake_connection.py), which pandas does through
+# pyarrow. Named here rather than left to arrive through streamlit: the production build of 2026-10-09 picked
+# up pyarrow 26.0.0, released that morning, and pandas could not use it -- every session build died with
+# "Unable to find a usable engine" reading the cache. Raise the cap once a 26.x is confirmed to import in the
+# python:3.11-slim image.
+pyarrow<26
 schedule
 unidecode
 fantraxapi
