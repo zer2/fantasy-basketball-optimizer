@@ -70,7 +70,9 @@ _YAHOO_TOKEN_URL = 'https://api.login.yahoo.com/oauth2/get_token'
 # exact string to be registered on the Yahoo app -- Yahoo matches it at both the authorize and the
 # token step, which is why it is read once here rather than per call.
 _REDIRECT_URI = get_secret('YAHOO_REDIRECT_URI') or 'oob'
-_DEFAULT_N_PICKS = 13           # Streamlit hard-codes this (ZR there: fix)
+# Roster positions that hold a player who is not drafted into them: injured list and not-active slots. A draft has one
+# round per OTHER roster position (starting slots and bench).
+_UNDRAFTED_POSITIONS = {'IL', 'IL+', 'NA'}
 
 # What the authorization probe reads: the cheapest fantasy endpoint there is, so a grant that
 # cannot read fantasy data says so at authorization time instead of at connect time.
@@ -393,12 +395,28 @@ class YahooIntegration(PlatformIntegration):
                             'stays unknown', error)
             return None
 
+    @staticmethod
+    def _read_roster_size(settings, league_id: str) -> int:
+        """Picks per drafter: every roster position the league has, starting slots and bench, except the injured-list
+        and not-active ones (_UNDRAFTED_POSITIONS). Measured on league 140277 (2026-10-08): PG, SG, G, SF, PF, F, C x2,
+        Util x2, BN x3 -> 13, IL x3 left out. Before this the app hard-coded 13 for every Yahoo league.
+
+        There is no fallback: a roster size guessed for a league that did not report one would size every team wrong,
+        so a league whose settings cannot be read fails the connection, saying why."""
+        if settings is None:
+            raise RuntimeError(f'Yahoo league {league_id} did not return its settings, so its roster size is unknown.')
+        positions = [entry['roster_position'] if isinstance(entry, dict) else entry for entry in settings.roster_positions]
+        size = sum(int(position.count) for position in positions if position.position not in _UNDRAFTED_POSITIONS)
+        if size <= 0:
+            raise RuntimeError(f'Yahoo league {league_id} reported no draftable roster positions.')
+        return size
+
     def fetch_league_shape(
         self
         , league_id: str
         , division_id: Optional[str]
     ) -> LeagueShape:
-        """The league's seats, drafter count and roster size (n_picks still hard-coded to 13).
+        """The league's seats, drafter count and roster size (_read_roster_size).
 
         team_names covers EVERY seat, padding the joined teams with placeholders; teams_dict
         keeps only the teams that exist on Yahoo's side, since it is the platform-id map.
@@ -410,7 +428,7 @@ class YahooIntegration(PlatformIntegration):
         return LeagueShape(
             team_names        = _pad_with_open_seats(joined_names, n_drafters),
             n_drafters        = n_drafters,
-            n_picks           = _DEFAULT_N_PICKS,
+            n_picks           = self._read_roster_size(settings, league_id),
             teams_dict        = teams_dict,
             is_auction_draft  = self._read_is_auction(settings),
         )
