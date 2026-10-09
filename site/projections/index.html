@@ -680,10 +680,153 @@
 <h3 id="projections">Projections</h3>
 <p>The default for player statistics is to use forward-looking projections.</p>
 <p><img alt="Projection source weights" src="../img/projections.png" /></p>
-<p>The default projection source is a 50/50 split between ESPN's free forecasts and a modified version of DARKO. The website's version of DARKO projections takes games played and total minutes from the ESPN forecasts, and combines those with DARKO pace and per-possession projections to get per-game projections. This is necessary because DARKO does not forecast games played, and its minute forecasts are designed for the next game only, which is not ideal for fantasy. </p>
-<p><strong>Note as of August 2026: the ESPN forecasting page currently has bugs, and for that reason the ESPN projections have not been updated since October. The DARKO app projections have also been down. So right now, the default forecasts are very stale</strong></p>
+<p>The projection sources are ESPN's free forecasts and a modified version of DARKO. The default is ESPN alone (DARKO at 0%), because the DARKO projections are stale.</p>
+<p>he website's version of DARKO projections takes games played and total minutes from the ESPN forecasts, and combines those with DARKO pace and per-possession projections to get per-game projections. This is necessary because DARKO does not forecast games played, and its minute forecasts are designed for the next game only, which is not ideal for fantasy. </p>
 <p>The weights are always re-scaled so they add up to 100%. E.g. if DARKO is set to 75% while ESPN is still at 50%, that re-scales to 60% DARKO and 40% ESPN. </p>
-<p>Any other set of projections can be uploaded and included in the blend, as either a CSV or an Excel file. There is no list of supported providers: the website reads each column on its own and recognizes the common ways each statistic is labelled, so most exports work as downloaded. If a file is missing a category, which is common for non-standard categories like Double Doubles, that category can still be used if at least one other projection set has the category. The category will just ignore the weight of the projection that does not have it. </p>
+<p>Categories can only be used when at least one source has projections for that category. </p>
+<p>Players are blended over the sources that project them, so generally a player that only exists in one source can still have a projection. The exception is when one of the included categories is absent from some sources: if a player is not included in any projection with the necessary category, they will be excluded. </p>
+<p>Any other set of projections can be uploaded and included in the blend, as either a CSV or an Excel file. There is no list of supported providers: the website reads each column on its own and recognizes the common ways each statistic is labelled, so most exports work as downloaded. </p>
+<p><strong>Recognized column names</strong></p>
+<!-- CLAUDE DRAFT (2026-10-07): alias lists completed from parameters.yaml (projection-column-aliases); new rows for Minutes, Field Goals Made and Free Throws Made. Underscores in a header read as spaces, so field_goals_attempted matches "field goals attempted". -->
+
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Recognized aliases</th>
+<th>Required</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Player</td>
+<td>Player, name, player name</td>
+<td>If no first name/last name column</td>
+</tr>
+<tr>
+<td>Player First Name</td>
+<td>First Name, first name, firstname, player first name</td>
+<td>If no full name column</td>
+</tr>
+<tr>
+<td>Player Last Name</td>
+<td>Last Name, last name, lastname, player last name, surname</td>
+<td>If no full name column</td>
+</tr>
+<tr>
+<td>Position</td>
+<td>Position, pos</td>
+<td>No, default to Yahoo</td>
+</tr>
+<tr>
+<td>Games Played</td>
+<td>Games Played, g, gp, games</td>
+<td>If no Games Played % column</td>
+</tr>
+<tr>
+<td>Games Played %</td>
+<td>Games Played %, gp%, gp pct, g%</td>
+<td>If no Games Played column</td>
+</tr>
+<tr>
+<td>Minutes</td>
+<td>Minutes, min, mpg, m/g</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Points</td>
+<td>Points, p/g, pts, ppg</td>
+<td>At least three of these seven</td>
+</tr>
+<tr>
+<td>Rebounds</td>
+<td>Rebounds, r/g, reb, treb, trb, rpg, rebs</td>
+<td>At least three of these seven</td>
+</tr>
+<tr>
+<td>Assists</td>
+<td>Assists, a/g, ast, apg, asts</td>
+<td>At least three of these seven</td>
+</tr>
+<tr>
+<td>Steals</td>
+<td>Steals, s/g, stl, spg, stls</td>
+<td>At least three of these seven</td>
+</tr>
+<tr>
+<td>Blocks</td>
+<td>Blocks, b/g, blk, bpg, blks</td>
+<td>At least three of these seven</td>
+</tr>
+<tr>
+<td>Turnovers</td>
+<td>Turnovers, to/g, to, tov, tos</td>
+<td>At least three of these seven</td>
+</tr>
+<tr>
+<td>Threes</td>
+<td>Threes, 3/g, 3pm, 3p, 3ptm</td>
+<td>At least three of these seven</td>
+</tr>
+<tr>
+<td>Off Rebounds</td>
+<td>Off Rebounds, or/g, oreb, orb, offensive rebounds</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Def Rebounds</td>
+<td>Def Rebounds, dr/g, dreb, drb, defensive rebounds</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Double Doubles</td>
+<td>Double Doubles, 2d/g, dd, double doubles</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Field Goal %</td>
+<td>Field Goal %, fg%, fg pct</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Field Goals Made</td>
+<td>Field Goals Made, fgm, fgm/g, field goals</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Field Goal Attempts</td>
+<td>Field Goal Attempts, fga/g, fga, field goals attempted</td>
+<td>With Field Goal %</td>
+</tr>
+<tr>
+<td>Free Throw %</td>
+<td>Free Throw %, ft%, ft pct</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Free Throws Made</td>
+<td>Free Throws Made, ftm, ftm/g, free throws</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Free Throw Attempts</td>
+<td>Free Throw Attempts, fta/g, fta, free throws attempted</td>
+<td>With Free Throw %</td>
+</tr>
+<tr>
+<td>Three %</td>
+<td>Three %, 3%, 3p%, 3pt%</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Three Attempts</td>
+<td>Three Attempts, 3a/g, 3pa, 3pta, threes attempted</td>
+<td>With Three %</td>
+</tr>
+</tbody>
+</table>
+<p>For percentage rates like "Field Goal %", it is possible to include attempts in the same column, by formatting it "Rate (Success/Attempts)". Percentages can be input either as pure percentages, from 0 to 100, or rations, from 0 to 1. </p>
+<p>"Games Played" is a count of games and is converted to a share of an 82-game season. "Games Played %" is an alternative that is read as a percentage.</p>
 <p>One note of caution: be careful to download projections for all players instead of just the top players. During a draft, another drafter may take a player outside of the limited projection list, and the website will only have projections for them if they have been provided. </p>
 <h3 id="historical-data">Historical data</h3>
 <p>Historical data from past seasons is available for manual entry drafts. The season selector defaults to the most recent available season.</p>
