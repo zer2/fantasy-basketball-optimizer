@@ -43,6 +43,10 @@ class Session:
     # names live server-side; everything else keys by id.
     player_registry: Optional[dict] = None
 
+    # Content hash of the loaded pool (build_agent.hash_player_pool), set by step 1. What the caches downstream of the
+    # pool key on in place of the data-source settings that produced it.
+    player_pool_hash: Optional[str] = None
+
     # Step-4 processed player data (G-scores, positions, covariance, ...). A pipeline intermediate
     # kept for from_step==5 patches; consumers read it via session.agent.info.
     info: Optional[dict] = None

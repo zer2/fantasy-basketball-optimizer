@@ -12,7 +12,7 @@ from __future__ import annotations
 from typing import Optional
 
 from backend.state.session import Session, create_session, delete_session
-from backend.services.build_agent import build_agent
+from backend.services.build_agent import POOL_SOURCE_SETTINGS, build_agent, load_player_pool
 from backend.data_retrieval import get_unified_player_table
 from backend.platform_integration.base import PlatformConfig
 from backend.platform_integration.helpers import build_platform_player_id_lookup
@@ -63,14 +63,17 @@ def apply_patch(
 
     Pipelines this session already built are restored from its cache instead of re-running —
     the common case being a user toggling a setting (e.g. blend weights mid-draft) back to a
-    value they had before. The current build is stashed under its parameter snapshot before
-    the patch lands; a snapshot match after the patch restores agent + intermediates wholesale.
+    value they had before. The current build is stashed under its key (_build_pipeline_cache_key)
+    before the patch lands; a key match after the patch restores agent + intermediates wholesale.
+    A patch from step 1 loads the pool first, since the key is the pool's content hash: that load
+    is a cache hit in the common case, and it is what lets settings that build the same pool find
+    the same pipeline.
 
     platform_config feeds only the draft-state poll + name lookup, never the pipeline, so
     connecting a platform needs no pipeline rerun of its own.
     """
     if session.agent is not None:
-        outgoing_key = _build_pipeline_cache_key(session.current_settings)
+        outgoing_key = _build_pipeline_cache_key(session.current_settings, session.player_pool_hash)
         session.pipeline_cache[outgoing_key] = {
             'agent':           session.agent,
             'info':            session.info,
@@ -105,7 +108,12 @@ def apply_patch(
         # that rebuilds the registry refreshes the lookup again once it has.
         refresh_platform_player_id_lookup(session)
 
-    patched_pipeline_key = _build_pipeline_cache_key(session.current_settings)
+    rebuild_from_step = from_step
+    if from_step <= 1:
+        load_player_pool(session, csv_bytes=csv_bytes, uploaded_dfs=uploaded_dfs)
+        rebuild_from_step = 2
+
+    patched_pipeline_key = _build_pipeline_cache_key(session.current_settings, session.player_pool_hash)
     cached_pipeline = session.pipeline_cache.get(patched_pipeline_key)
     if cached_pipeline is not None:
         session.agent           = cached_pipeline['agent']
@@ -116,7 +124,7 @@ def apply_patch(
         session.player_registry = cached_pipeline['player_registry']
         session.pipeline_cache.move_to_end(patched_pipeline_key)
     else:
-        build_agent(session, from_step=from_step, csv_bytes=csv_bytes, uploaded_dfs=uploaded_dfs)
+        build_agent(session, from_step=rebuild_from_step, csv_bytes=csv_bytes, uploaded_dfs=uploaded_dfs)
 
     # Rebuild the lookup when the player set changed (from_step <= 2); a new platform_config had
     # its lookup built above, from a registry this patch did not touch.
@@ -124,15 +132,21 @@ def apply_patch(
         refresh_platform_player_id_lookup(session)
 
 
-def _build_pipeline_cache_key(current_settings: dict) -> tuple:
-    """A hashable snapshot of the full parameter set that produced a pipeline build."""
+def _build_pipeline_cache_key(
+    current_settings: dict
+    , player_pool_hash: str
+) -> tuple:
+    """A hashable snapshot of what a pipeline build read: the player pool, by its content hash
+    (build_agent.hash_player_pool), and every setting the steps after the pool read. The data-source
+    settings are left out: they describe the pool, and the hash is the pool."""
     def freeze(value):
         if isinstance(value, dict):
             return tuple(sorted((k, freeze(v)) for k, v in value.items()))
         if isinstance(value, (list, tuple)):
             return tuple(freeze(v) for v in value)
         return value
-    return freeze(current_settings)
+    settings = {key: value for key, value in current_settings.items() if key not in POOL_SOURCE_SETTINGS}
+    return (player_pool_hash, freeze(settings))
 
 
 def normalize_objective_settings(current_settings: dict) -> None:
