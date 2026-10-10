@@ -508,9 +508,9 @@ def test_projection_upload_accepts_xlsx():
     assert upload.status_code == 200, upload.text
     assert upload.json()['n_players'] == 2
 
-    # The older .xls format needs a different engine; say so plainly instead of failing deep
-    # in a parser with something unactionable.
-    with pytest.raises(ValueError, match='.xlsx'):
+    # The older .xls format is read too (xlrd, since 2026-10-07). A file carrying its signature that
+    # is not a readable workbook says so, with the reader's reason, instead of failing deep in a parser.
+    with pytest.raises(ValueError, match='Could not read this spreadsheet'):
         parse_projection_upload(b'\xd0\xcf\x11\xe0legacy-excel-file', params)
 
 
