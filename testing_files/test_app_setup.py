@@ -365,6 +365,53 @@ def test_v0_cache_key_reflects_blend_weights_and_uploads():
         'changing a Snowflake source weight must change the key'
 
 
+def test_pool_cache_key_depends_only_on_the_blend():
+    """The pool cache is the one cache keyed on settings (nothing else can say whether to reload before loading), so its
+    key is the blend the weights describe: a weighted average over the sources above zero depends only on the weights'
+    ratios, and re-blending an identical pool costs a few seconds."""
+    from backend.services.build_agent import _build_v0_cache_key
+
+    def settings_with(blend_weights):
+        return {'sport': 'NBA', 'data_source_type': 'projections', 'custom_data_ids': None,
+                'blend_weights': blend_weights}
+
+    keys = {_build_v0_cache_key(settings_with(blend))
+            for blend in ({'ESPN': 1.0, 'DARKO': 0.0}, {'ESPN': 0.35, 'DARKO': 0.0}, {'ESPN': 0.7})}
+    assert len(keys) == 1, 'one source at any weight is one blend'
+    assert _build_v0_cache_key(settings_with({'ESPN': 0.3, 'DARKO': 0.6}))         == _build_v0_cache_key(settings_with({'ESPN': 0.1, 'DARKO': 0.2})), 'weights scaled together are one blend'
+    assert _build_v0_cache_key(settings_with({'ESPN': 0.5, 'DARKO': 0.5}))         != _build_v0_cache_key(settings_with({'ESPN': 0.6, 'DARKO': 0.4})), 'different ratios are different blends'
+
+
+def test_downstream_cache_keys_are_the_pool_not_its_settings():
+    """The pipeline and agent caches key on the pool's content hash in place of the data-source settings: settings that
+    build the same pool share an entry (a slider moved re-ran self-play for an identical result, 2026-10-09), and the
+    same settings over a pool that has since changed (projections reload daily) share none."""
+    from backend.services.build_agent import _agent_cache_key
+    from backend.services.session_management import _build_pipeline_cache_key
+
+    def settings_with(blend_weights):
+        return {'sport': 'NBA', 'data_source_type': 'projections', 'custom_data_ids': None,
+                'blend_weights': blend_weights, 'team_names': ['Team 1'], 'upsilon': 0.5}
+
+    for build_key in (_build_pipeline_cache_key, _agent_cache_key):
+        assert build_key(settings_with({'ESPN': 1.0}), 'pool-a')             == build_key(settings_with({'ESPN': 0.5, 'DARKO': 0.5}), 'pool-a'),             f'{build_key.__name__}: any settings that built this pool share its entry'
+        assert build_key(settings_with({'ESPN': 1.0}), 'pool-a') != build_key(settings_with({'ESPN': 1.0}), 'pool-b'),             f'{build_key.__name__}: the same settings over a changed pool must not share an entry'
+        assert build_key(settings_with({'ESPN': 1.0}), 'pool-a')             != build_key({**settings_with({'ESPN': 1.0}), 'upsilon': 0.6}, 'pool-a'),             f'{build_key.__name__}: a setting the later steps read still changes the key'
+
+
+def test_hash_player_pool_follows_content():
+    import pandas as pd
+    from backend.services.build_agent import hash_player_pool
+
+    pool = pd.DataFrame({'Player': ['A', 'B'], 'Points': [20.0, np.nan], 'Position': ['C', 'PG']},
+                        index=pd.Index([1, 2], name='Player'))
+    assert hash_player_pool(pool) == hash_player_pool(pool.copy()), 'equal pools hash equal'
+    changed = pool.copy()
+    changed.loc[1, 'Points'] = 20.5
+    assert hash_player_pool(changed) != hash_player_pool(pool), 'a changed statistic changes the hash'
+    assert hash_player_pool(pool.rename(columns={'Points': 'Rebounds'})) != hash_player_pool(pool),         'a renamed column changes the hash'
+
+
 def test_parse_projection_upload_reads_any_recognized_spelling():
     """Files are interpreted column by column through the alias table, not matched against
     named export formats: differently-spelled headers for the same stat all land on the
@@ -930,6 +977,28 @@ def test_pipeline_cache_restores_prior_builds():
     assert patch_response.status_code == 200, patch_response.text
     assert get_session(session_id).agent is changed_agent, \
         'both sides of a toggle should be served from the cache'
+
+
+def test_moving_the_only_projection_slider_reuses_the_build():
+    """One projection source at any weight is one pool, so moving its slider must restore the session's build -- the
+    same agent, no self-play -- instead of rebuilding an identical one (it took four seconds a move, 2026-10-09)."""
+    request_body = _build_default_session_request()
+    request_body['data_source'] = {'type': 'projections', 'blend_weights': {'ESPN': 1.0, 'DARKO': 0.0}}
+    session_response = client.post('/sessions', json=request_body)
+    assert session_response.status_code == 201, session_response.text
+    session_id = session_response.json()['session_id']
+    original_agent = get_session(session_id).agent
+
+    for weight in (0.5, 0.25):
+        patch_response = client.patch(f'/sessions/{session_id}', json={
+            'from_step': 1, 'data_source': {'type': 'projections', 'blend_weights': {'ESPN': weight, 'DARKO': 0.0}}})
+        assert patch_response.status_code == 200, patch_response.text
+        assert get_session(session_id).agent is original_agent, f'ESPN at {weight} is the same pool: same build'
+
+    patch_response = client.patch(f'/sessions/{session_id}', json={
+        'from_step': 1, 'data_source': {'type': 'projections', 'blend_weights': {'ESPN': 0.5, 'DARKO': 0.5}}})
+    assert patch_response.status_code == 200, patch_response.text
+    assert get_session(session_id).agent is not original_agent, 'a different blend is a different pool: a new build'
 
 
 def test_evaluate_nonexistent_session():

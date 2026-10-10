@@ -15,6 +15,7 @@ The projection-file parser this module orchestrates around lives in projection_p
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import time
 import threading
@@ -98,6 +99,7 @@ def load_player_pool(
             # change. A projections blend keeps the 24-hour expiry, since projections move day to day.
             if entry is not None and (cache_key[1] == 'historical' or time.time() - entry[0] < _V0_CACHE_TTL):
                 v0_with_names = entry[1].copy()
+                pool_hash     = entry[2]
 
     if v0_with_names is None:
         if source_type == 'csv':
@@ -135,12 +137,34 @@ def load_player_pool(
             duplicated = v0_with_names.index[v0_with_names.index.duplicated()].tolist()
             raise ValueError(f'Player pool has duplicate player id(s): {duplicated}')
 
+        pool_hash = hash_player_pool(v0_with_names)
         if cache_key is not None:
             with _v0_cache_lock:
-                _v0_cache[cache_key] = (time.time(), v0_with_names.copy())
+                _v0_cache[cache_key] = (time.time(), v0_with_names.copy(), pool_hash)
 
     session.player_registry = _build_player_registry(v0_with_names)
     session.v0_clean = v0_with_names.drop(columns=['Player'])
+    session.player_pool_hash = pool_hash
+
+
+# The settings only step 1 reads: what they determine is the pool, and the pool's hash stands in for them in every
+# cache downstream of it (see hash_player_pool).
+POOL_SOURCE_SETTINGS = ('data_source_type', 'season', 'blend_weights', 'custom_data_ids')
+
+
+def hash_player_pool(v0_with_names: pd.DataFrame) -> str:
+    """A content hash of a loaded player pool: ids, names, positions and every statistic, with the column names.
+
+    The caches after step 1 (the session's pipeline cache, the agent cache) key on this rather than on the settings
+    that produced the pool. Settings are a description of the pool, and two ways the description goes wrong are why:
+    different settings that build the same pool (the only projection source's slider moved -- a weighted average
+    depends only on the weights' ratios) re-ran self-play for an identical result, and the same settings over a pool
+    that has since refreshed (projections reload daily) served an agent built from the old numbers. The hash is the
+    pool itself, so equal pools share every downstream entry and a changed pool shares none."""
+    digest = hashlib.sha256()
+    digest.update(json.dumps([str(column) for column in v0_with_names.columns]).encode())
+    digest.update(pd.util.hash_pandas_object(v0_with_names, index=True).to_numpy().tobytes())
+    return digest.hexdigest()
 
 
 def _build_v0_cache_key(current_settings: dict) -> tuple | None:
@@ -158,12 +182,31 @@ def _build_v0_cache_key(current_settings: dict) -> tuple | None:
     if source_type == 'historical':
         return (sport, 'historical', current_settings['season'])
     if source_type == 'projections':
-        blend_weights = current_settings['blend_weights']
         custom_data_ids = current_settings.get('custom_data_ids') or []
-        weight_keys = tuple(sorted(blend_weights.items()))
         upload_keys = tuple(sorted(custom_data_ids))
-        return (sport, 'projections', weight_keys, upload_keys)
+        return (sport, 'projections', describe_blend(current_settings['blend_weights']), upload_keys)
     return None
+
+
+# Normalized weights are rounded before they key a cache: 0.3 / 1.0 and 0.6 / 2.0 are the same blend, but dividing
+# can leave them a last bit apart. Twelve places is far finer than any weight the sidebar can set.
+_BLEND_KEY_DECIMALS = 12
+
+
+def describe_blend(blend_weights: dict[str, float]) -> tuple:
+    """The blend a set of source weights produces, as a hashable key: each participating source's share of the total.
+
+    combine_projections blends with a weighted average, which depends only on the weights' ratios, and leaves out
+    every source at weight zero. So moving the only active source's slider -- or scaling every weight together --
+    produces the same pool, and must key the same cache entry: keyed on the raw weights, each slider move rebuilt
+    the pool and re-ran self-play for an identical result. All weights zero describes no blend at all (an empty
+    key); load_player_pool rejects that case with its own message."""
+    total = sum(weight for weight in blend_weights.values() if weight > 0)
+    return tuple(sorted(
+        (source, round(weight / total, _BLEND_KEY_DECIMALS))
+        for source, weight in blend_weights.items()
+        if weight > 0
+    ))
 
 
 def _resolve_single_csv_player_ids(parsed_csv: pd.DataFrame) -> pd.DataFrame:
@@ -296,9 +339,9 @@ def build_scoring_info(session: Session) -> None:
 # suffice elsewhere). That determinism makes caching semantically invisible: a deep copy of
 # a cached agent is identical to a fresh build for the same settings, so toggling a setting
 # away and back — the EC/MC dial especially — costs a copy instead of a rebuild. Keyed on
-# the full current_settings minus the cosmetic team names: over-keying can only cost
-# misses, never wrongness (uploads key by their per-upload data_id, so changed file
-# contents can never collide). Entries hold fully-populated agents (large), so the cap
+# the player pool's content hash plus every other setting the build reads (_agent_cache_key):
+# the hash, not the data-source settings, so a pool that has since refreshed is never served
+# a stale agent, and settings that build the same pool share one. Entries hold fully-populated agents (large), so the cap
 # stays small; the session always receives its own copy, so draft-time mutation never
 # touches a cached entry.
 _AGENT_CACHE_MAX = 4
@@ -333,7 +376,7 @@ def build_session_agent(session: Session) -> None:
     Served from the agent cache when this exact configuration has been built before."""
     global agent_cache_hits, agent_cache_misses
 
-    cache_key = _agent_cache_key(session.current_settings)
+    cache_key = _agent_cache_key(session.current_settings, session.player_pool_hash)
     with _agent_cache_lock:
         cached = _agent_cache.get(cache_key)
         if cached is not None:
@@ -393,9 +436,14 @@ def build_session_agent(session: Session) -> None:
             _agent_cache.popitem(last=False)
 
 
-def _agent_cache_key(current_settings: dict) -> str:
+def _agent_cache_key(
+    current_settings: dict
+    , player_pool_hash: str
+) -> str:
+    """The pool by its content (hash_player_pool), and every other setting the build reads."""
     keyed = {key: value for key, value in current_settings.items()
-             if key not in _CACHE_KEY_IGNORED}
+             if key not in _CACHE_KEY_IGNORED and key not in POOL_SOURCE_SETTINGS}
+    keyed['player_pool_hash'] = player_pool_hash
     return json.dumps(keyed, sort_keys=True, default=str)
 
 
