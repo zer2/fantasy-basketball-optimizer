@@ -58,16 +58,15 @@ def test_evaluate_auction():
     assert h_scores == sorted(h_scores, reverse=True), 'Candidates are not sorted by H-score'
 
     # (expected_name, diff, your_dollar, generic_dollar, original_dollar)
-    # Regenerated 2026-08-16 with the corrected Each Category gradient. The old values came from a
-    # state no kappa reproduces: the penalty was subtracted from the score at full strength while
-    # reaching the gradient at a ninth of it, because the objective's own gradient was n_categories
-    # too large. Dollar values are differences of H-scores, so they show that mismatch more sharply
-    # than the H-scores do — Tatum's your-vs-generic gap moves most.
+    # Regenerated 2026-10-11 for the auction differential's roster-size term (72e9e869): the candidate
+    # now fills one of the drafter's slots, where before it was charged as two replacement players too
+    # few. The generic (neutral-board) values move most -- Haliburton and Daniels drop ~$14-15 -- since
+    # the bias applied to every seat of the baseline.
     expected_auction_values = [
-        ('Shai Gilgeous-Alexander',     -12.2,  91.5, 103.8, 101.4),
-        ('Tyrese Haliburton',           -5.8,  57.5, 63.3, 61.8),
-        ('Dyson Daniels',               12.4,  64.3, 52.0, 50.8),
-        ('Jayson Tatum',                1.6,  45.7, 44.1, 43.1),
+        ('Shai Gilgeous-Alexander',     -4.9,  87.2, 92.1, 90.8),
+        ('Tyrese Haliburton',           9.2,  58.9, 49.7, 49.0),
+        ('Dyson Daniels',               18.8,  55.3, 36.5, 36.0),
+        ('Jayson Tatum',                2.2,  44.9, 42.7, 42.1),
     ]
     candidates_by_name = name_candidates(session, candidates)
     if os.environ.get('REGEN_GOLDENS'):
