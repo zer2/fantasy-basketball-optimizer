@@ -836,9 +836,10 @@ class HAgent:
         self.players = my_players
 
         # Position-optimiser throttle schedule for this run. Draft uses the 'tiered' schedule; auction
-        # defaults to 'exact' (dollar values anchor on the whole-distribution replacement level, so
-        # they're sensitive to the approximated tail). _position_mode_override lets benchmarks/tests
-        # force a specific schedule: 'exact' | 'tiered' | 'light'.
+        # uses 'light' (top 300 re-solved every iteration, everyone every 5th), which keeps the
+        # replacement-level dollar anchor exactly solved; test_throttle_impact.py bounds the drift
+        # against 'exact'. _position_mode_override lets benchmarks/tests force a specific schedule:
+        # 'exact' | 'tiered' | 'light'.
         self._position_mode = getattr(self, '_position_mode_override', None) or (
             'light' if cash_remaining_per_team is not None else 'tiered'
         )
@@ -879,7 +880,7 @@ class HAgent:
         # seated anchor — self-exclusion swaps their own team out of the field (see get_diff_distributions).
         diff_means, diff_vars, sigma_2_m, opponent_future_tilts, volume_field = self.get_diff_distributions(
             player_assignments, drafter, x_scores_available, cash_remaining_per_team,
-            candidate_batch=list(x_scores_batch.index),
+            candidate_batch=list(x_scores_batch.index) if len(my_players) < self.n_picks else None,
         )
 
         self._current_batch_index = x_scores_batch.index
@@ -1155,10 +1156,12 @@ class HAgent:
                     seat_cash  = cash_remaining_per_team[team]
                     roster_len = 0
                     mu_edge    = None
+                # The candidate fills one of the drafter's slots, unless the roster is already full.
+                candidate_slot = 1 if len(my_players) < self.n_picks else 0
                 base = self.get_diff_means_auction(
                     x_self_sum.reshape(1, self.n_categories, 1) - roster_sum.reshape(1, self.n_categories, 1),
                     cash_remaining_per_team[drafter] - seat_cash,
-                    len(my_players) - roster_len,
+                    (len(my_players) + candidate_slot) - roster_len,
                     category_value_per_dollar,
                     replacement_value_by_category,
                 )
@@ -1206,7 +1209,7 @@ class HAgent:
                     # order, so results are bit-identical): get_diff_means_auction at roster_len=1,
                     # then the confidence-scaled punt tilt.
                     score_diff        = x_self_sum.reshape(1, -1) - anchor_stats
-                    player_diff_total = (len(my_players) - 1 - 1) * replacement_value_by_category.reshape(1, -1)
+                    player_diff_total = len(my_players) * replacement_value_by_category.reshape(1, -1)
                     money_diff_total  = batch_cash.reshape(-1, 1) * np.asarray(category_value_per_dollar).reshape(1, -1)
                     tilt              = (self.n_picks - 1) * prior_confidence * anchor_tilts
                     columns           = score_diff - player_diff_total + money_diff_total - tilt
@@ -1885,7 +1888,7 @@ class HAgent:
                                 , player_diff
                                 , category_value_per_dollar
                                 , replacement_value_by_category):
-        player_diff_total = ((player_diff - 1) * replacement_value_by_category).reshape(1, self.n_categories, 1)
+        player_diff_total = (player_diff * replacement_value_by_category).reshape(1, self.n_categories, 1)
         money_diff_total  = (money_diff * category_value_per_dollar).reshape(1, self.n_categories, 1)
         return score_diff - player_diff_total + money_diff_total
 
