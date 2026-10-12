@@ -934,6 +934,29 @@ def test_evaluate_rejects_rostered_players_missing_from_pool():
     assert 'player pool' in detail, 'the error should explain the cause'
 
 
+def test_auction_money_term_negates_only_turnovers():
+    """The auction's money term negates the lower-is-better categories. It used to negate whichever category came
+    last, which is Turnovers only in the default set: in canonical order Double Doubles (and the rebound splits,
+    FGM, FTM) come after it, and a league without Turnovers ends in Blocks."""
+    def money_signs(categories):
+        request = _build_default_session_request()
+        request['league']['categories'] = categories
+        request['league']['tiebreaker_category'] = None
+        response = client.post('/sessions', json=request)
+        assert response.status_code == 201, response.text
+        agent = get_session(response.json()['session_id']).agent
+        return dict(zip(agent.x_scores.columns, np.sign(agent.turnover_inverted_v.reshape(-1))))
+
+    default = _load_params()['NBA']['default-categories']
+    for categories in (default,
+                       [category for category in default if category != 'Turnovers'],
+                       default + ['Double Doubles']):
+        signs = money_signs(categories)
+        negated = [category for category, sign in signs.items() if sign < 0]
+        expected = ['Turnovers'] if 'Turnovers' in categories else []
+        assert negated == expected, f'{categories}: negated {negated}, expected {expected}'
+
+
 def test_pipeline_cache_restores_prior_builds():
     """Returning to a configuration the session already built must restore that build's
     agent from the per-session pipeline cache instead of re-running the pipeline (and its

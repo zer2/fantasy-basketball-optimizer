@@ -141,11 +141,22 @@ def process_player_data(player_stats_v2: pd.DataFrame
     x_scores = calculate_scores_from_coefficients(player_stats_v2, coefficients, sport_params, 0, 1,
                                                    counting_stats, ratio_stats, categories)
 
-    replacement_games_rate = (1 - player_stats_v2['Games Played %'] / 100) * psi
+    # Games Played % is a fraction (0-1). The /100 here outlived the 0-100 display scale it was written for
+    # (removed 2025-08-14), and made the rate ~psi for everyone, which the re-centring then cancelled.
+    replacement_games_rate = (1 - player_stats_v2['Games Played %']) * psi
+    # What an empty game is worth: the scores of a player who contributes nothing, through the same scoring.
+    # A replacement filling a missed game is credited his value OVER that, not his value relative to the
+    # average player (which is negative, and charged the injured player for being replaced).
+    zero_player_stats = player_stats_v2.iloc[:1].copy()
+    zero_player_stats.loc[:, zero_player_stats.select_dtypes('number').columns] = 0
+    zero_player_g = calculate_scores_from_coefficients(zero_player_stats, coefficients, sport_params, 1, 1,
+                                                        counting_stats, ratio_stats, categories).iloc[0]
+    zero_player_x = calculate_scores_from_coefficients(zero_player_stats, coefficients, sport_params, 0, 1,
+                                                        counting_stats, ratio_stats, categories).iloc[0]
     g_scores = games_played_adjustment(g_scores, replacement_games_rate, representative_player_set,
-                                        sport_params, categories)
+                                        sport_params, categories, zero_player_g)
     x_scores = games_played_adjustment(x_scores, replacement_games_rate, representative_player_set,
-                                        sport_params, categories, v=v)
+                                        sport_params, categories, zero_player_x, v=v)
 
     x_scores.loc[RP_PLAYER_ID, :] = -1
     g_scores.loc[RP_PLAYER_ID, :] = -1
@@ -580,6 +591,7 @@ def games_played_adjustment(scores: pd.DataFrame
                              , representative_player_set: list[str]
                              , sport_params: dict
                              , categories: list[str]
+                             , zero_player_scores: pd.Series
                              , v: pd.Series = None) -> pd.DataFrame:
 
     if v is None:
@@ -591,7 +603,7 @@ def games_played_adjustment(scores: pd.DataFrame
     category_level_rv = get_category_level_rv(rv, v, categories)
 
     replacement_player_value = (
-        np.array(category_level_rv.T).reshape(1, -1)
+        np.array(category_level_rv - zero_player_scores[categories]).reshape(1, -1)
         * np.array(replacement_games_rate).reshape(-1, 1)
     )
     adjusted_scores = scores + replacement_player_value

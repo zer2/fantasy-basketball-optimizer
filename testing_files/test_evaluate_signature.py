@@ -66,28 +66,32 @@ _TEAM_2 = [
 # plus the mean-field high-confidence redesign committed alongside this regen. All rows run at
 # the default confidence 0.5, so the drift here comes from the committed equilibrium mechanics,
 # not the mean-field mode (which only engages above 0.5).
+#
+# Regenerated 2026-10-11 for psi: a stale /100 on Games Played % had left it inert since
+# 2025-08-14, and it now credits a replacement's value over an empty game (process_player_data
+# games_played_adjustment), so every G- and X-score moves.
 _GOLDEN = {
-    ('Each Category',  'empty'): '74388a5db9145c6a479921bbdab82fe12fbf597897213e4f3563f00dc9efb8cc',
-    ('Each Category',  'mid'):   'e8ef1b5b5ea919301820e836c3f642926efb35c4b239b441ea860bb0eb29f200',
-    ('Half and Half',  'empty'): '5a03bf7c308d78456298e9bf13a7f62aaecdee56a44878bd6bf521c993e4d644',
-    ('Half and Half',  'mid'):   'ce6384b77f0757af8693dd807ae49fed0eff125557fbc7b8d243570858b9b536',
-    ('Most Categories','empty'): 'c1f4cd74db22d0023f088b0b6ef4fb72c953f28631acc668024970750edb321a',
-    ('Most Categories','mid'):   '441888a6655270485945e3dc7511c0520a5e63339c8120fff0ae725c7ebcb860',
+    ('Each Category',  'empty'): '0999b92ab811b4b7ec254de46aa41cdd599662d9140b4497764f5aeccba55578',
+    ('Each Category',  'mid'):   '8a202c92821ae8f429d7bfbb5265b2ac536fa5ffc9b08cf38f3a5861c335f13c',
+    ('Half and Half',  'empty'): '745e655d4596b5ee023801e4a0c6f80188fa0e18fd9df3414231b239b62f2cdb',
+    ('Half and Half',  'mid'):   '113a786b893d451a6cff1b23b1e93ece236a93606e6576a7175e49cc30cf7168',
+    ('Most Categories','empty'): '62d6072f798eea40f1ab52d4e629b333131cdaf4cf4228bd770fae7c1dec1cd5',
+    ('Most Categories','mid'):   '45a8753f5943a2aec06ca9e45bcc79440a0ef658474257d59339707644bfe3f0',
 
     # Eight categories (turnovers dropped), which is what a tiebreaker needs: a matchup that can
     # end level. Each objective appears with and without one named, so a change to the weighted
     # win-count DP, to what a category is worth in v, or to the G-score ranking the board is drawn
     # from has to show up here rather than only in a league nobody tested.
-    ('8cat Each Category',   'empty'): 'e2eb26c0e7d6e5269927f478be0d68db37096c22a9fff56b9b5230d7effa3ead',
-    ('8cat Each Category',   'mid'):   'b66b171b0022b21299c6f57a54b59cc3e903e1331823641b5a3e8ecae39cba3c',
-    ('8cat Most Categories', 'empty'): '2d38b55409b978793bc5ca6327b8a6adadce47b4a4c7e1f860f05c75ea0a5d7d',
-    ('8cat Most Categories', 'mid'):   '33967cc775341efb34a9f05dab3f12283c4234af988ef79b1d16537818fcdfa4',
-    ('8cat MC + Points',     'empty'): '051defd5384b45a767dd42d9a2a8fd5847547178cc4801daaa34c5bd0fb47b26',
-    ('8cat MC + Points',     'mid'):   'f81321afafe24bead6f78dad93c0fb61c163914c7364a08489d462d46ca1a86f',
-    ('8cat Half and Half',   'empty'): 'c2f8586956ec7c6b2291977c3fcb7bbe58e9688992eb5c8ddb9421b6e889b2cc',
-    ('8cat Half and Half',   'mid'):   '63feb9e780bfb0f4b8dd71d7cf13f09042395c24684c7c02459cb5feb3102784',
-    ('8cat Half + Points',   'empty'): '89af4e50b3dfb1b4cff933f8ebc59854ae1097666e47cf65f261869d350d9ffc',
-    ('8cat Half + Points',   'mid'):   '7a46ae3a136b5f1cb095ad0349b8eff5d9e500e80194ee8cd6f5143c205e97b6',
+    ('8cat Each Category',   'empty'): '2ee56957974f0420b577fcf82b5b97545ef5c86128625383b1e6844973d7e72e',
+    ('8cat Each Category',   'mid'):   '36a6cfb01c93b06464d843328b8b082a1e375e1e96e7a78fca20c8d1b8690599',
+    ('8cat Most Categories', 'empty'): '7fa73da85fb83769b44d9b5a2f3711e6f379033108b58b54010a546a1cbaeea3',
+    ('8cat Most Categories', 'mid'):   'e10aa95dd4bc4e60e5c7be35addb84056791065300f20e17e1d98d68ff6f0a2c',
+    ('8cat MC + Points',     'empty'): '3b232ffb44f6fd129610b77dba3cd9089b48dee3a658242b163cd71c1e58fb59',
+    ('8cat MC + Points',     'mid'):   '31e5bd22806f46f756ed5268fcd7d55273462b3f12308505bbad94259776cdc3',
+    ('8cat Half and Half',   'empty'): 'ecf6e9dfb39b38620daf5b985a093f140b7f080b33c00a74b688df0b9ec5a167',
+    ('8cat Half and Half',   'mid'):   '77eb1f79a7b7b21f023025c079680f49cfaad2f245315f1e105aa4a0937f072a',
+    ('8cat Half + Points',   'empty'): 'a6ccf50abeff474b7364793371170643cd7da89d613a4f05e4984717635e5d49',
+    ('8cat Half + Points',   'mid'):   '2de62d0b0c9c54f460cd37cc57d39027fe791571539b19f130afadffc7c22c9a',
 }
 
 

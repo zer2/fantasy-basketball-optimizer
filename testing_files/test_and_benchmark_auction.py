@@ -58,15 +58,14 @@ def test_evaluate_auction():
     assert h_scores == sorted(h_scores, reverse=True), 'Candidates are not sorted by H-score'
 
     # (expected_name, diff, your_dollar, generic_dollar, original_dollar)
-    # Regenerated 2026-10-11 for the auction differential's roster-size term (72e9e869): the candidate
-    # now fills one of the drafter's slots, where before it was charged as two replacement players too
-    # few. The generic (neutral-board) values move most -- Haliburton and Daniels drop ~$14-15 -- since
-    # the bias applied to every seat of the baseline.
+    # Regenerated 2026-10-11 twice: for the auction differential's roster-size term (72e9e869), and then
+    # for psi, which had done nothing since 2025-08-14 (a stale /100 on Games Played %) and now credits a
+    # replacement's value over an empty game, so every G- and X-score moves.
     expected_auction_values = [
-        ('Shai Gilgeous-Alexander',     -4.9,  87.2, 92.1, 90.8),
-        ('Tyrese Haliburton',           9.2,  58.9, 49.7, 49.0),
-        ('Dyson Daniels',               18.8,  55.3, 36.5, 36.0),
-        ('Jayson Tatum',                2.2,  44.9, 42.7, 42.1),
+        ('Shai Gilgeous-Alexander',     -12.9,  86.4, 99.3, 97.2),
+        ('Tyrese Haliburton',           2.9,  57.0, 54.1, 52.9),
+        ('Dyson Daniels',               12.9,  55.9, 43.1, 42.2),
+        ('Jayson Tatum',                -1.1,  39.3, 40.4, 39.5),
     ]
     candidates_by_name = name_candidates(session, candidates)
     if os.environ.get('REGEN_GOLDENS'):

@@ -723,8 +723,12 @@ class HAgent:
         self.v          = np.array(v / v.sum()).reshape(self.n_categories, 1)
         self.set_forced_category_weights(allow_force_weighting, forced_category_weights)
 
+        # v with the lower-is-better categories (Turnovers) negated, for the auction's money term. Found by
+        # name: this used to negate the LAST column, written when Turnovers always came last, so an 8-category
+        # league without Turnovers flipped Blocks, and one scoring Double Doubles flipped those instead.
         turnover_inverted_v = self.v.copy()
-        turnover_inverted_v[-1] = -turnover_inverted_v[-1]
+        negative_categories = np.isin(x_scores.columns, sport_params['negative-statistics'])
+        turnover_inverted_v[negative_categories] = -turnover_inverted_v[negative_categories]
         self.turnover_inverted_v = turnover_inverted_v / turnover_inverted_v.sum()
 
         self.category_weights  = None
