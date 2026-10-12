@@ -355,7 +355,7 @@ from backend.math.algorithm_helpers import (
 )
 
 
-from backend.math.process_player_data import get_category_level_rv, scale_tiebreaker_value
+from backend.math.process_player_data import get_category_value_direction, scale_tiebreaker_value
 
 
 from backend.math.position_optimization import (
@@ -723,13 +723,12 @@ class HAgent:
         self.v          = np.array(v / v.sum()).reshape(self.n_categories, 1)
         self.set_forced_category_weights(allow_force_weighting, forced_category_weights)
 
-        # v with the lower-is-better categories (Turnovers) negated, for the auction's money term. Found by
-        # name: this used to negate the LAST column, written when Turnovers always came last, so an 8-category
-        # league without Turnovers flipped Blocks, and one scoring Double Doubles flipped those instead.
-        turnover_inverted_v = self.v.copy()
-        negative_categories = np.isin(x_scores.columns, sport_params['negative-statistics'])
-        turnover_inverted_v[negative_categories] = -turnover_inverted_v[negative_categories]
-        self.turnover_inverted_v = turnover_inverted_v / turnover_inverted_v.sum()
+        # What a unit of generic value buys, per category (process_player_data.get_category_value_direction):
+        # the auction scales it by value per dollar for the cash term and by the replacement player's value for
+        # his stats, so a dollar and a roster slot trade off at the same rate. (n_categories, 1).
+        self.category_value_direction = np.array(get_category_value_direction(
+            pd.Series(self.v.reshape(-1), index=x_scores.columns), sport_params['negative-statistics'],
+        )).reshape(self.n_categories, 1)
 
         self.category_weights  = None
 
@@ -1107,14 +1106,11 @@ class HAgent:
                 - replacement_value
             ).sum()
             value_per_dollar = remaining_overall_value / total_cash
-            category_value_per_dollar = value_per_dollar / (self.turnover_inverted_v * self.n_categories)
-
-            replacement_value_by_category = get_category_level_rv(
-                replacement_value,
-                pd.Series(self.v.reshape(-1), index=self.x_scores.columns),
-                list(self.x_scores.columns),
-            )
-            replacement_value_by_category = np.array(replacement_value_by_category).reshape(self.n_categories, 1)
+            # Both in x-score units per category, and both worth exactly their totals in generic value: the
+            # cash term used to split value per dollar by a renormalised, Turnovers-negated v, which with
+            # Turnovers scored added up to (1 - 2 v_TO)(n - 2)/n of it -- about 0.6 for nine categories.
+            category_value_per_dollar     = value_per_dollar * self.category_value_direction
+            replacement_value_by_category = replacement_value * self.category_value_direction
             # Rational-opponent modelling (auction), parallel to the draft. An EMPTY seat with a predicted
             # first buy is modelled as having ALREADY bought it: the anchor's real stats are priced into the
             # score diff and its estimated price is deducted from the seat's cash, so the field does not jump

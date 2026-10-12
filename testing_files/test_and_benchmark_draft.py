@@ -166,8 +166,8 @@ _FORMAT_CONFIGS = [
     pytest.param(
         ('Most Categories', [
             ('Nikola Jokic',                        64.9),
-            ('Shai Gilgeous-Alexander',             56.1),
-            ('Karl-Anthony Towns',                  53.3),
+            ('Shai Gilgeous-Alexander',             55.8),
+            ('Karl-Anthony Towns',                  53.1),
             ('Giannis Antetokounmpo',               54.2),
         ], _ALL_CATEGORIES),
         id='MC-all-cats',

@@ -69,28 +69,31 @@ _TEAM_2 = [
 #
 # Regenerated 2026-10-11 for psi: a stale /100 on Games Played % had left it inert since
 # 2025-08-14, and it now credits a replacement's value over an empty game (process_player_data
-# games_played_adjustment), so every G- and X-score moves.
+# games_played_adjustment), so every G- and X-score moves. The seven 'empty' rows moved again the
+# same day with get_category_value_direction, which computes the replacement split in a different
+# operation order: identical in exact arithmetic, ~1e-16 apart in floating point, and self-play
+# amplifies that into a new hash (and 0.3 of an H-score in the 16-category draft golden).
 _GOLDEN = {
-    ('Each Category',  'empty'): '0999b92ab811b4b7ec254de46aa41cdd599662d9140b4497764f5aeccba55578',
+    ('Each Category',  'empty'): '7fb78f42889af5e987313826de45f9fcb6eb230319c691001f14552a409c2a81',
     ('Each Category',  'mid'):   '8a202c92821ae8f429d7bfbb5265b2ac536fa5ffc9b08cf38f3a5861c335f13c',
-    ('Half and Half',  'empty'): '745e655d4596b5ee023801e4a0c6f80188fa0e18fd9df3414231b239b62f2cdb',
+    ('Half and Half',  'empty'): '010852f4df59805bcb67df141106c8c05287870e886a70a730c43336085e535d',
     ('Half and Half',  'mid'):   '113a786b893d451a6cff1b23b1e93ece236a93606e6576a7175e49cc30cf7168',
-    ('Most Categories','empty'): '62d6072f798eea40f1ab52d4e629b333131cdaf4cf4228bd770fae7c1dec1cd5',
+    ('Most Categories','empty'): '05ab6edc2304699e15b8fe4cc73a51e5dcf5ad6a9b5fc8b9e40fff85f4b941e4',
     ('Most Categories','mid'):   '45a8753f5943a2aec06ca9e45bcc79440a0ef658474257d59339707644bfe3f0',
 
     # Eight categories (turnovers dropped), which is what a tiebreaker needs: a matchup that can
     # end level. Each objective appears with and without one named, so a change to the weighted
     # win-count DP, to what a category is worth in v, or to the G-score ranking the board is drawn
     # from has to show up here rather than only in a league nobody tested.
-    ('8cat Each Category',   'empty'): '2ee56957974f0420b577fcf82b5b97545ef5c86128625383b1e6844973d7e72e',
+    ('8cat Each Category',   'empty'): '83f4f54aaf889cece872be684c2e23def5df0f7a576208ce607f6c274eb9362f',
     ('8cat Each Category',   'mid'):   '36a6cfb01c93b06464d843328b8b082a1e375e1e96e7a78fca20c8d1b8690599',
-    ('8cat Most Categories', 'empty'): '7fa73da85fb83769b44d9b5a2f3711e6f379033108b58b54010a546a1cbaeea3',
+    ('8cat Most Categories', 'empty'): '3f2b343504277bc68fc245cd6d841feb10950f1baf1f3b6026aea667481631ae',
     ('8cat Most Categories', 'mid'):   'e10aa95dd4bc4e60e5c7be35addb84056791065300f20e17e1d98d68ff6f0a2c',
     ('8cat MC + Points',     'empty'): '3b232ffb44f6fd129610b77dba3cd9089b48dee3a658242b163cd71c1e58fb59',
     ('8cat MC + Points',     'mid'):   '31e5bd22806f46f756ed5268fcd7d55273462b3f12308505bbad94259776cdc3',
-    ('8cat Half and Half',   'empty'): 'ecf6e9dfb39b38620daf5b985a093f140b7f080b33c00a74b688df0b9ec5a167',
+    ('8cat Half and Half',   'empty'): 'a3b6b722570d812ebd3c27f4c53758057e7bddf308c5c1f8920b7992794e17fd',
     ('8cat Half and Half',   'mid'):   '77eb1f79a7b7b21f023025c079680f49cfaad2f245315f1e105aa4a0937f072a',
-    ('8cat Half + Points',   'empty'): 'a6ccf50abeff474b7364793371170643cd7da89d613a4f05e4984717635e5d49',
+    ('8cat Half + Points',   'empty'): 'fdac267162b2a9131213753ea488a7411868aad8d951d11cc5750f0ee5d5534f',
     ('8cat Half + Points',   'mid'):   '2de62d0b0c9c54f460cd37cc57d39027fe791571539b19f130afadffc7c22c9a',
 }
 

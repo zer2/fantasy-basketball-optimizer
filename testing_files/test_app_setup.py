@@ -934,27 +934,47 @@ def test_evaluate_rejects_rostered_players_missing_from_pool():
     assert 'player pool' in detail, 'the error should explain the cause'
 
 
-def test_auction_money_term_negates_only_turnovers():
-    """The auction's money term negates the lower-is-better categories. It used to negate whichever category came
-    last, which is Turnovers only in the default set: in canonical order Double Doubles (and the rebound splits,
-    FGM, FTM) come after it, and a league without Turnovers ends in Blocks."""
-    def money_signs(categories):
+def test_category_value_direction_is_one_unit_of_value():
+    """get_category_value_direction: what a unit of generic value buys. Every category gets the same share of value
+    (so the x-score amount is inversely proportional to v), the negative statistics get it with the sign flipped,
+    and the whole direction is worth exactly one unit: sum of v_c * d_c = 1."""
+    import pandas as pd
+    from backend.math.process_player_data import get_category_value_direction
+
+    v = pd.Series({'Points': 0.2, 'Rebounds': 0.3, 'Assists': 0.1, 'Turnovers': 0.4})
+    direction = get_category_value_direction(v, ['Turnovers'])
+    assert abs((v * direction).sum() - 1) < 1e-12, 'the direction is worth one unit of value'
+    shares = v * direction
+    assert np.allclose(shares[['Points', 'Rebounds', 'Assists']], 0.5) and np.isclose(shares['Turnovers'], -0.5),         'equal shares of value (n - 2k = 2 here), Turnovers negative'
+    assert abs((v * get_category_value_direction(v, [])).sum() - 1) < 1e-12, 'no negative statistics: still one unit'
+    with pytest.raises(ValueError):
+        get_category_value_direction(pd.Series({'Points': 0.5, 'Turnovers': 0.5}), ['Turnovers'])
+
+
+def test_auction_value_direction_negates_only_turnovers():
+    """The auction's value direction (its cash term and its replacement player) negates the lower-is-better
+    categories by name. The old money term negated whichever category came last, which is Turnovers only in the
+    default set: in canonical order Double Doubles (and the rebound splits, FGM, FTM) come after it, and a league
+    without Turnovers ends in Blocks."""
+    def direction_of(categories):
         request = _build_default_session_request()
         request['league']['categories'] = categories
         request['league']['tiebreaker_category'] = None
         response = client.post('/sessions', json=request)
         assert response.status_code == 201, response.text
         agent = get_session(response.json()['session_id']).agent
-        return dict(zip(agent.x_scores.columns, np.sign(agent.turnover_inverted_v.reshape(-1))))
+        return agent, dict(zip(agent.x_scores.columns, agent.category_value_direction.reshape(-1)))
 
     default = _load_params()['NBA']['default-categories']
     for categories in (default,
                        [category for category in default if category != 'Turnovers'],
                        default + ['Double Doubles']):
-        signs = money_signs(categories)
-        negated = [category for category, sign in signs.items() if sign < 0]
+        agent, direction = direction_of(categories)
+        negated = [category for category, amount in direction.items() if amount < 0]
         expected = ['Turnovers'] if 'Turnovers' in categories else []
         assert negated == expected, f'{categories}: negated {negated}, expected {expected}'
+        worth = float((agent.v.reshape(-1) * agent.category_value_direction.reshape(-1)).sum())
+        assert abs(worth - 1) < 1e-9, f'{categories}: the direction is worth {worth} units of value, not 1'
 
 
 def test_pipeline_cache_restores_prior_builds():

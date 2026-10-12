@@ -60,12 +60,14 @@ def test_evaluate_auction():
     # (expected_name, diff, your_dollar, generic_dollar, original_dollar)
     # Regenerated 2026-10-11 twice: for the auction differential's roster-size term (72e9e869), and then
     # for psi, which had done nothing since 2025-08-14 (a stale /100 on Games Played %) and now credits a
-    # replacement's value over an empty game, so every G- and X-score moves.
+    # replacement's value over an empty game, so every G- and X-score moves. Then once more for the cash
+    # term (get_category_value_direction): cash used to convert at ~0.6 of the market rate when Turnovers is
+    # scored. Only your$ moves; generic$ and orig$ are empty boards, where every seat has the same cash.
     expected_auction_values = [
-        ('Shai Gilgeous-Alexander',     -12.9,  86.4, 99.3, 97.2),
-        ('Tyrese Haliburton',           2.9,  57.0, 54.1, 52.9),
-        ('Dyson Daniels',               12.9,  55.9, 43.1, 42.2),
-        ('Jayson Tatum',                -1.1,  39.3, 40.4, 39.5),
+        ('Shai Gilgeous-Alexander',     -9.1,  90.2, 99.3, 97.2),
+        ('Tyrese Haliburton',           5.9,  60.0, 54.1, 52.9),
+        ('Dyson Daniels',               18.3,  61.4, 43.1, 42.2),
+        ('Jayson Tatum',                -1.4,  38.9, 40.4, 39.5),
     ]
     candidates_by_name = name_candidates(session, candidates)
     if os.environ.get('REGEN_GOLDENS'):
