@@ -141,11 +141,22 @@ def process_player_data(player_stats_v2: pd.DataFrame
     x_scores = calculate_scores_from_coefficients(player_stats_v2, coefficients, sport_params, 0, 1,
                                                    counting_stats, ratio_stats, categories)
 
-    replacement_games_rate = (1 - player_stats_v2['Games Played %'] / 100) * psi
+    # Games Played % is a fraction (0-1). The /100 here outlived the 0-100 display scale it was written for
+    # (removed 2025-08-14), and made the rate ~psi for everyone, which the re-centring then cancelled.
+    replacement_games_rate = (1 - player_stats_v2['Games Played %']) * psi
+    # What an empty game is worth: the scores of a player who contributes nothing, through the same scoring.
+    # A replacement filling a missed game is credited his value OVER that, not his value relative to the
+    # average player (which is negative, and charged the injured player for being replaced).
+    zero_player_stats = player_stats_v2.iloc[:1].copy()
+    zero_player_stats.loc[:, zero_player_stats.select_dtypes('number').columns] = 0
+    zero_player_g = calculate_scores_from_coefficients(zero_player_stats, coefficients, sport_params, 1, 1,
+                                                        counting_stats, ratio_stats, categories).iloc[0]
+    zero_player_x = calculate_scores_from_coefficients(zero_player_stats, coefficients, sport_params, 0, 1,
+                                                        counting_stats, ratio_stats, categories).iloc[0]
     g_scores = games_played_adjustment(g_scores, replacement_games_rate, representative_player_set,
-                                        sport_params, categories)
+                                        sport_params, categories, zero_player_g)
     x_scores = games_played_adjustment(x_scores, replacement_games_rate, representative_player_set,
-                                        sport_params, categories, v=v)
+                                        sport_params, categories, zero_player_x, v=v)
 
     x_scores.loc[RP_PLAYER_ID, :] = -1
     g_scores.loc[RP_PLAYER_ID, :] = -1
@@ -580,6 +591,7 @@ def games_played_adjustment(scores: pd.DataFrame
                              , representative_player_set: list[str]
                              , sport_params: dict
                              , categories: list[str]
+                             , zero_player_scores: pd.Series
                              , v: pd.Series = None) -> pd.DataFrame:
 
     if v is None:
@@ -588,10 +600,10 @@ def games_played_adjustment(scores: pd.DataFrame
     totals = scores.dot(v)
     n_players = len(representative_player_set)
     rv = totals.sort_values(ascending=False).iloc[n_players]
-    category_level_rv = get_category_level_rv(rv, v, categories)
+    category_level_rv = rv * get_category_value_direction(v[categories], sport_params['negative-statistics'])
 
     replacement_player_value = (
-        np.array(category_level_rv.T).reshape(1, -1)
+        np.array(category_level_rv - zero_player_scores[categories]).reshape(1, -1)
         * np.array(replacement_games_rate).reshape(-1, 1)
     )
     adjusted_scores = scores + replacement_player_value
@@ -600,7 +612,7 @@ def games_played_adjustment(scores: pd.DataFrame
 
 
 # ── helpers ────────────────────────────────────────────────────────────────────
-# The two category filters serve only process_player_data; get_category_level_rv is public
+# The two category filters serve only process_player_data; get_category_value_direction is public
 # (algorithm_agents imports it).
 
 def _list_counting_stats(sport_params: dict, categories: list[str]) -> list[str]:
@@ -613,13 +625,23 @@ def _list_ratio_stats(sport_params: dict, categories: list[str]) -> list[str]:
     return [c for c in sport_params['ratio-statistics'] if c in categories]
 
 
-def get_category_level_rv(rv: float
-                          , v: pd.Series
-                          , categories: list[str]) -> pd.Series:
-    rv_multiple = (rv / (len(categories) - 2)
-                   if 'Turnovers' in categories
-                   else rv / len(categories))
-    return pd.Series({
-        stat: -rv_multiple / v[stat] if stat == 'Turnovers' else rv_multiple / v[stat]
-        for stat in categories
-    })
+def get_category_value_direction(v: pd.Series
+                                 , negative_statistics: list[str]) -> pd.Series:
+    """What one unit of generic value is expected to buy, category by category, in x-score units.
+
+    Value is spread evenly: each category receives the same share of it, which is 1 / v_c in that
+    category's own units, since v_c is what a unit of x-score is worth there. Value comes with more of
+    the negative statistics, not less -- players who add value add turnovers -- so those categories get
+    the same share with the sign flipped. The shares are sized so that the direction is worth exactly
+    one unit of value: sum over c of v_c * d_c = 1. With k negative statistics among n categories, the
+    n - k positive shares and the k negative ones net to n - 2k, which is the divisor.
+
+    Used at two scales: the auction's cash term (value per dollar times the direction), and the
+    replacement player (his total value, which is negative, times the direction).
+    """
+    sign = pd.Series(np.where(v.index.isin(negative_statistics), -1.0, 1.0), index=v.index)
+    net_share_count = sign.sum()
+    if net_share_count <= 0:
+        raise ValueError(f'Categories {list(v.index)} have as many negative statistics as positive ones, '
+                         'so no direction is worth a unit of value.')
+    return sign / (net_share_count * v)
