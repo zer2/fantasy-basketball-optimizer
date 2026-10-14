@@ -1948,10 +1948,6 @@ tr {
         padding-top: 7px;
         padding-bottom: 7px;
     }
-    /* One line does not fit a phone: the Suggestions controls wrap. */
-    .trade-combo-row {
-        flex-wrap: wrap;
-    }
     /* Stack each board header so the team name sits on its own line above the method
        dropdown — keeps the column narrow to save horizontal space. */
     .team-header {
@@ -2322,6 +2318,7 @@ tr {
 
 .trade-combo-row {
     display: flex;
+    flex-wrap: wrap;   /* one line where it fits; a narrow window wraps rather than clipping the threshold controls */
     align-items: center;
     gap: 10px;
     margin-bottom: 12px;

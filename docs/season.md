@@ -48,7 +48,7 @@ In theory asymmetric trades could be analyzed. The team getting bigger could be 
 
 ### Trade suggestions 
 
-Below the trade analysis module, trade suggestions are shown. 
+Below the trade analysis module, trade suggestions are shown. Clicking on a potential trade automatically brings the details up to the analysis module.  
 
 ![Trade suggestions list](img/tradesuggestions.png)
 
@@ -56,11 +56,11 @@ Which trades end up being shown as suggestions depends on the user-configurable 
 
 ![Trade parameters](img/tp3.png)
 
-Candidate trades are found by iterating through all combinations of possible trades. Those trades are first filtered by a general value difference threshold, which limits candidate trades to those between collections of players whose total general values are similar to each other. Specifically, if the difference in total H-score (calculated for the first pick of a draft, with no players selected) between the two groups of players that are to be traded is above 2%, the trade will not be considered for analysis. E.g. a trade between two 48% players and two 50% players has an H-score difference of 4%, which is above the threshold, so the trade will not be analyzed further. This is to prevent unnecessary computation checking trades that are unlikely to be viable. 
+Candidate trades are found by iterating through all combinations of possible trades. They are checked to see how they would change H-scores for each team, and those which surpass the user-supplied differential thresholds are shown as suggestions. The thresholds cannot be lowered below -2%; loose filters allow an extreme number of candidate trades to be displayed. 
 
-After trades are analyzed for H-score implications, one more filter is applied. Only those which meet the H-score differential thresholds as supplied by the user are shown. 
+Searching prospective trades can be computationally expensive. For the purpose of limiting computation time, only 1x1 trades are searched for by default. 2x2 and 3x3 are also available. 
 
-Even with all this filtering, there can be many possible trades to look through, especially when looking for trades with large numbers of players and when the parameters for acceptable trades are loose. For the purpose of limiting computation time, only 1x1 trades are searched for by default. 2x2 and 3x3 are also available. 
+Also, candidate trades are processed in batches, starting with pairs of player sets that are within 1% of each other in the sum of total H-scores (calculated for the first pick of a draft, with no players selected). Then the criterion is relaxed to 2%, 3% etc., until all of the 10%+ trades are evaluated at once. This is so that the most promising trades are evaluated first, and can be inspected before all possibilities are processed. 
 
 ## Rosters tab
 

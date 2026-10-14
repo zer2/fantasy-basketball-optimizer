@@ -440,6 +440,9 @@ const STATES = {
             await page.waitForTimeout(200)
         }
         await waitEval(page)
+        // The trade analysis drives no status indicator, and it queues behind the suggestion search on the server:
+        // wait for its table, or the shot catches "Analyzing trade...".
+        await page.locator('[data-testid="trade-hscore-pane"] table').first().waitFor({ timeout: 120000 })
     },
     // Team 2 is the default counterparty and has no qualifying 1-for-1 trade with Team 1, so
     // the suggestions pane rendered its "No promising trades found." stub and the shot shipped
