@@ -1,20 +1,20 @@
 // api/season_session.ts
 // Season mode API: trade analysis, trade suggestions, waiver wire evaluate, and season init.
-// Owns #suggest-indicator for trade suggestions.
+// Trade suggestions show no indicator of their own: the one beside the Season Mode tabs covers every request.
 // Directly manages #eval-indicator for waiver wire (no autopilot protection needed in season mode).
 
 import { setCandidatePlayerResults, setPlayerResultsFromGScores } from '../app_state.js'
 import { buildTable } from '../table/player_table.js'
 import {
-    ensureSession, getSessionId, applyIndicatorState,
+    ensureSession, getSessionId,
     withDisplayOwnership, withSessionRetry,
 } from './session.js'
 import { evaluate, candidatesToPlayerResults, analyzeTrade, suggestTrades, fetchDraftState } from './client.js'
-import type { TradeAnalyzeResponse, TradeSuggestResponse } from './client.js'
+import type { TradeAnalyzeResponse, TradeSuggestResponse, TradeComboParam } from './client.js'
 
 // ─── Live-platform season rosters ──────────────────────────────────────────────
 // When a live platform is connected in Season Mode, the roster grid is prefilled
-// from the platform instead of DEFAULT_SEASON_ROSTERS. The rosters are fetched async
+// from the platform (without one it starts empty). The rosters are fetched async
 // (draft-state needs a session), cached here, and read by renderSeasonRosters as its
 // prefill source; the caller re-renders (applyLayout) once they arrive. Living here
 // (not in season_rosters) keeps the import one-way: season_rosters → season_session.
@@ -101,35 +101,26 @@ export async function runTradeAnalyze(
 // ─── Trade suggestions ───────────────────────────────────────────────────────
 
 /**
- * Generates trade suggestions for two teams.
- * Updates #suggest-indicator: "Starting..." while waiting for a session,
- * "Updating..." once the session is ready and computation begins.
- * Hiding the indicator when all fetches complete is the caller's responsibility.
+ * Generates trade suggestions between your team and each of `theirTeams`, ranked together by your score.
  */
 export async function runTradeSuggest(
     playerAssignments: Record<string, number[]>
   , myTeam: string
-  , theirTeam: string
-  , comboParams: { n_traded: number; n_received: number; threshold: number }[]
+  , theirTeams: string[]
+  , comboParams: TradeComboParam[]
   , yourThreshold: number
   , theirThreshold: number
   , checkPositions?: boolean
 ): Promise<TradeSuggestResponse> {
-    return await withSessionRetry(
-        async () => {
-            applyIndicatorState('suggest-indicator', 'evaluating')
-            return await suggestTrades(getSessionId()!, {
-                player_assignments:           playerAssignments,
-                my_team:                      myTeam,
-                their_team:                   theirTeam,
-                combo_params:                 comboParams,
-                your_differential_threshold:  yourThreshold,
-                their_differential_threshold: theirThreshold,
-                position_check:               checkPositions,
-            })
-        }
-        , () => applyIndicatorState('suggest-indicator', 'fetching')
-    )
+    return await withSessionRetry(() => suggestTrades(getSessionId()!, {
+        player_assignments:           playerAssignments,
+        my_team:                      myTeam,
+        their_teams:                  theirTeams,
+        combo_params:                 comboParams,
+        your_differential_threshold:  yourThreshold,
+        their_differential_threshold: theirThreshold,
+        position_check:               checkPositions,
+    }))
 }
 
 // ─── Waiver wire ─────────────────────────────────────────────────────────────

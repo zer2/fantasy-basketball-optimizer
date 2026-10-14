@@ -100,13 +100,24 @@ class TradeAnalyzeResponse(BaseModel):
 
 # ── /sessions/{id}/trade/suggest ─────────────────────────────────────────────
 
+# The lowest H-score gain (a fraction) a trade search may ask about, for either side: -2%.
+TRADE_THRESHOLD_FLOOR = -0.02
+
+
 class ComboParam(BaseModel):
     n_traded: int
     n_received: int
-    threshold: float
+    # The value window searched, in percentage points of summed general value (base H-score) between the two sides:
+    # combos further apart than `threshold` are skipped, and None searches every gap. Combos within
+    # `searched_threshold` were searched by an earlier batch, so they are skipped too (None: no earlier batch). The
+    # frontend searches within 10 for every team first, then beyond 10 -- a gap that wide has not held a good trade in
+    # any league measured, but nothing is left out by assumption.
+    threshold: Optional[float]
+    searched_threshold: Optional[float] = None
 
 
 class TradeSuggestion(BaseModel):
+    their_team: str   # the team the trade is made with: a request may search several
     send: list[int]
     receive: list[int]
     your_score: float

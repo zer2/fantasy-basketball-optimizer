@@ -7,13 +7,16 @@
 import { createSection, addApplyBtn, makeSidebarToggle, MOBILE_BREAKPOINT_PX } from './helper_functions.js'
 import { makeDebouncer, withDisplayOwnership } from './api/session.js'
 import { setSportConfig } from './app_state.js'
-import { createOrPatchSession, runEvaluate, clearFullTeamResult, showDefaultRankings, SEASON_PLATFORM_CONNECTED } from './api/draft_and_auction_session.js'
+import {
+    createOrPatchSession, runEvaluate, clearFullTeamResult, showDefaultRankings, SEASON_PLATFORM_CONNECTED,
+    isConnectionWaitingForSlots,
+} from './api/draft_and_auction_session.js'
 import { runSeasonInit, refreshSeasonRostersFromPlatform, clearLivePlatformRosters } from './api/season_session.js'
 import { fetchConfig } from './api/client.js'
 import { fetchCurrentUser, setSignedInUser } from './api/auth.js'
 import { buildTableHeader } from './table/player_table.js'
 import { showFailureInTable } from './table/failure_message.js'
-import { applyLayout } from './layout.js'
+import { applyLayout, redrawActiveSeasonTab, getActiveSeasonTab } from './layout.js'
 import { resetDraftBoard } from './data_entry/draft_board.js'
 import { resetAuctionEntry } from './data_entry/auction_entry.js'
 import { pref, savePref } from './preferences.js'
@@ -65,7 +68,16 @@ function makeApplyChain(label: string) {
         if (rebuildTableHeader) buildTableHeader()
         return createOrPatchSession(fromStep, patch, signal)
             .then(() => { if (!signal.aborted && evaluate) return runModeEval() })
-            .then(() => { if (!signal.aborted) applyLayout() })
+            .then(() => {
+                if (signal.aborted) return
+                const seasonTabBeforeLayout = getActiveSeasonTab()
+                applyLayout()
+                // In Season Mode a settings change redraws the tab on screen: its results came from the old settings,
+                // and the table-header rebuild above empties the shared candidate table, so the Waiver tab showed
+                // headers over no rows until a dropdown was touched (2026-10-13). Entering Season Mode draws the tab
+                // already (the tab is null until then).
+                if (seasonTabBeforeLayout !== null) redrawActiveSeasonTab()
+            })
             .catch(err => {
                 if (err.name === 'AbortError') return
                 console.error(`${label} failed:`, err)
@@ -139,16 +151,18 @@ renderSeatSelector().addEventListener('change', () => handleSeatChanged())
 const applyModeChange = makeApplyChain('Mode change')
 function patchSessionForModeChange(): void {
     const { mode, cash_per_team } = getLeagueSettings()
+    const isSeasonMode = mode === 'Season Mode'
     const patch = mode === 'Auction Mode'
-        ? { is_auction: true, league: { cash_per_team } }
-        : { is_auction: false }
-    // Season Mode: the table is hidden, so there is no rebuild or evaluate — but the session's
+        ? { is_auction: true, is_season_mode: false, league: { cash_per_team } }
+        : { is_auction: false, is_season_mode: isSeasonMode }
+    // Season Mode: the table is hidden, so there is no table rebuild — but the session's
     // league type must be patched BEFORE the season layout renders, because rendering fires
     // season evaluates (waiver, roster inspection) that omit remaining_cash. Step 2 below
     // skips Season Mode for the same reason: its layout comes after the patch, not
-    // concurrently with it.
-    const entersSeasonMode = mode === 'Season Mode'
-    applyModeChange(4, patch, { rebuildTableHeader: !entersSeasonMode, evaluate: !entersSeasonMode })
+    // concurrently with it. Its "evaluate" is runSeasonInit (see runModeEval), which settles the
+    // indicator the patch left on "Starting..." -- the Waiver tab's first evaluate used to do it,
+    // and with no full team (no rosters entered yet) there is none (2026-10-13).
+    applyModeChange(4, patch, { rebuildTableHeader: !isSeasonMode })
 }
 
 // Season Mode + live platform: pull the platform's rosters into the grid when the user
@@ -162,7 +176,11 @@ function refreshSeasonRostersIfLive(): void {
     // what triggers the poll now, via SEASON_PLATFORM_CONNECTED below.
     if (mode === 'Season Mode' && platform !== 'Enter your own data' && isPlatformConnected()) {
         withDisplayOwnership({ busy: 'fetching', onSuccess: 'idle', onFailure: 'idle' }, () => refreshSeasonRostersFromPlatform())
-            .then(() => applyLayout())
+            .then(() => {
+                applyLayout()
+                // The tab on screen was drawn before these rosters existed (applyLayout redraws only the Rosters grid).
+                redrawActiveSeasonTab()
+            })
             .catch(err => console.error('Season roster refresh failed:', err))
     } else {
         clearLivePlatformRosters()
@@ -212,6 +230,9 @@ getPlatformSelectElement().addEventListener('change', () => {
     applyLayout()                 // 1. swap the layout for the new platform
     refreshSeasonRostersIfLive()  // 2. season live-roster sync
     syncForPlatformSwitch()       // 3. seat options + the right evaluation for the new source
+    // 4. Season Mode: the tab on screen follows the platform too -- its rosters (or, a league's still loading, the
+    // message saying so) changed with it; the rosters arriving redraw it again.
+    redrawActiveSeasonTab()
 })
 
 // Numeric league settings: n_drafters, n_picks, cash_per_team fire on 'change' (focus leaves).
@@ -360,12 +381,15 @@ renderSlotCounts(slotSection)
 document.getElementById('sc-bench-slots')!.addEventListener('change', () => {
     revalidateSlotCounts()
     if (!isSlotCountsValid()) return
+    // A connection held back for a structure that did not fit its picks goes through now, carrying the slots.
+    if (isConnectionWaitingForSlots()) { document.dispatchEvent(new Event('platform-connected')); return }
     const { n_drafters, n_picks, cash_per_team } = getLeagueSettings()
     applyLeagueSettings(4, { league: { n_drafters, n_picks, cash_per_team }, slot_counts: getSlotCounts() })
 })
 const applySlotCounts = makeApplyChain('Position parameters apply')
 addApplyBtn(slotSection, async () => {
     if (!isSlotCountsValid()) return
+    if (isConnectionWaitingForSlots()) { document.dispatchEvent(new Event('platform-connected')); return }
     await applySlotCounts(4, { slot_counts: getSlotCounts() })
 })
 

@@ -33,5 +33,5 @@ FYI there is a bug in the wrapper used for connecting to the Yahoo API, which cr
 If draft picks are being input manually, a number of additional inputs are required. They are 
 
 - The number of drafters
-- The number of picks per drafter
+- The number of picks per drafter (note that if a non-standard number of picks is chosen, a position structure might need to be provided manually as well)
 - For snake drafting, a third round reversal toggle. Third round reversal is a common draft setting, wherein the draft order stays the same between the second and third round, instead of snaking. This is designed to limit the advantage of early picks. 

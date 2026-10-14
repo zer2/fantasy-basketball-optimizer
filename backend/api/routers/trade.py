@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from backend.api.helpers import fail, require_session
 from backend.state.session import Session
 from backend.infra.rate_limit import enforce_rate_limit, COMPUTE_POLICY
-from backend.services.trading import run_trade_analyze, run_trade_suggest
+from backend.services.trading import run_trade_analyze, run_trade_suggest_across_teams
 from backend.api.schemas import TradeAnalyzeRequest, TradeSuggestRequest
 from backend.models import TradeAnalyzeResponse, TradeSuggestResponse
 
@@ -41,11 +41,11 @@ def suggest_trades_route(req: TradeSuggestRequest, session: Session = Depends(re
 
     try:
         with session.lock:
-            return run_trade_suggest(
+            return run_trade_suggest_across_teams(
                 session,
                 player_assignments=req.player_assignments,
                 my_team=req.my_team,
-                their_team=req.their_team,
+                their_teams=req.their_teams,
                 combo_params=req.combo_params,
                 your_threshold=req.your_differential_threshold,
                 their_threshold=req.their_differential_threshold,

@@ -1,9 +1,8 @@
-// default_season_rosters.ts
-// Pre-computed default Season Mode rosters: EC scoring, 2025-26 historical data,
-// 12 drafters, 13 picks, snake-drafted by H-score rank.
-// Used to pre-fill the Season Mode roster table consistently across the app and tests.
+// scripts/sample_season_rosters.mjs
+// The rosters the docs' Season Mode screenshots show: an H-score snake draft on 2025-26 historical data (12 teams, 13
+// picks, Each Category). The app prefilled the grid with these until 2026-10-13; screenshots.mjs now pastes them in.
 
-export const DEFAULT_SEASON_ROSTERS: Record<string, string[]> = {
+export const SAMPLE_SEASON_ROSTERS = {
     'Team 1': [
         'Nikola Jokic (C)',
         'Bam Adebayo (C,PF)',

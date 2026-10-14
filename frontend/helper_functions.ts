@@ -129,7 +129,8 @@ export function makeSidebarToggle(id: string, rightText: string, leftText?: stri
     const rightSpan = document.createElement('span')
     rightSpan.textContent = rightText
 
-    row.append(input, track, rightSpan)
+    row.append(input, track)
+    if (rightText !== '') row.append(rightSpan)   // '' when the label sits on the left only
     return row
 }
 
@@ -190,6 +191,11 @@ export function renderMultiselect(
         Array.from(inputArea.children).forEach(child => {
             if (child !== textInput) child.remove()
         })
+        // Nothing is left to add once every option is chosen: no prompt (it would only be clipped beside the chips), and
+        // the typing field shrinks to a sliver (.ms-all-chosen).
+        const isEveryOptionChosen = selected.length === allOptions.length
+        textInput.placeholder = isEveryOptionChosen ? '' : 'Add…'
+        inputArea.classList.toggle('ms-all-chosen', isEveryOptionChosen)
         for (const value of selected) {
             const chip = document.createElement('span')
             chip.className = 'ms-chip'
@@ -441,4 +447,10 @@ export function addApplyBtn(container: HTMLElement, onClick: () => void | Promis
         }
     })
     container.append(btn)
+}
+
+/** Lower-cased, accents stripped, outer spaces trimmed: 'Jokić' and 'jokic' both search as 'jokic'. Shared by the
+ *  player searches (the candidate table's and the suggested trades'). */
+export function normalizeSearchText(text: string): string {
+    return text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim()
 }

@@ -52,8 +52,8 @@ test('the app is usable without signing in', async t => {
             assert.match(await prompt.textContent(), /needs an account/,
                          'the prompt should say why an account is needed')
             assert.equal(await prompt.locator('.signin-link').count(), 1)
-            assert.ok(!(await page.locator('#ls-connect-btn').isVisible()),
-                      'Connect must be hidden rather than left to fail at the first request')
+            assert.ok(!(await page.locator('#ls-fantrax-wrap').isVisible()),
+                      'the connect controls must be hidden rather than left to fail at the first request')
             expectCleanSession(app, 'anonymous platform selection')
         })
 

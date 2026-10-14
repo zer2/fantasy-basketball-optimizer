@@ -7,7 +7,6 @@ import { getPlayerResults } from '../../app_state.js'
 import { getRegistryEntry, findPlayerIdByName } from '../../player_registry.js'
 import { buildFullPlayerDisplayHtml, buildPlayerOptionLabel } from '../../player_display.js'
 import { isMobileViewport, readRequiredIntInput } from '../../helper_functions.js'
-import { DEFAULT_SEASON_ROSTERS } from './default_season_rosters.js'
 import { getTeamLabel, makeTeamLabelInput } from '../team_labels.js'
 import { getSelectedCategories } from '../../setting_collection/format_and_categories.js'
 import { getLeagueSettings, getTeamIdentitiesFromSidebar } from '../../setting_collection/league_settings.js'
@@ -50,9 +49,11 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
     }))
 
     // Live platform → prefill the grid from the platform's rosters (blank until the
-    // async poll populates the cache); own data → the hardcoded defaults.
+    // async poll populates the cache); own data → whatever the grid held before this redraw.
     const isLivePlatform = getLeagueSettings().platform !== 'Enter your own data'
     const platformRosters = isLivePlatform ? getLivePlatformRosters() : null
+    const enteredPlayerIdsByCell = isLivePlatform ? null : readEnteredPlayerIdsByCell()
+    const poolPlayerIds = new Set(playerResults.map(p => String(p.player_id)))
 
     leftEl.innerHTML  = ''
     rightEl.innerHTML = ''
@@ -110,18 +111,16 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
               , true
               , rosterListenerController.signal
             )
-            // Live platform rosters arrive as player ids; DEFAULT_SEASON_ROSTERS stays a
-            // name-keyed file and is resolved through the registry at render time. A default
-            // name missing from the current pool simply leaves the cell blank.
+            // A connected league prefills the grid with its rosters (as player ids). Without one, the grid keeps what
+            // was entered: every Season Mode layout pass and every visit to the Rosters tab redraws it, which used to
+            // be hidden by refilling built-in sample rosters (removed 2026-10-13) and now would empty it. A player the
+            // current pool no longer has (the data source changed) leaves the cell blank.
             if (isLivePlatform) {
                 const prefillPlayerId = platformRosters?.[teamNames[d]]?.[r]
                 if (prefillPlayerId !== undefined) sel.setValue(String(prefillPlayerId))
             } else {
-                const defaultName = DEFAULT_SEASON_ROSTERS[teamNames[d]]?.[r]
-                if (defaultName) {
-                    const prefillPlayerId = resolveRosterEntryName(defaultName)
-                    if (prefillPlayerId !== null) sel.setValue(String(prefillPlayerId))
-                }
+                const enteredPlayerId = enteredPlayerIdsByCell!.get(`sr-player-${r}-${d}`)
+                if (enteredPlayerId !== undefined && poolPlayerIds.has(enteredPlayerId)) sel.setValue(enteredPlayerId)
             }
             cell.append(sel.element)
             rowSelects.push(sel)
@@ -402,9 +401,19 @@ async function buildTeamGScoreTable(
         { testId: 'roster-inspection-hscore', fullWidth: false }))
 }
 
+/** The player id in each filled cell of the grid as it stands, keyed by the cell's select id (sr-player-{pick}-{team}),
+ *  read before a redraw replaces the grid. Empty before the grid was first drawn. */
+function readEnteredPlayerIdsByCell(): Map<string, string> {
+    const entered = new Map<string, string>()
+    document.querySelectorAll<HTMLInputElement>('input[id^="sr-player-"]').forEach(input => {
+        if (input.value !== '') entered.set(input.id, input.value)
+    })
+    return entered
+}
+
 /** Resolves a human-entered roster name to a player id, or null when the registry doesn't
- *  know it. Accepts both bare names and the pre-refactor "Name (POS)" form, which
- *  DEFAULT_SEASON_ROSTERS (and old clipboard copies) still carry. */
+ *  know it. Accepts both bare names and the pre-refactor "Name (POS)" form, which old clipboard
+ *  copies still carry. */
 function resolveRosterEntryName(entryName: string): number | null {
     const bareName = entryName.replace(/\s*\([A-Z,\-]+\)\s*$/, '')
     return findPlayerIdByName(bareName)

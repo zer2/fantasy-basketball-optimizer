@@ -25,6 +25,7 @@ logging.setLoggerClass(logging.Logger)
 import urllib3.util.connection
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
@@ -86,6 +87,8 @@ app.add_middleware(
     https_only=session_https_only(),
     same_site='lax',
 )
+# Trade suggestions return up to tens of thousands of rows per request; the JSON is repetitive and compresses well.
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_ALLOWED_ORIGINS,

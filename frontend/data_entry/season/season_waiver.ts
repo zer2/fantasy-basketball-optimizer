@@ -6,14 +6,16 @@
 
 import { makeCustomSelect } from '../../custom_select.js'
 import { readRequiredIntInput } from '../../helper_functions.js'
-import { readRosterAssignments } from './season_helpers.js'
+import { readRosterAssignments, readEmptyRostersMessage } from './season_helpers.js'
 import { getTeamIdentitiesFromSidebar } from '../../setting_collection/league_settings.js'
 import { getPlayerResultsById } from '../../app_state.js'
 import { buildPlayerOption } from '../../player_display.js'
 import { runWaiverEvaluate } from '../../api/season_session.js'
 import { highlightCandidate } from '../../table/player_table.js'
+import { pref, savePref } from '../../preferences.js'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
 
 /** Returns the id of the player with the highest g_rank (worst) among the given ids.
  *  Returns null if none of the ids are found in the backend player data. */
@@ -56,10 +58,16 @@ export function renderWaiverControls(container: HTMLElement): void {
     // assignments[t] can be undefined for team names beyond nDrafters, hence the optional chain
     const fullTeams   = teamNames.filter(t => (assignments[t]?.length ?? 0) >= nPicks)
 
+    // The candidate table is this tab's results; with no team to score it would show headers over nothing. The table
+    // is set either way here, since the Draft and Auction team-statistics tabs hide it.
+    const candidateTable = document.getElementById('hscoretable')
+    if (!candidateTable) throw new Error('Candidate table #hscoretable not found')
+    candidateTable.style.display = fullTeams.length < 1 ? 'none' : ''
+
     if (fullTeams.length < 1) {
         const msg = document.createElement('p')
         msg.className   = 'coming-soon'
-        msg.textContent = 'Fill out at least one full team on the Rosters tab to use Waiver Wire.'
+        msg.textContent = readEmptyRostersMessage('one full team', 'Waiver Wire')
         container.append(msg)
         return
     }
@@ -74,10 +82,15 @@ export function renderWaiverControls(container: HTMLElement): void {
     teamLabel.textContent = 'Which team do you want to drop a player from?'
     teamWrap.append(teamLabel)
 
+    // Your team, shared with the Trading tab and remembered across reloads. Always opening on the first team scored
+    // someone else's roster whenever the tab was drawn again (the rosters arriving redraw it), 2026-10-13. A
+    // remembered team this league does not have falls back to the first full team.
+    const savedTeam   = pref<string | null>('season-your-team', null)
+    const initialTeam = savedTeam !== null && fullTeams.includes(savedTeam) ? savedTeam : fullTeams[0]
     const teamSel = makeCustomSelect(
         'waiver-team-select',
         fullTeams.map(n => ({ value: n, label: n })),
-        undefined,
+        initialTeam,
         undefined,
         waiverListenerController.signal,
     )
@@ -97,7 +110,6 @@ export function renderWaiverControls(container: HTMLElement): void {
     // teams in fullTeams are guaranteed to have entries in assignments
     const buildDropOptions = (team: string) => assignments[team].map(buildPlayerOption)
 
-    const initialTeam    = fullTeams[0]
     const initialRoster  = assignments[initialTeam]
     // lowestGRankPlayer returns null if roster ids aren't in backend data yet
     const initialDefault = lowestGRankPlayer(initialRoster) ?? initialRoster[0]
@@ -131,6 +143,7 @@ export function renderWaiverControls(container: HTMLElement): void {
 
     teamSel.element.addEventListener('change', () => {
         const team        = teamSel.getValue()
+        savePref('season-your-team', team)
         const roster      = assignments[team]
         const defaultDrop = lowestGRankPlayer(roster) ?? roster[0]
         dropSel.setOptions(buildDropOptions(team), String(defaultDrop))

@@ -253,7 +253,7 @@ The position structure used by the algorithm — also shown in the [detailed dro
 
 ![Position structure configuration](img/positions.png)
 
-It is important to note that this position structure should not necessarily be the same as the league's position structure. The league position structure might include bench slots which players can be moved in and out of on a day-to-day basis to make their games count. Players sitting on that kind of bench do matter, so long as the team is balanced enough in terms of position to accommodate all the players who are active on a given day. Those bench slots should be included as Utilities, or perhaps extra Guards or Forwards to ensure adequate balance. The proper configuration will depend on the rules of a league and some degree of personal preference. 
+It is important to note that this position structure should not necessarily be the same as the league's position structure. The league position structure might include bench slots which players can be moved in and out of on a day-to-day basis to make their games count. Players sitting on that kind of bench do matter, so long as the team is balanced enough in terms of position to accommodate all the players who are active on a given day. Those bench slots should be included as Utilities, or perhaps extra Guards or Forwards to ensure adequate balance. The proper configuration will depend on the rules of a league and some degree of personal preference. By default, leagues pull exact roster positions with bench slots converted to utilities, when position structure is available. 
 
 ## Corrections
 
@@ -267,7 +267,7 @@ This inability to doubt itself can make the algorithm overconfident, believing t
 
 The papers assume that player projections are all known and agreed upon by all the drafters, so they don't address this issue. However, it is so important in practice that the website has its own logic to address it. 
 
-The ℶ (beth) parameter controls the influence of the adjustment. Higher values of ℶ more aggressively regress the strength of the team towards the average. It defaults to 3. An adjustment is made to the algorithm's assessment of its team's strength for any pick after the first.
+The ℶ (beth) parameter controls the influence of the adjustment. Higher values of ℶ more aggressively regress the strength of teams towards the average during H-scoring. It defaults to 3.
 
 ??? note "How is the ℶ adjustment computed?"
     Say that $w$ is a vector of the algorithm's naive guess at how likely it is to win each category, before performing gradient descent to optimize a future strategy. Corrected versions are calculated as

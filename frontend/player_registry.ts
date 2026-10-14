@@ -38,8 +38,8 @@ export function getRegistryEntry(playerId: number): PlayerRegistryEntry {
 }
 
 /** Resolves a bare display name to a player id (case-sensitive exact match), or null when
- *  the name is not in the session registry. For human-text inputs — clipboard pastes and
- *  the name-keyed DEFAULT_SEASON_ROSTERS prefill — where an unknown name is a legitimate
+ *  the name is not in the session registry. For human-text inputs — clipboard pastes —
+ *  where an unknown name is a legitimate
  *  outcome the caller must handle visibly, not a contract violation. */
 export function findPlayerIdByName(name: string): number | null {
     return playerIdByName?.get(name) ?? null

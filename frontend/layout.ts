@@ -16,7 +16,8 @@ import { getCurrentSeat } from './app_state.js'
 import {
     getFullTeamResult, getLivePlayerAssignments, LIVE_BOARD_UPDATED,
 } from './api/draft_and_auction_session.js'
-import { setIndicatorState, claimDisplay } from './api/session.js'
+import { setIndicatorState, claimDisplay, applyIndicatorState } from './api/session.js'
+import { BACKEND_WORK_CHANGED, countInFlightBackendWork } from './api/client.js'
 
 // ─── Module state ─────────────────────────────────────────────────────────────
 
@@ -223,6 +224,19 @@ function showSeasonLayout(): void {
     }
 }
 
+/** The Season Mode tab on screen, or null when the season layout is not up (leaving Season Mode resets it). */
+export function getActiveSeasonTab(): string | null {
+    return currentSeasonTab
+}
+
+/** Redraws the season tab on screen from the rosters as they now stand. For when the rosters change underneath it --
+ *  a connected league's rosters arriving: showSeasonLayout redraws only the (hidden) Rosters grid, so a Waiver tab
+ *  drawn before they arrived kept saying "Fill out at least one full team" over an empty table until it was clicked
+ *  again. Not part of every layout pass, because drawing the Trading tab re-runs its trade suggestions. */
+export function redrawActiveSeasonTab(): void {
+    if (currentSeasonTab !== null && getLeagueSettings().mode === 'Season Mode') activateSeasonTab(currentSeasonTab)
+}
+
 /** Creates the season mode tab buttons (Waiver, Trading, Rosters) in the nav bar. */
 function buildSeasonNav(): void {
     const nav = document.getElementById('season-nav')!
@@ -242,7 +256,21 @@ function buildSeasonNav(): void {
         btn.addEventListener('click', () => activateSeasonTab(tab.id))
         nav.append(btn)
     }
+
+    // Beside the tabs: whether the backend is still working (a build, an evaluate, the league's rosters loading).
+    const indicator = document.createElement('span')
+    indicator.id        = 'season-indicator'
+    indicator.className = 'eval-indicator season-indicator'
+    nav.append(indicator)
+    reflectBackendWorkInSeasonIndicator()
 }
+
+/** Shows "Updating..." with a spinner while any session or platform request is in flight, "Updated" once none is. */
+function reflectBackendWorkInSeasonIndicator(): void {
+    if (document.getElementById('season-indicator') === null) return   // Season Mode not entered yet
+    applyIndicatorState('season-indicator', countInFlightBackendWork() > 0 ? 'evaluating' : 'idle')
+}
+document.addEventListener(BACKEND_WORK_CHANGED, reflectBackendWorkInSeasonIndicator)
 
 /** Switches the visible season mode content pane and highlights the active tab button. */
 function activateSeasonTab(tabId: string): void {

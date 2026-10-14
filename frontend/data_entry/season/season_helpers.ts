@@ -4,7 +4,7 @@
 
 import { readRequiredIntInput } from '../../helper_functions.js'
 import { defaultTeamLabel } from '../team_labels.js'
-import { getTeamIdentitiesFromSidebar } from '../../setting_collection/league_settings.js'
+import { getTeamIdentitiesFromSidebar, getLeagueSettings } from '../../setting_collection/league_settings.js'
 
 
 /** Reads roster assignments from the Rosters tab grid (sr-player-{row}-{col}). The single
@@ -32,4 +32,15 @@ export function readRosterAssignments(): Record<string, number[]> {
         assignments[team] = players
     }
     return assignments
+}
+
+/** What a Season Mode tab says before it has the full teams it needs. A connected league's rosters are on their way
+ *  (the tab is drawn again when they arrive), so asking the user to fill them in read as broken (2026-10-13). */
+export function readEmptyRostersMessage(
+    teamsNeeded: string
+    , toolName: string
+): string {
+    return getLeagueSettings().platform === 'Enter your own data'
+        ? `Fill out at least ${teamsNeeded} on the Rosters tab to use ${toolName}.`
+        : "Loading your league's rosters…"
 }

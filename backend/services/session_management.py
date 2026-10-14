@@ -35,8 +35,9 @@ def build_session(
     HTTP-free: on pipeline failure it cleans up its own session and re-raises; the router maps
     that to a 500.
     """
-    session = create_session()
     normalize_objective_settings(current_settings)
+    validate_slot_structure(current_settings)
+    session = create_session()
     session.current_settings = current_settings
     if platform_config is not None:
         session.platform_config = platform_config
@@ -95,6 +96,7 @@ def apply_patch(
     merged_settings = dict(session.current_settings)
     merged_settings.update(patch)
     normalize_objective_settings(merged_settings)
+    validate_slot_structure(merged_settings)
     session.current_settings = merged_settings
 
     if platform_config is not None:
@@ -147,6 +149,22 @@ def _build_pipeline_cache_key(
         return value
     settings = {key: value for key, value in current_settings.items() if key not in POOL_SOURCE_SETTINGS}
     return (player_pool_hash, freeze(settings))
+
+
+def validate_slot_structure(current_settings: dict) -> None:
+    """Refuse a position structure with more slots than each team has picks.
+
+    The active count is the slot total (build_agent._count_active) and picks past it are perma-bench, so fewer
+    slots than picks is a structure with a bench; MORE is a roster shape the league does not have. It used to be
+    accepted and scored: connecting an 11-pick Yahoo league kept the 13-slot default structure (no default exists
+    for 11), and every H-score of an auction was computed for 13-man rosters with nothing on screen but the slot
+    check's warning (2026-10-12). Raises ValueError, which the routes return as a 400 with this message."""
+    slot_counts = current_settings['slot_counts']
+    total_slots = sum(slot_counts.values())
+    if total_slots > current_settings['n_picks']:
+        raise ValueError(
+            f"The position structure has {total_slots} slots, but each team has {current_settings['n_picks']} picks. "
+            f'Set the Position Parameters so the slots fit the roster.')
 
 
 def normalize_objective_settings(current_settings: dict) -> None:

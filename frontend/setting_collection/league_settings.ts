@@ -8,10 +8,10 @@ import { getSportConfig } from '../app_state.js'
 import { pref, savePref } from '../preferences.js'
 import { connectPlatform } from '../api/client.js'
 import { makeConnectors, connectorPlatforms } from '../platforms/registry.js'
-import { PlatformConnector, ConnectStatus } from '../platforms/connector.js'
+import { PlatformConnector, ConnectStatus, PLATFORM_LEAGUE_CHOSEN } from '../platforms/connector.js'
 import { isSignedIn, makeSignInPrompt } from '../api/auth.js'
 import { defaultTeamLabel } from '../data_entry/team_labels.js'
-import { applySlotDefaultsForPicks } from './slot_counts.js'
+import { applySlotDefaultsForPicks, setSlotCountsFromPlatform } from './slot_counts.js'
 
 const DRAFT_MODE_OPTIONS = ['Draft Mode', 'Auction Mode', 'Season Mode'] as const
 export type DraftMode = typeof DRAFT_MODE_OPTIONS[number]
@@ -256,12 +256,6 @@ export function renderLeagueSettings(container: HTMLElement): void {
         }
     }
 
-    const connectButton = document.createElement('button')
-    connectButton.type        = 'button'
-    connectButton.id          = 'ls-connect-btn'
-    connectButton.className   = 'section-apply-btn'
-    connectButton.textContent = 'Connect'
-    connectCell.append(connectButton)
 
     // Yahoo brand attribution, required when serving Yahoo fantasy data; the whole row
     // links to Yahoo Fantasy. Shown only while the Yahoo platform is selected.
@@ -309,7 +303,6 @@ export function renderLeagueSettings(container: HTMLElement): void {
         const canConnect = isSignedIn()
         yahooAttribution.style.display = platform === 'Retrieve from Yahoo' ? '' : 'none'
         signInPrompt.style.display  = canConnect ? 'none' : ''
-        connectButton.style.display = canConnect ? '' : 'none'
         connectStatus.style.display = canConnect ? '' : 'none'
         for (const connector of connectors) {
             connector.element.style.display =
@@ -326,14 +319,22 @@ export function renderLeagueSettings(container: HTMLElement): void {
         }
     }
 
-    connectButton.addEventListener('click', () => {
+    // There is no Connect button: the app connects whenever it can, which is whenever the controls name a league that
+    // is not already connected -- a league picked or an id entered (PLATFORM_LEAGUE_CHOSEN, which a connector also
+    // fires when it restores the league it remembers), or the mode changed under a named league (a connection
+    // belongs to a mode, see isPlatformConnected). A failure offers "Try again" in its status line. A request for
+    // the league a connection is already under way to is dropped; the key leaves the mode out, because a connection
+    // may switch the mode itself, and that switch must not start a second one.
+    let connectingTo: string | null = null
+    function connectNamedLeague(): void {
+        if (!isSignedIn()) return
         const connector = connectorsByPlatform.get(platformSelect.getValue())
         if (!connector) return
         const selection = connector.getSelection()
-        if (selection === null) {
-            setConnectStatus.showError('Select or enter a league first.')
-            return
-        }
+        if (selection === null || isPlatformConnected()) return
+        const selectionKey = JSON.stringify([connector.platform, selection.league_id, selection.division_id])
+        if (connectingTo === selectionKey) return
+        connectingTo = selectionKey
         setConnectStatus.showProgress('Connecting...')
         connectPlatform(connector.platform, selection.league_id, selection.division_id)
             .then(resp => {
@@ -362,7 +363,14 @@ export function renderLeagueSettings(container: HTMLElement): void {
                 // its validation followed the league's own pick count: a 16-spot league sat on
                 // the default 13-slot structure with nothing on screen to say so, and the
                 // evaluate went ahead optimising for a roster shape the league does not use.
-                applySlotDefaultsForPicks(resp.n_picks)
+                // The league's own positions when the platform reports them (Yahoo); otherwise the default structure
+                // for its roster size, where one exists. Neither may leave a structure that does not fit the picks:
+                // the connection's session update waits for a valid one (draft_and_auction_session).
+                if (resp.slot_counts !== null) {
+                    setSlotCountsFromPlatform(resp.slot_counts)
+                } else {
+                    applySlotDefaultsForPicks(resp.n_picks)
+                }
                 hiddenNamesTextarea.value = resp.team_names.join('\n')
                 hiddenNamesTextarea.dispatchEvent(new Event('input', { bubbles: true }))
                 // Enables the live-layout Refresh Analysis button, for as long as the controls
@@ -377,8 +385,27 @@ export function renderLeagueSettings(container: HTMLElement): void {
                 // just changed on screen, which says "connected" better than a sentence can.
                 setConnectStatus.clear()
             })
-            .catch(err => { setConnectStatus.showError(`Connect failed: ${err.message}`) })
-    })
+            .catch(err => showConnectFailure(`Connect failed: ${err.message}`))
+            // Cleared only once the response is handled: handling it can change the mode, which calls back in here.
+            .finally(() => { if (connectingTo === selectionKey) connectingTo = null })
+    }
+
+    /** A failed connection's message, with "Try again" -- the one thing the removed Connect button still did. */
+    function showConnectFailure(message: string): void {
+        setConnectStatus.showError(message)
+        const retryButton = document.createElement('button')
+        retryButton.type        = 'button'
+        retryButton.id          = 'ls-connect-retry'
+        retryButton.className   = 'connect-retry-btn'
+        retryButton.textContent = 'Try again'
+        retryButton.addEventListener('click', () => connectNamedLeague())
+        connectStatus.append(' ', retryButton)
+    }
+
+    for (const connector of connectors) {
+        connector.element.addEventListener(PLATFORM_LEAGUE_CHOSEN, () => connectNamedLeague())
+    }
+    modeSelect.element.addEventListener('change', () => connectNamedLeague())
 
     // ── Own-data-dependent and mode-dependent visibility ──────────────────
     function updateVisibility(): void {

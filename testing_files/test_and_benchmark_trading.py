@@ -1,9 +1,7 @@
 # testing_files/test_and_benchmark_trading.py
 # Trade suggestion speed benchmarks.
 # Uses 2024-25 historical season data with default parameters from parameters.yaml.
-# Rosters are a 2024-25 snapshot of an H-score snake draft; the live frontend default
-# (default_season_rosters.ts) tracks current-season data and is regenerated via
-# testing_files/generate_default_season_rosters.py.
+# Rosters are a 2024-25 snapshot of an H-score snake draft (testing_files/generate_default_season_rosters.py).
 #
 # The suggest pipeline has three main cost centres:
 #   1. _identify_trade_candidates — one get_h_scores call per player on each team

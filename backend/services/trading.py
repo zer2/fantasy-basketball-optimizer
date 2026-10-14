@@ -172,7 +172,7 @@ def run_trade_suggest(
             cp.n_traded, cp.n_received,
             my_candidates, their_candidates,
             general_values, replacement_value,
-            cp.threshold,
+            cp.threshold, cp.searched_threshold,
         )
         if len(combos) > 0:
             all_combo_frames.append(combos)
@@ -185,10 +185,8 @@ def run_trade_suggest(
     # Step 3: evaluate all combos vectorized
     df = _make_combo_df(
         session.agent
+        , get_trade_context(session, player_assignments, my_team, their_team)
         , all_combos
-        , my_team
-        , their_team
-        , player_assignments
         , my_x_numpy
         , their_x_numpy
         , my_name_to_index
@@ -199,29 +197,66 @@ def run_trade_suggest(
     mask = (df['Your Score'] > your_threshold) & (df['Their Score'] > their_threshold)
     df = df[mask]
 
-    # Step 5: position check only on the small set that passed the thresholds
+    # Step 5: position check only on the set that passed the thresholds. A roster's eligibility depends only on its
+    # players' position eligibilities, so it is decided once per distinct mix: one linear assignment per trade was
+    # 41 of the 54 s a 3-for-3 search at the -2% floor took (2026-10-13), and many trades share a mix.
+    sends, receives = list(df['Send']), list(df['Receive'])
+    your_scores, their_scores = df['Your Score'].to_numpy(), df['Their Score'].to_numpy()
     if position_check and len(df) > 0:
         position_config = session.agent.position_config
-        valid = []
-        for _, row in df.iterrows():
-            sent, received = row['Send'], row['Receive']
-            post_my_roster    = [p for p in player_assignments[my_team]    if p not in sent]    + received
-            post_their_roster = [p for p in player_assignments[their_team] if p not in received] + sent
-            if (check_team_eligibility(session.agent.info['Positions'].loc[post_my_roster],    position_config)
-            and check_team_eligibility(session.agent.info['Positions'].loc[post_their_roster], position_config)):
-                valid.append(row)
-        df = pd.DataFrame(valid) if valid else df.iloc[:0]
+        # Each player's eligible positions (a list, e.g. ['PG', 'SG']) as a sorted tuple, so a roster's mix can key
+        # the memo.
+        position_by_player = {player: tuple(sorted(eligible))
+                              for player, eligible in session.agent.info['Positions'].items()}
+        eligibility_by_mix: dict[tuple, bool] = {}
+
+        def is_eligible_roster(roster: list) -> bool:
+            mix = tuple(sorted(position_by_player[p] for p in roster))
+            if mix not in eligibility_by_mix:
+                eligibility_by_mix[mix] = check_team_eligibility(list(mix), position_config)
+            return eligibility_by_mix[mix]
+
+        my_roster, their_roster = player_assignments[my_team], player_assignments[their_team]
+        keep = [is_eligible_roster([p for p in my_roster if p not in sent] + received)
+                and is_eligible_roster([p for p in their_roster if p not in received] + sent)
+                for sent, received in zip(sends, receives)]
+    else:
+        keep = [True] * len(sends)
 
     suggestions = [
         TradeSuggestion(
-            send=[int(player_id) for player_id in row['Send']],
-            receive=[int(player_id) for player_id in row['Receive']],
-            your_score=round(float(row['Your Score']), 4),
-            their_score=round(float(row['Their Score']), 4),
+            their_team=their_team,
+            send=[int(player_id) for player_id in sent],
+            receive=[int(player_id) for player_id in received],
+            your_score=round(float(your_score), 4),
+            their_score=round(float(their_score), 4),
         )
-        for _, row in df.iterrows()
+        for sent, received, your_score, their_score, kept in zip(sends, receives, your_scores, their_scores, keep)
+        if kept
     ]
 
+    return TradeSuggestResponse(suggestions=suggestions)
+
+
+def run_trade_suggest_across_teams(
+    session: Session
+    , player_assignments: dict[str, list[int]]
+    , my_team: str
+    , their_teams: list[str]
+    , combo_params: list[ComboParam]
+    , your_threshold: float
+    , their_threshold: float
+    , position_check: bool
+) -> TradeSuggestResponse:
+    """run_trade_suggest for every team in their_teams, the suggestions ranked together by your score (highest first)."""
+    suggestions = [
+        suggestion
+        for their_team in their_teams
+        for suggestion in run_trade_suggest(
+            session, player_assignments, my_team, their_team, combo_params, your_threshold, their_threshold,
+            position_check).suggestions
+    ]
+    suggestions.sort(key=lambda suggestion: -suggestion.your_score)
     return TradeSuggestResponse(suggestions=suggestions)
 
 
@@ -234,54 +269,70 @@ def _get_cross_combos(
     , their_players: list[str]
     , general_values: pd.Series
     , replacement_value: float
-    , value_threshold: float
+    , value_threshold: Optional[float]
+    , searched_value_threshold: Optional[float]
 ) -> pd.DataFrame:
     """Generate filtered cross-product of (n-from-mine, m-from-theirs) combos.
 
-    Filters by absolute general-value differential within the threshold.
+    Keeps the combos whose absolute general-value differential is within value_threshold (every one when None) and
+    beyond searched_value_threshold (every one when None): an earlier batch searched within it. Both in percentage points.
+    Rows come in the order itertools.product would give them (mine outer, theirs inner). The gap of every pairing is one
+    broadcast subtraction, and only the pairings that meet the window become rows: a 3-for-3 search builds ~27,000
+    pairings per team, and making each a Python tuple and then a DataFrame row was most of its bookkeeping (2026-10-13).
     """
-    my_pw = [(p, general_values[p]) for p in my_players if p in general_values.index]
-    their_pw = [(p, general_values[p]) for p in their_players if p in general_values.index]
+    my_pool    = [p for p in my_players    if p in general_values.index]
+    their_pool = [p for p in their_players if p in general_values.index]
+    my_combos    = _list_index_combinations(len(my_pool), n)       # (A, n) positions in my_pool
+    their_combos = _list_index_combinations(len(their_pool), m)    # (B, m)
 
-    cross = list(itertools.product(_get_combos(my_pw, n), _get_combos(their_pw, m)))
-
-    if len(cross) == 0:
+    if len(my_combos) == 0 or len(their_combos) == 0:
         return pd.DataFrame(columns=['My Trade', 'My Value', 'Their Trade', 'Their Value'])
 
-    full = pd.DataFrame(cross)
-    separated = pd.concat([
-        pd.DataFrame(full[0].tolist(), index=full.index),
-        pd.DataFrame(full[1].tolist(), index=full.index),
-    ], axis=1)
-    separated.columns = ['My Trade', 'My Value', 'Their Trade', 'Their Value']
-
+    # Summed one player at a time, left to right, as Python's sum over a combination would: identical floats.
+    my_values    = _sum_columns_in_order(general_values.loc[my_pool].to_numpy()[my_combos])
+    their_values = _sum_columns_in_order(general_values.loc[their_pool].to_numpy()[their_combos])
     if n != m:
-        separated['My Value'] += replacement_value * (m - n)
+        my_values = my_values + replacement_value * (m - n)
 
-    diff = separated['My Value'] - separated['Their Value']
-    meets = abs(diff) <= value_threshold / 100  # threshold is in percentage terms
+    gap = np.abs(my_values[:, np.newaxis] - their_values[np.newaxis, :])   # (A, B)
+    meets = np.ones(gap.shape, dtype=bool)
+    if value_threshold is not None:
+        meets &= gap <= value_threshold / 100  # thresholds are in percentage terms
+    if searched_value_threshold is not None:
+        meets &= gap > searched_value_threshold / 100
+    my_rows, their_rows = np.nonzero(meets)
 
-    return separated[meets]
+    return pd.DataFrame({
+        'My Trade':    [[my_pool[i]    for i in my_combos[row]]    for row in my_rows],
+        'My Value':    my_values[my_rows],
+        'Their Trade': [[their_pool[i] for i in their_combos[row]] for row in their_rows],
+        'Their Value': their_values[their_rows],
+    })
 
 
-def _get_combos(
-    players_with_weight: list[tuple[str, float]]
-    , n: int
-) -> list[tuple[list[str], float]]:
-    """Generate all n-player combinations with summed general values."""
-    combos = list(itertools.combinations(players_with_weight, n))
-    return [
-        (list(z[0] for z in m), sum(z[1] for z in m))
-        for m in combos
-    ]
+def _list_index_combinations(
+    pool_size: int
+    , combination_size: int
+) -> np.ndarray:
+    """Every combination_size-subset of range(pool_size), one per row, in itertools.combinations order."""
+    return np.array(list(itertools.combinations(range(pool_size), combination_size)), dtype=int) \
+        .reshape(-1, combination_size)
+
+
+def _sum_columns_in_order(
+    values: np.ndarray
+) -> np.ndarray:
+    """Row sums of a (rows, k) array, added column by column from the left."""
+    total = values[:, 0].copy()
+    for column in range(1, values.shape[1]):
+        total = total + values[:, column]
+    return total
 
 
 def _make_combo_df(
     h_agent: HAgent
+    , ctx: dict
     , all_combos: pd.DataFrame
-    , my_team: str
-    , their_team: str
-    , player_assignments: dict[str, list[int]]
     , my_x_numpy: np.ndarray
     , their_x_numpy: np.ndarray
     , my_name_to_index: dict[str, int]
@@ -292,9 +343,8 @@ def _make_combo_df(
     For each combo, trade_delta = received_sum - sent_sum shifts diff_means on ALL
     opponent columns (my roster improved vs every opponent), with an extra shift on
     the counterparty column (their roster also weakened). Both perspectives are
-    computed in a single batched call to compute_h_scores_batched.
+    computed in a single batched call to compute_h_scores_batched. ctx is the pair's trade context (get_trade_context).
     """
-    ctx = _build_trade_context(h_agent, player_assignments, my_team, their_team)
 
     n_combos = len(all_combos)
     if n_combos == 0:
@@ -305,17 +355,27 @@ def _make_combo_df(
     # When all combos have the same size, builds a uniform 2D index array for a
     # fully vectorized sum. When sizes are mixed (asymmetric), falls back to a
     # per-row loop that still uses numpy rather than pandas.
+    # The same row indices serve every per-player quantity summed over the traded players: the X-scores here and,
+    # below, the percentage categories' volume units (which once ran a Python loop per combo, 2026-10-13).
     sent_sizes     = set(len(sent)     for sent     in all_combos['My Trade'])
     received_sizes = set(len(received) for received in all_combos['Their Trade'])
+    sent_index_lists     = [[my_name_to_index[p]    for p in sent]     for sent     in all_combos['My Trade']]
+    received_index_lists = [[their_name_to_index[p] for p in received] for received in all_combos['Their Trade']]
 
     if len(sent_sizes) == 1 and len(received_sizes) == 1:
-        sent_index_array     = np.array([[my_name_to_index[p]    for p in sent]     for sent     in all_combos['My Trade']])
-        received_index_array = np.array([[their_name_to_index[p] for p in received] for received in all_combos['Their Trade']])
-        sent_sums     = my_x_numpy[sent_index_array].sum(axis=1)
-        received_sums = their_x_numpy[received_index_array].sum(axis=1)
+        sent_index_array     = np.array(sent_index_lists)
+        received_index_array = np.array(received_index_lists)
+
+        def sum_traded_rows(my_rows: np.ndarray, their_rows: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+            """Per combo, the sent players' rows summed and the received players' rows summed."""
+            return my_rows[sent_index_array].sum(axis=1), their_rows[received_index_array].sum(axis=1)
     else:
-        sent_sums     = np.array([my_x_numpy[   [my_name_to_index[p]    for p in sent]    ].sum(axis=0) for sent     in all_combos['My Trade']])
-        received_sums = np.array([their_x_numpy[[their_name_to_index[p] for p in received]].sum(axis=0) for received in all_combos['Their Trade']])
+        def sum_traded_rows(my_rows: np.ndarray, their_rows: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+            """Per combo, the sent players' rows summed and the received players' rows summed."""
+            return (np.array([my_rows[index].sum(axis=0)    for index in sent_index_lists]),
+                    np.array([their_rows[index].sum(axis=0) for index in received_index_lists]))
+
+    sent_sums, received_sums = sum_traded_rows(my_x_numpy, their_x_numpy)
     trade_deltas = received_sums - sent_sums  # (n_combos, n_categories)
 
     # Build all post diff_means at once: (n_combos, n_categories, n_drafters-1)
@@ -333,10 +393,7 @@ def _make_combo_df(
         their_candidates = sorted(their_name_to_index, key=their_name_to_index.get)
         my_units_numpy    = h_agent.player_volume_units.loc[my_candidates].to_numpy()
         their_units_numpy = h_agent.player_volume_units.loc[their_candidates].to_numpy()
-        sent_units     = np.array([my_units_numpy[[my_name_to_index[p] for p in sent]].sum(axis=0)
-                                   for sent in all_combos['My Trade']])
-        received_units = np.array([their_units_numpy[[their_name_to_index[p] for p in received]].sum(axis=0)
-                                   for received in all_combos['Their Trade']])
+        sent_units, received_units = sum_traded_rows(my_units_numpy, their_units_numpy)
         unit_deltas = received_units - sent_units                  # (n_combos, R): my side gains these
         x_deltas    = trade_deltas[:, index]
 
@@ -367,6 +424,32 @@ def _make_combo_df(
 
 
 # ── Fast trade evaluation ────────────────────────────────────────────────────
+
+_TRADE_CONTEXT_CACHE_MAX = 64   # a league's worth of counterparties for a few boards
+
+
+def get_trade_context(
+    session: Session
+    , player_assignments: dict[str, list[int]]
+    , my_team: str
+    , their_team: str
+) -> dict:
+    """The trade context for a team pair (_build_trade_context), kept on the session. A trade search asks for the same
+    pair once per value-gap band, and rebuilding it each time was a quarter of the search (2026-10-13 profile).
+    Keyed by both teams and every roster in order (the order sets the opponent columns); an entry built from another
+    agent than the session's current one is rebuilt. The context is only read, never modified, by the scoring."""
+    key = (my_team, their_team, tuple((team, tuple(roster)) for team, roster in player_assignments.items()))
+    cache = session.trade_context_cache
+    cached = cache.get(key)
+    if cached is not None and cached[0] is session.agent:
+        cache.move_to_end(key)
+        return cached[1]
+    context = _build_trade_context(session.agent, player_assignments, my_team, their_team)
+    cache[key] = (session.agent, context)
+    cache.move_to_end(key)
+    while len(cache) > _TRADE_CONTEXT_CACHE_MAX:
+        cache.popitem(last=False)
+    return context
 
 def _build_trade_context(
     h_agent: HAgent

@@ -9,7 +9,7 @@ import assert from 'node:assert/strict'
 import {
     launchAppPage, loadApp, selectHistoricalSeason, expectCleanSession, waitAppSettled,
     setSelect, readDropdownOptionLabels, pickControlButton, lockInAuctionPick,
-    countBoardCellsWithPlayer,
+    countBoardCellsWithPlayer, pasteSeasonRostersFromPool,
 } from './helpers.mjs'
 
 test('auction-league session regressions', async t => {
@@ -89,7 +89,7 @@ test('auction-league session regressions', async t => {
             await waitAppSettled(app)
             await setSelect(page, 'ls-mode', 'Season Mode')
             await waitAppSettled(app)
-            await page.locator('.season-tab-btn[data-tab="rosters"]').click()
+            await pasteSeasonRostersFromPool(app, 12, 13)
 
             // Toggle the inspected team so the selection fires a fresh change-driven eval.
             await setSelect(page, 'sr-team-select', 'Team 2')
