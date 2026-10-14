@@ -144,6 +144,34 @@ export function setAutopilotOff(): void {
  * session ID and G-scores.  Every code path that needs a new session calls this.
  */
 export async function startFreshSession(signal?: AbortSignal): Promise<void> {
+    const creation = createSessionFromSidebar(signal)
+    sessionCreationInFlight = creation
+    try {
+        await creation
+    } finally {
+        if (sessionCreationInFlight === creation) sessionCreationInFlight = null
+    }
+}
+
+// The session create in progress, if any. A second caller that found no session id while it ran used to create
+// another session beside it: connecting a league during the page-load create built two identical sessions at once,
+// and each build slowed the other (2026-10-13, Season Mode rosters waited ~35s). Callers wait for this instead.
+let sessionCreationInFlight: Promise<void> | null = null
+
+/** Waits for a session create already in progress, so the caller can update that session rather than build a second.
+ *  A failed create is left to the caller that started it (it reports the failure); the waiter finds no session id
+ *  afterwards and creates one itself. */
+export async function waitForSessionCreationInFlight(): Promise<void> {
+    const creation = sessionCreationInFlight
+    if (creation === null) return
+    try {
+        await creation
+    } catch {
+        // Reported by the create's own caller; see above.
+    }
+}
+
+async function createSessionFromSidebar(signal?: AbortSignal): Promise<void> {
     const { sport, platform, mode, n_drafters, n_picks, cash_per_team } = getLeagueSettings()
     const scoring_format = getScoringFormat()
     const most_categories_weight = getMostCategoriesWeight()
@@ -158,6 +186,7 @@ export async function startFreshSession(signal?: AbortSignal): Promise<void> {
     const req: SessionRequest = {
         league,
         is_auction: mode === 'Auction Mode',
+        is_season_mode: mode === 'Season Mode',
         // A platform means something to a session only together with its config: the config is
         // what carries the league shape the draft-state poll and the name lookup need, and the
         // backend refuses a live platform without one. Selecting a live platform is therefore
@@ -185,7 +214,7 @@ export async function startFreshSession(signal?: AbortSignal): Promise<void> {
         // returns false once nothing is left to clear, so this retries at most once.
         const isDeadUpload = err instanceof HTTPError && err.status === 404 && String(err).includes('data_id')
         if (!isDeadUpload || !markUploadedSourcesExpired()) throw err
-        return startFreshSession(signal)
+        return createSessionFromSidebar(signal)
     }
     sessionId = resp.session_id
     syncCategoriesFromBackend(resp.categories)
@@ -197,6 +226,7 @@ export async function startFreshSession(signal?: AbortSignal): Promise<void> {
  * Called before any backend operation that requires a session.
  */
 export async function ensureSession(): Promise<void> {
+    await waitForSessionCreationInFlight()
     if (sessionId) return
     await startFreshSession()
 }

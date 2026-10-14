@@ -353,6 +353,12 @@ _agent_cache: 'OrderedDict[str, object]' = OrderedDict()
 _agent_cache_lock = threading.Lock()
 
 
+# One lock per configuration being built, so identical builds that arrive together run once: the later ones wait and
+# copy the first's result from the cache. A page reloaded during its build abandons the request but not the build, so
+# three reloads plus a connect ran five identical self-plays at once and each took ~7x as long (2026-10-13).
+_agent_build_locks: dict[str, threading.Lock] = {}
+
+
 agent_cache_hits = 0     # introspection for tests and ops; no behavior reads these
 
 
@@ -378,14 +384,32 @@ def build_session_agent(session: Session) -> None:
 
     cache_key = _agent_cache_key(session.current_settings, session.player_pool_hash)
     with _agent_cache_lock:
-        cached = _agent_cache.get(cache_key)
-        if cached is not None:
-            _agent_cache.move_to_end(cache_key)
-    if cached is not None:
-        agent_cache_hits += 1
-        session.agent = copy.deepcopy(cached)
-        return
-    agent_cache_misses += 1
+        build_lock = _agent_build_locks.setdefault(cache_key, threading.Lock())
+    try:
+        with build_lock:
+            with _agent_cache_lock:
+                cached = _agent_cache.get(cache_key)
+                if cached is not None:
+                    _agent_cache.move_to_end(cache_key)
+            if cached is not None:
+                agent_cache_hits += 1
+                session.agent = copy.deepcopy(cached)
+            else:
+                agent_cache_misses += 1
+                _build_and_cache_agent(session, cache_key)
+    finally:
+        # Forget the lock once nobody holds it. A build that took a lock just before this removal still runs, and
+        # finds the cache entry; one arriving after gets a fresh lock and the same cache entry.
+        with _agent_cache_lock:
+            if not build_lock.locked() and _agent_build_locks.get(cache_key) is build_lock:
+                del _agent_build_locks[cache_key]
+
+
+def _build_and_cache_agent(
+    session: Session
+    , cache_key: str
+) -> None:
+    """Build the HAgent and prime its base H-scores (build_session_agent's cache miss), then snapshot it into the cache."""
 
     _, sport_params, sport = _resolve_sport_params(session)
     current_settings = session.current_settings
@@ -425,7 +449,14 @@ def build_session_agent(session: Session) -> None:
         {f'Team {i + 1}': cash_per_team for i in range(n_drafters)}
         if cash_per_team is not None else None
     )
-    session.agent.populate_default_h_scores(current_settings['n_iterations'], default_cash)
+    # Season Mode only ranks by the base H-scores and never shows them, so it builds them in one neutral pass: the
+    # opponent self-play is ~5x the cost and its committed field is unused once rosters are full (a full seat has no
+    # future picks to tilt).
+    session.agent.populate_default_h_scores(
+        current_settings['n_iterations']
+        , default_cash
+        , builds_opponent_field = not current_settings['is_season_mode']
+    )
 
     # Freshly built: snapshot into the cache. The session keeps the original; the cache holds
     # its own copy, so later draft-time mutation of this session's agent cannot leak in.

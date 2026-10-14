@@ -21,6 +21,9 @@ import {
 export { setSelect, setObjectiveWeight, waitEval, lockInDraftPick, openSelectDropdown, chooseDropdownOption }
 
 export const APP = process.env.APP_URL ?? 'http://localhost:8000'
+
+/** Gradient iterations the browser tests run the model at (see launchAppPage); above 0, which is a different path. */
+export const TEST_ITERATIONS = 5
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
 
 /**
@@ -32,8 +35,13 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
  * Signed in by default, since that is what most tests want to exercise. Pass
  * `{ signedIn: false }` for the anonymous path — the app is usable without an account, and
  * only the live-platform controls require one.
+ *
+ * Runs the model at TEST_ITERATIONS gradient iterations (the app's default is 30): no browser test reads an exact
+ * score -- they check behaviour, orderings and that results move -- and every session build and evaluate scales with
+ * the iteration count, the self-play build included. Set before the app loads, so even the first session is built
+ * at it. Pass `{ iterations: null }` to keep the app's own default.
  */
-export async function launchAppPage({ signedIn = true } = {}) {
+export async function launchAppPage({ signedIn = true, iterations = TEST_ITERATIONS } = {}) {
     try {
         await fetch(APP, { method: 'HEAD' })
     } catch {
@@ -47,6 +55,9 @@ export async function launchAppPage({ signedIn = true } = {}) {
     if (signedIn) {
         const cookie = mintSessionCookie(repoRoot)
         await context.addCookies([{ name: cookie.name, value: cookie.value, url: APP }])
+    }
+    if (iterations !== null) {
+        await context.addInitScript(count => localStorage.setItem('fbbo-n_iterations', JSON.stringify(count)), iterations)
     }
     const page = await context.newPage()
     page.setDefaultTimeout(20000)
@@ -186,6 +197,33 @@ export async function readDropdownPlayerNames(page, wrapperTestId) {
     await page.keyboard.press('Escape')
     await page.waitForTimeout(150)
     return names
+}
+
+/** Fills Season Mode's roster grid by pasting a league built from the pool, as a user would: rows are picks,
+ *  tab-separated columns are teams. The app ships no rosters of its own (its built-in sample rosters were removed
+ *  2026-10-13), so any Season Mode test that needs full teams supplies them. Opens the Rosters tab to paste. Returns the
+ *  rosters, one array of player names per team. */
+export async function pasteSeasonRostersFromPool(app, teamCount, picksPerTeam) {
+    const { page } = app
+    await page.locator('.season-tab-btn[data-tab="rosters"]').click()
+    await waitAppSettled(app)
+    // A grid cell opens its player search on a double-click (a single click selects the cell for copy and paste).
+    const firstCell = page.locator('[data-testid="sr-player-0-0-wrapper"]')
+    await firstCell.locator('.cs-trigger').dblclick()
+    await firstCell.locator('.cs-dropdown').waitFor({ state: 'visible' })
+    const pool = await firstCell.locator('.cs-dropdown').evaluate(dropdown =>
+        [...dropdown.querySelectorAll('.cs-option .playername')].map(span => span.childNodes[0].textContent.trim()))
+    await page.keyboard.press('Escape')
+    assert.ok(pool.length >= teamCount * picksPerTeam, 'the pool must cover the rosters')
+    const rosters = Array.from({ length: teamCount }, (_, team) =>
+        pool.slice(team * picksPerTeam, (team + 1) * picksPerTeam))
+    const pasteBlock = Array.from({ length: picksPerTeam }, (_, pick) =>
+        rosters.map(roster => roster[pick]).join('\t')).join('\n')
+    await page.evaluate(text => navigator.clipboard.writeText(text), pasteBlock)
+    await page.locator('[data-testid="sr-player-0-0-wrapper"]').click()
+    await page.keyboard.press('Control+v')
+    await waitAppSettled(app)
+    return rosters
 }
 
 /** Full names of the players on the draft/auction board. Board cells render the minimal

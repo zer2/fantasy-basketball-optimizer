@@ -25,6 +25,7 @@ import { fileURLToPath } from 'node:url'
 import {
     mintSessionCookie, setSelect, setObjectiveWeight, waitEval, lockInDraftPick,
 } from './browser_helpers.mjs'
+import { SAMPLE_SEASON_ROSTERS } from './sample_season_rosters.mjs'
 
 const APP  = process.env.APP_URL ?? 'http://localhost:8000'
 // Defaults to docs/img; set SHOT_OUT to a scratch dir when debugging so real images aren't clobbered.
@@ -189,6 +190,21 @@ async function ensure(page, state) {
     current = state
 }
 
+/** Enters Season Mode on 2025-26 data with the sample rosters pasted into the grid. The app no longer ships rosters of
+ *  its own (until 2026-10-13 it prefilled these), so the Waiver, Trading and Rosters shots supply them. Rows are picks,
+ *  tab-separated columns are teams, pasted at the top-left cell. */
+async function enterSeasonModeWithSampleRosters(page) {
+    await setMode(page, 'Season Mode')
+    await selectHistoricalSeason(page, '2025-26')
+    await page.locator('.season-tab-btn[data-tab="rosters"]').click()
+    const teams = Object.values(SAMPLE_SEASON_ROSTERS)
+    const pasteBlock = teams[0].map((_, pick) => teams.map(roster => roster[pick]).join('\t')).join('\n')
+    await page.evaluate(text => navigator.clipboard.writeText(text), pasteBlock)
+    await page.locator('[data-testid="sr-player-0-0-wrapper"]').click()
+    await page.keyboard.press('Control+v')
+    await waitEval(page)
+}
+
 async function setMode(page, mode) { await setSelect(page, 'ls-mode', mode);          await waitEval(page) }
 // Head to Head became one format with an objective dial: the shots that used to select
 // "Each Category" / "Most Categories" now select Head to Head and set the dial (0 / 1).
@@ -233,7 +249,7 @@ async function waitCandidateRows(page, minimum = 8) {
 // Establish the demonstration data source: historical stats for a completed season, so shots stay
 // identical over time (live projections drift as the season updates). The H-scoring / draft page uses
 // 2024-25 — where Giannis, the docs' punt exemplar, ranks top-6 by H-score; auction/season use 2025-26
-// (Season needs it: its default rosters are 2025-26 players). Set after load and on auction/season
+// (Season needs it: its sample rosters are 2025-26 players). Set after load and on auction/season
 // entry; the projections/1984-85 shots switch the data source at the very end.
 async function selectHistoricalSeason(page, season) {
     await setSelect(page, 'ps-data-type', 'Historical')
@@ -343,7 +359,7 @@ const STATES = {
     },
 
     // Auction / Season are not the H-scoring page, so they reset to 2025-26 (Season also *needs* it —
-    // its default rosters are 2025-26 players, who have no stats in 2024-25).
+    // its sample rosters are 2025-26 players, who have no stats in 2024-25).
     async 'auction'(page)           { await setMode(page, 'Auction Mode'); await selectHistoricalSeason(page, '2025-26') },
     async 'auction-candidate'(page) { await ensure(page, 'auction'); await expandCandidate(page, 0) },
 
@@ -395,8 +411,7 @@ const STATES = {
     },
 
     async 'season-waiver'(page)   {
-        await setMode(page, 'Season Mode')
-        await selectHistoricalSeason(page, '2025-26')
+        await enterSeasonModeWithSampleRosters(page)
         await page.locator('.season-tab-btn[data-tab="waiver"]').click()
         await page.locator('.waiver-selector-row, .coming-soon').first().waitFor()
         // The waiver eval renders into the shared #hscoretable, but arriving from Auction Mode it can
@@ -408,7 +423,7 @@ const STATES = {
         await waitEval(page)
     },
     async 'season-waiver-exp'(page) { await ensure(page, 'season-waiver'); await expandCandidate(page, 0) },
-    async 'season-trading'(page)  { await setMode(page, 'Season Mode'); await selectHistoricalSeason(page, '2025-26'); await page.locator('.season-tab-btn[data-tab="trading"]').click(); await page.locator('.trade-left-col .ms-container').first().waitFor() },
+    async 'season-trading'(page)  { await enterSeasonModeWithSampleRosters(page); await page.locator('.season-tab-btn[data-tab="trading"]').click(); await page.locator('.trade-left-col .ms-container').first().waitFor() },
     // Pick one player to send and one to receive so the trade result panes populate.
     // The multiselect opens its dropdown on focus (async), so wait for the option before clicking.
     async 'season-trade'(page)    {
@@ -437,7 +452,7 @@ const STATES = {
             .waitFor({ timeout: 20000 })
     },
     async 'season-trade-g'(page)  { await ensure(page, 'season-trade'); await page.locator('.trade-tab-btn', { hasText: /G-score/i }).click(); await page.waitForTimeout(150) },
-    async 'season-rosters'(page)  { await setMode(page, 'Season Mode'); await selectHistoricalSeason(page, '2025-26'); await page.locator('.season-tab-btn[data-tab="rosters"]').click() },
+    async 'season-rosters'(page)  { await enterSeasonModeWithSampleRosters(page); await page.locator('.season-tab-btn[data-tab="rosters"]').click() },
     async 'season-roster-insp'(page) {
         await ensure(page, 'season-rosters')
         // Team 1 is the default selection, so selecting it fires no change event and never re-triggers
@@ -678,6 +693,8 @@ const authCookie = mintSessionCookie(repoRoot)
 const browser = await chromium.launch()
 const ctx     = await browser.newContext(CONTEXT)
 await ctx.addCookies([{ name: authCookie.name, value: authCookie.value, url: APP }])
+// The Season Mode shots paste their rosters into the grid (enterSeasonModeWithSampleRosters).
+await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: APP })
 // Force light theme (the app manages its own, keyed on this pref) so every shot matches.
 await ctx.addInitScript(() => { try { localStorage.setItem('fbbo-light_mode', 'true') } catch {} })
 const page    = await ctx.newPage()

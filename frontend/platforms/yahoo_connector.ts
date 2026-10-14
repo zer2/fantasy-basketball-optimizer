@@ -6,8 +6,9 @@
 
 import { makeCustomSelect } from '../custom_select.js'
 import { makeLabel } from '../helper_functions.js'
+import { pref, savePref } from '../preferences.js'
 import { fetchLeagues, fetchYahooAuthUrl, submitYahooToken, PlatformLeague, HTTPError } from '../api/client.js'
-import { PlatformConnector, ConnectStatus } from './connector.js'
+import { PlatformConnector, ConnectStatus, PLATFORM_LEAGUE_CHOSEN } from './connector.js'
 import { makeConnectorDialog } from './connector_dialog.js'
 import { extractYahooLeagueId } from './yahoo_league_id.js'
 
@@ -67,11 +68,44 @@ export function makeYahooConnector(status: ConnectStatus): PlatformConnector {
         }
     })
     leagueSelect.element.addEventListener('change', () => {
-        if (leagueBeforeTypedId === null || !leagueSelect.getValue()) return
-        leagueIdInput.value = ''
-        leagueBeforeTypedId = null
-        leagueSelect.setOptions(listedLeagueOptions, leagueSelect.getValue() ?? undefined)
+        if (!leagueSelect.getValue()) return
+        if (leagueBeforeTypedId !== null) {
+            leagueIdInput.value = ''
+            leagueBeforeTypedId = null
+            leagueSelect.setOptions(listedLeagueOptions, leagueSelect.getValue() ?? undefined)
+        }
+        announceChosenLeague()
     })
+    // A typed or pasted id is finished when the box is left or Enter is pressed (the change event), not on each key.
+    leagueIdInput.addEventListener('change', () => {
+        if (leagueIdInput.value.trim() === '') return
+        announceChosenLeague()
+    })
+
+    /** Remembers the league now named (so a reload or a return to Yahoo connects to it again) and tells the host,
+     *  which connects. */
+    function announceChosenLeague(): void {
+        const typed = leagueIdInput.value.trim()
+        savePref('yahoo_league', typed !== '' ? { typedId: typed } : { listedId: leagueSelect.getValue() })
+        element.dispatchEvent(new Event(PLATFORM_LEAGUE_CHOSEN, { bubbles: true }))
+    }
+
+    /** Names the remembered league again once the leagues are listed: picked from the list when it is there, typed
+     *  into the id box when it was typed (a mock draft, which Yahoo never lists). A remembered listed league that is
+     *  no longer listed is left alone, and nothing connects -- connecting to whatever is listed first would guess. */
+    function restoreRememberedLeague(): void {
+        const remembered = pref<{ typedId?: string, listedId?: string } | null>('yahoo_league', null)
+        if (remembered === null) return
+        if (remembered.typedId !== undefined) {
+            leagueIdInput.value = remembered.typedId
+            leagueIdInput.dispatchEvent(new Event('input', { bubbles: true }))   // the dropdown says an id is in use
+        } else if (listedLeagueOptions.some(option => option.value === remembered.listedId)) {
+            leagueSelect.setOptions(listedLeagueOptions, remembered.listedId)
+        } else {
+            return
+        }
+        element.dispatchEvent(new Event(PLATFORM_LEAGUE_CHOSEN, { bubbles: true }))
+    }
 
     // ── The authorization dialog ──────────────────────────────────────────────────────
     // Everything below here is the handshake, and none of it means anything once the token
@@ -137,6 +171,7 @@ export function makeYahooConnector(status: ConnectStatus): PlatformConnector {
             leagueSelect.setOptions([USING_TYPED_ID, ...listedLeagueOptions], USING_TYPED_ID.value)
         }
         status.clear()
+        restoreRememberedLeague()
     }
 
     /**

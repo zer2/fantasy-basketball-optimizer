@@ -81,6 +81,12 @@ class Session:
     # Per session (not global) so different sessions still run fully in parallel.
     lock: threading.Lock = field(default_factory=threading.Lock)
 
+    # Trade contexts (services/trading.get_trade_context) by (my team, their team, rosters): a trade search runs in
+    # value-gap bands, one request per band, and every band needs the same context for a team pair. Each entry keeps
+    # the agent it was built from and is used only while the session still holds that agent, so a rebuild (any
+    # settings change) never serves a stale one.
+    trade_context_cache: "OrderedDict[tuple, tuple]" = field(default_factory=OrderedDict)
+
 
 # ── Store ────────────────────────────────────────────────────────────────────
 # Grouped here rather than above Session because the _store annotation below is

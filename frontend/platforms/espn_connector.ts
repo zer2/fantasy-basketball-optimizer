@@ -4,8 +4,9 @@
 
 import { makeCustomSelect } from '../custom_select.js'
 import { makeLabel } from '../helper_functions.js'
+import { pref, savePref } from '../preferences.js'
 import { fetchLeagues, submitEspnCredentials } from '../api/client.js'
-import { PlatformConnector, ConnectStatus } from './connector.js'
+import { PlatformConnector, ConnectStatus, PLATFORM_LEAGUE_CHOSEN } from './connector.js'
 import { makeConnectorDialog } from './connector_dialog.js'
 
 const PLATFORM = 'Retrieve from ESPN'
@@ -55,7 +56,20 @@ export function makeEspnConnector(status: ConnectStatus): PlatformConnector {
         }
         // The select says which of those two happened; the line stays empty either way.
         status.clear()
+        // The league picked last time, when it is listed, is named again and connects; otherwise nothing connects
+        // until one is picked (connecting to whichever is listed first would guess).
+        const rememberedLeagueId = pref<string | null>('espn_league_id', null)
+        if (rememberedLeagueId !== null && leagues.some(league => league.id === rememberedLeagueId)) {
+            leagueSelect.setValue(rememberedLeagueId)
+        }
     }
+
+    // A picked league is remembered and connects (the host connects on PLATFORM_LEAGUE_CHOSEN).
+    leagueSelect.element.addEventListener('change', () => {
+        if (!leagueSelect.getValue()) return
+        savePref('espn_league_id', leagueSelect.getValue())
+        element.dispatchEvent(new Event(PLATFORM_LEAGUE_CHOSEN, { bubbles: true }))
+    })
 
     saveButton.addEventListener('click', () => {
         const s2   = s2Input.value.trim()

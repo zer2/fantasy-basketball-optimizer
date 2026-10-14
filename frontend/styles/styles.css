@@ -511,6 +511,12 @@ html { font-size: clamp(16px, 0.93vw, 20px); }
     align-items: center;
 }
 
+.ms-input-area.ms-all-chosen .ms-input {
+    flex: 0 0 6px;
+    min-width: 6px;
+    width: 6px;
+}
+
 .ms-input-area:focus-within {
     outline: 1px solid light-dark(#999999, #666688);
 }
@@ -1189,6 +1195,45 @@ tr {
     white-space: normal;
 }
 
+/* Suggested trades span every other team. Wide screens give the team its own column; narrow ones fold it into the
+   Receive cell as a line above the players (.trade-suggestion-team-line, see the mobile block). */
+/* The score columns get a fixed share, so the player columns no longer squeeze them; the team column fits its names. */
+.trade-suggestion-table .trade-suggestion-score {
+    width: 11%;
+    min-width: 64px;
+}
+
+.trade-suggestion-table .trade-suggestion-team-cell {
+    width: 1%;
+    white-space: nowrap;
+}
+
+.trade-suggestion-team-line {
+    display: none;
+    color: light-dark(#777777, #9999aa);
+    font-size: 0.68rem;
+}
+
+/* The Suggestions row holds every control on one line: the search and the thresholds stay narrow. */
+/* Scoped to the row so it outranks the shared search-box rule (#candidate-search, .player-search-input) further down. */
+.trade-combo-row .trade-search-input {
+    flex: 0 1 180px;   /* grows into the row's free space, up to a sensible width */
+    min-width: 90px;
+}
+
+/* The search group takes the row's free space, so the controls after it keep to the right. */
+.trade-combo-row .trade-search-group {
+    flex: 1 1 auto;
+}
+
+.trade-combo-row .sidebar-toggle-row {
+    margin-top: 0;
+    font-family: inherit;   /* the other labels in the row use the page font */
+    font-size: 0.78rem;
+    color: light-dark(#555, #aab);
+    white-space: nowrap;
+}
+
 /* Season roster paste feedback: pasted names the registry doesn't recognize. */
 .paste-warning {
     color: #e06c6c;
@@ -1541,7 +1586,8 @@ tr {
     margin: 0 12px;
 }
 
-#candidate-search {
+#candidate-search,
+.player-search-input {
     flex: 1;
     min-width: 0;
     min-height: 28px;
@@ -1556,11 +1602,13 @@ tr {
     outline: none;
 }
 
-#candidate-search:focus {
+#candidate-search:focus,
+.player-search-input:focus {
     outline: 1px solid light-dark(#999999, #666688);
 }
 
-#candidate-search::placeholder {
+#candidate-search::placeholder,
+.player-search-input::placeholder {
     color: #888;
 }
 
@@ -1610,6 +1658,12 @@ tr {
 .season-tab-btn.active {
     color: light-dark(black, white);
     border-bottom-color: light-dark(#999999, #666688);
+}
+
+/* The backend-activity indicator, after the last tab. */
+.season-indicator {
+    margin-left: 12px;
+    justify-content: flex-start;
 }
 
 /* ─── Data entry tables ──────────────────────────────────────────────────────── */
@@ -1883,6 +1937,20 @@ tr {
     .panel-table,
     .trade-result-table {
         font-variant-numeric: normal;
+    }
+    .trade-suggestion-table .trade-suggestion-team-cell {
+        display: none;
+    }
+    .trade-suggestion-table .trade-suggestion-team-line {
+        display: block;
+    }
+    .trade-suggestion-table td {
+        padding-top: 7px;
+        padding-bottom: 7px;
+    }
+    /* One line does not fit a phone: the Suggestions controls wrap. */
+    .trade-combo-row {
+        flex-wrap: wrap;
     }
     /* Stack each board header so the team name sits on its own line above the method
        dropdown — keeps the column narrow to save horizontal space. */
@@ -2259,20 +2327,18 @@ tr {
     margin-bottom: 12px;
 }
 
+/* The typing field would otherwise keep a text box's default width (~150px) inside the chips' max-content box. */
+.trade-combo-select .ms-input {
+    width: 50px;
+}
+
 .trade-combo-select .ms-input-area {
-    width: 250px;
+    width: max-content;   /* sized to its chips, so none is clipped */
+    min-width: 120px;
     flex-wrap: nowrap;
     overflow: hidden;
 }
 
-@media (max-width: 768px) {
-    /* Tighter trade-sizes selector on mobile — the 250px desktop width was
-       eating most of the row above the suggestion table; ~130px is enough
-       to show a "1 for 1 ×" chip plus a small Add input. */
-    .trade-combo-select .ms-input-area {
-        width: 130px;
-    }
-}
 
 .trade-threshold-group {
     display: flex;
@@ -2290,7 +2356,7 @@ tr {
 .trade-threshold-input-wrap {
     display: flex;
     align-items: center;
-    width: 66px;
+    width: 46px;
     padding: 4px 6px;
     background-color: light-dark(#fafafa, #181923);
     border: 1px solid light-dark(#e5e5e5, #3d3d55);

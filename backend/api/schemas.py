@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Optional
 from pydantic import BaseModel, Field, model_validator
 
-from backend.models import ComboParam
+from backend.models import ComboParam, TRADE_THRESHOLD_FLOOR
 
 
 # ── /data/upload ──────────────────────────────────────────────────────────────
@@ -118,6 +118,10 @@ class SessionRequest(BaseModel):
     # The session's league type: auction sessions require remaining_cash on every evaluate,
     # non-auction sessions forbid it. Patched whenever the user switches modes.
     is_auction: bool = False
+    # Season Mode never shows the base (empty-board) H-scores, it only ranks by them (trade suggestions, the waiver
+    # comparison), so its sessions build them in one neutral pass instead of the opponent self-play. Draft and
+    # Auction Mode (the other modes, like is_auction's False) keep the self-play.
+    is_season_mode: bool = False
     platform: str = 'Enter your own data'
     slot_counts: dict[str, int]
     model_settings: ModelSettings
@@ -169,6 +173,7 @@ class PatchLeague(BaseModel):
 class PatchRequest(BaseModel):
     from_step: int
     is_auction: Optional[bool] = None   # omitted = unchanged; True/False sets the league type
+    is_season_mode: Optional[bool] = None   # omitted = unchanged
     model_settings: Optional[ModelSettings] = None
     league: Optional[PatchLeague] = None
     data_source: Optional[DataSource] = None
@@ -226,10 +231,15 @@ class TradeAnalyzeRequest(BaseModel):
 class TradeSuggestRequest(BaseModel):
     player_assignments: dict[str, list[int]]
     my_team: str
-    their_team: str
+    # Every team searched, each with the same combos: one request covers one value-gap band (see ComboParam) across the
+    # league, so the frontend's batches are bands rather than teams.
+    their_teams: list[str]
     combo_params: list[ComboParam]
-    your_differential_threshold: float = 0.0
-    their_differential_threshold: float = -0.20
+    # H-score gains as fractions, each side strictly above its threshold. Never below TRADE_THRESHOLD_FLOOR: the
+    # frontend searches at the floor and filters stricter thresholds itself, so the floor bounds what one search
+    # returns (2026-10-13: 101,480 3-for-3 trades, 16.7 MB, in a 16-team league).
+    your_differential_threshold: float = Field(ge=TRADE_THRESHOLD_FLOOR)
+    their_differential_threshold: float = Field(ge=TRADE_THRESHOLD_FLOOR)
     position_check: bool = True
 
 
@@ -251,6 +261,8 @@ class ConnectResponse(BaseModel):
     # Whether this LEAGUE drafts by auction, as opposed to which modes the PLATFORM supports.
     # None when the platform does not report it, which means "no opinion" rather than "no".
     is_auction_draft: Optional[bool] = None
+    # The league's own position structure in the app's slot names, when the platform reports it.
+    slot_counts: Optional[dict[str, int]] = None
 
 
 class DraftStateResponse(BaseModel):

@@ -66,6 +66,10 @@ def create_session_route(req: SessionRequest, user_key: Optional[str] = Depends(
         )
     except InsufficientPlayerPoolError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+    except ValueError as exc:
+        # A settings combination the session cannot be built with (normalize_objective_settings,
+        # validate_slot_structure) -- the request's fault, said in its own words.
+        raise HTTPException(status_code=400, detail=str(exc))
     except Exception:
         raise fail(500, 'Failed to build projections for this session.')
 
@@ -161,6 +165,7 @@ def _build_current_settings(req: SessionRequest) -> dict:
     return {
         'sport':            sport,
         'is_auction':       req.is_auction,
+        'is_season_mode':   req.is_season_mode,
         'n_drafters':       n,
         'n_picks':          req.league.n_picks,
         'scoring_format':   req.league.scoring_format,
@@ -198,6 +203,8 @@ def _build_patch(req: PatchRequest) -> dict:
     patch: dict = {}
     if req.is_auction is not None:
         patch['is_auction'] = req.is_auction
+    if req.is_season_mode is not None:
+        patch['is_season_mode'] = req.is_season_mode
     if req.model_settings is not None:
         patch.update(req.model_settings.model_dump())
     if req.league is not None:

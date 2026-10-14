@@ -7,7 +7,7 @@ import { setBasePlayerResults, setCandidatePlayerResults, getCandidatePlayerResu
 import {
     getLeagueSettings, getPlatformConfig, getMode, DraftMode, isPlatformConnected, PLATFORM_SELECTION_CHANGED,
 } from '../setting_collection/league_settings.js'
-import { getActiveSlotCount, getSlotCounts } from '../setting_collection/slot_counts.js'
+import { getActiveSlotCount, getSlotCounts, isSlotCountsValid } from '../setting_collection/slot_counts.js'
 import { getDraftState } from '../data_entry/draft_state.js'
 import { getAuctionState } from '../data_entry/auction_state.js'
 import { defaultTeamLabel } from '../data_entry/team_labels.js'
@@ -16,7 +16,7 @@ import { showFailureInTable } from '../table/failure_message.js'
 
 import {
     startFreshSession, getSessionId, resetSession, setIndicatorState,
-    withDisplayOwnership, withSessionRetry,
+    withDisplayOwnership, withSessionRetry, waitForSessionCreationInFlight,
 } from './session.js'
 import { prefetchHeadshotsForDataSource } from '../player_display.js'
 import { patchSession, fetchGScores, evaluate, fetchDraftState, candidatesToPlayerResults, HTTPError } from './client.js'
@@ -139,6 +139,8 @@ export async function createOrPatchSession(
     // failed create/patch to reset it. onSuccess is omitted because the indicator deliberately
     // stays 'fetching': the caller chains an evaluate, which claims the display itself.
     await withDisplayOwnership({ busy: 'fetching', onFailure: 'idle' }, async () => {
+        // A create still in progress (the page-load one, typically) is the session this update belongs to.
+        await waitForSessionCreationInFlight()
         if (!getSessionId()) {
             await startFreshSession(signal)
             return
@@ -178,7 +180,27 @@ export const SEASON_PLATFORM_CONNECTED = 'season-platform-connected'
 // rebuild from an earlier settings change held the update up for fourteen seconds). Such an evaluate waits here.
 let platformConnectPatchInFlight: Promise<void> | null = null
 
+// Set while a connection's session update is held back because the position structure does not fit the league's
+// picks; main.ts sends the connection again (re-dispatching 'platform-connected') once the slots are applied valid.
+let connectionWaitingForSlots = false
+
+/** Whether a connection is waiting on a valid position structure before it reaches the session. */
+export function isConnectionWaitingForSlots(): boolean {
+    return connectionWaitingForSlots
+}
+
 document.addEventListener('platform-connected', () => {
+    // A structure that does not fit the league's picks is never sent: it would be scored as a roster shape the league
+    // does not have (an 11-pick league on the 13-slot default, 2026-10-12), and the backend now refuses it anyway. Say
+    // so where the results go, and wait for the slots to be fixed.
+    if (!isSlotCountsValid()) {
+        connectionWaitingForSlots = true
+        showTableMessage(`This league has ${getLeagueSettings().n_picks} roster spots and the position structure does `
+            + 'not add up to that. Set the Position Parameters to fit them and apply, and the league will load.',
+            { isError: true })
+        return
+    }
+    connectionWaitingForSlots = false
     // A fresh connection invalidates any polled board from the previous league. This is not
     // automatic: reconnecting to a different league on the SAME platform never touches the
     // platform-selection reset, so without this clear the old league's assignments would be
@@ -425,7 +447,10 @@ export async function showDefaultRankings(): Promise<void> {
 // LIVE_POLL_INTERVAL_MS while the page is in view and every LIVE_POLL_HIDDEN_INTERVAL_MS while it is
 // not, and the analysis re-runs when -- and only when -- the board changed. No platform pushes draft
 // events, so polling is the only way to follow a draft without a click per pick. One poll is one
-// platform request (Yahoo: one draft-results call).
+// platform request (Yahoo: one draft-results call). Until the first pick it polls every
+// LIVE_POLL_BEFORE_FIRST_PICK_MS, and a hidden tab whose board has not changed for
+// LIVE_POLL_HIDDEN_IDLE_LIMIT_MS stops until it is shown again: two tabs left open on one mock room,
+// polling all day, drew Yahoo's rate limit (2026-10-12).
 //
 // Polls never overlap: the next is scheduled only once the last has answered. A changed board
 // starts a new evaluate, which aborts one still running, so a burst of picks costs one finished
@@ -437,6 +462,12 @@ const LIVE_POLL_INTERVAL_MS = 1000
 // Hidden tabs keep following the draft, more gently: the board is current when the user comes back.
 // (Browsers throttle a long-hidden tab's timers further on their own; the poll on return covers that.)
 const LIVE_POLL_HIDDEN_INTERVAL_MS = 5000
+// Before anyone has picked, a pick or two arriving a few seconds late costs nothing, and a room can sit
+// waiting for its draft for a long time.
+const LIVE_POLL_BEFORE_FIRST_PICK_MS = 10000
+// A hidden tab keeps following a live draft (picks keep changing the board), but one whose board has sat unchanged
+// this long is a forgotten tab, or a room whose draft has not started; coming back to it polls at once.
+const LIVE_POLL_HIDDEN_IDLE_LIMIT_MS = 30 * 60 * 1000
 const LIVE_POLL_MAX_BACKOFF_MS = 30000
 // The least time "Updating..." shows when a poll on coming back finds nothing new: long enough to be
 // seen, so the user knows the board on screen was just checked.
@@ -447,6 +478,8 @@ let livePollTimer: ReturnType<typeof setTimeout> | null = null
 // reschedule a run that has since been stopped or replaced.
 let livePollGeneration = 0
 let livePollFailuresInARow = 0
+// When the polled board last changed, or polling (re)started: what the hidden-tab idle limit measures from.
+let liveBoardLastChangedAt = Date.now()
 // Whether the last evaluate a poll started has finished painting its board. A tab coming back with
 // one still running (or one that failed) re-evaluates instead of only flashing.
 let livePollEvaluateSettled = true
@@ -456,6 +489,7 @@ export function startLivePolling(): void {
     if (livePollTimer !== null || !shouldPollLiveBoard()) return
     livePollGeneration += 1
     livePollFailuresInARow = 0
+    liveBoardLastChangedAt = Date.now()
     scheduleLivePoll(livePollGeneration, livePollInterval(), false)
 }
 
@@ -466,11 +500,20 @@ function restartLivePollingImmediately(): void {
     if (!shouldPollLiveBoard()) return
     livePollGeneration += 1
     livePollFailuresInARow = 0
+    liveBoardLastChangedAt = Date.now()
     scheduleLivePoll(livePollGeneration, 0, true)
 }
 
 function livePollInterval(): number {
-    return document.visibilityState === 'visible' ? LIVE_POLL_INTERVAL_MS : LIVE_POLL_HIDDEN_INTERVAL_MS
+    const interval = document.visibilityState === 'visible' ? LIVE_POLL_INTERVAL_MS : LIVE_POLL_HIDDEN_INTERVAL_MS
+    const anyPickMade = livePlayerAssignments !== null
+        && Object.values(livePlayerAssignments).some(roster => roster.length > 0)
+    return anyPickMade ? interval : Math.max(interval, LIVE_POLL_BEFORE_FIRST_PICK_MS)
+}
+
+/** A hidden tab whose board has sat unchanged past LIVE_POLL_HIDDEN_IDLE_LIMIT_MS: stop until it is shown again. */
+function isHiddenTabIdle(): boolean {
+    return document.visibilityState !== 'visible' && Date.now() - liveBoardLastChangedAt > LIVE_POLL_HIDDEN_IDLE_LIMIT_MS
 }
 
 export function stopLivePolling(): void {
@@ -532,6 +575,7 @@ async function pollLiveBoardForChanges(
                !== describeLiveBoard(livePlayerAssignments, liveRemainingCash)
         if (boardChanged) {
             setLivePlayerAssignments(state.player_assignments, state.remaining_cash)
+            liveBoardLastChangedAt = Date.now()
             document.dispatchEvent(new Event(LIVE_BOARD_UPDATED))
         }
         if (boardChanged || (catchingUp && !livePollEvaluateSettled)) {
@@ -540,6 +584,8 @@ async function pollLiveBoardForChanges(
             flashUnchangedBoard(startedAt, catchUpOwnsDisplay)
         }
         if (roomClosed || isLiveBoardFull(state.player_assignments)) { stopLivePolling(); return }
+        // Coming back to the tab restarts polling at once (restartLivePollingImmediately).
+        if (isHiddenTabIdle()) { stopLivePolling(); return }
         scheduleLivePoll(generation, livePollInterval(), false)
     } catch (err) {
         if (generation !== livePollGeneration) return

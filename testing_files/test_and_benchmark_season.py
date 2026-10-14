@@ -1,7 +1,7 @@
 # testing_files/test_and_benchmark_season.py
 # Season Mode correctness tests: waiver wire evaluation.
 # Uses 2024-25 historical season data with default parameters from parameters.yaml.
-# Rosters mirror the pre-computed defaults in frontend/data_entry/season/default_season_rosters.ts.
+# Rosters are a snapshot of an H-score snake draft (testing_files/generate_default_season_rosters.py).
 #
 # Covers:
 #   - Waiver evaluate: Drafter 1 drops Gary Trent Jr.
@@ -20,8 +20,6 @@ from backend.state.session import get_session
 from backend.services.ranking import rank_candidates
 
 # 2024-25 snapshot of an H-score snake draft used by the assertions below.
-# (The frontend default — default_season_rosters.ts — tracks current-season data
-# and is regenerated via testing_files/generate_default_season_rosters.py.)
 # EC scoring, 12 drafters, 13 picks, snake-drafted by H-score rank.
 _DEFAULT_SEASON_ROSTERS: dict[str, list[str]] = {
     'Drafter 1': [

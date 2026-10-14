@@ -6,8 +6,8 @@
 # evaluate from the current drafter's perspective on the current board state and
 # select the top H-score candidate.
 #
-# Emits both targets:
-#   - frontend/data_entry/season/default_season_rosters.ts (TS export)
+# Prints the snapshot for the backend test fixtures (the frontend copy that prefilled the Season Mode grid was
+# removed 2026-10-13):
 #   - testing_files/test_and_benchmark_season.py (Python literal — printed for manual paste)
 
 import sys
@@ -61,31 +61,6 @@ def generate_snake_draft_rosters() -> dict[str, list[str]]:
     return assignments
 
 
-def format_typescript(rosters: dict[str, list[str]]) -> str:
-    """Render the TS DEFAULT_SEASON_ROSTERS export."""
-    lines: list[str] = []
-    lines.append('// default_season_rosters.ts')
-    lines.append(f'// Pre-computed default Season Mode rosters: EC scoring, {SEASON} historical data,')
-    lines.append(f'// {N_DRAFTERS} drafters, {N_PICKS} picks, snake-drafted by H-score rank.')
-    lines.append('// Used to pre-fill the Season Mode roster table consistently across the app and tests.')
-    lines.append('')
-    lines.append('export const DEFAULT_SEASON_ROSTERS: Record<string, string[]> = {')
-    for team, players in rosters.items():
-        lines.append(f"    '{team}': [")
-        for player in players:
-            escaped = player.replace("'", "\\'") if "'" in player else player
-            quote = '"' if "'" in player and '"' not in player else "'"
-            if quote == "'":
-                player_literal = f"'{escaped}'"
-            else:
-                player_literal = f'"{player}"'
-            lines.append(f'        {player_literal},')
-        lines.append('    ],')
-    lines.append('}')
-    lines.append('')
-    return '\n'.join(lines)
-
-
 def format_python_literal(rosters: dict[str, list[str]]) -> str:
     """Render the Python dict literal for _DEFAULT_SEASON_ROSTERS in test_and_benchmark_season.py."""
     lines: list[str] = []
@@ -106,10 +81,6 @@ def format_python_literal(rosters: dict[str, list[str]]) -> str:
 def main() -> None:
     print(f'Generating default season rosters for {SEASON} ...', flush=True)
     rosters = generate_snake_draft_rosters()
-
-    ts_path = Path(__file__).parent.parent / 'frontend' / 'data_entry' / 'season' / 'default_season_rosters.ts'
-    ts_path.write_text(format_typescript(rosters), encoding='utf-8')
-    print(f'\nWrote {ts_path}', flush=True)
 
     print('\n--- Python literal for testing_files/test_and_benchmark_season.py ---')
     print(format_python_literal(rosters))

@@ -115,6 +115,8 @@ export interface SessionRequest {
     // League type: auction sessions require remaining_cash on every evaluate, non-auction
     // sessions forbid it. Patched whenever the user switches modes.
     is_auction: boolean
+    // Season Mode builds the base H-scores in one neutral pass instead of the opponent self-play.
+    is_season_mode: boolean
     platform: string
     platform_config?: { league_id: string; division_id?: string | null }   // live platforms only
     slot_counts: Record<string, number>

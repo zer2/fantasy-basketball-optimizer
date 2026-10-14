@@ -144,8 +144,9 @@ _OPPONENT_INFERENCE_ITERATIONS = 50
 # predicted field converge toward a mixed equilibrium where punts actually spread. 1 pass = neutral only.
 # 8 is the measured knee: the punt structure settles by pass 6-9 in all six seasons (see the self-play
 # convergence experiment), the 8-pass serve lands within 0.16pp of the 15-pass serve with an identical
-# top-40, and dropping to 7 or 6 quintuples that drift. Cost is quadratic in the pass count (pass k
-# faces k stacked field snapshots), so 15 -> 8 halves populate time.
+# top-40, and dropping to 7 or 6 quintuples that drift. (Cost was quadratic in the pass count back when
+# pass k faced all k earlier fields; each pass now faces only the last _SERVE_FIELD_STACK, so cost is
+# linear: measured 2026-10-13, 32 passes at ~0.06-0.08 s each, 2.5 s of populate on a 12-team league.)
 # 16 (was 8): the average-field drift diagnostic showed the archetype mixture still
 # rebalancing at 8 passes (drift plateau ~0.12-0.27); at 16 the running-average field
 # converges cleanly (0.012 -> 0.0006) and the served equilibrium survives defection pins.
@@ -891,21 +892,8 @@ class HAgent:
         x_scores_batch_array = np.expand_dims(np.array(x_scores_batch), axis=2)
 
         if len(my_players) > 0:
-            cdf_original = _normal_cdf(
-                (diff_means + x_scores_batch_array).mean(axis=2),
-                scale=np.sqrt(diff_vars.mean(axis=2)),
-            )
-            cdf_mod = np.einsum(
-                'ij,ai -> aj',
-                self.transformation_matrix_inverted,
-                cdf_original + self.transformation_addition_constant,
-            )
-            # The Bayesian model treats win rates as unconstrained Gaussians, so its optimum can
-            # legitimately leave (0, 1) for extreme builds (measured: one category at 0.999 with the
-            # rest at 0.01 maps to 1.094 at n=9, beth=3) — which ndtri would turn into NaN and poison
-            # the candidate's whole evaluate. Saturate the correction at the boundary instead.
-            cdf_mod = np.clip(cdf_mod, 1e-6, 1 - 1e-6)
-            corrected_strength = _normal_ppf(cdf_mod, scale=np.sqrt(diff_vars.mean(axis=2)))
+            corrected_strength = self.regress_mean_strength(
+                (diff_means + x_scores_batch_array).mean(axis=2), np.sqrt(diff_vars.mean(axis=2)))
             x_scores_batch_mod    = corrected_strength - diff_means.mean(axis=2)
             x_scores_batch_array  = np.expand_dims(x_scores_batch_mod, axis=2)
 
@@ -1609,6 +1597,36 @@ class HAgent:
         volume_weights = d_k_d_units * d_objective_d_k                               # (N, R)
         return chained + volume_weights @ self.volume_tilt_matrix
 
+    def regress_mean_strength(self
+                              , mean_strength: np.ndarray
+                              , scale: np.ndarray) -> np.ndarray:
+        """The beth correction (docs: H-scoring, reducing over-confidence in the projection set): a team's mean
+        differential per category, (N, n_categories), regressed toward average through its win rates. Every scored
+        team after the first pick gets it -- a draft candidate here in get_h_scores, a complete team through
+        get_strength_regression_shift -- so a team scores the same whichever path completes it (2026-10-13: a
+        waiver pick's team scored 7 points under the same roster on the Rosters tab, beth 10)."""
+        cdf_original = _normal_cdf(mean_strength, scale=scale)
+        cdf_mod = np.einsum(
+            'ij,ai -> aj',
+            self.transformation_matrix_inverted,
+            cdf_original + self.transformation_addition_constant,
+        )
+        # The Bayesian model treats win rates as unconstrained Gaussians, so its optimum can
+        # legitimately leave (0, 1) for extreme builds (measured: one category at 0.999 with the
+        # rest at 0.01 maps to 1.094 at n=9, beth=3) — which ndtri would turn into NaN and poison
+        # the candidate's whole evaluate. Saturate the correction at the boundary instead.
+        cdf_mod = np.clip(cdf_mod, 1e-6, 1 - 1e-6)
+        return _normal_ppf(cdf_mod, scale=scale)
+
+    def get_strength_regression_shift(self
+                                      , diff_means: np.ndarray
+                                      , diff_vars: np.ndarray) -> np.ndarray:
+        """The beth correction for complete teams, (N, n_categories): added to every opponent column of
+        diff_means (N, n_categories, n_drafters-1), and to the team's own percentage totals, it is exactly what the
+        draft path does to a candidate that completes the team. diff_vars broadcasts over N."""
+        mean_strength = diff_means.mean(axis=2)
+        return self.regress_mean_strength(mean_strength, np.sqrt(diff_vars.mean(axis=2))) - mean_strength
+
     def compute_h_score_from_diff_means(self
                                          , diff_means: np.ndarray
                                          , diff_vars: np.ndarray
@@ -1628,10 +1646,13 @@ class HAgent:
         else:
             sigma_2_m = None
 
+        strength_shift = self.get_strength_regression_shift(diff_means, diff_vars)   # (1, n_categories)
+        diff_means = diff_means + strength_shift[:, :, np.newaxis]
         if volume_context is not None:
             diff_means, diff_vars, _ = self.apply_volume_awareness(
-                diff_means, diff_vars, volume_context['my_x_total'], volume_context['my_units'],
-                volume_context['opponent_units'])
+                diff_means, diff_vars,
+                volume_context['my_x_total'] + strength_shift[:, self.volume_category_indices],
+                volume_context['my_units'], volume_context['opponent_units'])
         cdf_estimates = self.get_cdf(diff_means, diff_vars)
         score = self.get_objective_and_pdf_weights(
             diff_means, diff_vars, cdf_estimates, None, sigma_2_m,
@@ -1661,10 +1682,13 @@ class HAgent:
         else:
             sigma_2_m = None
 
+        strength_shift = self.get_strength_regression_shift(diff_means_batch, diff_vars)   # (N, n_categories)
+        diff_means_batch = diff_means_batch + strength_shift[:, :, np.newaxis]
         if volume_context is not None:
             diff_means_batch, diff_vars, _ = self.apply_volume_awareness(
-                diff_means_batch, diff_vars, volume_context['my_x_total'], volume_context['my_units'],
-                volume_context['opponent_units'])
+                diff_means_batch, diff_vars,
+                volume_context['my_x_total'] + strength_shift[:, self.volume_category_indices],
+                volume_context['my_units'], volume_context['opponent_units'])
         cdf_estimates = self.get_cdf(diff_means_batch, diff_vars)
         return self.get_objective_and_pdf_weights(
             diff_means_batch, diff_vars, cdf_estimates, None, sigma_2_m,
@@ -2303,11 +2327,13 @@ class HAgent:
             category_weights_current = None
 
         elif n_players_selected == self.n_picks:
-            scored_diffs, scored_vars = diff_means, diff_vars
+            strength_shift = self.get_strength_regression_shift(diff_means, diff_vars)
+            scored_diffs, scored_vars = diff_means + strength_shift[:, :, np.newaxis], diff_vars
             if volume_context is not None:
                 scored_diffs, scored_vars, _ = self.apply_volume_awareness(
-                    diff_means, diff_vars, volume_context['roster_x'], volume_context['roster_units'],
-                    volume_context['opponent_units'])
+                    scored_diffs, diff_vars,
+                    volume_context['roster_x'] + strength_shift[:, self.volume_category_indices],
+                    volume_context['roster_units'], volume_context['opponent_units'])
             cdf_estimates  = self.get_cdf(scored_diffs, scored_vars)
             score          = self.get_objective_and_pdf_weights(
                 scored_diffs, scored_vars, cdf_estimates, None, sigma_2_m,
@@ -2331,6 +2357,8 @@ class HAgent:
             ).T
             drop_potentials_array = np.expand_dims(np.array(drop_potentials), axis=2)
             diff_means_mod = diff_means - drop_potentials_array
+            strength_shift = self.get_strength_regression_shift(diff_means_mod, diff_vars)   # (n_options, n_cat)
+            diff_means_mod = diff_means_mod + strength_shift[:, :, np.newaxis]
 
             scored_vars = diff_vars
             if volume_context is not None:
@@ -2341,7 +2369,8 @@ class HAgent:
                 ])
                 dropped_x = drop_potentials[self.volume_categories].to_numpy()
                 diff_means_mod, scored_vars, _ = self.apply_volume_awareness(
-                    diff_means_mod, diff_vars, volume_context['roster_x'] - dropped_x,
+                    diff_means_mod, diff_vars,
+                    volume_context['roster_x'] - dropped_x + strength_shift[:, self.volume_category_indices],
                     volume_context['roster_units'] - dropped_units, volume_context['opponent_units'])
             cdf_estimates  = self.get_cdf(diff_means_mod, scored_vars)
             score          = self.get_objective_and_pdf_weights(
@@ -2810,7 +2839,10 @@ class HAgent:
         self._warm_start_row_rate_scales = None
         return self.clear_initial_weights()
 
-    def populate_default_h_scores(self, n_iterations: int, cash_remaining_per_team: dict = None) -> None:
+    def populate_default_h_scores(self
+                                  , n_iterations: int
+                                  , cash_remaining_per_team: dict = None
+                                  , builds_opponent_field: bool = True) -> None:
         """Compute and cache the base (empty-board) H-scores. Run once at the end of the build so the
         agent is always primed — the throttle has a ranking to prioritise by, auction values have their
         anchor, and the draft-start evaluate can short-circuit to this result. Pass full cash only in
@@ -2823,7 +2855,11 @@ class HAgent:
         (a) player-specific punts survive, and (b) they match the from-scratch inference verbatim, so
         drafting a priced-in player confirms the prediction rather than moving the field. The bootstrap
         runs for auctions too (full cash) — the passes solve in auction mode, so the committed anchors are
-        auction-shaped (top-heavy) rather than borrowed from the draft. Off, it is a single neutral pass."""
+        auction-shaped (top-heavy) rather than borrowed from the draft. Off, it is a single neutral pass.
+
+        builds_opponent_field=False takes the single neutral pass even with opponent modelling on (Season Mode, which
+        only ranks by these scores). With no committed field, empty seats stay neutral and partly filled seats are
+        still inferred from their picks, exactly as when the bootstrap ran out of anchors."""
         empty = {f'Team {i + 1}': [] for i in range(self.n_drafters)}
         # Fresh build: drop any prior cache so the passes recompute (the empty-board short-circuit and the
         # throttle both key off these) instead of short-circuiting to stale results.
@@ -2838,7 +2874,7 @@ class HAgent:
         self._bootstrap_field_snapshots = None
         self._pass_weights_history     = None
 
-        bootstrap = (self.models_opponents and self.n_picks > 1)
+        bootstrap = (self.models_opponents and self.n_picks > 1 and builds_opponent_field)
         if not bootstrap:
             result = self._run_bootstrap_pass(empty, n_iterations, cash_remaining_per_team)
             self.default_h_scores = result['Scores'].sort_values(ascending=False)

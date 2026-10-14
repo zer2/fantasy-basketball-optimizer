@@ -57,6 +57,24 @@ export function countInFlightSessionRequests(): number {
     return inFlightSessionRequests
 }
 
+// Every backend request doing session or platform work -- builds included, unlike the count above -- for Season Mode's
+// activity indicator, which has no single owner to drive it: the Waiver evaluate, the Rosters tab's team score, the
+// league's rosters arriving and the session build all run independently. Each change is announced on document.
+let inFlightBackendWork = 0
+
+/** Fired on document whenever the number of backend requests in flight changes; see countInFlightBackendWork. */
+export const BACKEND_WORK_CHANGED = 'backend-work-changed'
+
+/** Number of session or platform requests in flight, session builds included. */
+export function countInFlightBackendWork(): number {
+    return inFlightBackendWork
+}
+
+function changeInFlightBackendWork(change: number): void {
+    inFlightBackendWork += change
+    document.dispatchEvent(new Event(BACKEND_WORK_CHANGED))
+}
+
 /** Issues `fetch(url, init)` and parses the JSON response, throwing HTTPError on
  *  non-2xx. The `label` prefixes error messages so callers don't each repeat the
  *  "X failed (status): body" boilerplate. */
@@ -70,6 +88,8 @@ async function jsonRequest<T>(
     const isCountedSessionRequest = url.includes('/sessions/')
         && (init?.method ?? 'GET').toUpperCase() !== 'PATCH'
     if (isCountedSessionRequest) inFlightSessionRequests += 1
+    const isBackendWork = url.includes('/sessions') || url.includes('/platforms/')
+    if (isBackendWork) changeInFlightBackendWork(1)
     try {
         const res = await fetch(url, init)
         if (!res.ok) {
@@ -86,6 +106,7 @@ async function jsonRequest<T>(
         }
     } finally {
         if (isCountedSessionRequest) inFlightSessionRequests -= 1
+        if (isBackendWork) changeInFlightBackendWork(-1)
     }
 }
 
@@ -329,6 +350,7 @@ export async function analyzeTrade(
 // ── POST /sessions/{id}/trade/suggest ────────────────────────────────────────
 
 export interface TradeSuggestion {
+    their_team: string   // the team the trade is made with: a request searches several
     send: number[]
     receive: number[]
     your_score: number
@@ -340,13 +362,23 @@ export interface TradeSuggestResponse {
 }
 
 /** Generates trade suggestions for two teams. May take 10-30s. */
+/** One trade size and the value window searched for it, in percentage points of summed general value between the two
+ *  sides: within `threshold` (null: every gap) and beyond `searched_threshold` (null: from zero). See
+ *  TRADE_SEARCH_ROUNDS. */
+export interface TradeComboParam {
+    n_traded:           number
+    n_received:         number
+    threshold:          number | null
+    searched_threshold: number | null
+}
+
 export async function suggestTrades(
     sessionId: string
     , req: {
         player_assignments: Record<string, number[]>
         my_team: string
-        their_team: string
-        combo_params: { n_traded: number; n_received: number; threshold: number }[]
+        their_teams: string[]
+        combo_params: TradeComboParam[]
         your_differential_threshold: number
         their_differential_threshold: number
         position_check?: boolean
@@ -374,6 +406,8 @@ export interface PlatformConnectResponse {
     available_modes: string[]
     /** Whether this LEAGUE drafts by auction. Null when the platform does not report it. */
     is_auction_draft: boolean | null
+    // The league's own position structure in the app's slot names, when the platform reports one.
+    slot_counts: Record<string, number> | null
 }
 
 export interface DraftStateResponse {

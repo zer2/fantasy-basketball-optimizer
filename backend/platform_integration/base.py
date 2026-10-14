@@ -35,6 +35,9 @@ class LeagueShape:
     # None is a real third state, not a default standing in for False: it means "do not judge the
     # user's chosen mode against this", which is what platforms that never report it need.
     is_auction_draft: Optional[bool] = None
+    # The league's own position structure, in the app's slot names ({'PG': 1, ..., 'Util': 3}), when the platform
+    # reports one; None when it does not, and the app falls back to its default for the roster size.
+    slot_counts: Optional[dict[str, int]] = None
 
 
 @dataclass

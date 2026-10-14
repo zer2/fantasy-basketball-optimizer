@@ -13,22 +13,24 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
     launchAppPage, loadApp, setSelect, waitAppSettled, drainSessionFailures, expectCleanSession,
-    readDropdownOptionLabels,
+    readDropdownOptionLabels, APP,
 } from './helpers.mjs'
 
 const LEAGUE_TEAMS = ['Ann', 'Bob', 'Cat', 'Dan']
 const ALL_MODES = ['Draft Mode', 'Auction Mode', 'Season Mode']
 const JOKIC_ID = 203999
 
-/** Stubs the live platform (see the header). `availableModes` is what the platform's connect reports. Returns the
- *  platform's board, which a test can change to stand in for picks being made on the platform. */
-async function stubLivePlatform(page, { availableModes }) {
-    const platformBoard = { assignments: { Ann: [JOKIC_ID], Bob: [], Cat: [], Dan: [] } }
+/** Stubs the live platform (see the header). `availableModes`, `picksPerTeam` and `slotCounts` are what the platform's
+ *  connect reports (`slotCounts` null: a platform that does not report its positions). Returns the platform's board,
+ *  which a test can change to stand in for picks being made on the platform; `configuredSlotCounts` collects the
+ *  slot_counts of every session update that carried the connection. */
+async function stubLivePlatform(page, { availableModes, picksPerTeam = 13, slotCounts = null }) {
+    const platformBoard = { assignments: { Ann: [JOKIC_ID], Bob: [], Cat: [], Dan: [] }, configuredSlotCounts: [] }
     const connectedSessions = new Set()
     await page.route(url => url.pathname.endsWith('/connect'), route => route.fulfill({
         status: 200, contentType: 'application/json',
-        body: JSON.stringify({ team_names: LEAGUE_TEAMS, n_drafters: LEAGUE_TEAMS.length, n_picks: 13,
-                               available_modes: availableModes, is_auction_draft: false }),
+        body: JSON.stringify({ team_names: LEAGUE_TEAMS, n_drafters: LEAGUE_TEAMS.length, n_picks: picksPerTeam,
+                               available_modes: availableModes, is_auction_draft: false, slot_counts: slotCounts }),
     }))
     await page.route(url => /^\/sessions(\/[^/]+)?$/.test(url.pathname), async route => {
         const request = route.request()
@@ -39,6 +41,7 @@ async function stubLivePlatform(page, { availableModes }) {
         delete body.platform_config
         const response = await route.fetch({ postData: JSON.stringify(body) })
         const json = await response.json()
+        if (carriesConfig) platformBoard.configuredSlotCounts.push(body.slot_counts)
         if (carriesConfig && response.ok()) {
             connectedSessions.add(request.method() === 'POST' ? json.session_id : new URL(request.url()).pathname.split('/')[2])
         }
@@ -63,7 +66,7 @@ async function connectYahooLeague(app, leagueId) {
     await setSelect(page, 'ls-platform', 'Retrieve from Yahoo')
     await waitAppSettled(app, { timeout: 120000 })
     await typeYahooLeagueId(page, leagueId)
-    await page.locator('#ls-connect-btn').click()
+    await page.locator('#ls-yahoo-league-id').press('Enter')   // naming the league connects
     await page.locator('#ls-n-drafters').evaluate(
         (input, count) => new Promise(resolve => {
             const check = () => input.value === String(count) ? resolve() : setTimeout(check, 50)
@@ -298,11 +301,17 @@ test('a connected draft is followed without clicking Refresh', async t => {
             await topCandidate.click()
             await page.locator('#hscoretable .playerpopup.popup-open').first().waitFor({ timeout: 10000 })
 
+            const pickEvaluated = page.waitForRequest(request => request.url().endsWith('/evaluate')
+                && request.postDataJSON().player_assignments.Bob?.includes(1628389), { timeout: 15000 })
             platformBoard.assignments = { Ann: [JOKIC_ID], Bob: [1628389], Cat: [], Dan: [] }   // Bob takes Adebayo
-            await page.waitForFunction(
-                () => ![...document.querySelectorAll('#hscoretable .playerheaderdiv')]
-                    .some(row => row.textContent.includes('Bam Adebayo')),
-                { timeout: 15000 })
+            // Waits for the evaluate that carries the pick: the table empties for a moment while an earlier evaluate
+            // redraws it, which satisfied "Adebayo is gone" before the pick was even polled, and the pick's evaluate
+            // then landed in the next step's quiet window.
+            await pickEvaluated
+            await page.waitForFunction(() => {
+                const rows = [...document.querySelectorAll('#hscoretable .playerheaderdiv')]
+                return rows.length > 0 && !rows.some(row => row.textContent.includes('Bam Adebayo'))
+            }, null, { timeout: 15000 })
             await waitAppSettled(app, { timeout: 120000 })
             const openRow = page.locator('#hscoretable .playerheaderdiv', { hasText: openedName })
                 .filter({ has: page.locator('.playerpopup.popup-open') })
@@ -355,7 +364,7 @@ test('choosing a seat while the connection is still reaching the session waits f
             await route.fallback()
         })
         await typeYahooLeagueId(page, '12345')
-        await page.locator('#ls-connect-btn').click()
+        await page.locator('#ls-yahoo-league-id').press('Enter')   // naming the league connects
         await page.locator('#ls-n-drafters').evaluate(
             (input, count) => new Promise(resolve => {
                 const check = () => input.value === String(count) ? resolve() : setTimeout(check, 50)
@@ -369,6 +378,33 @@ test('choosing a seat while the connection is still reaching the session waits f
         assert.ok(await page.locator('#hscoretable .playerheaderdiv').count() > 0, 'the board must be up')
         assert.notEqual(await indicatorText(page), 'Unconnected')
         expectCleanSession(app, 'seat chosen during the connect update')
+    } finally {
+        await app.close()
+    }
+})
+
+test('before the first pick the board is polled slowly, and at full speed once a pick is made', async () => {
+    // A room can wait a long time for its draft, and a pick arriving a few seconds late before anyone has picked costs
+    // nothing. Polling an empty room once a second -- in two forgotten tabs, all day -- drew Yahoo's rate limit.
+    const app = await launchAppPage()
+    const { page } = app
+    const pollsDuring = async milliseconds => {
+        const start = app.sessionRequestLog.length
+        await page.waitForTimeout(milliseconds)
+        return app.sessionRequestLog.slice(start).filter(entry => entry.includes('/draft-state')).length
+    }
+    try {
+        await loadApp(app)
+        const platformBoard = await stubLivePlatform(page, { availableModes: ALL_MODES })
+        platformBoard.assignments = { Ann: [], Bob: [], Cat: [], Dan: [] }
+        await connectYahooLeague(app, '12345')
+        assert.ok(await pollsDuring(12000) <= 2, 'an empty board is polled about every 10 seconds')
+
+        platformBoard.assignments = { Ann: [JOKIC_ID], Bob: [], Cat: [], Dan: [] }
+        await page.waitForTimeout(11000)   // the slow poll picks up the first pick
+        await waitAppSettled(app, { timeout: 120000 })
+        assert.ok(await pollsDuring(5000) >= 3, 'after the first pick the board is polled every second')
+        expectCleanSession(app, 'slow then fast polling')
     } finally {
         await app.close()
     }
@@ -423,6 +459,198 @@ for (const startMode of ['Season Mode', 'Draft Mode']) {
         }
     })
 }
+
+test("a Waiver tab drawn before the league's rosters arrive is redrawn when they do", async () => {
+    // Season Mode opens on the Waiver tab, which drew while the rosters were still empty ("Fill out at least one full
+    // team") and was never drawn again: the rosters' arrival redrew only the hidden Rosters grid (2026-10-13).
+    const app = await launchAppPage()
+    const { page } = app
+    const players = [1626157, 201142, 1628374, 1627783, 1629636, 1630202, 1628969, 1641717, 1641764, 1642349, 1630591,
+                     1642263, 1628983, 201935, 202695, 1630217, 1627826, 1628384, 1626181, 1643407, 1628392, 1630180,
+                     202710, 1642856, 1628415, 1630162, 1630567, 1631096, 1628991, 1630700, 1642851, 1641709, 1629651,
+                     1630245, 1629674, 1631099, 1631221, 1627832, 203999, 1626164, 1628389, 1627759, 1629638, 1642276,
+                     203497, 1630166, 1628404, 1629614, 1642273, 1631217, 1630174, 1629029]
+    try {
+        await loadApp(app)
+        await setSelect(page, 'ls-mode', 'Season Mode')
+        await waitAppSettled(app, { timeout: 120000 })
+        const platformBoard = await stubLivePlatform(page, { availableModes: ['Season Mode'] })
+        platformBoard.assignments = Object.fromEntries(LEAGUE_TEAMS.map((team, index) =>
+            [team, players.slice(index * 13, index * 13 + 13)]))
+        // Hold the league's rosters: while they load, the tab says so instead of asking for rosters to be filled in,
+        // and the empty table stays hidden (2026-10-13).
+        let releaseRosters
+        const rostersHeld = new Promise(resolve => { releaseRosters = resolve })
+        await page.route(url => url.pathname.endsWith('/draft-state'), async route => {
+            await rostersHeld
+            await route.fallback()
+        })
+        await setSelect(page, 'ls-platform', 'Retrieve from Yahoo')
+        await typeYahooLeagueId(page, '12345')
+        await page.locator('#ls-yahoo-league-id').press('Enter')
+        await page.waitForFunction(() => /Loading your league's rosters/.test(document.querySelector('#right-header')?.innerText ?? ''),
+                                   null, { timeout: 30000 })
+        assert.equal(await page.locator('#hscoretable').isVisible(), false, 'no empty table while the rosters load')
+        releaseRosters()
+        await waitAppSettled(app, { timeout: 120000 })
+        await page.waitForFunction(() => document.querySelector('[data-testid="waiver-drop-select-wrapper"]') !== null,
+                                   null, { timeout: 30000 })
+        await waitAppSettled(app, { timeout: 120000 })
+        assert.equal(await page.locator('.season-tab-btn.active').getAttribute('data-tab'), 'waiver')
+        assert.ok(await page.locator('#hscoretable .playerheaderdiv').count() > 0,
+                  'the waiver candidates must render without clicking the tab again')
+        expectCleanSession(app, 'waiver redrawn on roster arrival')
+    } finally {
+        await app.close()
+    }
+})
+
+/** The Position Parameters inputs, by slot, as the page shows them. */
+const readSlotInputs = page => page.evaluate(() => Object.fromEntries(
+    [...document.querySelectorAll('input[id^="sc-"]')].filter(input => input.id !== 'sc-bench-slots')
+        .map(input => [input.id.slice(3), Number(input.value)])))
+
+test("connecting takes the league's own position structure", async () => {
+    // An 11-pick league kept the 13-slot default and was scored as a roster shape it does not have (2026-10-12).
+    const app = await launchAppPage()
+    const { page } = app
+    const leagueSlots = { PG: 1, SG: 1, G: 1, SF: 1, PF: 1, F: 1, C: 1, Util: 4 }
+    try {
+        await loadApp(app)
+        const platformBoard = await stubLivePlatform(page, { availableModes: ALL_MODES, picksPerTeam: 11,
+                                                             slotCounts: leagueSlots })
+        await connectYahooLeague(app, '12345')
+        const shown = await readSlotInputs(page)
+        assert.deepEqual(Object.fromEntries(Object.entries(shown).filter(([, count]) => count > 0)),
+                         Object.fromEntries(Object.entries(leagueSlots).map(([slot, count]) => [slot.toLowerCase(), count])))
+        assert.equal(await page.locator('#sc-bench-slots').inputValue(), '0')
+        assert.deepEqual(platformBoard.configuredSlotCounts.at(-1), leagueSlots, 'the session gets the league structure')
+        expectCleanSession(app, 'league position structure')
+    } finally {
+        await app.close()
+    }
+})
+
+test('a connection whose picks no structure fits waits for the Position Parameters, then loads', async () => {
+    // A platform that does not report positions, at a pick count with no default structure: the 13-slot default was
+    // sent for 11 picks. Now nothing reaches the session until the slots fit, and applying them sends the connection.
+    const app = await launchAppPage()
+    const { page } = app
+    try {
+        await loadApp(app)
+        const platformBoard = await stubLivePlatform(page, { availableModes: ALL_MODES, picksPerTeam: 11 })
+        await connectYahooLeague(app, '12345')
+        assert.match(await page.locator('.table-message-error').innerText(), /11 roster spots/)
+        assert.deepEqual(platformBoard.configuredSlotCounts, [], 'a structure that does not fit is never sent')
+
+        await page.evaluate(() => {
+            for (const input of document.querySelectorAll('input[id^="sc-"]')) {
+                input.value = input.id === 'sc-util' ? '11' : '0'
+                input.dispatchEvent(new Event('input', { bubbles: true }))
+            }
+            let section = document.getElementById('sc-util').parentElement
+            while (!section.querySelector('.section-apply-btn')) section = section.parentElement
+            section.querySelector('.section-apply-btn').click()
+        })
+        await page.waitForFunction(() => document.querySelector('.table-message-error') === null, null, { timeout: 30000 })
+        await waitAppSettled(app, { timeout: 120000 })
+        assert.equal(platformBoard.configuredSlotCounts.length, 1, 'applying a fitting structure sends the connection once')
+        const sentSlots = platformBoard.configuredSlotCounts[0]
+        assert.equal(sentSlots.Util, 11)
+        assert.equal(Object.values(sentSlots).reduce((total, count) => total + count, 0), 11, '...with that structure')
+        expectCleanSession(app, 'connection held for slots')
+    } finally {
+        await app.close()
+    }
+})
+
+test('connecting while the first session is still building updates it instead of building a second', async () => {
+    // The connect found no session id while the page-load create ran, and created another beside it: two builds
+    // slowed each other, and whichever finished last became the session -- the page-load one carried the old
+    // position structure and no league (2026-10-13).
+    const app = await launchAppPage()
+    const { page } = app
+    try {
+        const platformBoard = await stubLivePlatform(page, { availableModes: ALL_MODES })
+        let sessionCreates = 0
+        let releaseFirstCreate
+        const firstCreateHeld = new Promise(resolve => { releaseFirstCreate = resolve })
+        await page.route(url => url.pathname === '/sessions', async route => {
+            if (route.request().method() === 'POST') {
+                sessionCreates += 1
+                if (sessionCreates === 1) await firstCreateHeld
+            }
+            await route.fallback()
+        })
+        await page.goto(APP, { waitUntil: 'domcontentloaded' })
+        await page.waitForFunction(() => document.querySelector('[data-testid="ls-platform-wrapper"]') !== null)
+        await setSelect(page, 'ls-platform', 'Retrieve from Yahoo')
+        await typeYahooLeagueId(page, '12345')
+        await page.locator('#ls-yahoo-league-id').press('Enter')   // naming the league connects
+        await page.waitForTimeout(1500)   // the connect lands while the first create is still held
+        releaseFirstCreate()
+        await page.locator('#hscoretable .playerheaderdiv').first().waitFor({ timeout: 120000 })
+        await waitAppSettled(app, { timeout: 120000 })
+        assert.equal(sessionCreates, 1, 'one session, updated by the connection')
+        assert.equal(platformBoard.configuredSlotCounts.length, 1, 'the connection reached that session')
+        expectCleanSession(app, 'connect during the first create')
+    } finally {
+        await app.close()
+    }
+})
+
+test('the app connects whenever it can: on naming a league, after a failure on Try again, and after a reload', async () => {
+    // There is no Connect button. Naming a league connects; a failed connect offers Try again; the league named last
+    // reconnects once the page is loaded again.
+    const app = await launchAppPage()
+    const { page } = app
+    try {
+        await loadApp(app)
+        await stubLivePlatform(page, { availableModes: ALL_MODES })
+        // The test account has no Yahoo token; an empty league list stands in for an authorized one.
+        await page.route(url => url.pathname.endsWith('/leagues'), route => route.fulfill({
+            status: 200, contentType: 'application/json', body: JSON.stringify({ leagues: [] }) }))
+        let connectRequests = 0
+        let failNextConnect = false
+        page.on('request', request => { if (new URL(request.url()).pathname.endsWith('/connect')) connectRequests += 1 })
+        await page.route(url => url.pathname.endsWith('/connect'), async route => {
+            if (!failNextConnect) return route.fallback()
+            failNextConnect = false
+            await route.fulfill({ status: 429, contentType: 'application/json',
+                                  body: JSON.stringify({ detail: 'Yahoo is rate limiting; try again shortly.' }) })
+        })
+        await setSelect(page, 'ls-platform', 'Retrieve from Yahoo')
+        await waitAppSettled(app, { timeout: 120000 })
+
+        await typeYahooLeagueId(page, '12345')
+        await page.locator('#ls-yahoo-league-id').press('Enter')
+        await page.waitForFunction(() => document.querySelector('#ls-n-drafters').value === '4', null, { timeout: 30000 })
+        await waitAppSettled(app, { timeout: 120000 })
+        assert.equal(connectRequests, 1, 'Enter in the league-id box connects')
+        expectCleanSession(app, 'connect on naming a league')
+
+        failNextConnect = true
+        await typeYahooLeagueId(page, '67890')
+        await page.locator('#ls-yahoo-league-id').blur()   // leaving the box names the league too
+        await page.locator('#ls-connect-retry').waitFor({ timeout: 30000 })
+        assert.match(await page.locator('#ls-connect-status').innerText(), /Connect failed/)
+        assert.equal(connectRequests, 2)
+        await page.locator('#ls-connect-retry').click()
+        await page.waitForFunction(() => document.querySelector('#ls-connect-status').textContent === '', null, { timeout: 30000 })
+        await waitAppSettled(app, { timeout: 120000 })
+        assert.equal(connectRequests, 3, 'Try again connects once more')
+        drainSessionFailures(app)   // the failed connect was the point
+
+        await page.reload({ waitUntil: 'domcontentloaded' })
+        await page.waitForFunction(() => document.querySelector('#ls-n-drafters')?.value === '4', null, { timeout: 60000 })
+        await waitAppSettled(app, { timeout: 120000 })
+        assert.equal(await page.locator('#ls-yahoo-league-id').inputValue(), '67890', 'the league named last is named again')
+        assert.equal(connectRequests, 4, 'and connects without being asked')
+        expectCleanSession(app, 'reconnect after a reload')
+    } finally {
+        await app.close()
+    }
+})
 
 test('leaving a platform restores the modes its connection narrowed', async () => {
     const app = await launchAppPage()

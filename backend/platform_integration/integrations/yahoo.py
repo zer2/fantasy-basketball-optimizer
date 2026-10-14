@@ -56,10 +56,13 @@ _GAME_CODE = 'nba'
 
 # Which season's game key each league belongs to, keyed by (auth dir, league id) so two accounts
 # cannot read each other's answers. Module level because integrations are built per request; see
-# _game_id_for. A miss is stored as None -- "asked, and this league is not the account's" -- which
+# _game_key_for. A miss is stored as None -- "asked, and this league is not the account's" -- which
 # is why lookups need a sentinel to tell that apart from "never asked".
-_GAME_ID_BY_LEAGUE: dict[tuple[str, str], Optional[int]] = {}
+_GAME_KEY_BY_LEAGUE: dict[tuple[str, str], Optional[str]] = {}
 _UNRESOLVED = object()
+# The current NBA season's game key, for leagues the account does not list (mock rooms). Fetched once per process:
+# it changes once a year, at the season rollover, and a process does not live that long.
+_CURRENT_GAME_KEY: Optional[str] = None
 _YAHOO_AUTH_URL = 'https://api.login.yahoo.com/oauth2/request_auth'
 _YAHOO_TOKEN_URL = 'https://api.login.yahoo.com/oauth2/get_token'
 # Out-of-band ('oob') is Yahoo's documented redirect for applications that cannot receive a
@@ -72,6 +75,9 @@ _YAHOO_TOKEN_URL = 'https://api.login.yahoo.com/oauth2/get_token'
 _REDIRECT_URI = get_secret('YAHOO_REDIRECT_URI') or 'oob'
 # Roster positions that hold a player who is not drafted into them: injured list and not-active slots. A draft has one
 # round per OTHER roster position (starting slots and bench).
+# Yahoo roster position -> the app's slot (see _read_slot_counts).
+_YAHOO_POSITION_TO_SLOT = {'PG': 'PG', 'SG': 'SG', 'G': 'G', 'SF': 'SF', 'PF': 'PF', 'F': 'F', 'C': 'C',
+                           'Util': 'Util', 'BN': 'Util'}
 _UNDRAFTED_POSITIONS = {'IL', 'IL+', 'NA'}
 
 # What the authorization probe reads: the cheapest fantasy endpoint there is, so a grant that
@@ -93,6 +99,18 @@ _CORROBORATION_URLS = {
 
 # yfpy roster slot positions meaning "injured", excluded in Season Mode.
 _INJURED_POSITIONS = {'IL', 'IL+'}
+
+
+def _read_yahoo_field(
+    entries: list
+    , field: str
+):
+    """A field of a Yahoo JSON record, which arrives as a list of one-field mappings (with empty lists between some).
+    Raises KeyError when the record has no such field: a shape change in Yahoo's response must fail loudly."""
+    for entry in entries:
+        if isinstance(entry, dict) and field in entry:
+            return entry[field]
+    raise KeyError(f'Yahoo record has no {field!r} field: {entries!r}'[:300])
 
 
 class YahooIntegration(PlatformIntegration):
@@ -239,8 +257,14 @@ class YahooIntegration(PlatformIntegration):
         """
         if self._auth_dir is None:
             raise RuntimeError('Yahoo integration has no auth_dir; authenticate first (exchange_auth_code).')
-        return YahooFantasySportsQuery(auth_dir=self._auth_dir, league_id=league_id,
-                                       game_code=_GAME_CODE, game_id=self._game_id_for(league_id))
+        query = YahooFantasySportsQuery(auth_dir=self._auth_dir, league_id=league_id, game_code=_GAME_CODE)
+        if league_id:
+            # The full league key, set here so yfpy never builds it. yfpy builds it with an API call of its own --
+            # the current season's metadata when it has no game id, that game's metadata when it has one -- on
+            # every request, so each draft-state poll cost two Yahoo calls. Polling at once a second, two tabs
+            # left open on one mock room drew Yahoo's rate limit (status 999) after ~4 hours (2026-10-12).
+            query.league_key = f'{self._game_key_for(league_id)}.l.{league_id}'
+        return query
 
     def _user_games(self) -> list:
         """The seasons this account has played, newest first, fetched once per integration.
@@ -276,12 +300,10 @@ class YahooIntegration(PlatformIntegration):
             leagues = [entry['league'] for entry in leagues]
         return leagues
 
-    def _game_id_for(self, league_id: str) -> Optional[int]:
-        """Which season's game key holds this league, or None when it is not one of the user's.
-
-        None is the right answer for a league the account cannot see in its own list -- a mock
-        draft room, most of all, which Yahoo does not publish as a league. yfpy then falls back
-        to the current season, which is where a mock lives anyway.
+    def _game_key_for(self, league_id: str) -> str:
+        """Which season's game key holds this league: its own season's when the account lists it, the current
+        season's when it does not -- a mock draft room, most of all, which Yahoo does not publish as a league and
+        which lives in the current season anyway.
 
         Cached beyond this instance on purpose. An integration is constructed per request, so a
         per-instance cache would be thrown away between polls and every Refresh Analysis during
@@ -289,17 +311,20 @@ class YahooIntegration(PlatformIntegration):
         re-learning the same answer -- slow, and a rate limit waiting to happen. The mapping it
         caches cannot change during a draft: a league does not move seasons.
         """
-        if not league_id:
-            return None
-        known = _GAME_ID_BY_LEAGUE.get((self._auth_dir, league_id), _UNRESOLVED)
-        if known is not _UNRESOLVED:
-            return known
-        for game in self._user_games():
-            for league in self._leagues_in(game):
-                _GAME_ID_BY_LEAGUE.setdefault((self._auth_dir, str(league.league_id)),
-                                              int(game.game_id))
-        _GAME_ID_BY_LEAGUE.setdefault((self._auth_dir, league_id), None)
-        return _GAME_ID_BY_LEAGUE[(self._auth_dir, league_id)]
+        known = _GAME_KEY_BY_LEAGUE.get((self._auth_dir, league_id), _UNRESOLVED)
+        if known is _UNRESOLVED:
+            for game in self._user_games():
+                for league in self._leagues_in(game):
+                    _GAME_KEY_BY_LEAGUE.setdefault((self._auth_dir, str(league.league_id)), str(game.game_key))
+            known = _GAME_KEY_BY_LEAGUE.setdefault((self._auth_dir, league_id), None)
+        return known if known is not None else self._current_game_key()
+
+    def _current_game_key(self) -> str:
+        """The current NBA season's game key, fetched once per process (_CURRENT_GAME_KEY)."""
+        global _CURRENT_GAME_KEY
+        if _CURRENT_GAME_KEY is None:
+            _CURRENT_GAME_KEY = str(self._bare_query().get_current_game_metadata().game_key)
+        return _CURRENT_GAME_KEY
 
     def _bare_query(self) -> YahooFantasySportsQuery:
         """A query for account-level calls, which belong to no league and so need no season."""
@@ -323,8 +348,7 @@ class YahooIntegration(PlatformIntegration):
         listed = []
         for game in self._user_games():
             for league in self._leagues_in(game):
-                _GAME_ID_BY_LEAGUE.setdefault((self._auth_dir, str(league.league_id)),
-                                              int(game.game_id))
+                _GAME_KEY_BY_LEAGUE.setdefault((self._auth_dir, str(league.league_id)), str(game.game_key))
                 name = league.name.decode('UTF-8') if isinstance(league.name, bytes) else league.name
                 listed.append({'id': league.league_id, 'name': name, 'season': league.season})
         return listed
@@ -411,6 +435,28 @@ class YahooIntegration(PlatformIntegration):
             raise RuntimeError(f'Yahoo league {league_id} reported no draftable roster positions.')
         return size
 
+    @staticmethod
+    def _read_slot_counts(settings, league_id: str) -> dict[str, int]:
+        """The league's roster positions as the app's slots. Yahoo's names are the app's (PG, SG, G, SF, PF, F, C,
+        Util), except BN: a swappable daily bench, which docs/hscores.md says to count as Utilities -- a benched player
+        still plays whenever the lineup has room. The injured-list and not-active slots are left out, as in
+        _read_roster_size, so the slots add up to the picks by construction. A position the app has no slot for fails
+        the connection rather than being dropped: a structure missing a slot is the bug this replaced (an 11-pick
+        league scored on the 13-slot default, 2026-10-12)."""
+        if settings is None:
+            raise RuntimeError(f'Yahoo league {league_id} did not return its settings, so its positions are unknown.')
+        slots: dict[str, int] = {}
+        positions = [entry['roster_position'] if isinstance(entry, dict) else entry for entry in settings.roster_positions]
+        for position in positions:
+            if position.position in _UNDRAFTED_POSITIONS:
+                continue
+            slot = _YAHOO_POSITION_TO_SLOT.get(position.position)
+            if slot is None:
+                raise RuntimeError(f'Yahoo league {league_id} has a roster position the app has no slot for: '
+                                   f'{position.position!r}.')
+            slots[slot] = slots.get(slot, 0) + int(position.count)
+        return slots
+
     def fetch_league_shape(
         self
         , league_id: str
@@ -431,6 +477,7 @@ class YahooIntegration(PlatformIntegration):
             n_picks           = self._read_roster_size(settings, league_id),
             teams_dict        = teams_dict,
             is_auction_draft  = self._read_is_auction(settings),
+            slot_counts       = self._read_slot_counts(settings, league_id),
         )
 
     # ── Roster / draft state ───────────────────────────────────────────────────
@@ -456,16 +503,15 @@ class YahooIntegration(PlatformIntegration):
         # Every seat starts empty; the joined teams then fill theirs. A season league is always
         # full, so this differs from teams_dict only in the half-filled draft-room case.
         player_assignments: dict[str, list[int]] = {seat: [] for seat in config.seat_names}
+        roster_by_team_id = self._read_all_rosters(query)
 
         for team_name, team_id in config.teams_dict.items():
-            roster = query.get_team_roster_by_week(team_id=int(team_id))
             players: list[int] = []
-            for player in roster.players:
-                position = player.selected_position.position
-                canonical = player_id_lookup.get(player.player_id, RP_PLAYER_ID)
+            for yahoo_player_id, position in roster_by_team_id[str(team_id)]:
+                canonical = player_id_lookup.get(yahoo_player_id, RP_PLAYER_ID)
                 if position in _INJURED_POSITIONS:
                     injured_players.append(canonical)
-                elif position is not None:
+                else:
                     players.append(canonical)
             player_assignments[team_name] = players
 
@@ -474,6 +520,33 @@ class YahooIntegration(PlatformIntegration):
             status             = 'Success',
             injured_players    = injured_players,
         )
+
+    @staticmethod
+    def _read_all_rosters(query: YahooFantasySportsQuery) -> dict[str, list[tuple[int, str]]]:
+        """Every team's current roster as (Yahoo player id, selected position) pairs, keyed by team id, from ONE Yahoo
+        request (league/<key>/teams/roster).
+
+        It was one request per team, one after another: sixteen calls and 4.5 s for a sixteen-team league (2026-10-13).
+        The single request then took 2.8 s, of which Yahoo's answer was 0.4 s: the response carries every field of all
+        ~176 players (1.6 MB), and yfpy's query() builds an object for each one, while three are read. So the JSON is
+        read directly, through yfpy's get_response -- its rate-limit check, re-authentication and retries -- in 0.3 s.
+        Its rosters are today's lineup where the per-team call gave the current week's; on the league it was checked
+        against, every team had the same players and the same injured-list slots both ways, and membership and the
+        injured slots are all that is read here."""
+        url = f'https://fantasysports.yahooapis.com/fantasy/v2/league/{query.get_league_key()}/teams/roster'
+        teams = query.get_response(url).json()['fantasy_content']['league'][1]['teams']
+        rosters: dict[str, list[tuple[int, str]]] = {}
+        for team_index in range(int(teams['count'])):
+            team = teams[str(team_index)]['team']   # [metadata entries, {'roster': ...}]
+            players = team[1]['roster']['0']['players']
+            entries: list[tuple[int, str]] = []
+            # A team with no players comes back as an empty list rather than a count-keyed mapping.
+            for player_index in range(int(players['count']) if players else 0):
+                player = players[str(player_index)]['player']   # [metadata entries, {'selected_position': ...}]
+                entries.append((int(_read_yahoo_field(player[0], 'player_id')),
+                                _read_yahoo_field(player[1]['selected_position'], 'position')))
+            rosters[str(_read_yahoo_field(team[0], 'team_id'))] = entries
+        return rosters
 
     def _empty_board(
         self
@@ -500,6 +573,22 @@ class YahooIntegration(PlatformIntegration):
             costs              = {seat: [] for seat in config.seat_names} if with_costs else None,
         )
 
+    @staticmethod
+    def _read_draft_results(query: YahooFantasySportsQuery) -> list:
+        """The league's draft results as a list, however many there are.
+
+        yfpy unwraps any one-element list into its element and then skips the step that turns
+        {'draft_result': DraftResult} entries into DraftResults, so a league with exactly ONE result
+        comes back as that bare dict. Indexing it with [0] raised KeyError: 0 on every poll between
+        the first player sold in an auction and the second (production logs, 2026-10-11), each one a
+        502 that sent the live poll into its backoff. The same quirk is handled for user games and
+        league teams above. No results at all still raises YahooFantasySportsDataNotFound, which
+        the callers read as a draft not yet started."""
+        draft_results = query.get_league_draft_results()
+        if isinstance(draft_results, dict):
+            return [draft_results['draft_result']]
+        return draft_results
+
     def _get_draft_board(
         self
         , config: PlatformConfig
@@ -507,7 +596,7 @@ class YahooIntegration(PlatformIntegration):
     ) -> PlatformSelections:
         query = self._make_query(config.league_id)
         try:
-            draft_results = query.get_league_draft_results()
+            draft_results = self._read_draft_results(query)
         except YahooFantasySportsDataNotFound:
             # Yahoo answered, and what it said was that there are no draft results. That is what
             # a room looks like before the draft starts, so an empty board is the truth.
@@ -534,7 +623,7 @@ class YahooIntegration(PlatformIntegration):
         player_assignments[team][i] sold for). The route turns costs into remaining_cash."""
         query = self._make_query(config.league_id)
         try:
-            draft_results = query.get_league_draft_results()
+            draft_results = self._read_draft_results(query)
         except YahooFantasySportsDataNotFound:
             return self._empty_board(config, 'Auction has not started', with_costs=True)
 

@@ -6,6 +6,11 @@
 // per-platform auth differences stay encapsulated here. The signed-in Google user identifies
 // the credentials server-side, so no client identifier is sent from here.
 
+/** Fired (bubbling) from a connector's element when the user has finished naming a league -- picked one, or typed or
+ *  pasted an id and left the box -- so the host connects without a click on Connect. A connector whose naming takes
+ *  more than one step (a division as well, say) fires it only once the selection is complete. */
+export const PLATFORM_LEAGUE_CHOSEN = 'platform-league-chosen'
+
 export interface PlatformSelection {
     league_id: string
     division_id: string | null

@@ -26,7 +26,7 @@ import { PlayerResult } from '../types.js'
 import { getScoringFormat, getSelectedCategories } from '../setting_collection/format_and_categories.js'
 import { getLeagueSettings, getMode } from '../setting_collection/league_settings.js'
 import { getShortCategoryNames } from '../app_state.js'
-import { isMobileViewport } from '../helper_functions.js'
+import { isMobileViewport, normalizeSearchText } from '../helper_functions.js'
 import { buildFullPlayerDisplayHtml } from '../player_display.js'
 import { buildForcedWeightsRow } from './force_weights.js'
 import { getRegistryEntry } from '../player_registry.js'
@@ -207,7 +207,9 @@ export function buildTableHeader(): void {
     // above every category's numbers, which is what they annotate. Column-aligned by construction:
     // one blank leading cell per score column (Player plus H-Score, or Player plus the four
     // auction dollar columns), then one box per category.
-    const forcedWeightsRow = buildForcedWeightsRow(categories, isAuction ? 5 : 2)
+    // Not in Season Mode: the waiver wire's evaluate carries no pins (runWaiverEvaluate), so boxes there would
+    // change nothing.
+    const forcedWeightsRow = getMode() === 'Season Mode' ? null : buildForcedWeightsRow(categories, isAuction ? 5 : 2)
     if (forcedWeightsRow) thead.append(forcedWeightsRow)
 }
 
@@ -354,10 +356,6 @@ function setSpacerHeight(spacer: HTMLTableRowElement, px: number): void {
 
 // ── Windowed rendering ────────────────────────────────────────────────────────
 
-/** Lower-cased, accents stripped, outer spaces trimmed: 'Jokić' and 'jokic' both search as 'jokic'. */
-function normalizeSearchText(text: string): string {
-    return text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim()
-}
 
 /** The candidates the search lets through, in H-score order: every candidate when there is no search. */
 function listShownCandidates(): CandidateRow[] {

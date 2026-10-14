@@ -3,18 +3,18 @@
 // inspector, the waiver wire, and trade analysis/suggestions.
 //
 // The tests build their OWN roster dataset: player names are read from the live pool
-// and pasted into the grid, so nothing here depends on the app's built-in default
-// rosters (which are slated for removal). A 2-drafter league keeps evaluates fast.
+// and pasted into the grid (the app ships no rosters of its own). A 3-drafter league keeps evaluates fast and still
+// gives the trade suggestions more than one team to search.
 // Uses the 2025-26 historical season for stable data.
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
     launchAppPage, loadApp, selectHistoricalSeason, expectCleanSession, waitAppSettled,
-    setSelect, setLeagueDrafterCount, readDropdownPlayerNames,
+    setSelect, setLeagueDrafterCount, readDropdownPlayerNames, setObjectiveWeight,
 } from './helpers.mjs'
 
-const TEAM_COUNT = 2
+const TEAM_COUNT = 3
 const PICKS_PER_TEAM = 13
 
 test('season tools on a self-built roster dataset', async t => {
@@ -108,6 +108,19 @@ test('season tools on a self-built roster dataset', async t => {
             expectCleanSession(app, 'waiver wire')
         })
 
+        await t.test('a settings change redraws the waiver results', async () => {
+            // A settings change rebuilt the candidate table's header (emptying it) and never re-ran the waiver
+            // evaluate: headers over no rows until a dropdown was touched (2026-10-13).
+            const countRows = () => page.locator('#hscoretable .playerheaderdiv').count()
+            assert.ok(await countRows() > 0, 'the waiver table has rows before the change')
+            await setObjectiveWeight(page, 0.3)
+            await waitAppSettled(app)
+            await page.waitForFunction(() => document.querySelectorAll('#hscoretable .playerheaderdiv').length > 0,
+                                       null, { timeout: 30000 })
+            assert.ok(await countRows() > 0, 'the waiver table has rows after the change')
+            expectCleanSession(app, 'waiver redrawn after a settings change')
+        })
+
         await t.test('trade analysis panes and suggestions populate', async () => {
             await openSeasonTab('trading')
             await page.locator('.trade-left-col .ms-container').first().waitFor()
@@ -128,6 +141,134 @@ test('season tools on a self-built roster dataset', async t => {
             await page.locator('[data-testid="trade-gscore-pane"]').waitFor({ timeout: 30000 })
             await page.locator('[data-testid="trade-suggestions"]').waitFor({ timeout: 60000 })
             expectCleanSession(app, 'trade analysis + suggestions')
+        })
+
+        await t.test('suggested trades span every other team, ranked, searchable, and open in the inspection', async () => {
+            // Suggestions used to cover only the team chosen to trade with; now every other team is searched, in bands
+            // of value gap (one request per band, across every team), each batch merged in by your score.
+            await openSeasonTab('trading')
+            await setSelect(page, 'trade-your-team', 'Team 1')
+            await waitAppSettled(app)
+            // Let every trade through, so each team contributes rows: the thresholds are what a user would loosen.
+            for (const id of ['ts-your-threshold', 'ts-their-threshold']) {
+                await page.locator(`#${id}`).fill('-100')
+                await page.locator(`#${id}`).blur()   // the change lands as the user leaves the box
+            }
+            await waitAppSettled(app)
+            const rows = page.locator('[data-testid="trade-suggestions"] tbody tr')
+            const teams = await rows.evaluateAll(trs => [...new Set(trs.map(tr => tr.dataset.team))].sort())
+            assert.deepEqual(teams, ['Team 2', 'Team 3'], 'suggestions come from every other team')
+            const yourScores = await rows.evaluateAll(trs => trs.map(tr => parseFloat(tr.cells[3].textContent)))
+            assert.deepEqual(yourScores, [...yourScores].sort((a, b) => b - a), 'merged batches stay ranked by your score')
+
+            const otherTeam = (await page.locator('input#trade-their-team').inputValue()) === 'Team 2' ? 'Team 3' : 'Team 2'
+            await page.locator(`[data-testid="trade-suggestions"] tbody tr[data-team="${otherTeam}"]`).first().click()
+            await waitAppSettled(app)
+                        assert.equal(await page.locator('input#trade-their-team').inputValue(), otherTeam,
+                         'inspecting a suggestion switches to the team it is made with')
+            await page.locator('[data-testid="trade-hscore-pane"] table').first().waitFor({ timeout: 30000 })
+
+            const searchedName = (await rows.first().locator('td').nth(1).locator('.player-minimal span').first().innerText()).trim()
+            await page.locator('#trade-suggestion-search').fill(searchedName)
+            const searchedRows = await rows.evaluateAll(trs => trs.map(tr => tr.innerText))
+            assert.ok(searchedRows.length > 0 && searchedRows.every(text => text.includes(searchedName)),
+                      'the search keeps only trades involving the player')
+            await page.locator('#trade-suggestion-search').fill('zzzz')
+            assert.match(await page.locator('[data-testid="trade-suggestions"]').innerText(), /No suggested trade matches/)
+            await page.locator('#trade-suggestion-search').fill('')
+
+            await page.locator('#trade-team-search').fill('team 3')
+            assert.deepEqual(await rows.evaluateAll(trs => [...new Set(trs.map(tr => tr.dataset.team))]), ['Team 3'],
+                             'the team search keeps only trades with that team')
+            await page.locator('#trade-team-search').fill('')
+            for (const id of ['ts-your-threshold', 'ts-their-threshold']) {
+                await page.locator(`#${id}`).fill('0')
+                await page.locator(`#${id}`).blur()
+            }
+            await waitAppSettled(app)
+            expectCleanSession(app, 'suggestions across teams')
+        })
+
+        await t.test('thresholds filter the suggestions found, never below -2, without searching again', async () => {
+            // Every search runs at the -2% floor and the thresholds filter what it found: a threshold change searched
+            // every team again (2026-10-13).
+            const suggestRequestsSince = start => app.sessionRequestLog.slice(start).filter(entry => entry.includes('/trade/suggest')).length
+            const setThreshold = async (id, value) => {
+                await page.locator(`#${id}`).fill(String(value))
+                await page.locator(`#${id}`).blur()
+                await waitAppSettled(app)
+            }
+            const readYourScores = () => page.locator('[data-testid="trade-suggestions"] tbody tr')
+                .evaluateAll(trs => trs.map(tr => parseFloat(tr.cells[3].textContent)))
+            const start = app.sessionRequestLog.length
+            await setThreshold('ts-your-threshold', -100)
+            assert.equal(await page.locator('#ts-your-threshold').inputValue(), '-2', 'nothing below the floor')
+            const atFloor = await readYourScores()
+            await setThreshold('ts-your-threshold', 0.2)
+            const stricter = await readYourScores()
+            assert.ok(stricter.length < atFloor.length && stricter.every(score => score > 0.2), 'a stricter threshold hides trades below it')
+            await setThreshold('ts-your-threshold', 0)
+            assert.equal(suggestRequestsSince(start), 0, 'no threshold change searches again')
+            expectCleanSession(app, 'threshold filtering')
+        })
+
+        await t.test('the chosen trade sizes are remembered', async () => {
+            const sizesInput = page.locator('.trade-combo-select')
+            const chooseTradeSize = async label => {
+                await sizesInput.locator('.ms-input-area').click()
+                await sizesInput.locator('.ms-option', { hasText: label }).click()
+                await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur())
+            }
+            await chooseTradeSize('2 for 2')
+            await waitAppSettled(app)
+            await openSeasonTab('waiver')
+            await openSeasonTab('trading')
+            assert.match(await sizesInput.innerText(), /2 for 2/, 'the Trading tab reopens with 2 for 2 still chosen')
+            expectCleanSession(app, 'trade sizes remembered')
+        })
+
+        await t.test('hand-entered rosters survive the grid being drawn again', async () => {
+            // Every visit to the Rosters tab redraws the grid. It used to refill built-in sample rosters, which hid
+            // that it dropped whatever had been entered; with those removed it came back empty (2026-10-13).
+            const countFilledCells = () => page.evaluate(() =>
+                [...document.querySelectorAll('input[id^="sr-player-"]')].filter(input => input.value !== '').length)
+            await openSeasonTab('rosters')
+            assert.equal(await countFilledCells(), TEAM_COUNT * PICKS_PER_TEAM, 'every pasted cell is still filled')
+            expectCleanSession(app, 'rosters kept through a redraw')
+        })
+
+        await t.test('your team is remembered across the Waiver and Trading tabs', async () => {
+            // The Waiver tab opened on the first team every time it was drawn, and the rosters arriving draw it: it
+            // scored someone else's team (2026-10-13).
+            const readChosenTeam = id => page.locator(`input#${id}`).inputValue()
+            await openSeasonTab('waiver')
+            await setSelect(page, 'waiver-team-select', 'Team 2')
+            await waitAppSettled(app)
+            await openSeasonTab('trading')
+            assert.match(await readChosenTeam('trade-your-team'), /Team 2/, 'Trading opens on the team chosen in Waiver')
+            await openSeasonTab('waiver')
+            assert.match(await readChosenTeam('waiver-team-select'), /Team 2/, 'Waiver keeps it when drawn again')
+            expectCleanSession(app, 'remembered team')
+        })
+
+        await t.test('the indicator beside the tabs shows the backend working', async () => {
+            const readIndicatorState = () => page.locator('#season-indicator').getAttribute('data-state')
+            await openSeasonTab('waiver')
+            let releaseEvaluate
+            const evaluateHeld = new Promise(resolve => { releaseEvaluate = resolve })
+            await page.route(url => url.pathname.endsWith('/evaluate'), async route => {
+                await evaluateHeld
+                await route.fallback()
+            })
+            await setSelect(page, 'waiver-team-select', 'Team 1')
+            await page.waitForFunction(() => document.querySelector('#season-indicator')?.dataset.state === 'evaluating')
+            assert.match(await page.locator('#season-indicator').innerText(), /Updating/)
+            releaseEvaluate()
+            await waitAppSettled(app)
+            await page.waitForFunction(() => document.querySelector('#season-indicator')?.dataset.state === 'idle')
+            assert.equal(await readIndicatorState(), 'idle')
+            await page.unroute(url => url.pathname.endsWith('/evaluate'))
+            expectCleanSession(app, 'season indicator')
         })
     } finally {
         await app.close()

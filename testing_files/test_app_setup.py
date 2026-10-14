@@ -977,6 +977,26 @@ def test_auction_value_direction_negates_only_turnovers():
         assert abs(worth - 1) < 1e-9, f'{categories}: the direction is worth {worth} units of value, not 1'
 
 
+def test_a_structure_with_more_slots_than_picks_is_refused():
+    """More slots than picks is a roster shape the league does not have; it used to be accepted and scored (an 11-pick
+    league on the 13-slot default, 2026-10-12). Refused on create and on patch, and a refused patch leaves the session
+    as it was. Fewer slots than picks is a perma-bench and stays allowed."""
+    request = _build_default_session_request()
+    request['league']['n_picks'] = 11            # the default structure has 13 slots
+    refused = client.post('/sessions', json=request)
+    assert refused.status_code == 400, refused.text
+    assert '13 slots' in refused.json()['detail'] and '11 picks' in refused.json()['detail']
+
+    session_id = client.post('/sessions', json=_build_default_session_request()).json()['session_id']
+    before = dict(get_session(session_id).current_settings)
+    patch = client.patch(f'/sessions/{session_id}', json={'from_step': 4, 'league': {'n_picks': 11}})
+    assert patch.status_code == 400, patch.text
+    assert get_session(session_id).current_settings['n_picks'] == before['n_picks'], 'a refused patch changes nothing'
+
+    bench = client.patch(f'/sessions/{session_id}', json={'from_step': 4, 'league': {'n_picks': 15}})
+    assert bench.status_code == 200, 'two picks past thirteen slots are perma-bench, which is allowed'
+
+
 def test_pipeline_cache_restores_prior_builds():
     """Returning to a configuration the session already built must restore that build's
     agent from the per-session pipeline cache instead of re-running the pipeline (and its
@@ -1089,6 +1109,86 @@ def test_agent_cache_serves_identical_sessions_fast():
     assert second_payload == first_payload, 'cache hit changed the evaluate payload'
     # Not a benchmark: just wide-enough proof the ~6s populate did not rerun.
     assert second_create_seconds < 4.0, f'cache hit took {second_create_seconds:.1f}s'
+
+
+def test_season_mode_builds_its_base_scores_in_one_pass():
+    """Season Mode never shows the base H-scores (it ranks trade and waiver candidates by them), so it skips the
+    opponent self-play: ~5x the build for a committed field that full rosters never read. A full league must
+    score the same either way."""
+    def create(is_season_mode):
+        request = _build_default_session_request()
+        request['is_season_mode'] = is_season_mode
+        response = client.post('/sessions', json=request)
+        assert response.status_code == 201, response.text
+        return response.json()['session_id']
+
+    draft_id, season_id = create(False), create(True)
+    draft_agent, season_agent = get_session(draft_id).agent, get_session(season_id).agent
+    assert draft_agent.models_opponents, 'the comparison needs opponent modelling on'
+    assert draft_agent._player_committed_future_diffs is not None, 'Draft Mode keeps the self-play'
+    assert season_agent._player_committed_future_diffs is None, 'Season Mode takes the single neutral pass'
+    assert season_agent.default_h_scores is not None, 'Season Mode still ranks by base H-scores'
+
+    request = _build_default_session_request()
+    n_drafters, n_picks = request['league']['n_drafters'], request['league']['n_picks']
+    ranked = list(draft_agent.default_h_scores.index[: n_drafters * n_picks])
+    teams = {f'Drafter {seat + 1}': ranked[seat::n_drafters] for seat in range(n_drafters)}
+    def score_full_team(session_id):
+        response = client.post(f'/sessions/{session_id}/evaluate', json={'player_assignments': teams,
+                                                                         'my_team_id': 'Drafter 1'})
+        assert response.status_code == 200, response.text
+        return response.json()['candidates'][0]['h_score']
+    assert score_full_team(season_id) == score_full_team(draft_id)
+
+
+def test_identical_builds_arriving_together_run_once():
+    """A page reloaded during its build abandons the request but not the build: three reloads and a connect ran five
+    identical self-plays at once, each ~7x slower for the company (2026-10-13). The later ones now wait for the first
+    and copy it from the agent cache."""
+    import threading as threading_module
+    from backend.services import build_agent as build_agent_module
+
+    build_agent_module.clear_agent_cache()
+    misses_before, hits_before = build_agent_module.agent_cache_misses, build_agent_module.agent_cache_hits
+    statuses = []
+    def create():
+        statuses.append(client.post('/sessions', json=_build_default_session_request()).status_code)
+    threads = [threading_module.Thread(target=create) for _ in range(3)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert statuses == [201, 201, 201]
+    assert build_agent_module.agent_cache_misses == misses_before + 1, 'one build for three identical creates'
+    assert build_agent_module.agent_cache_hits == hits_before + 2
+
+
+def test_a_team_completed_by_a_waiver_pick_scores_what_the_full_team_scores():
+    """The beth correction regresses a scored team toward average. It applied only to draft candidates, so the
+    waiver row that puts a dropped player back (a candidate completing the roster) scored 7 points under the same
+    full team on the Rosters tab (2026-10-13, beth 10). Complete teams get it too, so the two agree."""
+    request = _build_default_session_request()
+    request['model_settings']['beth'] = 10.0
+    request['is_season_mode'] = True
+    response = client.post('/sessions', json=request)
+    assert response.status_code == 201, response.text
+    session_id = response.json()['session_id']
+    agent = get_session(session_id).agent
+    n_drafters, n_picks = request['league']['n_drafters'], request['league']['n_picks']
+    ranked = list(agent.default_h_scores.index[: n_drafters * n_picks])
+    full = {f'Drafter {seat + 1}': ranked[seat::n_drafters] for seat in range(n_drafters)}
+    dropped = full['Drafter 1'][-1]
+    waiver = {**full, 'Drafter 1': full['Drafter 1'][:-1]}
+
+    def evaluate(board):
+        response = client.post(f'/sessions/{session_id}/evaluate', json={'player_assignments': board,
+                                                                         'my_team_id': 'Drafter 1'})
+        assert response.status_code == 200, response.text
+        return response.json()['candidates']
+
+    full_team_score = evaluate(full)[0]['h_score']
+    waiver_row = next(row for row in evaluate(waiver) if row['player_id'] == dropped)
+    assert waiver_row['h_score'] == pytest.approx(full_team_score, abs=0.01)
 
 
 def test_empty_categories_are_rejected_on_create_and_patch():

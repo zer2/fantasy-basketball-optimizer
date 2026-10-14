@@ -212,6 +212,33 @@ export function applySlotDefaultsForPicks(nPicks: number): boolean {
 
 
 /**
+ * Sets the position structure to a connected league's own (from its platform), with no perma-bench: the
+ * platform's slots already account for every pick (Yahoo's swappable bench arrives as Util slots), so they fit the
+ * league's picks by construction. Saved like a hand edit, so a reload keeps them. A slot the league does not have
+ * is set to zero.
+ */
+export function setSlotCountsFromPlatform(slotCounts: Record<string, number>): void {
+    const config = getSportConfig()
+    if (!config) throw new Error('Sport config not loaded')
+    const positions = [...config.position_structure.base_list, ...config.position_structure.flex_list]
+    const unknown = Object.keys(slotCounts).filter(slot => !positions.includes(slot))
+    if (unknown.length > 0) throw new Error(`The platform reported slots this sport does not have: ${unknown.join(', ')}`)
+    for (const pos of positions) {
+        const input = document.getElementById(`sc-${pos.toLowerCase()}`) as HTMLInputElement | null
+        if (!input) throw new Error(`Slot count input sc-${pos.toLowerCase()} not found`)
+        const count = slotCounts[pos] ?? 0
+        input.value = String(count)
+        savePref(`slot_${pos}`, count)
+    }
+    const benchInput = document.getElementById('sc-bench-slots') as HTMLInputElement | null
+    if (!benchInput) throw new Error('Perma-bench input sc-bench-slots not found')
+    benchInput.value = '0'
+    savePref('bench_slots', 0)
+    revalidateSlotCounts()
+}
+
+
+/**
  * Re-runs the slot count validation against the current n_picks value.
  * Call this when n_picks changes in League Settings so the error stays in sync.
  */
