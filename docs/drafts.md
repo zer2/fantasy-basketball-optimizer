@@ -40,7 +40,6 @@ These are the main views that can be used to choose players during a draft.
 For the most part, the website implements the algorithm exactly as it is described on the [H-scoring page](hscores.md). 
 The exceptions are a few drafting-specific adjustments to the algorithm which increase processing speed. These "tricks" increase speed significantly, without hurting the robustness of the algorithm in any significant way. 
 
-
 ??? note "What tricks does the website use to speed up the algorithm during drafting?"
 
     The website uses two tricks to speed up the algorithm for drafting. Both are made possible because for drafting, the top choices are the ones that matter. The difference between the 100th best choice and the 101st is not typically important. 

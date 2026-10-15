@@ -214,13 +214,17 @@ export function makeFullPlayerDisplay(playerId: number): HTMLElement {
 }
 
 /** Minimal display (headshot stacked above last name) as a DOM element, for the
- *  expanded-view roster grid and draft/auction board cells. The full name rides in the
- *  tooltip — narrow board cells ellipsize long last names. */
-export function makeMinimalPlayerDisplay(playerId: number): HTMLElement {
+ *  expanded-view roster grid and draft/auction board cells. showNameTooltip puts the full
+ *  name in the tooltip -- narrow board cells ellipsize long last names -- and is off where
+ *  the caller shows the name its own way (the roster grid's G-score card). */
+export function makeMinimalPlayerDisplay(
+    playerId: number
+    , showNameTooltip: boolean
+): HTMLElement {
     const entry = getRegistryEntry(playerId)
     const stack = document.createElement('div')
     stack.className = 'roster-player-stack'
-    stack.title = entry.name
+    if (showNameTooltip) stack.title = entry.name
     const headshot = makeHeadshotImage(playerId, 'roster-headshot')
     if (headshot) stack.appendChild(headshot)
     const nameLabel = document.createElement('span')
@@ -242,7 +246,6 @@ export function makeHypotheticalPlayerDisplay(
     const entry = getRegistryEntry(playerId)
     const card = document.createElement('div')
     card.className = 'roster-player-stack hypothetical-player-card'
-    card.title = entry.name
     const detail = document.createElement('span')
     detail.className = 'roster-hypothetical-detail'
     detail.textContent = detailText

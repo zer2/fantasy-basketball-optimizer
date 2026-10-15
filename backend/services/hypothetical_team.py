@@ -12,6 +12,9 @@ import pandas as pd
 from backend.math import exact_team_solves
 from backend.models import HypotheticalPick, HypotheticalTeamResponse, Roster, RosterAssignment
 from backend.services.build_agent import count_unscorable_players_as_replacement
+from backend.services.market_draft_values import (
+    compute_availability_order, compute_blended_prices, load_market_draft_values, uses_market_draft_values,
+)
 from backend.services.ranking import (
     compute_original_and_generic_dollars, make_candidate_strategy_key, split_off_bench, make_slot_names,
 )
@@ -48,6 +51,13 @@ def build_hypothetical_team(
     player_assignments, benched_players = split_off_bench(player_assignments, h_agent.n_picks)
     exclusion_list = list(exclusion_list) + benched_players
 
+    # When other drafters are predicted to take each player (and, in an auction, at what price): H-scoring's base order
+    # and generic dollars, blended with the market's draft positions and costs for the season being drafted.
+    market_values = load_market_draft_values() if uses_market_draft_values(session.current_settings) else None
+    availability_order = compute_availability_order(
+        [int(p) for p in h_agent.default_h_scores.index], market_values,
+        h_agent.n_drafters * session.current_settings['n_picks'])
+
     is_auction = remaining_cash is not None
     my_remaining_cash = None
     predicted_prices = None
@@ -56,11 +66,12 @@ def build_hypothetical_team(
         players_chosen = {p for roster in player_assignments.values() for p in roster}
         available_player_ids = h_agent.x_scores.index[
             ~h_agent.x_scores.index.isin(list(players_chosen) + exclusion_list)]
-        _, predicted_prices = compute_original_and_generic_dollars(
+        _, generic_prices = compute_original_and_generic_dollars(
             h_agent.default_h_scores, available_player_ids, h_agent.n_drafters * h_agent.n_picks,
             h_agent.n_drafters * current_settings['cash_per_team'], sum(remaining_cash.values()),
             current_settings['streaming_noise'],
         )
+        predicted_prices = compute_blended_prices(generic_prices, market_values)
         my_remaining_cash = remaining_cash[my_team_id]
 
     # My players and the candidate keep the exact slots H-scoring's roster gave them.
@@ -70,8 +81,9 @@ def build_hypothetical_team(
     expected_flex_position_counts = compute_expected_flex_position_counts(
         strategy.flex_shares, fixed_slot_types, h_agent.position_config.position_numbers)
     problem = exact_team_solves.build_team_solve_problem(
-        h_agent, player_assignments, my_team_id, candidate_player_id, exclusion_list,
-        fixed_slot_types, expected_flex_position_counts, my_remaining_cash, predicted_prices)
+        h_agent, player_assignments, my_team_id, candidate_player_id, exclusion_list, availability_order,
+        fixed_slot_types, expected_flex_position_counts, my_remaining_cash, predicted_prices,
+        None if market_values is None else market_values['team'].dropna())
     if is_auction:
         naive_seating = exact_team_solves.solve_naive_exact_team_for_auction(problem, strategy.category_weights)
     else:
@@ -110,8 +122,8 @@ def convert_seating_to_response(
     , fixed_slot_names: list[str]
 ) -> HypotheticalTeamResponse:
     """My players and the candidate in the exact slots H-scoring gave them; each hypothetical pick in the next free slot
-    of the type the solve chose. Draft picks are labelled with their planned round, in base-H order (the
-    earliest-ranked open player takes the earliest round)."""
+    of the type the solve chose. Draft picks are labelled with their planned round, in predicted draft order
+    (the earliest-predicted open player takes the earliest round)."""
     candidate_index = problem.n_fixed_players - 1
     assignments: dict[str, Optional[RosterAssignment]] = {name: None for name in slot_names}
     for pool_index, slot_name in enumerate(fixed_slot_names):
@@ -134,7 +146,8 @@ def convert_seating_to_response(
 
     first_open_round = problem.n_fixed_players + 1
     hypothetical_picks = []
-    # Pool order past the fixed players is base-H order, so sorting the indices assigns rounds earliest-first.
+    # Pool order past the fixed players is the predicted draft order, so sorting the indices assigns rounds
+    # earliest-first.
     for pick_offset, pool_index in enumerate(sorted(hypothetical_indices)):
         player_id = int(problem.pool_player_ids[pool_index])
         if problem.is_auction:

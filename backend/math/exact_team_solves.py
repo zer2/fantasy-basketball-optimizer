@@ -9,23 +9,34 @@ naive_exact_team_solve: the best legal team on the LINEAR value x . w, w being t
 weights. Linear value has no diminishing returns, so this team over-stacks whichever categories carry the most weight.
 
 fw_exact_team_solve: Frank-Wolfe from the naive team on the app's real complete-team H-score, minus a penalty for the
-team's category win rates drifting from the ones H-scoring predicted for the candidate. The real objective sees a
+team's category win rates falling short of the ones H-scoring predicted for the candidate. The real objective sees a
 category saturate (a nearly-won category's gradient goes flat) and moves the effort elsewhere; the penalty keeps the
-team on H-scoring's strategy rather than letting it switch to a different one.
+team from giving up categories H-scoring planned to compete in. Beating a prediction is not penalized: it already
+shows in the H-score. Frank-Wolfe moves through fractional mixes of teams, so its whole-team answer is the best of the
+corners it visited and its final mix rounded to the nearest legal team; then swaps -- one seat's player for another
+outside the team, the best improving swap each time -- polish that team to a local optimum. The swaps matter most at
+the start of a draft, where Frank-Wolfe's whole teams can sit several points below a team one or two swaps away.
+
+assignment_by_specificity: the finished team re-seated so its earlier picks hold the more specific slots. Display only.
 
 A legal team holds my current players and the candidate in the slots H-scoring seated them in, seats every other player
 in an eligible slot, fills each flex slot type with each base position as often as H-scoring's flex allocation expects
 (its share times the type's open slots, rounded down or up), and:
-  - draft:   takes one player per remaining round, each one whose base H-score round (overall base-H rank / number
-             of teams, rounded up) is that round or later. Deliberately approximate -- it ignores where in the round
-             my pick falls -- and needs no platform draft order.
+  - draft:   takes one player per remaining round, each one whose predicted round (his place in the predicted draft
+             order / number of teams, rounded up) is that round or later. The predicted order is the caller's: base
+             H-score order, or that blended with market draft positions (services/market_draft_values). Deliberately
+             approximate -- it ignores where in the round my pick falls -- and needs no platform draft order.
   - auction: pays every player's predicted price (generic dollars, whole, at least $1) out of my remaining cash.
+When NBA teams are known (the market data's, for the season being drafted), no two players predicted to go in a draft's
+first DRAFT_DISTINCT_TEAM_ROUNDS rounds share an NBA team, and an auction roster holds at most AUCTION_PLAYERS_PER_TEAM
+from one NBA team.
 
 A seat is (player, slot type, base position): in a flex slot a multi-position player fills it AS one of his eligible
 base positions, which the flex allocation rows count. Each step's best legal team is a linear program over seats. The
 draft rows form two laminar families -- per player (each player once, nested round prefixes) and per slot (each slot
 type's count, each flex cell inside it) -- so they are totally unimodular and the vertices are whole teams; the
-auction's budget row breaks that, so the auction solves an integer program instead.
+auction's budget row breaks that, and so do the NBA-team rows (they cut across the round prefixes), so an auction, or a
+draft with NBA-team rows, solves an integer program instead.
 (The flex allocation was first a penalty in the objective. At every weight tried it either lost to the win-rate penalty
 or stalled Frank-Wolfe on the naive team, so it is a hard rule.)
 """
@@ -42,10 +53,22 @@ from backend.math.algorithm_agents import HAgent
 
 FRANK_WOLFE_ITERATIONS = 30
 LINE_SEARCH_STEPS      = 21          # step sizes 0, 0.05, ..., 1
-# Lambda of the win-rate penalty, in H-score units per squared win-rate drift: a 10-point drift in one category
-# costs one point of H-score. Fixed, not tuned against outcomes; the team is display only.
+# Lambda of the win-rate penalty, in H-score units per squared win-rate shortfall: falling 10 points short of
+# H-scoring's predicted rate in one category costs one point of H-score. Fixed, not tuned against outcomes; the team is
+# display only.
 WIN_RATE_PENALTY       = 1.0
 GRADIENT_STEP          = 1e-4        # finite-difference step, in x-score (or volume unit) of one team total
+# Swaps bring in only players in the top SWAP_RANK_LIMIT of the predicted draft order: anyone later is all but never an
+# improvement, and the limit keeps each round of swaps to one small batch.
+SWAP_RANK_LIMIT        = 250
+# Realism rules on NBA teams, where teams are known: no two players predicted for a draft's first rounds share a team;
+# an auction roster holds at most a couple from one team.
+DRAFT_DISTINCT_TEAM_ROUNDS = 7
+AUCTION_PLAYERS_PER_TEAM   = 2
+# The pool stops at SWAP_RANK_LIMIT in the predicted order, or this many rounds past the draft's last pick in a league
+# big enough to draft further: later players are all but never an improvement (late specialists before it often are).
+POOL_EXTRA_ROUNDS = 2
+MIP_RELATIVE_GAP  = 1e-3
 
 
 @dataclass
@@ -71,8 +94,10 @@ class TeamSolveProblem:
     equality_rows: np.ndarray             # A_eq over seats
     equality_bounds: np.ndarray           # b_eq
     is_auction: bool
+    uses_integer_program: bool            # the best legal team needs an integer program (auction, or NBA-team rows)
     predicted_prices: Optional[np.ndarray]  # (P,) whole dollars, auction only
-    base_rounds: np.ndarray               # (P,) each player's base H-score round
+    base_rounds: np.ndarray               # (P,) each player's predicted round
+    base_ranks: np.ndarray                # (P,) each player's place in the predicted draft order (0 = first); -1 if absent
 
 
 @dataclass
@@ -93,16 +118,21 @@ def build_team_solve_problem(
     , my_team_id: str
     , candidate_player_id: int
     , exclusion_list: list[int]
+    , availability_order: list[int]
     , fixed_slot_types: list[str]
     , expected_flex_position_counts: dict[str, dict[str, float]]
     , remaining_cash: Optional[float]
     , predicted_prices: Optional[pd.Series]
+    , player_teams: Optional[pd.Series]
 ) -> TeamSolveProblem:
     """The pool and every constraint row of a team solve for one candidate. Draft when remaining_cash and
     predicted_prices are both None; auction when both are given. fixed_slot_types holds the slot type H-scoring seated
     each of my players and the candidate in (board order, then the candidate): they stay there, and only the open
-    slots are solved for. expected_flex_position_counts is H-scoring's flex allocation of the open slots, flex slot
-    type -> base position -> expected count; the open players filling each pair are held to it, rounded down or up."""
+    slots are solved for. availability_order lists the players in the order other drafters are predicted to take them
+    (whom the round rule and the swaps' candidate limit go by). expected_flex_position_counts is H-scoring's flex
+    allocation of the open slots, flex slot type -> base position -> expected count; the open players filling each pair
+    are held to it, rounded down or up. player_teams maps player ids to NBA teams for the team rules (None: no team
+    rules; a player it does not name is bound by none)."""
     if (remaining_cash is None) != (predicted_prices is None):
         raise ValueError('An auction team solve needs both the remaining cash and the predicted prices; '
                          'a draft solve takes neither.')
@@ -116,9 +146,10 @@ def build_team_solve_problem(
         raise ValueError(f'The roster has no slot left for a candidate ({len(my_players)} of {n_roster} filled).')
 
     taken = {p for roster in player_assignments.values() for p in roster if p == p} | set(exclusion_list)
-    ranked_players = [p for p in h_agent.default_h_scores.index if p in h_agent.x_scores.index]
+    ranked_players = [p for p in availability_order if p in h_agent.x_scores.index]
     base_round_of = {player: rank // h_agent.n_drafters + 1 for rank, player in enumerate(ranked_players)}
-    available = [p for p in ranked_players
+    pool_depth = max(SWAP_RANK_LIMIT, h_agent.n_drafters * (n_roster + POOL_EXTRA_ROUNDS))
+    available = [p for p in ranked_players[:pool_depth]
                  if p not in taken and p != candidate_player_id and p in h_agent.positions.index]
     pool_player_ids = my_players + [candidate_player_id] + available
     n_fixed_players = len(my_players) + 1
@@ -147,6 +178,8 @@ def build_team_solve_problem(
 
     # Only open picks are bound by rounds; the fixed players (who may include the unranked replacement player) get 0.
     base_rounds = np.array([0] * n_fixed_players + [base_round_of[player] for player in available])
+    base_rank_of = {player: rank for rank, player in enumerate(ranked_players)}
+    base_ranks = np.array([base_rank_of.get(player, -1) for player in pool_player_ids])
     is_open_pick = (seat_players >= n_fixed_players).astype(float)
 
     inequality_rows = ([(seat_players == index).astype(float) for index in range(n_pool)]
@@ -188,6 +221,28 @@ def build_team_solve_problem(
             inequality_rows.append(is_open_pick * (base_rounds[seat_players] < later_round))
             inequality_bounds.append(float(later_round - candidate_round - 1))
 
+    # NBA-team realism rules, over the open picks; my players and the candidate already on the team use up the room.
+    uses_team_rows = False
+    if player_teams is not None:
+        teams = np.array([player_teams.get(player) for player in pool_player_ids], dtype=object)
+        if is_auction:
+            fixed_counted = range(n_fixed_players)
+            open_counted = is_open_pick.astype(bool)
+            limit = AUCTION_PLAYERS_PER_TEAM
+        else:
+            # No two of the players predicted to go in the first DRAFT_DISTINCT_TEAM_ROUNDS rounds share a team: my
+            # players picked in those rounds (pick k is round k), the candidate if his round is one of them, and the open
+            # players predicted for them.
+            fixed_counted = range(min(n_fixed_players, DRAFT_DISTINCT_TEAM_ROUNDS))
+            open_counted = is_open_pick.astype(bool) & (base_rounds[seat_players] <= DRAFT_DISTINCT_TEAM_ROUNDS)
+            limit = 1
+        fixed_teams = [teams[index] for index in fixed_counted if teams[index] is not None]
+        for team in sorted({team for team in teams[seat_players[open_counted]] if team is not None}):
+            row = (open_counted & (teams[seat_players] == team)).astype(float)
+            inequality_rows.append(row)
+            inequality_bounds.append(float(max(0, limit - fixed_teams.count(team))))
+            uses_team_rows = True
+
     equality_rows = [np.ones(len(seats))] + [(seat_players == index).astype(float)
                                               for index in range(n_fixed_players)]
     equality_bounds = [float(n_roster)] + [1.0] * n_fixed_players
@@ -216,8 +271,10 @@ def build_team_solve_problem(
         equality_rows           = np.array(equality_rows),
         equality_bounds         = np.array(equality_bounds),
         is_auction              = is_auction,
+        uses_integer_program    = is_auction or uses_team_rows,
         predicted_prices        = predicted_price_array,
         base_rounds             = base_rounds,
+        base_ranks              = base_ranks,
     )
 
 
@@ -225,30 +282,49 @@ def find_best_legal_team(
     problem: TeamSolveProblem
     , seat_values: np.ndarray
 ) -> np.ndarray:
-    """The legal team maximizing the sum of seat_values (n_seats,), as a 0/1 seating over the problem's seats."""
-    if problem.is_auction:
+    """The legal whole team maximizing the sum of seat_values (n_seats,), as a 0/1 seating over the problem's seats --
+    an integer program where the problem needs one."""
+    if problem.uses_integer_program:
         result = milp(
             -seat_values,
             constraints=[LinearConstraint(problem.inequality_rows, -np.inf, problem.inequality_bounds),
                          LinearConstraint(problem.equality_rows, problem.equality_bounds, problem.equality_bounds)],
             integrality=np.ones(len(seat_values)),
             bounds=Bounds(0, 1),
+            # Within 0.1% of the best: the naive start and the rounding need a very good legal team, not a proof that
+            # none is better.
+            options={'mip_rel_gap': MIP_RELATIVE_GAP},
         )
-        if result.status != 0:
-            raise ValueError(f'No legal team fits the budget at predicted prices ({result.message}).')
-    else:
-        result = linprog(
-            -seat_values,
-            A_ub=problem.inequality_rows, b_ub=problem.inequality_bounds,
-            A_eq=problem.equality_rows, b_eq=problem.equality_bounds,
-            bounds=(0, 1), method='highs',
-        )
-        if result.status != 0:
-            raise ValueError(f'No legal team exists for this roster ({result.message}).')
-    seating = result.x
+        check_solved(problem, result)
+        return np.round(result.x)
+    seating = find_best_legal_mix(problem, seat_values)
     if not np.allclose(seating, np.round(seating), atol=1e-6):
         raise RuntimeError('The best legal team came back fractional; the constraints are not totally unimodular.')
     return np.round(seating)
+
+
+def find_best_legal_mix(
+    problem: TeamSolveProblem
+    , seat_values: np.ndarray
+) -> np.ndarray:
+    """The best point of the legal polytope by seat_values: the linear program alone. A whole team where the constraints
+    are totally unimodular (a draft without NBA-team rows); otherwise possibly a mix of teams, which is all a
+    Frank-Wolfe step needs -- its path runs through mixes anyway."""
+    result = linprog(
+        -seat_values,
+        A_ub=problem.inequality_rows, b_ub=problem.inequality_bounds,
+        A_eq=problem.equality_rows, b_eq=problem.equality_bounds,
+        bounds=(0, 1), method='highs',
+    )
+    check_solved(problem, result)
+    return result.x
+
+
+def check_solved(problem: TeamSolveProblem, result) -> None:
+    """Raises when a solve found no legal team (or mix)."""
+    if result.status != 0:
+        constraint = 'fits the budget at predicted prices' if problem.is_auction else 'exists for this roster'
+        raise ValueError(f'No legal team {constraint} ({result.message}).')
 
 
 def convert_seatings_to_selections(
@@ -295,7 +371,8 @@ def score_team_totals(
     , h_scoring_win_rates: np.ndarray
 ) -> np.ndarray:
     """(N,) the penalized objective of N teams given by their category totals (N, C) and volume units (N, R):
-    complete-team H-score minus WIN_RATE_PENALTY times the squared drift of the win rates from H-scoring's."""
+    complete-team H-score minus WIN_RATE_PENALTY times the squared shortfall of each category's win rate below
+    H-scoring's predicted one."""
     diff_means = field.diff_means + (team_totals - field.reference_totals)[:, :, np.newaxis]
     volume_context = None
     if problem.volume_units is not None:
@@ -306,7 +383,8 @@ def score_team_totals(
         }
     scores, win_rates = h_agent.compute_complete_team_scores_and_win_rates_batched(
         diff_means, field.diff_vars, volume_context)
-    return scores - WIN_RATE_PENALTY * ((win_rates - h_scoring_win_rates) ** 2).sum(axis=1)
+    shortfalls = np.maximum(h_scoring_win_rates - win_rates, 0.0)
+    return scores - WIN_RATE_PENALTY * (shortfalls ** 2).sum(axis=1)
 
 
 def score_seatings(
@@ -359,14 +437,18 @@ def run_frank_wolfe(
     , h_scoring_win_rates: np.ndarray
     , naive_seating: np.ndarray
 ) -> np.ndarray:
-    """Frank-Wolfe on the penalized objective from the naive team; returns the best whole team it visited (possibly
-    the naive team itself) as a seating."""
+    """Frank-Wolfe on the penalized objective from the naive team. Each step heads for the linear program's best point
+    -- a whole team where the constraints are totally unimodular, possibly a mix where they are not (an auction, NBA-team
+    rows), which spares an integer program per step. Returns, as a seating, the best whole team among the corners it
+    visited (the naive team included) and its final mix rounded to the legal team keeping the most of each player's
+    share in it -- a mix itself is never returned."""
     seating = naive_seating
     visited = [naive_seating]
     for _ in range(FRANK_WOLFE_ITERATIONS):
         gradient = compute_seating_gradient(h_agent, problem, field, seating, h_scoring_win_rates)
-        vertex = find_best_legal_team(problem, gradient)
-        visited.append(vertex)
+        vertex = find_best_legal_mix(problem, gradient)
+        if np.allclose(vertex, np.round(vertex), atol=1e-6):
+            visited.append(np.round(vertex))
         direction = vertex - seating
         if gradient @ direction < 1e-7:
             break
@@ -376,45 +458,59 @@ def run_frank_wolfe(
         if best_step == 0.0:
             break
         seating = seating + best_step * direction
+    player_shares = convert_seatings_to_selections(problem, seating[np.newaxis, :])[0]
+    visited.append(find_best_legal_team(problem, player_shares[problem.seat_players]))
     return visited[int(np.argmax(score_seatings(h_agent, problem, field, np.array(visited), h_scoring_win_rates)))]
 
 
-def seat_team_by_specificity(
-    problem: TeamSolveProblem
+def improve_team_by_swaps(
+    h_agent: HAgent
+    , problem: TeamSolveProblem
+    , field: CompleteTeamField
+    , h_scoring_win_rates: np.ndarray
     , seating: np.ndarray
 ) -> np.ndarray:
-    """The same team, re-seated so its earlier picks hold the more specific slots: among every legal seating of exactly
-    these players (eligibility, slot counts, the flex allocation, my players and the candidate where they are), the one
-    maximizing the sum of pick priority x slot specificity over the open players. A slot's specificity is the inverse
-    of how many base positions it takes (PG: 1, G: 1/2, Util: 1/5); a pick's priority is its rank among the open picks
-    from the latest -- in a draft the earliest base-H rank (the earliest planned round) ranks highest, in an auction the
-    highest predicted price. Display only: the team, and so its score, is unchanged."""
-    team = convert_seatings_to_selections(problem, seating[np.newaxis, :])[0] > 0.5
-    open_players = [index for index in np.flatnonzero(team) if index >= problem.n_fixed_players]
-    if problem.is_auction:
-        open_players.sort(key=lambda index: (-problem.predicted_prices[index], index))
-    priority = np.zeros(len(problem.pool_player_ids))
-    for order, index in enumerate(open_players):
-        priority[index] = len(open_players) - order
-
-    slot_specificity = 1.0 / np.array(problem.slot_base_counts, dtype=float)
-    seat_values = priority[problem.seat_players] * slot_specificity[problem.seat_slot_types]
-
-    # Only the team's own players may be seated, each exactly once (the problem's rows already hold every other rule).
-    team_rows = [(problem.seat_players == index).astype(float) for index in np.flatnonzero(team)]
-    outsider_seats = ~team[problem.seat_players]
-    result = linprog(
-        -seat_values,
-        A_ub=problem.inequality_rows, b_ub=problem.inequality_bounds,
-        A_eq=np.vstack([problem.equality_rows] + team_rows),
-        b_eq=np.concatenate([problem.equality_bounds, np.ones(len(team_rows))]),
-        bounds=[(0, 0) if is_outsider else (0, 1) for is_outsider in outsider_seats], method='highs',
-    )
-    if result.status != 0:
-        raise RuntimeError(f'Re-seating a legal team failed ({result.message}).')
-    if not np.allclose(result.x, np.round(result.x), atol=1e-6):
-        raise RuntimeError('The re-seated team came back fractional.')
-    return np.round(result.x)
+    """Best-improvement swaps to a local optimum: each round tries every swap of one open player's seat for a seat of a
+    player outside the team (in the top SWAP_RANK_LIMIT of the predicted draft order), keeps those that leave every rule satisfied,
+    and makes the one that most improves the penalized objective; it stops when none does. Legality is exact without a
+    solve: replacing one seat by another keeps the equality rows (team size, fixed players), and the inequality rows
+    are checked as the current row loads plus the two seats' columns. Returns the improved seating."""
+    seating = seating.copy()
+    rows = problem.inequality_rows
+    is_outside_candidate_seat = ((problem.seat_players >= problem.n_fixed_players)
+                                 & (problem.base_ranks[problem.seat_players] >= 0)
+                                 & (problem.base_ranks[problem.seat_players] < SWAP_RANK_LIMIT))
+    selection = convert_seatings_to_selections(problem, seating[np.newaxis, :])
+    current_score = score_seatings(h_agent, problem, field, seating[np.newaxis, :], h_scoring_win_rates)[0]
+    while True:
+        on_team = selection[0] > 0.5
+        outgoing_seats = [int(seat) for seat in np.flatnonzero(seating > 0.5)
+                          if problem.seat_players[seat] >= problem.n_fixed_players]
+        incoming_seats = np.flatnonzero(is_outside_candidate_seat & ~on_team[problem.seat_players])
+        loads = rows @ seating
+        swaps = []
+        for outgoing in outgoing_seats:
+            changed_loads = loads[:, np.newaxis] - rows[:, [outgoing]] + rows[:, incoming_seats]
+            legal = (changed_loads <= problem.inequality_bounds[:, np.newaxis] + 1e-9).all(axis=0)
+            swaps += [(outgoing, int(incoming)) for incoming in incoming_seats[legal]]
+        if not swaps:
+            return seating
+        outgoing_players = problem.seat_players[[outgoing for outgoing, _ in swaps]]
+        incoming_players = problem.seat_players[[incoming for _, incoming in swaps]]
+        totals = (selection @ problem.x_scores - problem.x_scores[outgoing_players]
+                  + problem.x_scores[incoming_players])
+        units = None
+        if problem.volume_units is not None:
+            units = (selection @ problem.volume_units - problem.volume_units[outgoing_players]
+                     + problem.volume_units[incoming_players])
+        scores = score_team_totals(h_agent, problem, field, totals, units, h_scoring_win_rates)
+        best = int(np.argmax(scores))
+        if scores[best] <= current_score + 1e-12:
+            return seating
+        outgoing, incoming = swaps[best]
+        seating[outgoing], seating[incoming] = 0.0, 1.0
+        selection = convert_seatings_to_selections(problem, seating[np.newaxis, :])
+        current_score = scores[best]
 
 
 # ── naive_exact_team_solve ────────────────────────────────────────────────────
@@ -444,8 +540,9 @@ def solve_fw_exact_team_for_draft(
     , h_scoring_win_rates: np.ndarray
     , naive_seating: np.ndarray
 ) -> np.ndarray:
-    """Frank-Wolfe refinement of the naive draft team; a seating."""
-    return run_frank_wolfe(h_agent, problem, field, h_scoring_win_rates, naive_seating)
+    """Frank-Wolfe refinement of the naive draft team, polished by swaps; a seating."""
+    refined = run_frank_wolfe(h_agent, problem, field, h_scoring_win_rates, naive_seating)
+    return improve_team_by_swaps(h_agent, problem, field, h_scoring_win_rates, refined)
 
 
 def solve_fw_exact_team_for_auction(
@@ -455,5 +552,47 @@ def solve_fw_exact_team_for_auction(
     , h_scoring_win_rates: np.ndarray
     , naive_seating: np.ndarray
 ) -> np.ndarray:
-    """Frank-Wolfe refinement of the naive auction team; a seating."""
-    return run_frank_wolfe(h_agent, problem, field, h_scoring_win_rates, naive_seating)
+    """Frank-Wolfe refinement of the naive auction team, polished by swaps; a seating."""
+    refined = run_frank_wolfe(h_agent, problem, field, h_scoring_win_rates, naive_seating)
+    return improve_team_by_swaps(h_agent, problem, field, h_scoring_win_rates, refined)
+
+
+# ── assignment_by_specificity ─────────────────────────────────────────────────
+
+def seat_team_by_specificity(
+    problem: TeamSolveProblem
+    , seating: np.ndarray
+) -> np.ndarray:
+    """The same team, re-seated so its earlier picks hold the more specific slots: among every legal seating of exactly
+    these players (eligibility, slot counts, the flex allocation, my players and the candidate where they are), the one
+    maximizing the sum of pick priority x slot specificity over the open players. A slot's specificity is the inverse
+    of how many base positions it takes (PG: 1, G: 1/2, Util: 1/5); a pick's priority is its rank among the open picks
+    from the latest -- in a draft the earliest in the predicted draft order (the earliest planned round) ranks highest,
+    in an auction the
+    highest predicted price. Display only: the team, and so its score, is unchanged."""
+    team = convert_seatings_to_selections(problem, seating[np.newaxis, :])[0] > 0.5
+    open_players = [index for index in np.flatnonzero(team) if index >= problem.n_fixed_players]
+    if problem.is_auction:
+        open_players.sort(key=lambda index: (-problem.predicted_prices[index], index))
+    priority = np.zeros(len(problem.pool_player_ids))
+    for order, index in enumerate(open_players):
+        priority[index] = len(open_players) - order
+
+    slot_specificity = 1.0 / np.array(problem.slot_base_counts, dtype=float)
+    seat_values = priority[problem.seat_players] * slot_specificity[problem.seat_slot_types]
+
+    # Only the team's own players may be seated, each exactly once (the problem's rows already hold every other rule).
+    team_rows = [(problem.seat_players == index).astype(float) for index in np.flatnonzero(team)]
+    outsider_seats = ~team[problem.seat_players]
+    result = linprog(
+        -seat_values,
+        A_ub=problem.inequality_rows, b_ub=problem.inequality_bounds,
+        A_eq=np.vstack([problem.equality_rows] + team_rows),
+        b_eq=np.concatenate([problem.equality_bounds, np.ones(len(team_rows))]),
+        bounds=[(0, 0) if is_outsider else (0, 1) for is_outsider in outsider_seats], method='highs',
+    )
+    if result.status != 0:
+        raise RuntimeError(f'Re-seating a legal team failed ({result.message}).')
+    if not np.allclose(result.x, np.round(result.x), atol=1e-6):
+        raise RuntimeError('The re-seated team came back fractional.')
+    return np.round(result.x)

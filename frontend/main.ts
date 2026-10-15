@@ -229,7 +229,18 @@ getPlatformSelectElement().addEventListener('change', () => {
     limitDataSourcesToPlatform(getLeagueSettings().platform, { announceChange: true })   // 0. live platforms: projections only
     applyLayout()                 // 1. swap the layout for the new platform
     refreshSeasonRostersIfLive()  // 2. season live-roster sync
-    syncForPlatformSwitch()       // 3. seat options + the right evaluation for the new source
+    // 3. Back to own data: manual entry's league shape is on screen again (league_settings restored it), and the
+    // session still has the league's, so it gets manual entry's -- the update runs the evaluation. Otherwise the seat
+    // options and the right evaluation for the new source.
+    if (getLeagueSettings().platform === 'Enter your own data') {
+        refreshSeatOptions()
+        if (isSlotCountsValid()) {
+            const { n_drafters, n_picks, cash_per_team } = getLeagueSettings()
+            applyLeagueSettings(4, { league: { n_drafters, n_picks, cash_per_team }, slot_counts: getSlotCounts() })
+        }
+    } else {
+        syncForPlatformSwitch()
+    }
     // 4. Season Mode: the tab on screen follows the platform too -- its rosters (or, a league's still loading, the
     // message saying so) changed with it; the rosters arriving redraw it again.
     redrawActiveSeasonTab()

@@ -4,7 +4,8 @@
 #   - draft teams are legal (slots, held players, the candidate, one pick per round from that round or later), and
 #     my players and the candidate keep the slots H-scoring's roster gave them
 #   - auction teams are legal and fit the budget at whole predicted prices
-#   - Frank-Wolfe never ends below the naive team on the penalized objective, and every team fills each flex slot
+#   - Frank-Wolfe never ends below the naive team, the swaps never end below Frank-Wolfe and leave a legal team at a
+#     local optimum, and every team fills each flex slot
 #     type with each base position as often as H-scoring's flex allocation expects (rounded down or up), also after
 #     re-seating the team so its earlier picks hold the more specific slots
 #   - asking for a hypothetical team changes nothing the evaluate returns afterwards
@@ -12,12 +13,15 @@
 # Uses 2024-25 historical data with default parameters.
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from benchmark_helpers import client, _build_session_request
 from backend.state.session import get_session
 from backend.math import exact_team_solves
-from backend.services.ranking import make_candidate_strategy_key, make_slot_names
+from backend.services.ranking import (
+    make_candidate_strategy_key, make_slot_names, compute_original_and_generic_dollars,
+)
 from backend.services.hypothetical_team import compute_expected_flex_position_counts
 
 
@@ -123,13 +127,24 @@ def test_frank_wolfe_never_ends_below_the_naive_team(draft_session):
         expected = compute_expected_flex_position_counts(
             strategy.flex_shares, fixed_slot_types, agent.position_config.position_numbers)
         problem = exact_team_solves.build_team_solve_problem(
-            agent, board, 'Drafter 1', candidate, [], fixed_slot_types, expected, None, None)
+            agent, board, 'Drafter 1', candidate, [], [int(p) for p in agent.default_h_scores.index],
+            fixed_slot_types, expected, None, None, None)
         naive = exact_team_solves.solve_naive_exact_team_for_draft(problem, strategy.category_weights)
         field = exact_team_solves.capture_complete_team_field(agent, problem, board, 'Drafter 1', [], naive, None)
+        frank_wolfe = exact_team_solves.run_frank_wolfe(agent, problem, field, strategy.win_rates, naive)
         refined = exact_team_solves.solve_fw_exact_team_for_draft(agent, problem, field, strategy.win_rates, naive)
-        naive_objective, refined_objective = exact_team_solves.score_seatings(
-            agent, problem, field, np.array([naive, refined]), strategy.win_rates)
-        assert refined_objective >= naive_objective - 1e-12
+        naive_objective, frank_wolfe_objective, refined_objective = exact_team_solves.score_seatings(
+            agent, problem, field, np.array([naive, frank_wolfe, refined]), strategy.win_rates)
+        assert frank_wolfe_objective >= naive_objective - 1e-12
+        assert refined_objective >= frank_wolfe_objective - 1e-12, 'the swaps never lower the objective'
+
+        # The swapped team is a whole, legal team under every rule of the solve.
+        assert np.array_equal(refined, np.round(refined))
+        assert (problem.inequality_rows @ refined <= problem.inequality_bounds + 1e-9).all()
+        assert np.allclose(problem.equality_rows @ refined, problem.equality_bounds)
+        # ...and is a local optimum: running the swaps again changes nothing.
+        assert np.array_equal(
+            exact_team_solves.improve_team_by_swaps(agent, problem, field, strategy.win_rates, refined), refined)
 
         # Re-seating by specificity keeps exactly the same players.
         reseated = exact_team_solves.seat_team_by_specificity(problem, refined)
@@ -184,6 +199,77 @@ def test_auction_hypothetical_team_fits_the_budget():
     assert all(isinstance(price, int) and price >= 1 for price in prices)
     candidate_price = max(round(affordable['auction_values']['generic_dollar']), 1)
     assert sum(prices) + candidate_price <= 140
+
+
+def solve_team_with_teams(agent, strategy, board, candidate, player_teams, remaining_cash=None, predicted_prices=None):
+    """The app's pipeline (naive -> Frank-Wolfe and swaps) for one candidate with NBA-team rules; returns the problem and
+    the final seating."""
+    slot_names = make_slot_names(agent.position_config)
+    fixed_slot_types = [slot_names[slot_index].rstrip('0123456789') for slot_index in strategy.seating]
+    expected = compute_expected_flex_position_counts(
+        strategy.flex_shares, fixed_slot_types, agent.position_config.position_numbers)
+    problem = exact_team_solves.build_team_solve_problem(
+        agent, board, 'Drafter 1', candidate, [], [int(p) for p in agent.default_h_scores.index],
+        fixed_slot_types, expected, remaining_cash, predicted_prices, player_teams)
+    if remaining_cash is None:
+        naive = exact_team_solves.solve_naive_exact_team_for_draft(problem, strategy.category_weights)
+    else:
+        naive = exact_team_solves.solve_naive_exact_team_for_auction(problem, strategy.category_weights)
+    field = exact_team_solves.capture_complete_team_field(agent, problem, board, 'Drafter 1', [], naive, None)
+    if remaining_cash is None:
+        seating = exact_team_solves.solve_fw_exact_team_for_draft(agent, problem, field, strategy.win_rates, naive)
+    else:
+        seating = exact_team_solves.solve_fw_exact_team_for_auction(agent, problem, field, strategy.win_rates, naive)
+    return problem, seating
+
+
+def test_draft_example_team_takes_its_first_picks_from_different_nba_teams(draft_session):
+    session_id, session = draft_session
+    agent = session.agent
+    board = make_two_round_board(session)
+    request = {'player_assignments': board, 'my_team_id': 'Drafter 1'}
+    candidates = client.post(f'/sessions/{session_id}/evaluate', json=request).json()['candidates']
+    strategies = session.candidate_strategy_cache[make_candidate_strategy_key(board, 'Drafter 1', [], None, None)][1]
+    # Ten artificial NBA teams, so the rule binds hard: plenty of top players share one.
+    player_teams = pd.Series({int(p): f'team {int(p) % 10}' for p in agent.default_h_scores.index})
+    for candidate in [c['player_id'] for c in candidates[:3]]:
+        problem, seating = solve_team_with_teams(agent, strategies[candidate], board, candidate, player_teams)
+        assert problem.uses_integer_program
+        team = [problem.pool_player_ids[i] for i in np.flatnonzero(
+            exact_team_solves.convert_seatings_to_selections(problem, seating[np.newaxis, :])[0] > 0.5)]
+        # My two players and the candidate are rounds 1-3; open players predicted for rounds 4-7 join them.
+        top_picks = board['Drafter 1'] + [candidate] + [
+            player for player in team if problem.pool_player_ids.index(player) >= problem.n_fixed_players
+            and problem.base_rounds[problem.pool_player_ids.index(player)] <= exact_team_solves.DRAFT_DISTINCT_TEAM_ROUNDS]
+        fixed_teams = [player_teams[p] for p in board['Drafter 1'] + [candidate]]
+        open_teams = [player_teams[p] for p in top_picks[len(fixed_teams):]]
+        for nba_team in set(open_teams):
+            assert open_teams.count(nba_team) + fixed_teams.count(nba_team) <= max(1, fixed_teams.count(nba_team)), \
+                f'{nba_team} repeats among the first picks'
+
+
+def test_auction_example_team_holds_at_most_two_players_per_nba_team():
+    session_id, session = create_session('Each Category', cash_per_team=200)
+    agent = session.agent
+    teams = [f'Drafter {seat + 1}' for seat in range(session.current_settings['n_drafters'])]
+    board = {team: [] for team in teams}
+    remaining_cash = {team: 200.0 for team in teams}
+    request = {'player_assignments': board, 'my_team_id': 'Drafter 1', 'remaining_cash': remaining_cash}
+    candidates = client.post(f'/sessions/{session_id}/evaluate', json=request).json()['candidates']
+    strategies = session.candidate_strategy_cache[
+        make_candidate_strategy_key(board, 'Drafter 1', [], remaining_cash, None)][1]
+    player_teams = pd.Series({int(p): f'team {int(p) % 10}' for p in agent.default_h_scores.index})
+    # Generic dollars for the whole available pool, as the service computes them.
+    _, prices = compute_original_and_generic_dollars(
+        agent.default_h_scores, agent.x_scores.index, agent.n_drafters * agent.n_picks, agent.n_drafters * 200,
+        sum(remaining_cash.values()), session.current_settings['streaming_noise'])
+    candidate = next(c for c in candidates if c['auction_values']['generic_dollar'] < 60)['player_id']
+    problem, seating = solve_team_with_teams(agent, strategies[candidate], board, candidate, player_teams,
+                                             remaining_cash=200.0, predicted_prices=prices)
+    team = [problem.pool_player_ids[i] for i in np.flatnonzero(
+        exact_team_solves.convert_seatings_to_selections(problem, seating[np.newaxis, :])[0] > 0.5)]
+    nba_teams = [player_teams[p] for p in team]
+    assert max(nba_teams.count(t) for t in set(nba_teams)) <= exact_team_solves.AUCTION_PLAYERS_PER_TEAM
 
 
 def test_requests_without_an_evaluate_on_record_are_refused(draft_session):

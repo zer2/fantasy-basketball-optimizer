@@ -107,6 +107,24 @@ test('candidate table content and detail views', async t => {
             await page.locator('#hscoretable .playerheaderdiv').nth(1).click()
             await expectHypotheticalTeamFills(/^Rd \d+$/, { expectSpinners: true })
             expectCleanSession(app, 'draft hypothetical team')
+
+            // Hovering any filled roster cell -- a hypothetical pick or the candidate -- shows that player's G-scores.
+            const grid = page.locator('[data-testid="roster-assignments-table"]')
+            const card = page.locator('[data-testid="gscore-hover-card"]')
+            for (const cellSelector of ['td.rosterhypothetical', 'td.rostercandidate']) {
+                await grid.locator(cellSelector).first().hover()
+                await card.waitFor({ state: 'visible', timeout: 5000 })
+                const name = await card.locator('thead tr').first().innerText()
+                assert.ok(name.trim().length > 0, "the card is headed by the player's name")
+                const headers = await card.locator('thead tr').nth(1).locator('th').allTextContents()
+                const values = await card.locator('tbody td').allTextContents()
+                assert.equal(headers[0], 'Total', 'the G-score total comes first')
+                assert.ok(headers.length > 2, 'the card shows the categories too')
+                assert.equal(values.length, headers.length, 'one value per header')
+                for (const value of values) assert.match(value, /^-?\d+\.\d\d$/)
+                await page.mouse.move(0, 0)
+                await card.waitFor({ state: 'detached', timeout: 5000 })
+            }
             await page.locator('#hscoretable .playerheaderdiv').nth(1).click()   // collapse again
             await page.locator('[data-testid="roster-assignments-table"]').waitFor({ state: 'hidden', timeout: 5000 })
         })

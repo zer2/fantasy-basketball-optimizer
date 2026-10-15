@@ -339,6 +339,17 @@ const STATES = {
         await expandCandidateByName(page, 'Dyson Daniels')
     },
 
+    // The same Daniels panel with the pointer over Giannis' roster cell: his G-score hover card. Giannis rather than
+    // Daniels because his PF cell sits mid-grid, so the card centred under it stays inside the grid's width.
+    async 'candidate-hover'(page) {
+        await ensure(page, 'candidate')
+        const cell = page.locator('[data-testid="roster-assignments-table"] td.rosteronteam').first()
+        await cell.scrollIntoViewIfNeeded()
+        await cell.hover()
+        await page.locator('[data-testid="gscore-hover-card"]').waitFor({ state: 'visible' })
+        await page.waitForTimeout(200)
+    },
+
     // The same Daniels panel with Display > Show example team on: the empty roster slots fill with a hypothetical
     // team H-scoring's plan for him could become. The shot's `after` step switches the toggle off again.
     async 'candidate-example-team'(page) {
@@ -573,8 +584,8 @@ const STATES = {
 //   ranks top-6 there); auction & season use 2025-26 (Season needs it — its rosters are 2025-26
 //   players). Set in the runner + auction/season states via selectHistoricalSeason().
 //
-//   AUTO (33, capture cleanly & verified light-theme): main hec hmc rototop positions hexp
-//     hstrat hflex hroster hrosterexample projections 1984-85 lsettings fantraxsettings espnpop hdollars
+//   AUTO (34, capture cleanly & verified light-theme): main hec hmc rototop positions hexp
+//     hstrat hflex hroster hrosterhover hrosterexample projections 1984-85 lsettings fantraxsettings espnpop hdollars
 //     auctiondetail hwaiver hwaiverexp tradeanalysis tradeanalysisg tradesuggestions tp3 rosters
 //     rosterinspection rosterh autodraft mdraft (draft manual entry, Jokic locked in as pick 1)
 //     mauction (auction manual entry, Jokic to Team 1 for $70) moreinfo (league-settings
@@ -616,6 +627,10 @@ const SHOTS = [
     { name: 'hstrat',      state: 'candidate',   selector: '[data-testid="future-pick-strategy-table"]' },
     { name: 'hflex',       state: 'candidate',   selector: '[data-testid="flex-allocations-table"]' },
     { name: 'hroster',     state: 'candidate',   selector: '[data-testid="roster-assignments-table"]' },
+    // The roster grid with the G-score card of the player under the pointer (hscores.md, Roster allocation strategy).
+    { name: 'hrosterhover', state: 'candidate-hover', pad: 6,
+      union: ['[data-testid="roster-assignments-table"]', '[data-testid="gscore-hover-card"]'],
+      after: async page => { await page.mouse.move(0, 0) } },
     // The roster grid with the example team filled in, and the note under it.
     { name: 'hrosterexample', state: 'candidate-example-team', selector: '[data-testid="roster-assignments-panel"]',
       after: async page => { await setExampleTeamShown(page, false) } },

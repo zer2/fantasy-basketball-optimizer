@@ -586,6 +586,57 @@ test("the league's position structure is a default: edits survive a reconnect un
     }
 })
 
+test("manual entry keeps its own league shape: connecting a league never overwrites it", async () => {
+    // A connection used to save the league's slots over manual entry's while leaving its pick count unsaved, so after
+    // a reload manual entry showed its own picks beside the league's slots (2026-10-15).
+    const app = await launchAppPage()
+    const { page } = app
+    const leagueSlots = { PG: 1, SG: 1, G: 1, SF: 1, PF: 1, F: 1, C: 1, Util: 4 }
+    const readShape = () => page.evaluate(() => ({
+        drafters: document.getElementById('ls-n-drafters').value,
+        picks: document.getElementById('ls-n-picks').value,
+        util: document.getElementById('sc-util').value,
+        bench: document.getElementById('sc-bench-slots').value,
+    }))
+    try {
+        await loadApp(app)
+        const manual = await readShape()
+        await stubLivePlatform(page, { availableModes: ALL_MODES, picksPerTeam: 11, slotCounts: leagueSlots })
+        await page.route(url => url.pathname.endsWith('/leagues'), route => route.fulfill({
+            status: 200, contentType: 'application/json', body: JSON.stringify({ leagues: [] }) }))
+        await connectYahooLeague(app, '12345')
+        assert.deepEqual(await readShape(), { drafters: String(LEAGUE_TEAMS.length), picks: '11', util: '4', bench: '0' })
+
+        const sessionUpdates = []
+        page.on('request', request => {
+            if (request.method() === 'PATCH' && /\/sessions\/[^/]+$/.test(new URL(request.url()).pathname)) {
+                sessionUpdates.push(request.postDataJSON())
+            }
+        })
+        await setSelect(page, 'ls-platform', 'Enter your own data')
+        await waitAppSettled(app, { timeout: 120000 })
+        assert.deepEqual(await readShape(), manual, "own data shows manual entry's shape again")
+        const update = sessionUpdates.at(-1)
+        assert.equal(update.league.n_picks, Number(manual.picks), "...and the session gets it")
+        assert.equal(update.league.n_drafters, Number(manual.drafters))
+        assert.equal(update.slot_counts.Util, Number(manual.util))
+
+        await page.reload({ waitUntil: 'domcontentloaded' })
+        await page.waitForFunction(() => document.getElementById('ls-n-picks') !== null, null, { timeout: 60000 })
+        await waitAppSettled(app, { timeout: 120000 })
+        assert.deepEqual(await readShape(), manual, 'a reload keeps it')
+
+        await setSelect(page, 'ls-platform', 'Retrieve from Yahoo')
+        await page.waitForFunction(() => document.getElementById('ls-n-picks').value === '11', null, { timeout: 60000 })
+        await waitAppSettled(app, { timeout: 120000 })
+        assert.deepEqual(await readShape(), { drafters: String(LEAGUE_TEAMS.length), picks: '11', util: '4', bench: '0' },
+                         "reconnecting brings the league's shape back")
+        expectCleanSession(app, 'manual and league shapes kept apart')
+    } finally {
+        await app.close()
+    }
+})
+
 test('a connection whose picks no structure fits waits for the Position Parameters, then loads', async () => {
     // A platform that does not report positions, at a pick count with no default structure: the 13-slot default was
     // sent for 11 picks. Now nothing reaches the session until the slots fit, and applying them sends the connection.

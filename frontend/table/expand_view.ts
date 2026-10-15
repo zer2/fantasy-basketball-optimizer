@@ -6,6 +6,7 @@ import { stat_styler_primary, stat_styler_tertiary, G_SCORE_MULTIPLIER } from '.
 import { PlayerResult, FlexAllocations, Roster, HypotheticalTeam, BoardRequest } from '../types.js'
 import { getPositionNames, getPositionStructure, getLatestScoredBoard } from '../app_state.js'
 import { makeSpacerTh } from './table_helpers.js'
+import { buildPlayerGScoreCard } from './gscore_table.js'
 import { makeMinimalPlayerDisplay, makeHypotheticalPlayerDisplay } from '../player_display.js'
 import { fetchHypotheticalTeam, HTTPError } from '../api/client.js'
 import { getRegistryEntry } from '../player_registry.js'
@@ -190,6 +191,54 @@ function readErrorDetail(error: HTTPError): string {
         return error.body
     }
 }
+
+// ─── G-score hover card ───────────────────────────────────────────────────────
+// Hovering a filled roster cell (a tap on a touch screen) shows that player's G-scores -- the Total and each category
+// -- in a card floating beside the cell. One card at a time; it floats above the page, so the panel never moves.
+
+let gScoreCard: { element: HTMLDivElement; anchor: HTMLElement } | null = null
+
+/** Shows the player's G-score card on hover, or on a tap for touch input (a second tap closes it). */
+function attachGScoreCard(cell: HTMLElement, playerId: number): void {
+    cell.addEventListener('mouseenter', () => showGScoreCard(cell, playerId))
+    cell.addEventListener('mouseleave', () => hideGScoreCard())
+    cell.addEventListener('click', event => {
+        if ((event as PointerEvent).pointerType === 'mouse') return   // the mouse already shows it on hover
+        if (gScoreCard?.anchor === cell) hideGScoreCard()
+        else showGScoreCard(cell, playerId)
+        event.stopPropagation()
+    })
+}
+
+/** Places the card centred under the cell (over it when there is no room below in the window), kept inside the window,
+ *  in page coordinates so it stays beside the cell when the page scrolls. */
+function showGScoreCard(cell: HTMLElement, playerId: number): void {
+    hideGScoreCard()
+    const element = document.createElement('div')
+    element.className = 'gscore-hover-card'
+    element.appendChild(buildPlayerGScoreCard(playerId))
+    document.body.appendChild(element)
+    const cellBox = cell.getBoundingClientRect()
+    const cardBox = element.getBoundingClientRect()
+    const margin = 6
+    const below = cellBox.bottom + margin
+    const top = below + cardBox.height <= window.innerHeight ? below : cellBox.top - margin - cardBox.height
+    const centred = cellBox.left + cellBox.width / 2 - cardBox.width / 2
+    const left = Math.min(Math.max(margin, centred), window.innerWidth - cardBox.width - margin)
+    element.style.top = `${Math.max(margin, top) + window.scrollY}px`
+    element.style.left = `${Math.max(margin, left) + window.scrollX}px`
+    gScoreCard = { element, anchor: cell }
+}
+
+function hideGScoreCard(): void {
+    gScoreCard?.element.remove()
+    gScoreCard = null
+}
+
+// A resize can reflow the cell away from the card, so it closes the card; so does a tap elsewhere.
+window.addEventListener('resize', hideGScoreCard)
+document.addEventListener('click', hideGScoreCard)
+
 
 /** A roster cell's corner label listing the positions the player is eligible for, one per line (a narrow column). */
 function makePositionEligibilityLabel(playerId: number): HTMLSpanElement {
@@ -486,6 +535,7 @@ function makeRosterGrid(
         slotsByType[positionType].push(slot)
     }
 
+    hideGScoreCard()
     const groups = document.createElement('div')
     groups.className = 'roster-groups'
     groups.dataset.testid = 'roster-assignments-table'
@@ -532,11 +582,13 @@ function makeRosterGrid(
                 cell.className = 'rosterhypothetical panel-datacell roster-player-cell'
                 cell.appendChild(makeHypotheticalPlayerDisplay(assignment.player_id, label))
                 cell.appendChild(makePositionEligibilityLabel(assignment.player_id))
+                attachGScoreCard(cell, assignment.player_id)
             } else {
                 cell.className = (assignment.kind === 'candidate' ? 'rostercandidate' : 'rosteronteam')
                     + ' panel-datacell roster-player-cell'
-                cell.appendChild(makeMinimalPlayerDisplay(assignment.player_id))
+                cell.appendChild(makeMinimalPlayerDisplay(assignment.player_id, false))   // the card shows the name
                 cell.appendChild(makePositionEligibilityLabel(assignment.player_id))
+                attachGScoreCard(cell, assignment.player_id)
             }
         }
         ;(flexPositions.has(positionType) ? flexBlock : baseBlock).appendChild(group)

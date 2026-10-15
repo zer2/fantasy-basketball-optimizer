@@ -202,6 +202,18 @@ def _parse_with_renamer(
     # it is dropped here rather than becoming a duplicate label.
     df = df_raw[list(column_mapping)].rename(columns=column_mapping).copy()
 
+    # A header row repeated inside the table body (exports that reprint it every page) repeats the file's own column
+    # names in its cells: its player-name cell reads "PLAYER" (or whatever the name column is called). Drop those rows
+    # by that, not only by their stat cells being non-numeric below -- a spreadsheet can turn a repeated "3PM" header
+    # into the time "3:00 PM", which leaves the row a stat cell that looks numeric.
+    identity_columns = {'Player', 'Position'} | _SPLIT_NAME_COLUMNS
+    is_repeated_header = pd.Series(False, index=df.index)
+    for raw_name, canonical_name in column_mapping.items():
+        if canonical_name in identity_columns:
+            is_repeated_header |= (df_raw[raw_name].astype(str).str.strip().str.casefold()
+                                   == str(raw_name).strip().casefold())
+    df = df[~is_repeated_header]
+
     # Before the ratio cells are reduced to their leading number below, mine them for any
     # attempts column the file does not carry separately.
     df = _recover_volumes_from_ratio_cells(df, sport_params)
@@ -212,13 +224,13 @@ def _parse_with_renamer(
     # then drop rows with no numeric stats at all — those are the embedded header/junk rows.
     def coerce_stat_column(column: pd.Series) -> pd.Series:
         if column.dtype == object:
-            # Leading number only, and not one embedded in a word — the repeated header
-            # rows contain cells like "3PM", which must NOT read as the number 3.
+            # Leading number only, and not one embedded in a word or a time — the repeated
+            # header rows contain cells like "3PM" (or "3:00 PM", a spreadsheet's reading of
+            # it), which must NOT read as the number 3.
             column = column.astype(str).str.extract(
-                r'^\s*(-?(?:\d+\.?\d*|\.\d+))(?![A-Za-z])', expand=False)
+                r'^\s*(-?(?:\d+\.?\d*|\.\d+))(?![A-Za-z:])', expand=False)
         return pd.to_numeric(column, errors='coerce')
 
-    identity_columns = {'Player', 'Position'} | _SPLIT_NAME_COLUMNS
     stat_columns = [column for column in df.columns if column not in identity_columns]
     df[stat_columns] = df[stat_columns].apply(coerce_stat_column)
     df = df.dropna(subset=stat_columns, how='all')

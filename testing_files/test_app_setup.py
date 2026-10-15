@@ -453,6 +453,25 @@ def test_parse_projection_upload_reads_any_recognized_spelling():
     assert 'Ticker' in str(exc_info.value), "the error should list the file's unrecognized headers"
 
 
+def test_parse_projection_upload_drops_repeated_header_rows_even_when_a_spreadsheet_mangled_them():
+    """Exports reprint the header row every page. A spreadsheet can turn a reprinted "3PM" into the time "3:00 PM",
+    which once read as the number 3 and kept the row, a player named "PLAYER" (a Hashtag Basketball sheet,
+    2026-10-15: fourteen such rows, all resolving to the same unknown-player id, refused the session)."""
+    from backend.services.projection_parsing import parse_projection_upload
+    params = _load_params()['NBA']
+    header = 'R#,PLAYER,POS,GP,PTS,TREB,AST,STL,BLK,TO,3PM,FG%,FT%\n'
+    mangled_header = 'R#,PLAYER,POS,GP,PTS,TREB,AST,STL,BLK,TO,3:00 PM,FG%,FT%\n'
+    csv = (header
+           + '1,First Player,C,70,25.0,10.0,5.0,1.0,1.0,3.0,2.0,0.573(10.5/18.3),0.816(5.6/6.8)\n'
+           + mangled_header
+           + '2,Second Player,PG,68,20.0,4.0,8.0,1.5,0.4,2.5,2.5,0.469(8.0/17.0),0.889(4.0/4.5)\n'
+           + header
+           + '3,Third Player,SF,60,15.0,6.0,3.0,1.0,0.5,1.5,1.8,0.480(6.0/12.5),0.780(2.0/2.6)\n').encode()
+    parsed = parse_projection_upload(csv, params)
+    assert sorted(parsed.index) == ['First Player', 'Second Player', 'Third Player']
+    assert parsed.loc['Second Player', 'Threes'] == 2.5
+
+
 def test_parse_projection_upload_reads_shares_as_fractions_either_way():
     """Shooting percentages and games played % arrive as 0.475 or as 47.5 depending on the source;
     both must land as fractions, since the blend averages them with ESPN's fractions. Assist to TO

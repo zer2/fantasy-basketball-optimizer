@@ -217,14 +217,21 @@ The algorithm uses a simple model to estimate how its position strategy will inf
 
 ### Roster allocation strategy
 
-The fourth element of the drop-down shows how the algorithm intends to arrange its previously chosen players, plus the candidate player, into position slots. 
+The fourth element of the drop-down shows how the algorithm intends to arrange its previously chosen players, plus the candidate player, into position slots.
 
 ![Roster assignments](img/hroster.png)
 /// caption
 Roster assignments for the same example — Giannis slots in at Power Forward and the Daniels candidate at Shooting Guard. Each Category, 2024-25.
 ///
 
-The roster allocation is strategically relevant because it can free up different positions to take with future draft picks. In the example above, the algorithm is choosing to categorize Daniels as a SG, likely because it does not want to take more SGs in general. It figures this out via a sub-algorithm, solving an assignment problem matching players to roster slots. 
+Hovering over a player triggers hovertext with their stats to pop up.
+
+![G-score hover card](img/hrosterhover.png)
+/// caption
+G-scores for Giannis, 2024-25.
+///
+
+The roster allocation is strategically relevant because it can free up different positions to take with future draft picks. In the example above, the algorithm is choosing to categorize Daniels as a SG, likely because it does not want to take more SGs in general. It figures this out via a sub-algorithm, solving an assignment problem matching players to roster slots.
 
 <video controls preload="metadata" width="100%" poster="../videos/roster-assignment-poster.jpg">
   <source src="../videos/roster-assignment.mp4" type="video/mp4">
@@ -233,7 +240,7 @@ The roster allocation is strategically relevant because it can free up different
 A toy example of the assignment problem used to arrange players by position.
 ///
 
-After the assignment problem is solved, the algorithm will have a strategy for what positions it wants to prioritize with future picks- e.g. two guards, one shooting guard, and one center. It then knows how many flex spots it has, and can optimize how it allocates them through the general gradient descent process. 
+After the assignment problem is solved, the algorithm will have a strategy for what positions it wants to prioritize with future picks- e.g. two guards, one shooting guard, and one center. It then knows how many flex spots it has, and can optimize how it allocates them through the general gradient descent process.
 
 ### Example team
 
@@ -247,19 +254,27 @@ A hypothetical team with Dyson Daniels as the candidate player. Each Category, 2
 ??? note "How are example teams created?"
     The example teams are created by optimizing exact player selections.
 
-    Player selections are modeled in the probability space, constrained by round. E.g., if the draft is currently in the first round, the sum of probabilities across second round players cannot exceed one, across the second and third round cannot exceed two, etc. Players are assigned to rounds in base H-score order. The H-scoring objective is applied directly, and optimized using a Frank-Wolfe process which settles on binary decisions for each player.
+    Player selections are modeled in the probability space, constrained by round. E.g., if the draft is currently in the first round, the sum of probabilities across second round players cannot exceed one, across the second and third round cannot exceed two, etc.
 
-    This method was adapted from a paper by [Becker and Sun](https://www.degruyterbrill.com/document/doi/10.1515/jqas-2013-0009/html).
+    Players are assigned to rounds in base H-score order, or a 50-50 blend of H-score rank and ADP when ADPs are available (ADPs will often be more realistic, but don't adapt to specific league settings like H-scores do. The idea behind blending the two is to balance realism and specificity).
 
-    The optimization process is initialized with a heuristic, selecting the highest-value players according to H-scoring category weights. The objective function is the H-scoring objective, with an added penalty term for deviance away from the category-level win rates expected by H-scoring. Roster positions are also held fixed for players already assigned by H-scoring, and H-scoring's flex position allocations are enforced strictly, after rounding. This setup selects for a team that does well under H-scoring, with the same build that the general H-scoring approach found.
+    This structure was adapted from a paper by [Becker and Sun](https://www.degruyterbrill.com/document/doi/10.1515/jqas-2013-0009/html). The paper looked at fantasy football, which is relatively easy to describe with a linear objective. In that context, it was possible for the authors to optimize teams with a standard integer program.
 
-    For auctions, the process is adjusted to constrain by total money spent instead of the round criteria. Generic dollar values are used for the optimization.
+    The objective function used for this context is the H-scoring objective, with an added penalty term for shortfalls relative to the category-level win rates expected by H-scoring. Roster positions are held fixed for players already assigned by H-scoring, and H-scoring's flex position allocations are enforced strictly, after rounding. There are also constraints preventing too many players from the same NBA team being chosen for the same fantasy team. This setup is intended to select for realistic teams that might actually be drafted under the general strategy approach outlined by H-scoring.
 
-    The process of finding an exact team solution with the Frank-Wolfe algorithm could also be used as an alternative to H-scoring with the category weight model. The reasons that I think it is generally less preferable for selecting players are:
+    The H-scoring objective is not only inherently non-linear but also non-convex. That means that this setup requires an inexact algorithm to optimize a team.
 
-    1. The decision space is much larger and scales with the number of draft picks remaining, making it impractical in many circumstances, especially auctions. Running it faster would probably require choosing the candidate player as part of the algorithm, which would preclude showing the options for alternative top players.
-    2. This procedure is very sensitive to specific players being available, which cannot be known for certain.
-    3. In 6v6 testing, this method did no better than normal H-scoring. This was a favorable setup for the algorithm, since other drafters were using exactly H-scoring, which is how it sorted players into rounds. Drafters being less predictable would be a significant problem for such a sensitive algorithm. Therefore, I expect that in most real contexts the heuristic approach of H-scoring is a better choice.
+    The inexact optimization process is initialized with a heuristic, selecting the highest-value players according to H-scoring category weights. It then iterates with a Frank-Wolfe process. The Frank-Wolfe process repeatedly steps towards solutions that maximize a linearized version of the objective at the current position in probability space. Once it converges, the final position in probability space is rounded to the nearest exact team.
+
+    The best team from the Frank-Wolfe process is then iteratively checked for individual player swaps that would improve the objective. Usually, a few beneficial swaps are found. Once the team cannot be improved by any one-for-one swaps, it is returned as the final team.
+
+    For auctions, the process is adjusted to constrain by total money spent instead of the round criteria. Generic dollar values are used for the optimization, blended with average auction values when available.
+
+    This process could also be used as an alternative to H-scoring with the category weight model. The reasons that I think it is generally less preferable for selecting players are:
+
+    1. The decision space is large and scales with the number of draft picks remaining, making it impractical to run on many candidate picks. Potentially, for drafting, the candidate pick itself could be chosen via Frank-Wolfe, but that would discard the starting point that the H-scoring algorithm provides. It would also provide a less flexible user experience.
+    2. This procedure is very sensitive to specific players being available, which cannot be known for certain. Designing an entire strategy around a certain player being available only for them to be picked ahead of schedule could be disastrous.
+    3. In 6v6 testing, refining the top 10 H-scoring results with this process did worse than regular H-scoring. This was a favorable setup for the procedure, since other drafters were using exactly H-scoring, which was how it sorted players into rounds. The fact that the procedure still was not helpful is evidence that the sensitivity problem is a significant limitation for using it to pick players.
 
 ## Input parameters
 

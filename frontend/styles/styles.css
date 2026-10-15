@@ -1473,6 +1473,37 @@ tr {
     table-layout: fixed;
 }
 
+/* A player's G-scores, floating beside the roster cell under the pointer (expand_view's hover card). It never takes
+   the pointer itself, so moving onto it does not count as leaving the cell. */
+.gscore-hover-card {
+    position: absolute;   /* page coordinates: it scrolls with the cell */
+    z-index: 1000;
+    pointer-events: none;
+    padding: 4px;
+    border-radius: 8px;
+    background-color: light-dark(#ffffff, rgb(14, 17, 23));
+    box-shadow: 0 2px 10px light-dark(rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.6));
+}
+
+.panel-table.gscore-card-table {
+    width: auto;
+}
+
+.gscore-card-name {
+    padding: 2px 6px 4px;
+    text-align: center;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: light-dark(#262730, #f0f0f6);
+}
+
+.gscore-card-table .panel-colheader,
+.gscore-card-table .panel-datacell {
+    min-width: 44px;
+    padding: 3px 6px;
+    text-align: center;
+}
+
 /* Rows of a grid that shows (or is about to show) a hypothetical team are sized for a hypothetical card from the
    start: the spinners and the arriving team occupy the same height, so the panel never grows. */
 .roster-grid-hypothetical tbody tr {

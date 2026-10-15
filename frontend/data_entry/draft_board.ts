@@ -407,7 +407,7 @@ function rebuildStandardBody(table: HTMLTableElement): void {
             const cell     = row.insertCell()
             const playerId = drafted[r][d]
             if (playerId !== null) {
-                cell.append(makeMinimalPlayerDisplay(playerId))
+                cell.append(makeMinimalPlayerDisplay(playerId, true))
                 cell.classList.add('drafted')
             } else if (r === pickRow && d === pickDrafter) {
                 cell.classList.add('current-pick')
@@ -438,7 +438,7 @@ function rebuildTransposedBody(table: HTMLTableElement): void {
             const cell     = row.insertCell()
             const playerId = drafted[r][d]
             if (playerId !== null) {
-                cell.append(makeMinimalPlayerDisplay(playerId))
+                cell.append(makeMinimalPlayerDisplay(playerId, true))
                 cell.classList.add('drafted')
             } else if (r === pickRow && d === pickDrafter) {
                 cell.classList.add('current-pick')
