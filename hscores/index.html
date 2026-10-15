@@ -431,6 +431,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#example-team" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example team
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -834,6 +845,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#example-team" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example team
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1202,14 +1224,21 @@ algorithm for Rotisserie.</p>
 <p>The shares are the expected number of players of each position the algorithm will take with its flex spots. This choice has strategic implications because the algorithm understands that different positions have different statistical tendencies. In the Dyson Daniels example above, the algorithm is leaning heavily on taking Power Forwards and Centers with its flex spots, likely because they tend to have poor Free Throw rates, and that synergizes with the strategy of punting Free Throws.</p>
 <p>The algorithm uses a simple model to estimate how its position strategy will influence its team's category-level strengths. It adds average strengths within fantasy-relevant players for each position (normalized to sum to 0 G-scores for each position) multiplied by the flex position shares. This crudely estimates the expected differential driven by position. Flex positions are optimized simultaneously with category weights. </p>
 <h3 id="roster-allocation-strategy">Roster allocation strategy</h3>
-<p>The fourth element of the drop-down shows how the algorithm intends to arrange its previously chosen players, plus the candidate player, into position slots. </p>
+<p>The fourth element of the drop-down shows how the algorithm intends to arrange its previously chosen players, plus the candidate player, into position slots.</p>
 <figure>
 <p><img alt="Roster assignments" src="../img/hroster.png" /></p>
 <figcaption>
-<p>Roster assignments for the same example — Giannis slots in at Power Forward and the Daniels candidate at Small Forward. Each Category, 2024-25.</p>
+<p>Roster assignments for the same example — Giannis slots in at Power Forward and the Daniels candidate at Shooting Guard. Each Category, 2024-25.</p>
 </figcaption>
 </figure>
-<p>The roster allocation is strategically relevant because it can free up different positions to take with future draft picks. In the example above, the algorithm is choosing to categorize Daniels as a SF, likely because it does not want to take more SFs in general. It figures this out via a sub-algorithm, solving an assignment problem matching players to roster slots. </p>
+<p>Hovering over a player triggers hovertext with their stats to pop up.</p>
+<figure>
+<p><img alt="G-score hover card" src="../img/hrosterhover.png" /></p>
+<figcaption>
+<p>G-scores for Giannis, 2024-25.</p>
+</figcaption>
+</figure>
+<p>The roster allocation is strategically relevant because it can free up different positions to take with future draft picks. In the example above, the algorithm is choosing to categorize Daniels as a SG, likely because it does not want to take more SGs in general. It figures this out via a sub-algorithm, solving an assignment problem matching players to roster slots.</p>
 <figure>
 <video controls preload="metadata" width="100%" poster="../videos/roster-assignment-poster.jpg">
   <source src="../videos/roster-assignment.mp4" type="video/mp4">
@@ -1218,7 +1247,33 @@ algorithm for Rotisserie.</p>
 <p>A toy example of the assignment problem used to arrange players by position.</p>
 </figcaption>
 </figure>
-<p>After the assignment problem is solved, the algorithm will have a strategy for what positions it wants to prioritize with future picks- e.g. two guards, one shooting guard, and one center. It then knows how many flex spots it has, and can optimize how it allocates them through the general gradient descent process. </p>
+<p>After the assignment problem is solved, the algorithm will have a strategy for what positions it wants to prioritize with future picks- e.g. two guards, one shooting guard, and one center. It then knows how many flex spots it has, and can optimize how it allocates them through the general gradient descent process.</p>
+<h3 id="example-team">Example team</h3>
+<p>If the 'Show example team' toggle in the Display section is switched on, the roster table gets filled in with hypothetical future picks. The hypothetical full team is for illustrative purposes only; its expected performance is not part of H-scoring.</p>
+<figure>
+<p><img alt="Roster assignments with an example team" src="../img/hrosterexample.png" /></p>
+<figcaption>
+<p>A hypothetical team with Dyson Daniels as the candidate player. Each Category, 2024-25.</p>
+</figcaption>
+</figure>
+<details class="note">
+<summary>How are example teams created?</summary>
+<p>The example teams are created by optimizing exact player selections.</p>
+<p>Player selections are modeled in the probability space, constrained by round. E.g., if the draft is currently in the first round, the sum of probabilities across second round players cannot exceed one, across the second and third round cannot exceed two, etc.</p>
+<p>Players are assigned to rounds in base H-score order, or a 50-50 blend of H-score rank and ADP when ADPs are available (ADPs will often be more realistic, but don't adapt to specific league settings like H-scores do. The idea behind blending the two is to balance realism and specificity).</p>
+<p>This structure was adapted from a paper by <a href="https://www.degruyterbrill.com/document/doi/10.1515/jqas-2013-0009/html">Becker and Sun</a>. The paper looked at fantasy football, which is relatively easy to describe with a linear objective. In that context, it was possible for the authors to optimize teams with a standard integer program.</p>
+<p>The objective function used for this context is the H-scoring objective, with an added penalty term for shortfalls relative to the category-level win rates expected by H-scoring. Roster positions are held fixed for players already assigned by H-scoring, and H-scoring's flex position allocations are enforced strictly, after rounding. There are also constraints preventing too many players from the same NBA team being chosen for the same fantasy team. This setup is intended to select for realistic teams that might actually be drafted under the general strategy approach outlined by H-scoring.</p>
+<p>The H-scoring objective is not only inherently non-linear but also non-convex. That means that this setup requires an inexact algorithm to optimize a team.</p>
+<p>The inexact optimization process is initialized with a heuristic, selecting the highest-value players according to H-scoring category weights. It then iterates with a Frank-Wolfe process. The Frank-Wolfe process repeatedly steps towards solutions that maximize a linearized version of the objective at the current position in probability space. Once it converges, the final position in probability space is rounded to the nearest exact team.</p>
+<p>The best team from the Frank-Wolfe process is then iteratively checked for individual player swaps that would improve the objective. Usually, a few beneficial swaps are found. Once the team cannot be improved by any one-for-one swaps, it is returned as the final team.</p>
+<p>For auctions, the process is adjusted to constrain by total money spent instead of the round criteria. Generic dollar values are used for the optimization, blended with average auction values when available.</p>
+<p>This process could also be used as an alternative to H-scoring with the category weight model. The reasons that I think it is generally less preferable for selecting players are:</p>
+<ol>
+<li>The decision space is large and scales with the number of draft picks remaining, making it impractical to run on many candidate picks. Potentially, for drafting, the candidate pick itself could be chosen via Frank-Wolfe, but that would discard the starting point that the H-scoring algorithm provides. It would also provide a less flexible user experience.</li>
+<li>This procedure is very sensitive to specific players being available, which cannot be known for certain. Designing an entire strategy around a certain player being available only for them to be picked ahead of schedule could be disastrous.</li>
+<li>In 6v6 testing, refining the top 10 H-scoring results with this process did worse than regular H-scoring. This was a favorable setup for the procedure, since other drafters were using exactly H-scoring, which was how it sorted players into rounds. The fact that the procedure still was not helpful is evidence that the sensitivity problem is a significant limitation for using it to pick players.</li>
+</ol>
+</details>
 <h2 id="input-parameters">Input parameters</h2>
 <p>The H-scoring algorithm is modulated by several parameters available for customization via the sidebar.</p>
 <h3 id="h-scoring-parameters">H-scoring parameters</h3>
