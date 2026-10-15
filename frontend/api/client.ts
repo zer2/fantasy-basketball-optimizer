@@ -2,7 +2,7 @@
 // HTTP client for the Fantasy Basketball Optimizer backend.
 // All fetch calls go through this module; callers receive typed results.
 
-import { PlayerResult, PlayerGScore, SessionRequest, SportConfig } from '../types.js'
+import { PlayerResult, PlayerGScore, SessionRequest, SportConfig, Roster, HypotheticalTeam, BoardRequest } from '../types.js'
 import { setPlayerRegistry } from '../player_registry.js'
 
 
@@ -131,6 +131,19 @@ export function readFullRosterScore(candidates: any[]): number | null {
 }
 
 
+/** Converts a raw backend Roster (evaluate candidate or hypothetical team) to the frontend Roster. */
+function convertRoster(rawRoster: any): Roster {
+    return {
+        slots: rawRoster.slots,
+        assignments: Object.fromEntries(
+            Object.entries(rawRoster.assignments).map(([slot, a]: [string, any]) => [
+                slot,
+                a ? { player_id: a.player_id, kind: a.kind } : null,
+            ]),
+        ),
+    }
+}
+
 // Adapter between backend snake_case Candidate objects and frontend PlayerResult objects.
 // The backend follows Python naming conventions; this is the single place where that translation
 // happens. Players are keyed by player id end to end; display resolution happens in the
@@ -160,18 +173,7 @@ export function candidatesToPlayerResults(candidates: any[]): PlayerResult[] {
                 isTotal: r.is_total,
             })),
         } : undefined,
-        roster: c.roster ? {
-            slots: c.roster.slots,
-            assignments: Object.fromEntries(
-                Object.entries(c.roster.assignments).map(([slot, a]: [string, any]) => [
-                    slot,
-                    a ? {
-                        player_id:   a.player_id,
-                        isCandidate: a.is_candidate,
-                    } : null,
-                ]),
-            ),
-        } : undefined,
+        roster: c.roster ? convertRoster(c.roster) : undefined,
         auction_values: c.auction_values ? {
             your_dollar:   c.auction_values.your_dollar,
             generic_dollar:   c.auction_values.generic_dollar,
@@ -308,6 +310,21 @@ export async function evaluate(
         body:    JSON.stringify(req),
         signal,
     })
+}
+
+// ── POST /sessions/{id}/hypothetical-team ────────────────────────────────────
+
+/** One hypothetical team the candidate's H-scoring plan could become, on the board the last evaluate scored. */
+export async function fetchHypotheticalTeam(
+    sessionId: string
+    , request: BoardRequest & { candidate_player_id: number }
+): Promise<HypotheticalTeam> {
+    const response = await jsonRequest<any>(`${BASE_URL}/sessions/${sessionId}/hypothetical-team`, 'Hypothetical team', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(request),
+    })
+    return { roster: convertRoster(response.roster), hypothetical_picks: response.hypothetical_picks }
 }
 
 // ── POST /sessions/{id}/trade/analyze ────────────────────────────────────────

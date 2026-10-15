@@ -214,13 +214,17 @@ export function makeFullPlayerDisplay(playerId: number): HTMLElement {
 }
 
 /** Minimal display (headshot stacked above last name) as a DOM element, for the
- *  expanded-view roster grid and draft/auction board cells. The full name rides in the
- *  tooltip — narrow board cells ellipsize long last names. */
-export function makeMinimalPlayerDisplay(playerId: number): HTMLElement {
+ *  expanded-view roster grid and draft/auction board cells. showNameTooltip puts the full
+ *  name in the tooltip -- narrow board cells ellipsize long last names -- and is off where
+ *  the caller shows the name its own way (the roster grid's G-score card). */
+export function makeMinimalPlayerDisplay(
+    playerId: number
+    , showNameTooltip: boolean
+): HTMLElement {
     const entry = getRegistryEntry(playerId)
     const stack = document.createElement('div')
     stack.className = 'roster-player-stack'
-    stack.title = entry.name
+    if (showNameTooltip) stack.title = entry.name
     const headshot = makeHeadshotImage(playerId, 'roster-headshot')
     if (headshot) stack.appendChild(headshot)
     const nameLabel = document.createElement('span')
@@ -228,4 +232,34 @@ export function makeMinimalPlayerDisplay(playerId: number): HTMLElement {
     nameLabel.textContent = entry.last_name
     stack.appendChild(nameLabel)
     return stack
+}
+
+/**
+ * A hypothetical future pick for the roster grid, on a dotted card greyed by CSS so it reads as a placeholder: the
+ * headshot, then the full name over two lines (first, last), with the detail (planned round or predicted price) in
+ * the card's top-left corner.
+ */
+export function makeHypotheticalPlayerDisplay(
+    playerId: number
+    , detailText: string
+): HTMLElement {
+    const entry = getRegistryEntry(playerId)
+    const card = document.createElement('div')
+    card.className = 'roster-player-stack hypothetical-player-card'
+    const detail = document.createElement('span')
+    detail.className = 'roster-hypothetical-detail'
+    detail.textContent = detailText
+    card.appendChild(detail)
+    const headshot = makeHeadshotImage(playerId, 'roster-headshot')
+    if (headshot) card.appendChild(headshot)
+    // The registry's last name is every word after the first (backend extract_last_name), so the first name is what
+    // precedes it; a one-word name has no first-name line to show.
+    const firstName = entry.name.slice(0, entry.name.length - entry.last_name.length).trim()
+    for (const namePart of [firstName, entry.last_name]) {
+        const nameLine = document.createElement('span')
+        nameLine.className = 'roster-player-name'
+        nameLine.textContent = namePart || ' '
+        card.appendChild(nameLine)
+    }
+    return card
 }

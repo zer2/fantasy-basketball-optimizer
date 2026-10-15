@@ -1328,8 +1328,23 @@ tr {
 /* Roster-grid cells holding a player stack drop panel-datacell's vertical padding so
    their height matches the draft/auction board cells (which pad 0). */
 .panel-datacell.roster-player-cell {
+    position: relative;   /* anchors the corner labels (position eligibility; a hypothetical pick's round or price) */
     padding-top: 0;
     padding-bottom: 0;
+}
+
+/* The positions a rostered, candidate or hypothetical player is eligible for, stacked one per line in the cell's
+   top-right corner. */
+.roster-position-eligibility {
+    position: absolute;
+    top: 2px;
+    right: 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    font-size: 0.6rem;
+    line-height: 1.15;
+    opacity: 0.8;
 }
 
 /* ─── Board collapse toggle (draft/auction grids) ─────────────────────────── */
@@ -1388,6 +1403,153 @@ tr {
     text-overflow: ellipsis;
     white-space: nowrap;
     max-width: 0;
+}
+
+/* ─── Hypothetical team (candidate detail panel) ───────────────────────────── */
+/* A hypothetical future pick: a dotted cell on the empty-slot background, a lightly greyed headshot and an italic
+   full name, so it never reads as a real roster player. The planned round or price sits in the cell's corner. */
+
+.rosterhypothetical {
+    background-color: light-dark(#F6F6F6, #8D8D9E);
+    color: light-dark(black, white);
+    text-align: center;
+    font-size: 0.72rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 0;
+}
+
+/* Wider than the grid's 0.5px lines, so the collapsed border resolves to the dotted one. The slots still waiting for
+   their hypothetical pick carry it too, so the panel keeps its height when the team arrives. */
+.panel-datacell.rosterhypothetical,
+.panel-datacell.rosterpending {
+    border: 2px dotted light-dark(#8c8ca6, #e4e4ee);
+}
+
+.hypothetical-player-card .roster-headshot {
+    filter: grayscale(0.5);
+    opacity: 0.8;
+}
+
+.hypothetical-player-card .roster-player-name {
+    padding: 0 2px;   /* room for the italic's overhang, which the ellipsis box would otherwise clip */
+    box-sizing: border-box;
+    font-style: italic;
+    color: light-dark(#4a4a5e, #f0f0f6);
+}
+
+.roster-hypothetical-detail {
+    position: absolute;
+    top: 2px;
+    left: 4px;
+    font-size: 0.65rem;
+    line-height: 1.15;
+    font-weight: 600;
+    color: light-dark(#4a4a5e, #f0f0f6);
+}
+
+/* The roster grid: two rows, the base positions over the flex positions, one group per position type with its slots
+   side by side. Cells are --roster-cell-width wide when the row has room and shrink evenly when it does not, so the
+   grid stays two rows; on a phone, where they would get too narrow, a row wraps within itself instead. */
+.roster-groups {
+    --roster-cell-width: 104px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.roster-block {
+    display: flex;
+    gap: 6px;
+}
+
+.roster-group {
+    flex: 0 1 calc(var(--roster-cell-width) * var(--roster-group-slots));
+    min-width: 0;
+}
+
+.roster-group > .panel-table {
+    table-layout: fixed;
+}
+
+/* A player's G-scores, floating beside the roster cell under the pointer (expand_view's hover card). It never takes
+   the pointer itself, so moving onto it does not count as leaving the cell. */
+.gscore-hover-card {
+    position: absolute;   /* page coordinates: it scrolls with the cell */
+    z-index: 1000;
+    pointer-events: none;
+    padding: 4px;
+    border-radius: 8px;
+    background-color: light-dark(#ffffff, rgb(14, 17, 23));
+    box-shadow: 0 2px 10px light-dark(rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.6));
+}
+
+.panel-table.gscore-card-table {
+    width: auto;
+}
+
+.gscore-card-name {
+    padding: 2px 6px 4px;
+    text-align: center;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: light-dark(#262730, #f0f0f6);
+}
+
+.gscore-card-table .panel-colheader,
+.gscore-card-table .panel-datacell {
+    min-width: 44px;
+    padding: 3px 6px;
+    text-align: center;
+}
+
+/* Rows of a grid that shows (or is about to show) a hypothetical team are sized for a hypothetical card from the
+   start: the spinners and the arriving team occupy the same height, so the panel never grows. */
+.roster-grid-hypothetical tbody tr {
+    height: 66px;
+}
+
+.roster-slot-spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    box-sizing: border-box;
+    border: 2px solid light-dark(#999999, #d8d8e4);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: eval-spin 0.65s linear infinite;
+}
+
+.hypothetical-team-error,
+.hypothetical-team-note {
+    margin: 8px 0 0 100px;   /* lines up with .panel-indent */
+    color: light-dark(#5c5c70, #b8b8c8);
+}
+
+/* Phones: the roster headshot shrinks from 37px to 26px wide (see .roster-headshot), so the grid's text shrinks by the
+   same ~0.7 and the rows by what that frees. */
+@media (max-width: 768px) {
+    .roster-groups {
+        --roster-cell-width: 60px;
+    }
+    .roster-block {
+        flex-wrap: wrap;
+    }
+    .roster-grid-hypothetical tbody tr {
+        height: 48px;
+    }
+    .panel-datacell.roster-player-cell {
+        font-size: 0.5rem;
+    }
+    .roster-position-eligibility,
+    .roster-hypothetical-detail {
+        font-size: 0.42rem;
+    }
+    .hypothetical-team-error,
+    .hypothetical-team-note {
+        margin-left: 0;
+    }
 }
 
 .ineligible {

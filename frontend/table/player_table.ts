@@ -489,6 +489,26 @@ function ensureScrollWired(): void {
     // overflow container) — scroll events fire on the scroller and do not bubble.
     document.addEventListener('scroll', onScroll, { passive: true, capture: true })
     window.addEventListener('resize', () => { windowDirty = true; renderWindow() })
+    // A detail panel changed its own height (expand_view: the hypothetical team swapping its roster grid). Every open
+    // panel is re-measured on the next render, as when it was first opened.
+    document.addEventListener('expand-panel-resized', () => {
+        for (const candidate of candidateRows) {
+            if (candidate.expanded) candidate.expandedHeight = 0
+        }
+        windowDirty = true
+        renderWindow()
+    })
+    // The Display section's "Show example team" changed: every open detail panel is rebuilt with or without it.
+    document.addEventListener('example-team-toggled', () => {
+        if (renderCtx === null) return
+        for (const candidate of candidateRows) {
+            if (!candidate.expanded) continue
+            candidate.expandRow.innerHTML = ''
+            openDetails(candidate, renderCtx)
+        }
+        windowDirty = true
+        renderWindow()
+    })
     scrollWired = true
 }
 

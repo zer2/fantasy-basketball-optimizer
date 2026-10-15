@@ -3,7 +3,7 @@
 // Owns the #eval-indicator element and all draft/auction-specific session state.
 
 import { PlayerResult } from '../types.js'
-import { setBasePlayerResults, setCandidatePlayerResults, getCandidatePlayerResults, setGScores, getCurrentSeat } from '../app_state.js'
+import { setBasePlayerResults, setCandidatePlayerResults, getCandidatePlayerResults, setGScores, getCurrentSeat, setLatestScoredBoard } from '../app_state.js'
 import {
     getLeagueSettings, getPlatformConfig, getMode, DraftMode, isPlatformConnected, PLATFORM_SELECTION_CHANGED,
 } from '../setting_collection/league_settings.js'
@@ -292,6 +292,7 @@ async function evaluateSeat(seat: string, forAutopilot = false): Promise<number 
             if (forcedCategoryWeights) {
                 evalReq = { ...evalReq, forced_category_weights: forcedCategoryWeights }
             }
+            setLatestScoredBoard({ sessionId: getSessionId()!, request: evalReq })
 
             // Autopilot never renders the board, so it needs neither the base-player comparison nor
             // a full base evaluation to establish it — skip that work entirely.
@@ -426,7 +427,9 @@ export async function showDefaultRankings(): Promise<void> {
         { busy: 'fetching', onSuccess: 'unconnected', onFailure: 'unconnected' }
         , stillOwner => withSessionRetry(async () => {
             const { mode } = getLeagueSettings()
-            const resp = await evaluate(getSessionId()!, buildEmptyBoardEvaluateRequest(mode))
+            const request = buildEmptyBoardEvaluateRequest(mode)
+            const sessionId = getSessionId()!
+            const resp = await evaluate(sessionId, request)
             // Nothing cancels this request — it carries no abort signal — so by the time it
             // resolves, a newer run may own the display. Its board must not be repainted
             // with empty-board rankings, so the writes are ownership-gated like the
@@ -436,6 +439,8 @@ export async function showDefaultRankings(): Promise<void> {
                 const players = candidatesToPlayerResults(resp.candidates)
                 setBasePlayerResults(players)
                 setCandidatePlayerResults(players)
+                // The board these rankings were scored on: a hypothetical team asks about this board.
+                setLatestScoredBoard({ sessionId, request })
                 buildTable(players)
             }
         })

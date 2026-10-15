@@ -1674,6 +1674,19 @@ class HAgent:
         diff_vars        : (1, n_categories, n_drafters-1)  [broadcasts over N]
         Returns          : (N,) scores
         """
+        return self.compute_complete_team_scores_and_win_rates_batched(
+            diff_means_batch, diff_vars, volume_context)[0]
+
+    def compute_complete_team_scores_and_win_rates_batched(self
+                                                            , diff_means_batch: np.ndarray
+                                                            , diff_vars: np.ndarray
+                                                            , volume_context: dict | None = None
+                                                            ) -> tuple[np.ndarray, np.ndarray]:
+        """compute_h_scores_batched plus each team's per-category win rates: the CDF averaged over the
+        opponents, the same quantity get_h_scores reports as 'Rates'.
+
+        Returns : (N,) scores, (N, n_categories) win rates
+        """
         if self.scoring_format == 'Rotisserie':
             z         = diff_means_batch / np.sqrt(diff_vars)   # (N, n_cats, n_drafters-1)
             sigma_c   = z.std(axis=2, ddof=1) * np.sqrt(2)      # (N, n_cats)
@@ -1690,10 +1703,34 @@ class HAgent:
                 volume_context['my_x_total'] + strength_shift[:, self.volume_category_indices],
                 volume_context['my_units'], volume_context['opponent_units'])
         cdf_estimates = self.get_cdf(diff_means_batch, diff_vars)
-        return self.get_objective_and_pdf_weights(
+        scores = self.get_objective_and_pdf_weights(
             diff_means_batch, diff_vars, cdf_estimates, None, sigma_2_m,
             calculate_pdf_weights=False,
         )
+        return scores, cdf_estimates.mean(axis=2)
+
+    def get_complete_team_field(self
+                                , player_assignments: dict
+                                , drafter
+                                , exclusion_list: list
+                                , cash_remaining_per_team: dict = None) -> tuple:
+        """The field a COMPLETE roster of the drafter's is scored against: get_h_scores' own call to
+        get_diff_distributions for that board, without solving anything. Returns (diff_means (1, C, D-1),
+        diff_vars, volume_field). Writes no agent state, so it cannot move any later evaluate; the opponent
+        builds it reads are the ones the last evaluate of this board brought up to date."""
+        my_players = [p for p in player_assignments[drafter] if p == p]
+        if len(my_players) != self.n_picks:
+            raise ValueError(f'A complete-team field needs {self.n_picks} players on the drafter\'s roster, '
+                             f'not {len(my_players)}.')
+        players_chosen = [x for v in player_assignments.values() for x in v if x == x]
+        available_mask = (
+            ~self.x_scores.index.isin(players_chosen + list(exclusion_list))
+            & self.x_scores.index.isin(self.positions.index)
+            & (self.x_scores.index != RP_PLAYER_ID)
+        )
+        diff_means, diff_vars, _, _, volume_field = self.get_diff_distributions(
+            player_assignments, drafter, self.x_scores[available_mask], cash_remaining_per_team)
+        return diff_means, diff_vars, volume_field
 
     def get_opposing_team_means(self, players, mean_extra_players, target_team_size):
         n_extra = max(target_team_size - len(players), 0)

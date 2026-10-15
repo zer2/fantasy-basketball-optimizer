@@ -31,6 +31,42 @@ test('candidate table content and detail views', async t => {
         assert.ok(shape.width > 0, `${testId} should be laid out with real width`)
     }
 
+    /** Turns the Display section's "Show example team" toggle on or off, as a user flipping it would. */
+    async function setExampleTeamShown(isShown) {
+        await page.evaluate(shown => {
+            const toggle = document.getElementById('show-example-team')
+            if (toggle.checked === shown) return
+            toggle.checked = shown
+            toggle.dispatchEvent(new Event('change'))
+        }, isShown)
+    }
+
+    /** With a candidate panel open: every empty roster slot holds a hypothetical pick whose label matches
+     *  labelPattern. When the panel opened on a team not found yet, its empty slots show spinners first, and the panel
+     *  is already at its full height while they do. */
+    async function expectHypotheticalTeamFills(labelPattern, { expectSpinners }) {
+        const grid = page.locator('[data-testid="roster-assignments-table"]')
+        await grid.waitFor({ state: 'visible', timeout: 15000 })
+        const panel = page.locator('#hscoretable td.panel-cell').first()
+        const pendingSlots = await grid.locator('td.rosterpending').count()
+        const heightWhilePending = (await panel.boundingBox()).height
+        if (expectSpinners) assert.ok(pendingSlots > 0, 'the empty roster slots should show spinners at first')
+        await page.waitForFunction(() =>
+            document.querySelectorAll('[data-testid="roster-assignments-table"] td.rosterhypothetical').length > 0,
+            null, { timeout: 30000 })
+        assert.equal(await grid.locator('td.rosterpending').count(), 0, 'no spinner should remain')
+        assert.equal(await grid.locator('td.rosterabsent').count(), 0, 'every empty slot should be filled')
+        if (expectSpinners) {
+            assert.equal(await grid.locator('td.rosterhypothetical').count(), pendingSlots,
+                         'each spinner slot should hold one hypothetical pick')
+            const heightWhenFilled = (await panel.boundingBox()).height
+            assert.ok(Math.abs(heightWhenFilled - heightWhilePending) <= 1,
+                      `the panel should not change height as the team arrives (${heightWhilePending} -> ${heightWhenFilled})`)
+        }
+        const labels = await grid.locator('.roster-hypothetical-detail').allTextContents()
+        for (const label of labels) assert.match(label, labelPattern)
+    }
+
     try {
         await loadApp(app)
         await selectHistoricalSeason(app, '2025-26')
@@ -53,11 +89,56 @@ test('candidate table content and detail views', async t => {
             await expectStyledTable('future-pick-strategy-table')
             await expectStyledTable('flex-allocations-table')
             await expectStyledTable('roster-assignments-table', { expectStyledCells: false })
+            // Show example team is off by default: the empty slots stay empty.
+            const grid = page.locator('[data-testid="roster-assignments-table"]')
+            assert.equal(await grid.locator('td.rosterpending, td.rosterhypothetical').count(), 0,
+                         'no example team should be shown with the toggle off')
+            assert.ok(await grid.locator('td.rosterabsent').count() > 0, 'the empty slots should stay empty')
             expectCleanSession(app, 'draft candidate expanded')
 
             await page.locator('#hscoretable .playerheaderdiv').first().click()   // collapse again
             await page.locator('[data-testid="gscore-expectations-table"]')
                 .waitFor({ state: 'hidden', timeout: 5000 })
+        })
+
+        await t.test('opening a draft candidate fills its empty roster slots with a hypothetical team', async () => {
+            await setExampleTeamShown(true)
+            // The second candidate: one not asked about yet, so its panel opens on spinners.
+            await page.locator('#hscoretable .playerheaderdiv').nth(1).click()
+            await expectHypotheticalTeamFills(/^Rd \d+$/, { expectSpinners: true })
+            expectCleanSession(app, 'draft hypothetical team')
+
+            // Hovering any filled roster cell -- a hypothetical pick or the candidate -- shows that player's G-scores.
+            const grid = page.locator('[data-testid="roster-assignments-table"]')
+            const card = page.locator('[data-testid="gscore-hover-card"]')
+            for (const cellSelector of ['td.rosterhypothetical', 'td.rostercandidate']) {
+                await grid.locator(cellSelector).first().hover()
+                await card.waitFor({ state: 'visible', timeout: 5000 })
+                const name = await card.locator('thead tr').first().innerText()
+                assert.ok(name.trim().length > 0, "the card is headed by the player's name")
+                const headers = await card.locator('thead tr').nth(1).locator('th').allTextContents()
+                const values = await card.locator('tbody td').allTextContents()
+                assert.equal(headers[0], 'Total', 'the G-score total comes first')
+                assert.ok(headers.length > 2, 'the card shows the categories too')
+                assert.equal(values.length, headers.length, 'one value per header')
+                for (const value of values) assert.match(value, /^-?\d+\.\d\d$/)
+                await page.mouse.move(0, 0)
+                await card.waitFor({ state: 'detached', timeout: 5000 })
+            }
+            await page.locator('#hscoretable .playerheaderdiv').nth(1).click()   // collapse again
+            await page.locator('[data-testid="roster-assignments-table"]').waitFor({ state: 'hidden', timeout: 5000 })
+        })
+
+        await t.test('the hypothetical team works on the default rankings shown before a league connects', async () => {
+            await setSelect(page, 'ls-platform', 'Retrieve from Yahoo')
+            await waitAppSettled(app)
+            await page.locator('#hscoretable .playerheaderdiv').first().click()
+            await expectHypotheticalTeamFills(/^Rd \d+$/, { expectSpinners: true })
+            expectCleanSession(app, 'unconnected-platform hypothetical team')
+            await page.locator('#hscoretable .playerheaderdiv').first().click()   // collapse again
+            await page.locator('[data-testid="roster-assignments-table"]').waitFor({ state: 'hidden', timeout: 5000 })
+            await setSelect(page, 'ls-platform', 'Enter your own data')
+            await waitAppSettled(app)
         })
 
         await t.test('expanding an auction candidate adds the auction values table', async () => {
@@ -67,6 +148,12 @@ test('candidate table content and detail views', async t => {
             await expectStyledTable('auction-values-table', { expectStyledCells: false })
             await expectStyledTable('gscore-expectations-table')
             expectCleanSession(app, 'auction candidate expanded')
+        })
+
+        await t.test('the auction hypothetical team labels its picks with predicted prices', async () => {
+            // The panel opened in the step above, so its team may already be in.
+            await expectHypotheticalTeamFills(/^\$\d+$/, { expectSpinners: false })
+            expectCleanSession(app, 'auction hypothetical team')
         })
     } finally {
         await app.close()

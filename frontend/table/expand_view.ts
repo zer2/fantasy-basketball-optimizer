@@ -3,10 +3,15 @@
 // Mirrors the detail panels in the original Streamlit app.
 
 import { stat_styler_primary, stat_styler_tertiary, G_SCORE_MULTIPLIER } from '../styles/styler_functions.js'
-import { PlayerResult, FlexAllocations, Roster } from '../types.js'
-import { getPositionNames } from '../app_state.js'
+import { PlayerResult, FlexAllocations, Roster, HypotheticalTeam, BoardRequest } from '../types.js'
+import { getPositionNames, getPositionStructure, getLatestScoredBoard } from '../app_state.js'
 import { makeSpacerTh } from './table_helpers.js'
-import { makeMinimalPlayerDisplay } from '../player_display.js'
+import { buildPlayerGScoreCard } from './gscore_table.js'
+import { makeMinimalPlayerDisplay, makeHypotheticalPlayerDisplay } from '../player_display.js'
+import { fetchHypotheticalTeam, HTTPError } from '../api/client.js'
+import { getRegistryEntry } from '../player_registry.js'
+import { isExampleTeamShown } from '../preferences.js'
+import { getMode } from '../setting_collection/league_settings.js'
 
 
 /** Expands a flex slot row label by expanding the position prefix.
@@ -50,34 +55,20 @@ export function buildExpandPanel(
         cell.appendChild(makeWeightsTable(playerData, categories))
     }
 
-    // Position-column count shared between the flex allocations and roster
-    // tables so each non-label column has the same width in both. The roster
-    // always includes every base position the flex table can allocate to plus
-    // extra flex types (G, F, Util), so its position-type count is the larger
-    // of the two and the flex table pads with invisible filler columns to match.
-    const nRosterPositionTypes = playerData.roster
-        ? new Set(playerData.roster.slots.map(slot => slot.replace(/\d+$/, ''))).size
-        : 0
-
     if (playerData.flex_allocations) {
         cell.appendChild(makePanelLabel('Position allocations for future flex spot picks', '60px'))
 
+        // The flex table keeps its natural width; in an auction the auction values sit beside it.
+        const sideRow = document.createElement('div')
+        sideRow.className = 'panel-flex-row'
+        sideRow.appendChild(makeFlexAllocationsTable(playerData.flex_allocations))
         if (playerData.auction_values) {
-            // Side-by-side with auction values. The flex table keeps its natural
-            // per-column width (no roster filler) so the auction block fits beside it.
-            const sideRow = document.createElement('div')
-            sideRow.className = 'panel-flex-row'
-            sideRow.appendChild(makeFlexAllocationsTable(playerData.flex_allocations, false, playerData.flex_allocations.base_positions.length))
-
             const auctionBlock = document.createElement('div')
             auctionBlock.appendChild(makePanelLabel('All auction values'))
             auctionBlock.appendChild(makeAuctionValuesTable(playerData))
             sideRow.appendChild(auctionBlock)
-
-            cell.appendChild(sideRow)
-        } else {
-            cell.appendChild(makeFlexAllocationsTable(playerData.flex_allocations, true, nRosterPositionTypes))
         }
+        cell.appendChild(sideRow)
     } else if (playerData.auction_values) {
         cell.appendChild(makePanelLabel('All auction values', '60px'))
         cell.appendChild(makeAuctionValuesTable(playerData))
@@ -85,8 +76,191 @@ export function buildExpandPanel(
 
     if (playerData.roster) {
         cell.appendChild(makePanelLabel('Roster assignments', '60px'))
-        cell.appendChild(makeRosterGrid(playerData.roster, nRosterPositionTypes))
+        const rosterHolder = document.createElement('div')
+        rosterHolder.dataset.testid = 'roster-assignments-panel'   // the grid plus, with an example team, its note
+        cell.appendChild(rosterHolder)
+        // Draft and auction only, with the Display section's "Show example team" on: the hypothetical team reads the
+        // strategy the last draft/auction evaluate cached. A candidate with no category weights (the last open slot)
+        // has no future picks to fill.
+        const mode = getMode()
+        if (isExampleTeamShown() && (mode === 'Draft Mode' || mode === 'Auction Mode') && playerData.category_weights) {
+            fillRosterWithHypotheticalTeam(playerData, rosterHolder)
+        } else {
+            rosterHolder.appendChild(makeRosterGrid(playerData.roster, null, false))
+        }
     }
+}
+
+
+// ─── Hypothetical team ────────────────────────────────────────────────────────
+// Opening a draft/auction candidate's panel fills the roster grid's empty slots with one team the candidate's
+// H-scoring plan could become (backend math/exact_team_solves): spinners in the empty slots while it is found, then
+// greyed hypothetical picks. Display only: it never changes the ranking.
+
+// Teams (found or being found) for the board the latest evaluate scored, by candidate; reset whenever that board
+// changes, so a pick never shows a team built for an earlier board, and reopening a panel never asks twice.
+let hypotheticalTeamsBoard: BoardRequest | null = null
+const hypotheticalTeamsByCandidate = new Map<number, Promise<HypotheticalTeam>>()
+const foundHypotheticalTeamsByCandidate = new Map<number, HypotheticalTeam>()   // the settled ones, shown at once
+
+/** The candidate's hypothetical team on the given scored board: requested once per board and candidate. */
+function requestHypotheticalTeam(
+    board: { sessionId: string; request: BoardRequest }
+    , candidatePlayerId: number
+): Promise<HypotheticalTeam> {
+    syncHypotheticalTeamsToBoard(board.request)
+    let team = hypotheticalTeamsByCandidate.get(candidatePlayerId)
+    if (team === undefined) {
+        team = fetchHypotheticalTeam(board.sessionId, { ...board.request, candidate_player_id: candidatePlayerId })
+        team.then(
+            found => { if (hypotheticalTeamsBoard === board.request) foundHypotheticalTeamsByCandidate.set(candidatePlayerId, found) },
+            // A failed request is not kept, so reopening the panel tries again.
+            () => hypotheticalTeamsByCandidate.delete(candidatePlayerId),
+        )
+        hypotheticalTeamsByCandidate.set(candidatePlayerId, team)
+    }
+    return team
+}
+
+/** Forgets every team found for an earlier board. */
+function syncHypotheticalTeamsToBoard(request: BoardRequest): void {
+    if (request === hypotheticalTeamsBoard) return
+    hypotheticalTeamsByCandidate.clear()
+    foundHypotheticalTeamsByCandidate.clear()
+    hypotheticalTeamsBoard = request
+}
+
+/** Each hypothetical pick's grid label: its planned round (draft) or predicted price (auction). */
+function makeHypotheticalPickLabels(team: HypotheticalTeam): Map<number, string> {
+    return new Map(team.hypothetical_picks.map(pick => [
+        pick.player_id,
+        pick.predicted_price !== null ? `$${pick.predicted_price}` : `Rd ${pick.pick_round}`,
+    ]))
+}
+
+/**
+ * Shows the roster grid with a spinner in every empty slot, then swaps in the hypothetical team (and its note) when
+ * it arrives. On failure the plain grid returns, with the reason under it.
+ */
+function fillRosterWithHypotheticalTeam(
+    playerData: PlayerResult
+    , rosterHolder: HTMLDivElement
+): void {
+    const board = getLatestScoredBoard()
+    if (board === null) throw new Error('A candidate panel is open with no scored board on record')
+    syncHypotheticalTeamsToBoard(board.request)
+    const foundTeam = foundHypotheticalTeamsByCandidate.get(playerData.player_id)
+    if (foundTeam !== undefined) {
+        rosterHolder.append(
+            makeRosterGrid(foundTeam.roster, makeHypotheticalPickLabels(foundTeam), false),
+            makeHypotheticalTeamNote(true),
+        )
+        return
+    }
+    // The spinner grid and the (hidden) note take the filled panel's full height from the start
+    // (.roster-grid-hypothetical rows are sized for a hypothetical card), so the panel does not grow when the team arrives.
+    rosterHolder.append(makeRosterGrid(playerData.roster!, null, true),
+                        makeHypotheticalTeamNote(false))
+
+    requestHypotheticalTeam(board, playerData.player_id)
+        .then(team => {
+            // A newer board rebuilds the open panels and asks for its own team.
+            if (getLatestScoredBoard()?.request !== board.request) return
+            rosterHolder.replaceChildren(
+                makeRosterGrid(team.roster, makeHypotheticalPickLabels(team), false),
+                makeHypotheticalTeamNote(true),
+            )
+            document.dispatchEvent(new Event('expand-panel-resized'))
+        })
+        .catch(error => {
+            if (getLatestScoredBoard()?.request !== board.request) return
+            const message = document.createElement('div')
+            message.className = 'hypothetical-team-error'
+            message.textContent = error instanceof HTTPError ? readErrorDetail(error) : String(error)
+            rosterHolder.replaceChildren(
+                makeRosterGrid(playerData.roster!, null, false), message)
+            document.dispatchEvent(new Event('expand-panel-resized'))
+        })
+}
+
+/** The server's error message from an HTTPError body ({"detail": ...}), or the raw body when it is not JSON. */
+function readErrorDetail(error: HTTPError): string {
+    try {
+        return JSON.parse(error.body).detail ?? error.body
+    } catch {
+        return error.body
+    }
+}
+
+// ─── G-score hover card ───────────────────────────────────────────────────────
+// Hovering a filled roster cell (a tap on a touch screen) shows that player's G-scores -- the Total and each category
+// -- in a card floating beside the cell. One card at a time; it floats above the page, so the panel never moves.
+
+let gScoreCard: { element: HTMLDivElement; anchor: HTMLElement } | null = null
+
+/** Shows the player's G-score card on hover, or on a tap for touch input (a second tap closes it). */
+function attachGScoreCard(cell: HTMLElement, playerId: number): void {
+    cell.addEventListener('mouseenter', () => showGScoreCard(cell, playerId))
+    cell.addEventListener('mouseleave', () => hideGScoreCard())
+    cell.addEventListener('click', event => {
+        if ((event as PointerEvent).pointerType === 'mouse') return   // the mouse already shows it on hover
+        if (gScoreCard?.anchor === cell) hideGScoreCard()
+        else showGScoreCard(cell, playerId)
+        event.stopPropagation()
+    })
+}
+
+/** Places the card centred under the cell (over it when there is no room below in the window), kept inside the window,
+ *  in page coordinates so it stays beside the cell when the page scrolls. */
+function showGScoreCard(cell: HTMLElement, playerId: number): void {
+    hideGScoreCard()
+    const element = document.createElement('div')
+    element.className = 'gscore-hover-card'
+    element.appendChild(buildPlayerGScoreCard(playerId))
+    document.body.appendChild(element)
+    const cellBox = cell.getBoundingClientRect()
+    const cardBox = element.getBoundingClientRect()
+    const margin = 6
+    const below = cellBox.bottom + margin
+    const top = below + cardBox.height <= window.innerHeight ? below : cellBox.top - margin - cardBox.height
+    const centred = cellBox.left + cellBox.width / 2 - cardBox.width / 2
+    const left = Math.min(Math.max(margin, centred), window.innerWidth - cardBox.width - margin)
+    element.style.top = `${Math.max(margin, top) + window.scrollY}px`
+    element.style.left = `${Math.max(margin, left) + window.scrollX}px`
+    gScoreCard = { element, anchor: cell }
+}
+
+function hideGScoreCard(): void {
+    gScoreCard?.element.remove()
+    gScoreCard = null
+}
+
+// A resize can reflow the cell away from the card, so it closes the card; so does a tap elsewhere.
+window.addEventListener('resize', hideGScoreCard)
+document.addEventListener('click', hideGScoreCard)
+
+
+/** A roster cell's corner label listing the positions the player is eligible for, one per line (a narrow column). */
+function makePositionEligibilityLabel(playerId: number): HTMLSpanElement {
+    const label = document.createElement('span')
+    label.className = 'roster-position-eligibility'
+    for (const position of getRegistryEntry(playerId).positions) {
+        const line = document.createElement('span')
+        line.textContent = position
+        label.appendChild(line)
+    }
+    return label
+}
+
+/** The one-line note under a grid holding a hypothetical team. While the team is still being found the note is not
+ *  shown, but keeps its line, so the panel does not grow when the team arrives. */
+function makeHypotheticalTeamNote(isTeamShown: boolean): HTMLDivElement {
+    const note = document.createElement('div')
+    note.className = 'hypothetical-team-note'
+    note.style.visibility = isTeamShown ? 'visible' : 'hidden'
+    note.textContent = 'Potential future picks are hypothetical, and for illustrative purposes only. '
+        + 'They are found based on the results of H-scoring but not taken into account for scoring'
+    return note
 }
 
 
@@ -224,21 +398,14 @@ function makeWeightsTable(playerData: PlayerResult, categories: string[]): HTMLD
  * Builds the flex allocations table showing how future picks are expected to
  * fill remaining flex roster slots, given that this candidate is drafted.
  *
- * @param flexData   - The flex allocation data for this player
- * @param useMargin  - Whether to apply the standard left-margin indent (default true)
+ * @param flexData - The flex allocation data for this player
  */
-function makeFlexAllocationsTable(
-    flexData: FlexAllocations
-    , useMargin: boolean
-    , nTotalColumns: number
-): HTMLDivElement {
+function makeFlexAllocationsTable(flexData: FlexAllocations): HTMLDivElement {
     const positionNames = getPositionNames()
 
     const table = document.createElement('table')
     table.className = 'panel-table'
     table.dataset.testid = 'flex-allocations-table'
-    table.style.tableLayout = 'fixed'
-    table.style.width = '100%'
 
     const headerRow = table.createTHead().insertRow(-1)
     headerRow.appendChild(makeSpacerTh('panel-colheader-blank panel-colspacer-position-label'))
@@ -247,11 +414,6 @@ function makeFlexAllocationsTable(
         positionHeader.className = 'panel-colheader'
         positionHeader.textContent = positionNames[basePosition] ?? basePosition
         headerRow.appendChild(positionHeader)
-    }
-    // Invisible filler columns so this table's column count matches the roster's,
-    // giving each non-label column an identical width in both tables.
-    for (let i = flexData.base_positions.length; i < nTotalColumns; i++) {
-        headerRow.appendChild(makeSpacerTh('panel-colheader-blank'))
     }
 
     const tableBody = table.createTBody()
@@ -273,17 +435,9 @@ function makeFlexAllocationsTable(
                 cell.style.cssText = stat_styler_tertiary(value, 50, 0)
             }
         }
-        // Filler cells with border-style:hidden — in border-collapse mode, hidden
-        // borders override any neighbor's solid borders at the shared edge, so the
-        // row's bottom line does not extend into the filler region.
-        for (let i = rowData.values.length; i < nTotalColumns; i++) {
-            const filler = row.insertCell(-1)
-            filler.style.cssText = 'border-style: hidden; padding: 0;'
-        }
     }
 
     const wrapper = document.createElement('div')
-    if (useMargin) wrapper.className = 'panel-indent'
     wrapper.appendChild(table)
     return wrapper
 }
@@ -346,15 +500,30 @@ function makeAuctionValuesTable(playerData: PlayerResult): HTMLTableElement {
 }
 
 
+/** One row of the roster grid: the base positions, or the flex positions. */
+function makeRosterBlock(): HTMLDivElement {
+    const block = document.createElement('div')
+    block.className = 'roster-block'
+    return block
+}
+
+
 // ─── Roster grid ──────────────────────────────────────────────────────────────
-// Rows: depth level (1st slot, 2nd slot, …); Cols: all position types (PG…Util).
-// Base-position cols align with the flex allocations table above.
+// One group per position type (PG, SG, ..., Util), its slots side by side under the type's label, in two rows: the
+// base positions over the flex positions. Every cell has the same width, so a roster of any shape reads evenly with no
+// filler cells; a row too wide for the panel (a phone) wraps within itself.
 
 /**
  * Builds the roster grid showing which players are assigned to each slot,
- * and highlights the candidate player being evaluated.
+ * and highlights the candidate player being evaluated. hypotheticalPickLabels labels each hypothetical
+ * pick's cell (planned round or predicted price); null when the roster holds none. showPendingSpinners puts a
+ * spinner in every empty slot while a hypothetical team is being found.
  */
-function makeRosterGrid(roster: Roster, nTotalColumns: number): HTMLDivElement {
+function makeRosterGrid(
+    roster: Roster
+    , hypotheticalPickLabels: Map<number, string> | null
+    , showPendingSpinners: boolean
+): HTMLDivElement {
     const positionNames = getPositionNames()
 
     // Group slots by position type (e.g. "PG1", "PG2" → type "PG") preserving insertion order.
@@ -365,64 +534,68 @@ function makeRosterGrid(roster: Roster, nTotalColumns: number): HTMLDivElement {
         if (!slotsByType[positionType]) { slotsByType[positionType] = []; positionTypes.push(positionType) }
         slotsByType[positionType].push(slot)
     }
-    const maxDepth = Math.max(...positionTypes.map(positionType => slotsByType[positionType].length))
 
-    const table = document.createElement('table')
-    table.className = 'panel-table'
-    table.dataset.testid = 'roster-assignments-table'
-    table.style.tableLayout = 'fixed'
-    table.style.width = '100%'
+    hideGScoreCard()
+    const groups = document.createElement('div')
+    groups.className = 'roster-groups'
+    groups.dataset.testid = 'roster-assignments-table'
+    if (showPendingSpinners || hypotheticalPickLabels !== null) groups.classList.add('roster-grid-hypothetical')
+    const flexPositions = new Set(getPositionStructure().flex_list)
+    const baseTypes = positionTypes.filter(positionType => !flexPositions.has(positionType))
+    const flexTypes = positionTypes.filter(positionType => flexPositions.has(positionType))
+    const baseBlock = makeRosterBlock()
+    const flexBlock = makeRosterBlock()
+    if (baseTypes.length > 0) groups.appendChild(baseBlock)
+    if (flexTypes.length > 0) groups.appendChild(flexBlock)
 
-    const headerRow = table.createTHead().insertRow(-1)
-    headerRow.appendChild(makeSpacerTh('panel-colheader-blank panel-colspacer-position-label'))
     for (const positionType of positionTypes) {
-        const positionHeader = document.createElement('th')
-        positionHeader.className = 'panel-colheader'
-        positionHeader.textContent = positionNames[positionType] ?? positionType
-        headerRow.appendChild(positionHeader)
-    }
-    // Invisible filler columns so this table's column count matches the flex
-    // allocations table's, giving each non-label column an identical width.
-    for (let i = positionTypes.length; i < nTotalColumns; i++) {
-        headerRow.appendChild(makeSpacerTh('panel-colheader-blank'))
-    }
+        const slots = slotsByType[positionType]
+        const group = document.createElement('div')
+        group.className = 'roster-group'
+        group.style.setProperty('--roster-group-slots', String(slots.length))
+        const table = document.createElement('table')
+        table.className = 'panel-table'
+        group.appendChild(table)
 
-    const tableBody = table.createTBody()
-    for (let depthIndex = 0; depthIndex < maxDepth; depthIndex++) {
-        const row = tableBody.insertRow(-1)
+        const header = document.createElement('th')
+        header.className = 'panel-colheader'
+        header.colSpan = slots.length
+        header.textContent = positionType
+        header.title = positionNames[positionType] ?? positionType
+        table.createTHead().insertRow(-1).appendChild(header)
 
-        const labelCell = document.createElement('th')
-        labelCell.className = 'panel-rowlabel'
-        labelCell.textContent = 'Slot ' + (depthIndex + 1)
-        row.appendChild(labelCell)
-
-        for (const positionType of positionTypes) {
+        const row = table.createTBody().insertRow(-1)
+        for (const slot of slots) {
             const cell = row.insertCell(-1)
-            const slot = slotsByType[positionType][depthIndex]
-            if (slot === undefined) {
-                cell.className = 'ineligible panel-datacell'
+            const assignment = roster.assignments[slot]
+            if (!assignment && showPendingSpinners) {
+                cell.className = 'rosterabsent rosterpending panel-datacell'
+                const spinner = document.createElement('span')
+                spinner.className = 'roster-slot-spinner'
+                cell.appendChild(spinner)
+            } else if (!assignment) {
+                cell.className = 'rosterabsent panel-datacell'
                 cell.textContent = '\u00A0'
+            } else if (assignment.kind === 'hypothetical') {
+                const label = hypotheticalPickLabels?.get(assignment.player_id)
+                if (label === undefined) throw new Error(`No label for hypothetical pick ${assignment.player_id}`)
+                cell.className = 'rosterhypothetical panel-datacell roster-player-cell'
+                cell.appendChild(makeHypotheticalPlayerDisplay(assignment.player_id, label))
+                cell.appendChild(makePositionEligibilityLabel(assignment.player_id))
+                attachGScoreCard(cell, assignment.player_id)
             } else {
-                const assignment = roster.assignments[slot]
-                if (!assignment) {
-                    cell.className = 'rosterabsent panel-datacell'
-                    cell.textContent = '\u00A0'
-                } else {
-                    cell.className = (assignment.isCandidate ? 'rostercandidate' : 'rosteronteam')
-                        + ' panel-datacell roster-player-cell'
-                    cell.appendChild(makeMinimalPlayerDisplay(assignment.player_id))
-                }
+                cell.className = (assignment.kind === 'candidate' ? 'rostercandidate' : 'rosteronteam')
+                    + ' panel-datacell roster-player-cell'
+                cell.appendChild(makeMinimalPlayerDisplay(assignment.player_id, false))   // the card shows the name
+                cell.appendChild(makePositionEligibilityLabel(assignment.player_id))
+                attachGScoreCard(cell, assignment.player_id)
             }
         }
-        // See makeFlexAllocationsTable for the filler-cell rationale.
-        for (let i = positionTypes.length; i < nTotalColumns; i++) {
-            const filler = row.insertCell(-1)
-            filler.style.cssText = 'border-style: hidden; padding: 0;'
-        }
+        ;(flexPositions.has(positionType) ? flexBlock : baseBlock).appendChild(group)
     }
 
     const wrapper = document.createElement('div')
     wrapper.className = 'panel-indent'
-    wrapper.appendChild(table)
+    wrapper.appendChild(groups)
     return wrapper
 }

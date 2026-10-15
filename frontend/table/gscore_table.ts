@@ -7,7 +7,7 @@
 // here vs. the inspector's CSS-class spacer row).
 
 import { getGScoreById, getShortCategoryNames } from '../app_state.js'
-import { makeFullPlayerDisplay } from '../player_display.js'
+import { makeFullPlayerDisplay, buildPlayerOptionLabel } from '../player_display.js'
 import { getSelectedCategories, getScoringFormat } from '../setting_collection/format_and_categories.js'
 import { getLeagueSettings } from '../setting_collection/league_settings.js'
 import {
@@ -145,6 +145,49 @@ export function appendGScoreBodyAndTotals(
         cell.style.cssText = stat_styler_primary(val, G_SCORE_MULTIPLIER, 0)
         cell.className = 'panel-datacell'
     }
+}
+
+// A single player's G-scores run far smaller than the team totals the tables' shared multiplier is sized for, so the
+// hover card colours 50% more strongly (full colour at about +-1.2 G instead of +-1.8 G).
+const PLAYER_CARD_G_SCORE_MULTIPLIER = G_SCORE_MULTIPLIER * 1.5
+
+/** A single player's G-scores as a compact table -- his name and positions, then short category labels over the Total and each
+ *  category's value -- for the roster grid's hover card. */
+export function buildPlayerGScoreCard(playerId: number): HTMLTableElement {
+    const categories = getSelectedCategories()
+    const shortNames = getShortCategoryNames()
+    const row = getGScoreRowOrThrow(playerId)
+
+    const table = document.createElement('table')
+    table.className = 'panel-table gscore-card-table'
+    table.dataset.testid = 'gscore-hover-card'
+
+    const tableHead = table.createTHead()
+    const nameHeader = document.createElement('th')
+    nameHeader.className = 'gscore-card-name'
+    nameHeader.colSpan = categories.length + 1
+    nameHeader.textContent = buildPlayerOptionLabel(playerId)   // e.g. 'Mikal Bridges (SF,PF)'
+    tableHead.insertRow(-1).appendChild(nameHeader)
+
+    const headerRow = tableHead.insertRow(-1)
+    for (const label of ['Total', ...categories.map(category => shortNames[category] ?? category)]) {
+        const header = document.createElement('th')
+        header.className = 'panel-colheader'
+        header.textContent = label
+        headerRow.appendChild(header)
+    }
+
+    const valueRow = table.createTBody().insertRow(-1)
+    const totalCell = valueRow.insertCell(-1)
+    totalCell.textContent = row.total.toFixed(2)
+    totalCell.className = 'panel-datacell celltypea'
+    for (const value of row.values) {
+        const cell = valueRow.insertCell(-1)
+        cell.textContent = value.toFixed(2)
+        cell.style.cssText = stat_styler_primary(value, PLAYER_CARD_G_SCORE_MULTIPLIER, 0)
+        cell.className = 'panel-datacell'
+    }
+    return table
 }
 
 /** The one-row H-score table, column-aligned (via the shared colgroup) with a G-score table

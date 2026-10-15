@@ -7,7 +7,7 @@ responses live in `backend.api.schemas`.
 
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Optional
+from typing import Literal, Optional
 from pydantic import BaseModel
 
 
@@ -44,7 +44,7 @@ class FlexAllocations:
 @dataclass
 class RosterAssignment:
     player_id: int   # display resolution (names, headshots) happens client-side via the registry
-    is_candidate: bool
+    kind: Literal['rostered', 'candidate', 'hypothetical']   # hypothetical: a future pick of a hypothetical team
 
 
 @dataclass
@@ -78,6 +78,19 @@ class EvaluateResponse(BaseModel):
     candidates: list[Candidate]
     has_more: bool = False   # True when more candidate batches remain beyond this slice
     total_candidates: int = 0   # total candidates across all batches; lets the client reserve tail space
+
+
+# ── /sessions/{id}/hypothetical-team ─────────────────────────────────────────
+
+class HypotheticalPick(BaseModel):
+    player_id: int
+    pick_round: Optional[int] = None        # draft: the round the pick is planned for
+    predicted_price: Optional[int] = None   # auction: whole generic dollars
+
+
+class HypotheticalTeamResponse(BaseModel):
+    roster: Roster                         # the full team: rostered, candidate and hypothetical assignments
+    hypothetical_picks: list[HypotheticalPick]
 
 
 # ── /sessions/{id}/trade/analyze ─────────────────────────────────────────────

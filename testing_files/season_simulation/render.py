@@ -313,7 +313,7 @@ function rosterTableHTML(roster){
     for(const t of types){ const slot=byType[t][d];
       if(slot===undefined){ h+=`<td class="ineligible"></td>`; continue; }
       const a = roster.assignments[slot];
-      h += a ? `<td class="name${a.is_candidate?' cand':''}">${a.name}</td>` : `<td></td>`;
+      h += a ? `<td class="name${a.kind==='candidate'?' cand':''}">${a.name}</td>` : `<td></td>`;
     }
     h += `</tr>`;
   }

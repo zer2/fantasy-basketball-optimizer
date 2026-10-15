@@ -11,7 +11,7 @@ import { makeConnectors, connectorPlatforms } from '../platforms/registry.js'
 import { PlatformConnector, ConnectStatus, PLATFORM_LEAGUE_CHOSEN } from '../platforms/connector.js'
 import { isSignedIn, makeSignInPrompt } from '../api/auth.js'
 import { defaultTeamLabel } from '../data_entry/team_labels.js'
-import { applySlotDefaultsForPicks, applyPlatformSlotCountsAsDefault } from './slot_counts.js'
+import { showLeaguePositionStructure, showManualPositionStructure } from './slot_counts.js'
 
 const DRAFT_MODE_OPTIONS = ['Draft Mode', 'Auction Mode', 'Season Mode'] as const
 export type DraftMode = typeof DRAFT_MODE_OPTIONS[number]
@@ -155,6 +155,14 @@ export function renderLeagueSettings(container: HTMLElement): void {
     platformSelectHandle = platformSelect
     platformSelect.element.addEventListener('change', () => {
         savePref('platform', platformSelect.getValue())
+        // Back to own data: manual entry's own league shape returns -- a connection only ever set the inputs, never
+        // manual entry's saved values. main.ts sends it to the session.
+        if (platformSelect.getValue() === 'Enter your own data') {
+            nDraftersInput.value = String(pref('n_drafters', nDraftersDefault))
+            nPicksInput.value    = String(pref('n_picks', nPicksDefault))
+            showManualPositionStructure()
+            refreshTeamIdentities()
+        }
         // A connection narrows the modes to what its platform supports (ESPN: Season only). That narrowing belongs to
         // the connection, so it ends with it: without this, connecting ESPN and switching to own data left Draft and
         // Auction unselectable until a reload. Connecting the new platform narrows them again. Silent, and keeps the
@@ -363,15 +371,11 @@ export function renderLeagueSettings(container: HTMLElement): void {
                 // its validation followed the league's own pick count: a 16-spot league sat on
                 // the default 13-slot structure with nothing on screen to say so, and the
                 // evaluate went ahead optimising for a roster shape the league does not use.
-                // The league's own positions when the platform reports them (Yahoo), as the default the user's own
-                // edits override; otherwise the default structure for its roster size, where one exists. Neither may
-                // leave a structure that does not fit the picks: the connection's session update waits for a valid
-                // one (draft_and_auction_session).
-                if (resp.slot_counts !== null) {
-                    applyPlatformSlotCountsAsDefault(connector.platform, selection.league_id, resp.slot_counts)
-                } else {
-                    applySlotDefaultsForPicks(resp.n_picks)
-                }
+                // The league's own structure (its saved one, or its platform's report, or the default for its
+                // roster size), saved under the league -- never over manual entry's. None may leave a structure that
+                // does not fit the picks: the connection's session update waits for a valid one
+                // (draft_and_auction_session).
+                showLeaguePositionStructure(connector.platform, selection.league_id, resp.slot_counts, resp.n_picks)
                 hiddenNamesTextarea.value = resp.team_names.join('\n')
                 hiddenNamesTextarea.dispatchEvent(new Event('input', { bubbles: true }))
                 // Enables the live-layout Refresh Analysis button, for as long as the controls

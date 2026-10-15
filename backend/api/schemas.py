@@ -215,6 +215,19 @@ class EvaluateRequest(BaseModel):
     forced_category_weights: Optional[dict[str, Optional[float]]] = None
 
 
+# ── /sessions/{id}/hypothetical-team ─────────────────────────────────────────
+
+class HypotheticalTeamRequest(BaseModel):
+    # The board exactly as the evaluate that ranked the candidate stated it: the request reads that evaluate's
+    # strategy for the candidate, keyed by these fields.
+    player_assignments: dict[str, list[int]]
+    my_team_id: str
+    remaining_cash: Optional[dict[str, float]] = None   # Auction Mode only
+    exclusion_list: list[int] = []
+    forced_category_weights: Optional[dict[str, Optional[float]]] = None
+    candidate_player_id: int
+
+
 # ── /sessions/{id}/trade/analyze ─────────────────────────────────────────────
 
 class TradeAnalyzeRequest(BaseModel):

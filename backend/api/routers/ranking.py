@@ -11,9 +11,10 @@ from backend.state.session import Session
 from backend.infra.rate_limit import enforce_rate_limit, COMPUTE_POLICY
 from backend.math.algorithm_agents import ForcedWeightsInfeasibleError
 from backend.services.ranking import rank_candidates, UnknownRosterPlayersError, UnknownTeamError
+from backend.services.hypothetical_team import build_hypothetical_team, StaleBoardError
 from backend.infra.server_timing import begin_timing, server_timing_header
-from backend.api.schemas import EvaluateRequest
-from backend.models import EvaluateResponse
+from backend.api.schemas import EvaluateRequest, HypotheticalTeamRequest
+from backend.models import EvaluateResponse, HypotheticalTeamResponse
 
 router = APIRouter()
 
@@ -66,3 +67,34 @@ def rank_candidates_route(req: EvaluateRequest, response: Response,
 
     response.headers['Server-Timing'] = server_timing_header()
     return result
+
+
+@router.post('/sessions/{session_id}/hypothetical-team', response_model=HypotheticalTeamResponse,
+             dependencies=[Depends(enforce_rate_limit(COMPUTE_POLICY))])
+def build_hypothetical_team_route(req: HypotheticalTeamRequest, session: Session = Depends(require_session)):
+    # Same all-or-nothing auction rule as the evaluate: the request names the board that evaluate scored.
+    is_auction_league = bool(session.current_settings.get('is_auction'))
+    if is_auction_league != (req.remaining_cash is not None):
+        raise HTTPException(
+            status_code=400,
+            detail='remaining_cash is required for auction leagues and must be omitted for draft leagues.',
+        )
+    try:
+        with session.lock:
+            return build_hypothetical_team(
+                session                 = session,
+                player_assignments      = req.player_assignments,
+                my_team_id              = req.my_team_id,
+                exclusion_list          = req.exclusion_list,
+                remaining_cash          = req.remaining_cash,
+                forced_category_weights = req.forced_category_weights,
+                candidate_player_id     = req.candidate_player_id,
+            )
+    except StaleBoardError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except ValueError as exc:
+        # An infeasible team (e.g. the candidate's predicted price leaves too little cash) is the user's board, not
+        # a server fault; the message says which.
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception:
+        raise fail(500, 'Finding a hypothetical team failed.')

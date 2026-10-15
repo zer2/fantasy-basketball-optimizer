@@ -82,7 +82,7 @@ export function renderSlotCounts(container: HTMLElement): void {
     container.append(benchCaption)
 
     const benchInput = makeNumberInput('sc-bench-slots', pref('bench_slots', 0), 0)
-    benchInput.addEventListener('change', () => savePref('bench_slots', parseInt(benchInput.value)))
+    benchInput.addEventListener('change', savePositionStructure)
     container.append(benchInput)
 
     // Validation message
@@ -113,7 +113,7 @@ function makeSlotRow(pos: string, defaultValue: number): HTMLElement {
     input.className = 'sidebar-input slot-input'
     input.min = '0'
     input.value = String(defaultValue)
-    input.addEventListener('change', () => savePref(`slot_${pos}`, parseInt(input.value)))
+    input.addEventListener('change', savePositionStructure)
     row.append(input)
 
     return row
@@ -175,97 +175,114 @@ export function getActiveSlotCount(): number {
     return Object.values(getSlotCounts()).reduce((a, b) => a + b, 0)
 }
 
-/**
- * Applies the default position structure parameters.yaml defines for `nPicks`, if it defines
- * one, and revalidates either way.
- *
- * The structures are keyed by pick count (13, 14, 15, 16 for the NBA) and each sums to its own
- * key, so selecting the right one satisfies the slot-total validation by construction.
- * renderSlotCounts only ever reads the entry for the n_picks DEFAULT, so a league with some
- * other pick count kept the default 13-slot structure however many spots it really had --
- * connecting a 16-spot league left the algorithm optimising for a roster shape the league does
- * not use.
- *
- * Returns false when no structure is defined for that pick count. That is not an error: the
- * slots are left alone and the validation message states the mismatch, which is the honest
- * outcome for a league the parameters file has no opinion about.
- */
-export function applySlotDefaultsForPicks(nPicks: number): boolean {
-    const config = getSportConfig()
-    if (!config) throw new Error('Sport config not loaded')
-    const posEntry = config.positions[String(nPicks)]
-    if (posEntry) {
-        const defaults: Record<string, number> = { ...posEntry.base, ...posEntry.flex }
-        const positions = [...config.position_structure.base_list, ...config.position_structure.flex_list]
-        for (const pos of positions) {
-            const input = document.getElementById(`sc-${pos.toLowerCase()}`) as HTMLInputElement | null
-            if (!input) throw new Error(`Slot count input sc-${pos.toLowerCase()} not found`)
-            const count = defaults[pos] ?? 0
-            input.value = String(count)
-            // Saved too, or the next render reads the stale preference back over this.
-            savePref(`slot_${pos}`, count)
-        }
-    }
-    revalidateSlotCounts()
-    return posEntry !== undefined
+// ─── Where the position structure is saved ────────────────────────────────────
+// Manual entry and each connected league keep their own: manual entry in the slot_<pos> and bench_slots preferences, a
+// league in league_shape:<platform>:<league id>. Connecting a league never touches manual entry's, so switching back
+// to "Enter your own data" restores exactly what was there; a hand edit while connected is saved to that league.
+// (They used to share one set, which a connection overwrote with the league's slots while its pick count went
+// unsaved: manual entry came back with its own picks and the league's slots, which did not fit.)
+
+/** A connected league's saved structure: the slots its platform last reported (null for a platform that reports
+ *  none), and the structure in use for it -- that report, or the user's edit of it. */
+interface LeaguePositionStructure {
+    reported: Record<string, number> | null
+    slots: Record<string, number>
+    bench: number
 }
 
+let connectedLeagueKey: string | null = null   // whose structure is on screen; null = manual entry
 
-/**
- * Sets the position structure to a connected league's own (from its platform), with no perma-bench: the
- * platform's slots already account for every pick (Yahoo's swappable bench arrives as Util slots), so they fit the
- * league's picks by construction. Saved like a hand edit, so a reload keeps them. A slot the league does not have
- * is set to zero.
- */
-function setSlotCountsFromPlatform(slotCounts: Record<string, number>): void {
+/** Saves the structure on screen to its owner: manual entry's preferences, or the connected league's entry. */
+function savePositionStructure(): void {
+    const slots = getSlotCounts()
+    const bench = parseInt((document.getElementById('sc-bench-slots') as HTMLInputElement).value)
+    if (connectedLeagueKey === null) {
+        for (const [pos, count] of Object.entries(slots)) savePref(`slot_${pos}`, count)
+        savePref('bench_slots', bench)
+        return
+    }
+    const saved = pref<LeaguePositionStructure | null>(connectedLeagueKey, null)
+    if (saved === null) throw new Error(`No saved structure for the connected league ${connectedLeagueKey}`)
+    savePref(connectedLeagueKey, { ...saved, slots, bench })
+}
+
+/** Puts a structure in the Position Parameters inputs (a slot it does not name is zero) and revalidates. */
+function showPositionStructure(slots: Record<string, number>, bench: number): void {
     const config = getSportConfig()
     if (!config) throw new Error('Sport config not loaded')
     const positions = [...config.position_structure.base_list, ...config.position_structure.flex_list]
-    const unknown = Object.keys(slotCounts).filter(slot => !positions.includes(slot))
-    if (unknown.length > 0) throw new Error(`The platform reported slots this sport does not have: ${unknown.join(', ')}`)
+    const unknown = Object.keys(slots).filter(slot => !positions.includes(slot))
+    if (unknown.length > 0) throw new Error(`A position structure names slots this sport does not have: ${unknown.join(', ')}`)
     for (const pos of positions) {
         const input = document.getElementById(`sc-${pos.toLowerCase()}`) as HTMLInputElement | null
         if (!input) throw new Error(`Slot count input sc-${pos.toLowerCase()} not found`)
-        const count = slotCounts[pos] ?? 0
-        input.value = String(count)
-        savePref(`slot_${pos}`, count)
+        input.value = String(slots[pos] ?? 0)
     }
     const benchInput = document.getElementById('sc-bench-slots') as HTMLInputElement | null
     if (!benchInput) throw new Error('Perma-bench input sc-bench-slots not found')
-    benchInput.value = '0'
-    savePref('bench_slots', 0)
+    benchInput.value = String(bench)
     revalidateSlotCounts()
 }
 
-
-/**
- * Uses a connected league's own position structure (from its platform) as the DEFAULT for that league, not an
- * override. A connection happens on every page load and every mode change, and used to reset the Position section to
- * the platform's slots each time, so a hand edit (perma-bench slots taken out of Util, say) lasted only until the next
- * reconnect. Now the platform's slots are applied only when they differ from what this league reported the last time
- * they were applied -- the first connection, or a league whose roster settings changed -- or when the current structure
- * no longer fits the league's picks. Otherwise the user's own structure stays.
- */
-export function applyPlatformSlotCountsAsDefault(
-    platform: string
-    , leagueId: string
-    , slotCounts: Record<string, number>
-): void {
-    const preferenceKey = `platform_slots:${platform}:${leagueId}`
-    const reportedBefore = pref<Record<string, number> | null>(preferenceKey, null)
-    if (reportedBefore !== null && haveSameSlotCounts(reportedBefore, slotCounts) && isSlotCountsValid()) {
-        revalidateSlotCounts()
-        return
-    }
-    setSlotCountsFromPlatform(slotCounts)
-    savePref(preferenceKey, slotCounts)
+/** Manual entry's own structure, from its preferences (the config's default where never set), back on screen and in
+ *  charge of hand edits again. */
+export function showManualPositionStructure(): void {
+    const { basePositions, flexPositions, defaults } = resolvePositionConfig()
+    connectedLeagueKey = null
+    showPositionStructure(
+        Object.fromEntries([...basePositions, ...flexPositions].map(pos => [pos, pref(`slot_${pos}`, defaults[pos])])),
+        pref('bench_slots', 0),
+    )
 }
 
-/** Whether two position structures have the same count for every slot type (an absent type counting as zero). */
-function haveSameSlotCounts(
-    first: Record<string, number>
-    , second: Record<string, number>
+/**
+ * Shows a connected league's structure and puts it in charge of hand edits. The league's platform report is the
+ * default, not an override: a structure saved for this league stays -- the user's edits included -- as long as the
+ * league still reports the slots it reported when that was saved and the structure fits its picks. Otherwise the
+ * report is applied fresh with no perma-bench (the platform's slots already account for every pick; Yahoo's bench
+ * arrives as Util slots), or for a platform that reports no slots, the default structure parameters.yaml defines for
+ * the league's pick count (left as it is, with the mismatch stated, when it defines none).
+ */
+export function showLeaguePositionStructure(
+    platform: string
+    , leagueId: string
+    , reportedSlots: Record<string, number> | null
+    , nPicks: number
+): void {
+    connectedLeagueKey = `league_shape:${platform}:${leagueId}`
+    const saved = pref<LeaguePositionStructure | null>(connectedLeagueKey, null)
+    if (saved !== null && haveSameReport(saved.reported, reportedSlots)) {
+        showPositionStructure(saved.slots, saved.bench)
+        if (isSlotCountsValid()) return
+    }
+    if (reportedSlots !== null) {
+        showPositionStructure(reportedSlots, 0)
+    } else {
+        const defaults = getDefaultSlotCountsForPicks(nPicks)
+        if (defaults !== null) showPositionStructure(defaults, 0)
+        else revalidateSlotCounts()
+    }
+    savePref(connectedLeagueKey, {
+        reported: reportedSlots,
+        slots: getSlotCounts(),
+        bench: parseInt((document.getElementById('sc-bench-slots') as HTMLInputElement).value),
+    })
+}
+
+/** The default structure parameters.yaml defines for a pick count (13, 14, 15, 16 for the NBA), or null if none. */
+function getDefaultSlotCountsForPicks(nPicks: number): Record<string, number> | null {
+    const config = getSportConfig()
+    if (!config) throw new Error('Sport config not loaded')
+    const posEntry = config.positions[String(nPicks)]
+    return posEntry ? { ...posEntry.base, ...posEntry.flex } : null
+}
+
+/** Whether two platform reports are the same (both none, or the same count for every slot type). */
+function haveSameReport(
+    first: Record<string, number> | null
+    , second: Record<string, number> | null
 ): boolean {
+    if (first === null || second === null) return first === second
     const slotTypes = new Set([...Object.keys(first), ...Object.keys(second)])
     return [...slotTypes].every(slotType => (first[slotType] ?? 0) === (second[slotType] ?? 0))
 }
