@@ -1473,6 +1473,14 @@ tr {
     table-layout: fixed;
 }
 
+/* The position allocation table: every position column the same width (the row-label column keeps its own), wide
+   enough for the longest full name. On a phone the table fills the panel instead and the columns share what is left. */
+.panel-table.flex-allocations-table {
+    --flex-position-column-width: 104px;
+    table-layout: fixed;
+    width: calc(110px + var(--flex-position-count) * var(--flex-position-column-width));
+}
+
 /* A player's G-scores, floating beside the roster cell under the pointer (expand_view's hover card). It never takes
    the pointer itself, so moving onto it does not count as leaving the cell. */
 .gscore-hover-card {
@@ -1504,16 +1512,18 @@ tr {
     text-align: center;
 }
 
-/* Every slot row is a player cell's height (a headshot over a name line), filled or not, so empty slots are the same
-   size as the players beside them. */
+/* Every slot row is a hypothetical card's height (a headshot over a two-line full name), filled or not and whether or
+   not the example team is shown: empty slots match the players beside them, and neither the spinners, the arriving
+   team nor flipping the example-team toggle changes the panel's height. */
 .roster-groups tbody tr {
-    height: 43px;
+    height: 66px;
 }
 
-/* Rows of a grid that shows (or is about to show) a hypothetical team are sized for a hypothetical card from the
-   start: the spinners and the arriving team occupy the same height, so the panel never grows. */
-.roster-grid-hypothetical tbody tr {
-    height: 66px;
+/* An empty slot's border is as wide as the dotted one its hypothetical pick (or spinner) takes, in the grid's own color:
+   a collapsed border adds half its width to the table's edge, so with thinner lines the grid would be shorter with the
+   example team off. */
+.roster-groups .panel-datacell.rosterabsent {
+    border-width: 2px;
 }
 
 .roster-slot-spinner {
@@ -1539,13 +1549,13 @@ tr {
     .roster-groups {
         --roster-cell-width: 60px;
     }
+    .panel-table.flex-allocations-table {
+        width: 100%;
+    }
     .roster-block {
         flex-wrap: wrap;
     }
     .roster-groups tbody tr {
-        height: 31px;
-    }
-    .roster-grid-hypothetical tbody tr {
         height: 48px;
     }
     .panel-datacell.roster-player-cell {
