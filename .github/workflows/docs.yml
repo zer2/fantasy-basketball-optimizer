@@ -1,0 +1,34 @@
+name: Publish docs
+# Rebuilds the MkDocs site and publishes it to the gh-pages branch (GitHub Pages) whenever a merge into main changes
+# the docs, so the site never lags main. It used to be published by hand with `mkdocs gh-deploy`. Can also be run by
+# hand from the Actions tab (workflow_dispatch).
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/**'
+      - 'mkdocs.yml'
+      - '.github/workflows/docs.yml'
+  workflow_dispatch:
+concurrency: docs   # one publish at a time; a newer merge waits for the running one rather than racing it
+permissions:
+  contents: write   # to push the built site to gh-pages
+jobs:
+  Publish:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: '0'   # gh-deploy pushes to gh-pages, which needs the branch history
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - name: Install MkDocs
+      # The versions the site is built and checked with locally.
+      run: pip install mkdocs==1.6.1 mkdocs-material==9.7.6 pymdown-extensions==10.12
+    - name: Build and publish
+      run: |
+        git config user.name 'github-actions[bot]'
+        git config user.email 'github-actions[bot]@users.noreply.github.com'
+        mkdocs gh-deploy --force --strict
