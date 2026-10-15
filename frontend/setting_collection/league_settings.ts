@@ -11,7 +11,7 @@ import { makeConnectors, connectorPlatforms } from '../platforms/registry.js'
 import { PlatformConnector, ConnectStatus, PLATFORM_LEAGUE_CHOSEN } from '../platforms/connector.js'
 import { isSignedIn, makeSignInPrompt } from '../api/auth.js'
 import { defaultTeamLabel } from '../data_entry/team_labels.js'
-import { applySlotDefaultsForPicks, setSlotCountsFromPlatform } from './slot_counts.js'
+import { applySlotDefaultsForPicks, applyPlatformSlotCountsAsDefault } from './slot_counts.js'
 
 const DRAFT_MODE_OPTIONS = ['Draft Mode', 'Auction Mode', 'Season Mode'] as const
 export type DraftMode = typeof DRAFT_MODE_OPTIONS[number]
@@ -363,11 +363,12 @@ export function renderLeagueSettings(container: HTMLElement): void {
                 // its validation followed the league's own pick count: a 16-spot league sat on
                 // the default 13-slot structure with nothing on screen to say so, and the
                 // evaluate went ahead optimising for a roster shape the league does not use.
-                // The league's own positions when the platform reports them (Yahoo); otherwise the default structure
-                // for its roster size, where one exists. Neither may leave a structure that does not fit the picks:
-                // the connection's session update waits for a valid one (draft_and_auction_session).
+                // The league's own positions when the platform reports them (Yahoo), as the default the user's own
+                // edits override; otherwise the default structure for its roster size, where one exists. Neither may
+                // leave a structure that does not fit the picks: the connection's session update waits for a valid
+                // one (draft_and_auction_session).
                 if (resp.slot_counts !== null) {
-                    setSlotCountsFromPlatform(resp.slot_counts)
+                    applyPlatformSlotCountsAsDefault(connector.platform, selection.league_id, resp.slot_counts)
                 } else {
                     applySlotDefaultsForPicks(resp.n_picks)
                 }

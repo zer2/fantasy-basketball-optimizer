@@ -531,6 +531,61 @@ test("connecting takes the league's own position structure", async () => {
     }
 })
 
+test("the league's position structure is a default: edits survive a reconnect until the league's own changes", async () => {
+    // Every page load and mode change reconnects, and each reconnect used to put the platform's slots back, so moving
+    // Utils to perma-bench lasted only until the next one (2026-10-14).
+    const app = await launchAppPage()
+    const { page } = app
+    const leagueSlots = { PG: 1, SG: 1, G: 1, SF: 1, PF: 1, F: 1, C: 1, Util: 4 }
+    const readBench = () => page.locator('#sc-bench-slots').inputValue()
+    try {
+        await loadApp(app)
+        const platformBoard = await stubLivePlatform(page, { availableModes: ALL_MODES, picksPerTeam: 11,
+                                                             slotCounts: leagueSlots })
+        // The test account has no Yahoo token; an empty league list stands in for an authorized one, so a reload
+        // reconnects to the league named last.
+        await page.route(url => url.pathname.endsWith('/leagues'), route => route.fulfill({
+            status: 200, contentType: 'application/json', body: JSON.stringify({ leagues: [] }) }))
+        await connectYahooLeague(app, '12345')
+
+        // Two Utils to perma-bench: the slot box first (the check fails), then the bench box (it passes and applies).
+        await page.evaluate(() => {
+            for (const [id, value] of [['sc-util', '2'], ['sc-bench-slots', '2']]) {
+                const input = document.getElementById(id)
+                input.value = value
+                input.dispatchEvent(new Event('input', { bubbles: true }))
+                input.dispatchEvent(new Event('change', { bubbles: true }))
+            }
+        })
+        await waitAppSettled(app, { timeout: 120000 })
+
+        await page.reload({ waitUntil: 'domcontentloaded' })
+        await page.waitForFunction(() => document.querySelector('#ls-n-drafters')?.value === '4', null, { timeout: 60000 })
+        await waitAppSettled(app, { timeout: 120000 })
+        assert.equal((await readSlotInputs(page)).util, 2, 'the reconnect keeps the edited Util count')
+        assert.equal(await readBench(), '2', '...and the perma-bench')
+        assert.equal(platformBoard.configuredSlotCounts.at(-1).Util, 2, 'the session gets the edited structure')
+
+        // The league's own roster settings change: the platform's new structure replaces the edit.
+        const changedSlots = { ...leagueSlots, C: 2, Util: 3 }
+        await page.route(url => url.pathname.endsWith('/connect'), route => route.fulfill({
+            status: 200, contentType: 'application/json',
+            body: JSON.stringify({ team_names: LEAGUE_TEAMS, n_drafters: LEAGUE_TEAMS.length, n_picks: 11,
+                                   available_modes: ALL_MODES, is_auction_draft: false, slot_counts: changedSlots }),
+        }))
+        await page.reload({ waitUntil: 'domcontentloaded' })
+        await page.waitForFunction(() => document.querySelector('#ls-n-drafters')?.value === '4', null, { timeout: 60000 })
+        await waitAppSettled(app, { timeout: 120000 })
+        const shown = await readSlotInputs(page)
+        assert.equal(shown.c, 2)
+        assert.equal(shown.util, 3)
+        assert.equal(await readBench(), '0')
+        expectCleanSession(app, 'platform structure as a default')
+    } finally {
+        await app.close()
+    }
+})
+
 test('a connection whose picks no structure fits waits for the Position Parameters, then loads', async () => {
     // A platform that does not report positions, at a pick count with no default structure: the 13-slot default was
     // sent for 11 picks. Now nothing reaches the session until the slots fit, and applying them sends the connection.
