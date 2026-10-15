@@ -1504,6 +1504,12 @@ tr {
     text-align: center;
 }
 
+/* Every slot row is a player cell's height (a headshot over a name line), filled or not, so empty slots are the same
+   size as the players beside them. */
+.roster-groups tbody tr {
+    height: 43px;
+}
+
 /* Rows of a grid that shows (or is about to show) a hypothetical team are sized for a hypothetical card from the
    start: the spinners and the arriving team occupy the same height, so the panel never grows. */
 .roster-grid-hypothetical tbody tr {
@@ -1535,6 +1541,9 @@ tr {
     }
     .roster-block {
         flex-wrap: wrap;
+    }
+    .roster-groups tbody tr {
+        height: 31px;
     }
     .roster-grid-hypothetical tbody tr {
         height: 48px;
