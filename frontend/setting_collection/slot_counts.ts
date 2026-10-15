@@ -217,7 +217,7 @@ export function applySlotDefaultsForPicks(nPicks: number): boolean {
  * league's picks by construction. Saved like a hand edit, so a reload keeps them. A slot the league does not have
  * is set to zero.
  */
-export function setSlotCountsFromPlatform(slotCounts: Record<string, number>): void {
+function setSlotCountsFromPlatform(slotCounts: Record<string, number>): void {
     const config = getSportConfig()
     if (!config) throw new Error('Sport config not loaded')
     const positions = [...config.position_structure.base_list, ...config.position_structure.flex_list]
@@ -235,6 +235,39 @@ export function setSlotCountsFromPlatform(slotCounts: Record<string, number>): v
     benchInput.value = '0'
     savePref('bench_slots', 0)
     revalidateSlotCounts()
+}
+
+
+/**
+ * Uses a connected league's own position structure (from its platform) as the DEFAULT for that league, not an
+ * override. A connection happens on every page load and every mode change, and used to reset the Position section to
+ * the platform's slots each time, so a hand edit (perma-bench slots taken out of Util, say) lasted only until the next
+ * reconnect. Now the platform's slots are applied only when they differ from what this league reported the last time
+ * they were applied -- the first connection, or a league whose roster settings changed -- or when the current structure
+ * no longer fits the league's picks. Otherwise the user's own structure stays.
+ */
+export function applyPlatformSlotCountsAsDefault(
+    platform: string
+    , leagueId: string
+    , slotCounts: Record<string, number>
+): void {
+    const preferenceKey = `platform_slots:${platform}:${leagueId}`
+    const reportedBefore = pref<Record<string, number> | null>(preferenceKey, null)
+    if (reportedBefore !== null && haveSameSlotCounts(reportedBefore, slotCounts) && isSlotCountsValid()) {
+        revalidateSlotCounts()
+        return
+    }
+    setSlotCountsFromPlatform(slotCounts)
+    savePref(preferenceKey, slotCounts)
+}
+
+/** Whether two position structures have the same count for every slot type (an absent type counting as zero). */
+function haveSameSlotCounts(
+    first: Record<string, number>
+    , second: Record<string, number>
+): boolean {
+    const slotTypes = new Set([...Object.keys(first), ...Object.keys(second)])
+    return [...slotTypes].every(slotType => (first[slotType] ?? 0) === (second[slotType] ?? 0))
 }
 
 
