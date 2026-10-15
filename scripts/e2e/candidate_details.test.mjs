@@ -125,6 +125,27 @@ test('candidate table content and detail views', async t => {
                 await page.mouse.move(0, 0)
                 await card.waitFor({ state: 'detached', timeout: 5000 })
             }
+
+            // Flipping the toggle off and back on leaves the roster panel exactly as tall: the empty slots are sized
+            // like the example team's cards and its note's space is kept.
+            const rosterPanel = page.locator('[data-testid="roster-assignments-panel"]')
+            const heightWithTeam = (await rosterPanel.boundingBox()).height
+            const measureHeaderWidths = () => page.locator('[data-testid="roster-assignments-table"] th.panel-colheader')
+                .evaluateAll(headers => headers.map(header => header.getBoundingClientRect().width))
+            const headerWidthsWithTeam = await measureHeaderWidths()
+            await setExampleTeamShown(false)
+            await page.waitForFunction(() =>
+                document.querySelectorAll('[data-testid="roster-assignments-table"] td.rosterhypothetical').length === 0,
+                null, { timeout: 10000 })
+            const heightWithoutTeam = (await rosterPanel.boundingBox()).height
+            assert.ok(Math.abs(heightWithTeam - heightWithoutTeam) <= 1,
+                      `the toggle should not change the roster panel's height (${heightWithTeam} -> ${heightWithoutTeam})`)
+            const headerWidthsWithoutTeam = await measureHeaderWidths()
+            headerWidthsWithTeam.forEach((width, index) => assert.ok(Math.abs(width - headerWidthsWithoutTeam[index]) <= 0.5,
+                `the toggle should not change the position headers' widths (${headerWidthsWithTeam} -> ${headerWidthsWithoutTeam})`))
+            await setExampleTeamShown(true)
+            await expectHypotheticalTeamFills(/^Rd \d+$/, { expectSpinners: false })
+
             await page.locator('#hscoretable .playerheaderdiv').nth(1).click()   // collapse again
             await page.locator('[data-testid="roster-assignments-table"]').waitFor({ state: 'hidden', timeout: 5000 })
         })

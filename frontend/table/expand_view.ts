@@ -83,10 +83,14 @@ export function buildExpandPanel(
         // strategy the last draft/auction evaluate cached. A candidate with no category weights (the last open slot)
         // has no future picks to fill.
         const mode = getMode()
-        if (isExampleTeamShown() && (mode === 'Draft Mode' || mode === 'Auction Mode') && playerData.category_weights) {
+        const canShowExampleTeam = (mode === 'Draft Mode' || mode === 'Auction Mode') && Boolean(playerData.category_weights)
+        if (canShowExampleTeam && isExampleTeamShown()) {
             fillRosterWithHypotheticalTeam(playerData, rosterHolder)
         } else {
             rosterHolder.appendChild(makeRosterGrid(playerData.roster, null, false))
+            // The note's space is kept with the example team off too, so flipping the toggle never changes the
+            // panel's height.
+            if (canShowExampleTeam) rosterHolder.appendChild(makeHypotheticalTeamNote(false))
         }
     }
 }
@@ -158,7 +162,7 @@ function fillRosterWithHypotheticalTeam(
         return
     }
     // The spinner grid and the (hidden) note take the filled panel's full height from the start
-    // (.roster-grid-hypothetical rows are sized for a hypothetical card), so the panel does not grow when the team arrives.
+    // (every roster row is sized for a hypothetical card), so the panel does not grow when the team arrives.
     rosterHolder.append(makeRosterGrid(playerData.roster!, null, true),
                         makeHypotheticalTeamNote(false))
 
@@ -404,8 +408,9 @@ function makeFlexAllocationsTable(flexData: FlexAllocations): HTMLDivElement {
     const positionNames = getPositionNames()
 
     const table = document.createElement('table')
-    table.className = 'panel-table'
+    table.className = 'panel-table flex-allocations-table'
     table.dataset.testid = 'flex-allocations-table'
+    table.style.setProperty('--flex-position-count', String(flexData.base_positions.length))
 
     const headerRow = table.createTHead().insertRow(-1)
     headerRow.appendChild(makeSpacerTh('panel-colheader-blank panel-colspacer-position-label'))
@@ -539,7 +544,6 @@ function makeRosterGrid(
     const groups = document.createElement('div')
     groups.className = 'roster-groups'
     groups.dataset.testid = 'roster-assignments-table'
-    if (showPendingSpinners || hypotheticalPickLabels !== null) groups.classList.add('roster-grid-hypothetical')
     const flexPositions = new Set(getPositionStructure().flex_list)
     const baseTypes = positionTypes.filter(positionType => !flexPositions.has(positionType))
     const flexTypes = positionTypes.filter(positionType => flexPositions.has(positionType))
@@ -560,8 +564,7 @@ function makeRosterGrid(
         const header = document.createElement('th')
         header.className = 'panel-colheader'
         header.colSpan = slots.length
-        header.textContent = positionType
-        header.title = positionNames[positionType] ?? positionType
+        header.textContent = positionNames[positionType] ?? positionType   // full names, as in the position allocation table
         table.createTHead().insertRow(-1).appendChild(header)
 
         const row = table.createTBody().insertRow(-1)
