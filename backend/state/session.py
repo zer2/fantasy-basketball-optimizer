@@ -87,6 +87,11 @@ class Session:
     # settings change) never serves a stale one.
     trade_context_cache: "OrderedDict[tuple, tuple]" = field(default_factory=OrderedDict)
 
+    # Each evaluated candidate's raw H-scoring category weights and win rates, by board
+    # (services/ranking.store_candidate_strategies): {board key: (agent, {player id: (weights, rates)})}. The
+    # hypothetical team (services/hypothetical_team) reads the strategy the board showed instead of re-solving.
+    candidate_strategy_cache: "OrderedDict[tuple, tuple]" = field(default_factory=OrderedDict)
+
 
 # ── Store ────────────────────────────────────────────────────────────────────
 # Grouped here rather than above Session because the _store annotation below is

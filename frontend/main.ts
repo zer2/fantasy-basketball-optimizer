@@ -19,7 +19,7 @@ import { showFailureInTable } from './table/failure_message.js'
 import { applyLayout, redrawActiveSeasonTab, getActiveSeasonTab } from './layout.js'
 import { resetDraftBoard } from './data_entry/draft_board.js'
 import { resetAuctionEntry } from './data_entry/auction_entry.js'
-import { pref, savePref } from './preferences.js'
+import { pref, savePref, isExampleTeamShown } from './preferences.js'
 import { setTheme } from './styles/styler_functions.js'
 import { renderSeatSelector, refreshSeatOptions, clearSeatOptions } from './seat_selector.js'
 import { renderAccountRow } from './account_row.js'
@@ -406,6 +406,17 @@ themeInput.addEventListener('change', () => {
     const isLight = themeInput.checked
     savePref('light_mode', isLight)
     setTheme(isLight ? 'light' : 'dark')
+})
+
+// Example team: candidate detail panels fill the empty roster slots with one hypothetical team the candidate's
+// H-scoring plan could become. The candidate table rebuilds any open panel when it changes.
+const exampleTeamToggle = makeSidebarToggle('show-example-team', 'Show example team')
+displaySection.append(exampleTeamToggle)
+const exampleTeamInput = document.getElementById('show-example-team') as HTMLInputElement
+exampleTeamInput.checked = isExampleTeamShown()
+exampleTeamInput.addEventListener('change', () => {
+    savePref('show_example_team', exampleTeamInput.checked)
+    document.dispatchEvent(new Event('example-team-toggled'))
 })
 
 // ─── Sidebar toggle ───────────────────────────────────────────────────────────

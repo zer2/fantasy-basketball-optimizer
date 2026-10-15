@@ -5,6 +5,8 @@ to the /evaluate response payload.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import numpy as np
 import pandas as pd
 from typing import Optional
@@ -40,6 +42,88 @@ def split_off_bench(
     return active, benched
 
 
+def compute_original_and_generic_dollars(
+    baseline_scores: pd.Series
+    , available_player_ids: pd.Index
+    , total_picks: int
+    , total_original_cash: float
+    , total_cash_remaining: float
+    , streaming_noise: float
+) -> tuple[pd.Series, pd.Series]:
+    """(original dollars, generic dollars). original: SAVOR on the neutral baseline H-scores over the full original cash
+    and picks. generic: original dollars over the available players, rescaled so they sum to the remaining cash."""
+    original_dollar_series = auction_value_adjuster(
+        baseline_scores, total_picks, total_original_cash, streaming_noise,
+    )
+    original_available = original_dollar_series.reindex(available_player_ids).fillna(0.0)
+    generic_dollar_series = original_available * (total_cash_remaining / original_available.sum())
+    return original_dollar_series, generic_dollar_series
+
+
+# ── Candidate strategy cache ──────────────────────────────────────────────────
+
+_CANDIDATE_STRATEGY_CACHE_MAX = 8   # boards; the hypothetical team only ever asks about the current one
+
+
+def make_candidate_strategy_key(
+    player_assignments: dict[str, list[int]]
+    , my_team_id: str
+    , exclusion_list: list[int]
+    , remaining_cash: Optional[dict[str, float]]
+    , forced_category_weights: Optional[dict[str, Optional[float]]]
+) -> tuple:
+    """Identifies a board as an evaluate request states it (before any bench split or replacement substitution)."""
+    return (
+        my_team_id,
+        tuple((team, tuple(roster)) for team, roster in player_assignments.items()),
+        tuple(sorted(exclusion_list)),
+        None if remaining_cash is None else tuple(sorted(remaining_cash.items())),
+        None if not forced_category_weights else tuple(sorted(forced_category_weights.items())),
+    )
+
+
+@dataclass
+class CandidateStrategy:
+    """What H-scoring planned for one candidate on one board: the inputs of its hypothetical team."""
+    category_weights: np.ndarray        # (C,) raw weights for future picks
+    win_rates: np.ndarray               # (C,) predicted category win rates
+    seating: Optional[np.ndarray]       # slot index of each of my active players (board order), then the candidate;
+                                        # None when H-scoring found no seating
+    flex_shares: dict[str, pd.Series]   # flex type -> share of its remaining slots each base position fills
+
+
+def store_candidate_strategies(
+    session: Session
+    , board_key: tuple
+    , h_score_result: dict
+    , n_my_players: int
+) -> None:
+    """Keep each scored candidate's CandidateStrategy for this board, merged across batches, so the hypothetical team
+    reads exactly the strategy on screen without re-solving (a re-solve would move the agent's warm-start state).
+    Entries remember the agent they came from; a rebuild invalidates them."""
+    if h_score_result['Weights'] is None:
+        return
+    cache = session.candidate_strategy_cache
+    entry = cache.get(board_key)
+    if entry is None or entry[0] is not session.agent:
+        entry = (session.agent, {})
+        cache[board_key] = entry
+    weights = h_score_result['Weights']
+    rates = h_score_result['Rates'].loc[weights.index].to_numpy()
+    seatings = h_score_result['Rosters'].loc[weights.index].to_numpy()[:, :n_my_players + 1].astype(int)
+    shares = {flex_type: frame.loc[weights.index] for flex_type, frame in h_score_result['Position-Shares'].items()}
+    for row, player_id in enumerate(weights.index):
+        entry[1][player_id] = CandidateStrategy(
+            category_weights = weights.iloc[row].to_numpy(),
+            win_rates        = rates[row],
+            seating          = None if (seatings[row] < 0).any() else seatings[row],
+            flex_shares      = {flex_type: frame.iloc[row] for flex_type, frame in shares.items()},
+        )
+    cache.move_to_end(board_key)
+    while len(cache) > _CANDIDATE_STRATEGY_CACHE_MAX:
+        cache.popitem(last=False)
+
+
 # ── Public entry point ────────────────────────────────────────────────────────
 
 def rank_candidates(
@@ -71,6 +155,8 @@ def rank_candidates(
     Returns:
         EvaluateResponse containing the iteration count and ranked Candidate list.
     """
+    board_key = make_candidate_strategy_key(
+        player_assignments, my_team_id, exclusion_list, remaining_cash, forced_category_weights)
     # A rostered player the league's categories cannot score is replacement level, not an error.
     player_assignments = count_unscorable_players_as_replacement(session, player_assignments)
     info           = session.agent.info
@@ -158,6 +244,8 @@ def rank_candidates(
 
     if h_score_result is None:
         return EvaluateResponse(iteration=0, candidates=[])
+
+    store_candidate_strategies(session, board_key, h_score_result, len(player_assignments[my_team_id]))
 
     with record_phase('build_candidates'):
         candidates = _build_candidates(
@@ -285,7 +373,7 @@ def _build_candidates(
     position_structure = h_agent.position_structure
     base_list          = position_structure['base_list']
     slot_counts        = current_settings['slot_counts']
-    slot_names         = _make_slot_names(h_agent.position_config)
+    slot_names         = make_slot_names(h_agent.position_config)
 
     # ── Auction dollar values (SAVOR) ─────────────────────────────────────────
     # Computed once for all players before the loop; None in draft mode.
@@ -327,25 +415,18 @@ def _build_candidates(
             available_in_g = [p for p in h_scores_sorted.index if p in player_g_scores.index]
             g_scores_available = player_g_scores.loc[available_in_g, 'Total']
 
-            # Baseline scores for the generic/original dollars: the neutral-board run,
-            # populated unconditionally at session build (build_session_agent).
-            baseline_scores = generic_h_scores
-
             # No defensive guard here: build_agent rejects any league whose pool can't fill every
             # roster, so the replacement-level index inside auction_value_adjuster always resolves.
             # your_dollar: team-specific H-scores, current state (remaining cash + picks)
             your_dollar_series = auction_value_adjuster(
                 h_scores_sorted, n_remaining, total_cash_remaining, streaming_noise,
             )
-            # original_dollar: neutral baseline H-scores, full original cash/picks
-            original_dollar_series = auction_value_adjuster(
-                baseline_scores, total_picks, total_original_cash, streaming_noise,
+            # Baseline scores for the generic/original dollars: the neutral-board run,
+            # populated unconditionally at session build (build_session_agent).
+            original_dollar_series, generic_dollar_series = compute_original_and_generic_dollars(
+                generic_h_scores, h_scores_sorted.index, total_picks, total_original_cash,
+                total_cash_remaining, streaming_noise,
             )
-            # generic_dollar: original_dollar over the available players, rescaled to the remaining cash
-            # (see the column definitions above — the sum over available players must equal the
-            # remaining cash exactly, like your_dollar).
-            orig_available     = original_dollar_series.reindex(h_scores_sorted.index).fillna(0.0)
-            generic_dollar_series = orig_available * (total_cash_remaining / orig_available.sum())
             # G-score variants, same construction from the G-score original values.
             original_dollar_g_score_series = auction_value_adjuster(
                 player_g_scores['Total'], total_picks, total_original_cash, streaming_noise,
@@ -803,7 +884,7 @@ def _build_roster_assignments(
 
     # Shared assignments for the already-drafted players (built once).
     drafted_assignments = [
-        RosterAssignment(player_id=int(player_id), is_candidate=False)
+        RosterAssignment(player_id=int(player_id), kind='rostered')
         for player_id in my_players
     ]
     # Cross the numpy→Python boundary once for all slot indices.
@@ -822,7 +903,7 @@ def _build_roster_assignments(
             if 0 <= candidate_slot_idx < n_slots:
                 assignments[slot_names[candidate_slot_idx]] = RosterAssignment(
                     player_id=int(candidate_player_ids[rank_idx]),
-                    is_candidate=True,
+                    kind='candidate',
                 )
 
         result.append(Roster(slots=slot_names, assignments=assignments))
@@ -830,7 +911,7 @@ def _build_roster_assignments(
     return result
 
 
-def _make_slot_names(position_config: PositionConfig) -> list[str]:
+def make_slot_names(position_config: PositionConfig) -> list[str]:
     """Return slot IDs in canonical order: base positions then flex.
 
     Each position contributes one ID per slot in its position_ranges block, numbered from

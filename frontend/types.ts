@@ -53,12 +53,35 @@ export interface FlexAllocations {
 
 export interface RosterAssignment {
     player_id: number;      // display resolution (name, headshot) via the player registry
-    isCandidate: boolean;   // true = the player being evaluated; false = already rostered
+    // candidate = the player being evaluated; hypothetical = a future pick of a hypothetical team
+    kind: 'rostered' | 'candidate' | 'hypothetical';
 }
 
 export interface Roster {
     slots: string[];                                        // all slot IDs, e.g. ["PG1", "G1", ...]
     assignments: Record<string, RosterAssignment | null>;  // null = empty slot
+}
+
+// ─── Hypothetical team ────────────────────────────────────────────────────────
+
+export interface HypotheticalPick {
+    player_id: number;
+    pick_round: number | null;        // draft: the round the pick is planned for
+    predicted_price: number | null;   // auction: whole generic dollars
+}
+
+export interface HypotheticalTeam {
+    roster: Roster;
+    hypothetical_picks: HypotheticalPick[];
+}
+
+/** A board as an evaluate request states it: the hypothetical team asks about the board the last evaluate scored. */
+export interface BoardRequest {
+    player_assignments: Record<string, number[]>;
+    my_team_id: string;
+    exclusion_list?: number[];
+    remaining_cash?: Record<string, number>;
+    forced_category_weights?: Record<string, number>;
 }
 
 // ─── API request types ────────────────────────────────────────────────────────

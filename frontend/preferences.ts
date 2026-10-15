@@ -18,3 +18,9 @@ export function savePref(key: string, value: unknown): void {
         localStorage.setItem(PREFIX + key, JSON.stringify(value))
     } catch { /* storage full or unavailable — silently ignore */ }
 }
+
+/** Whether candidate detail panels fill the empty roster slots with an example (hypothetical) team: the Display
+ *  section's "Show example team" toggle, off until turned on. */
+export function isExampleTeamShown(): boolean {
+    return pref('show_example_team', false)
+}

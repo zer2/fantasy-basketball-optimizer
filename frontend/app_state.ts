@@ -3,7 +3,7 @@
 // Kept in a standalone module with no app-internal imports (only types.ts)
 // so that any module can read the state without creating circular dependencies.
 
-import { PlayerResult, PlayerGScore, SportConfig } from './types.js'
+import { PlayerResult, PlayerGScore, SportConfig, BoardRequest } from './types.js'
 
 // ── Session phase ─────────────────────────────────────────────────────────────
 
@@ -110,6 +110,12 @@ export function getSportConfig(): SportConfig | null { return sportConfig }
 /** Stores the sport config fetched from the backend. */
 export function setSportConfig(c: SportConfig): void { sportConfig = c }
 
+/** The sport's position structure: its base positions and its flex positions. */
+export function getPositionStructure(): SportConfig['position_structure'] {
+    if (sportConfig === null) throw new Error('getPositionStructure called before sport config was loaded')
+    return sportConfig.position_structure
+}
+
 /** Returns the position abbreviation → full name map (e.g. "PG" → "Point Guard"). */
 export function getPositionNames(): Record<string, string> {
     if (sportConfig === null) throw new Error('getPositionNames called before sport config was loaded')
@@ -121,4 +127,18 @@ export function getPositionNames(): Record<string, string> {
 export function getShortCategoryNames(): Record<string, string> {
     if (sportConfig === null) throw new Error('getShortCategoryNames called before sport config was loaded')
     return sportConfig.short_category_names
+}
+
+// ── Latest scored board (draft / auction) ─────────────────────────────────────
+// The personalised evaluate's request, as sent. The hypothetical team asks the backend about exactly this board, whose
+// strategies that evaluate cached; null until a draft or auction evaluate runs.
+
+let latestScoredBoard: { sessionId: string; request: BoardRequest } | null = null
+
+/** Returns the board the latest draft/auction evaluate scored, or null if none has. */
+export function getLatestScoredBoard(): { sessionId: string; request: BoardRequest } | null { return latestScoredBoard }
+
+/** Records the board a draft/auction evaluate is scoring (null clears it). */
+export function setLatestScoredBoard(board: { sessionId: string; request: BoardRequest } | null): void {
+    latestScoredBoard = board
 }

@@ -229,3 +229,34 @@ export function makeMinimalPlayerDisplay(playerId: number): HTMLElement {
     stack.appendChild(nameLabel)
     return stack
 }
+
+/**
+ * A hypothetical future pick for the roster grid, on a dotted card greyed by CSS so it reads as a placeholder: the
+ * headshot, then the full name over two lines (first, last), with the detail (planned round or predicted price) in
+ * the card's top-left corner.
+ */
+export function makeHypotheticalPlayerDisplay(
+    playerId: number
+    , detailText: string
+): HTMLElement {
+    const entry = getRegistryEntry(playerId)
+    const card = document.createElement('div')
+    card.className = 'roster-player-stack hypothetical-player-card'
+    card.title = entry.name
+    const detail = document.createElement('span')
+    detail.className = 'roster-hypothetical-detail'
+    detail.textContent = detailText
+    card.appendChild(detail)
+    const headshot = makeHeadshotImage(playerId, 'roster-headshot')
+    if (headshot) card.appendChild(headshot)
+    // The registry's last name is every word after the first (backend extract_last_name), so the first name is what
+    // precedes it; a one-word name has no first-name line to show.
+    const firstName = entry.name.slice(0, entry.name.length - entry.last_name.length).trim()
+    for (const namePart of [firstName, entry.last_name]) {
+        const nameLine = document.createElement('span')
+        nameLine.className = 'roster-player-name'
+        nameLine.textContent = namePart || ' '
+        card.appendChild(nameLine)
+    }
+    return card
+}
