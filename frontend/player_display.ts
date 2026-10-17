@@ -213,18 +213,13 @@ export function makeFullPlayerDisplay(playerId: number): HTMLElement {
     return display
 }
 
-/** Minimal display (headshot stacked above last name) as a DOM element, for the
- *  expanded-view roster grid and draft/auction board cells. showNameTooltip puts the full
- *  name in the tooltip -- narrow board cells ellipsize long last names -- and is off where
- *  the caller shows the name its own way (the roster grid's G-score card). */
-export function makeMinimalPlayerDisplay(
-    playerId: number
-    , showNameTooltip: boolean
-): HTMLElement {
+/** Minimal display (headshot stacked above last name) as a DOM element, for the draft and auction board cells, which
+ *  are too narrow for full names: the full name is in the tooltip, as narrow cells ellipsize long last names. */
+export function makeMinimalPlayerDisplay(playerId: number): HTMLElement {
     const entry = getRegistryEntry(playerId)
     const stack = document.createElement('div')
     stack.className = 'roster-player-stack'
-    if (showNameTooltip) stack.title = entry.name
+    stack.title = entry.name
     const headshot = makeHeadshotImage(playerId, 'roster-headshot')
     if (headshot) stack.appendChild(headshot)
     const nameLabel = document.createElement('span')
@@ -235,23 +230,16 @@ export function makeMinimalPlayerDisplay(
 }
 
 /**
- * A hypothetical future pick for the roster grid, on a dotted card greyed by CSS so it reads as a placeholder: the
- * headshot, then the full name over two lines (first, last), with the detail (planned round or predicted price) in
- * the card's top-left corner.
+ * A player in the expanded view's roster grid: the headshot, then the full name over two lines (first, last). A
+ * rostered or candidate player and a hypothetical future pick are shown alike; makeHypotheticalPlayerDisplay adds
+ * the pick's marks.
  */
-export function makeHypotheticalPlayerDisplay(
-    playerId: number
-    , detailText: string
-): HTMLElement {
+export function makeRosterPlayerDisplay(playerId: number): HTMLElement {
     const entry = getRegistryEntry(playerId)
-    const card = document.createElement('div')
-    card.className = 'roster-player-stack hypothetical-player-card'
-    const detail = document.createElement('span')
-    detail.className = 'roster-hypothetical-detail'
-    detail.textContent = detailText
-    card.appendChild(detail)
+    const stack = document.createElement('div')
+    stack.className = 'roster-player-stack'
     const headshot = makeHeadshotImage(playerId, 'roster-headshot')
-    if (headshot) card.appendChild(headshot)
+    if (headshot) stack.appendChild(headshot)
     // The registry's last name is every word after the first (backend extract_last_name), so the first name is what
     // precedes it; a one-word name has no first-name line to show.
     const firstName = entry.name.slice(0, entry.name.length - entry.last_name.length).trim()
@@ -259,7 +247,24 @@ export function makeHypotheticalPlayerDisplay(
         const nameLine = document.createElement('span')
         nameLine.className = 'roster-player-name'
         nameLine.textContent = namePart || ' '
-        card.appendChild(nameLine)
+        stack.appendChild(nameLine)
     }
+    return stack
+}
+
+/**
+ * A hypothetical future pick for the roster grid: the roster grid's player display on a dotted card greyed by CSS so
+ * it reads as a placeholder, with the detail (planned round or predicted price) in the card's top-left corner.
+ */
+export function makeHypotheticalPlayerDisplay(
+    playerId: number
+    , detailText: string
+): HTMLElement {
+    const card = makeRosterPlayerDisplay(playerId)
+    card.classList.add('hypothetical-player-card')
+    const detail = document.createElement('span')
+    detail.className = 'roster-hypothetical-detail'
+    detail.textContent = detailText
+    card.prepend(detail)
     return card
 }

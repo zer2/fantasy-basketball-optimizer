@@ -1696,6 +1696,14 @@ tr {
     font-weight: 500;
 }
 
+/* The first team-level row of a G-score table (after the player rows): its cells colour on the aggregate multiplier, so a
+   darker line marks where the colour scale changes. Drawn as an inset shadow along the cells' top edge rather than a
+   border: a collapsed border has to out-rank the grid's lines on width, and at 1px it did not. */
+.panel-table tr.gscore-aggregate-start > th,
+.panel-table tr.gscore-aggregate-start > td {
+    box-shadow: inset 0 1px 0 light-dark(#9a9aae, #8a8aa0);
+}
+
 .panel-datacell {
     padding: 3px 8px;
     text-align: right;

@@ -659,9 +659,9 @@ def _build_g_score_rows(
         zero_values = [0.0] * n_categories
         return [
             [
-                GScoreRow(label='Current diff', values=zero_values, total=0.0, is_total=False),
-                GScoreRow(label=candidate_last_names[i], values=own_values[i], total=own_totals[i], is_total=False),
-                GScoreRow(label='Total diff', values=own_values[i], total=own_totals[i], is_total=True),
+                GScoreRow(label='Current diff', values=zero_values, total=0.0, is_total=False, is_candidate=False),
+                GScoreRow(label=candidate_last_names[i], values=own_values[i], total=own_totals[i], is_total=False, is_candidate=True),
+                GScoreRow(label='Total diff', values=own_values[i], total=own_totals[i], is_total=True, is_candidate=False),
             ]
             for i in range(n_players)
         ]
@@ -683,9 +683,9 @@ def _build_g_score_rows(
         current_totals = np.round(total_diff.sum(axis=1), 2).tolist()
         return [
             [
-                GScoreRow(label='Current diff', values=current_values[i], total=current_totals[i], is_total=False),
-                GScoreRow(label=candidate_last_names[i], values=own_values[i], total=own_totals[i], is_total=False),
-                GScoreRow(label='Total diff', values=total_values[i], total=total_totals[i], is_total=True),
+                GScoreRow(label='Current diff', values=current_values[i], total=current_totals[i], is_total=False, is_candidate=False),
+                GScoreRow(label=candidate_last_names[i], values=own_values[i], total=own_totals[i], is_total=False, is_candidate=True),
+                GScoreRow(label='Total diff', values=total_values[i], total=total_totals[i], is_total=True, is_candidate=False),
             ]
             for i in range(n_players)
         ]
@@ -706,10 +706,10 @@ def _build_g_score_rows(
     future_totals  = np.round(future_diff.sum(axis=1), 2).tolist()
     return [
         [
-            GScoreRow(label='Current diff', values=current_values[i], total=current_totals[i], is_total=False),
-            GScoreRow(label=candidate_last_names[i], values=own_values[i], total=own_totals[i], is_total=False),
-            GScoreRow(label='Future diff', values=future_values[i], total=future_totals[i], is_total=False),
-            GScoreRow(label='Total diff', values=total_values[i], total=total_totals[i], is_total=True),
+            GScoreRow(label='Current diff', values=current_values[i], total=current_totals[i], is_total=False, is_candidate=False),
+            GScoreRow(label=candidate_last_names[i], values=own_values[i], total=own_totals[i], is_total=False, is_candidate=True),
+            GScoreRow(label='Future diff', values=future_values[i], total=future_totals[i], is_total=False, is_candidate=False),
+            GScoreRow(label='Total diff', values=total_values[i], total=total_totals[i], is_total=True, is_candidate=False),
         ]
         for i in range(n_players)
     ]

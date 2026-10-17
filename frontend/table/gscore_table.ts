@@ -11,7 +11,7 @@ import { makeFullPlayerDisplay, buildPlayerOptionLabel } from '../player_display
 import { getSelectedCategories, getScoringFormat } from '../setting_collection/format_and_categories.js'
 import { getLeagueSettings } from '../setting_collection/league_settings.js'
 import {
-    stat_styler_primary, G_SCORE_MULTIPLIER, H_MULTIPLIER,
+    stat_styler_primary, G_SCORE_MULTIPLIER, G_SCORE_AGGREGATE_MULTIPLIER, H_MULTIPLIER,
     convertWinRateToRotoPoints, computeRotoMiddle,
 } from '../styles/styler_functions.js'
 import { isMobileViewport } from '../helper_functions.js'
@@ -130,6 +130,7 @@ export function appendGScoreBodyAndTotals(
     }
 
     const totalsRow = tBody.insertRow(-1)
+    totalsRow.className = 'gscore-aggregate-start'   // the totals colour on the aggregate multiplier; the line marks it
     const totalsLabel = document.createElement('th')
     totalsLabel.className = 'panel-rowlabel'
     totalsLabel.textContent = 'Team Total'
@@ -142,13 +143,13 @@ export function appendGScoreBodyAndTotals(
     for (const val of teamTotals) {
         const cell = totalsRow.insertCell(-1)
         cell.textContent = val.toFixed(2)
-        cell.style.cssText = stat_styler_primary(val, G_SCORE_MULTIPLIER, 0)
+        cell.style.cssText = stat_styler_primary(val, G_SCORE_AGGREGATE_MULTIPLIER, 0)
         cell.className = 'panel-datacell'
     }
 }
 
-// A single player's G-scores run far smaller than the team totals the tables' shared multiplier is sized for, so the
-// hover card colours 50% more strongly (full colour at about +-1.2 G instead of +-1.8 G).
+// The hover card shows one player on its own, so it colours 50% more strongly than the tables' player rows (full colour
+// at about +-1.2 G instead of +-1.8 G).
 const PLAYER_CARD_G_SCORE_MULTIPLIER = G_SCORE_MULTIPLIER * 1.5
 
 /** A single player's G-scores as a compact table -- his name and positions, then short category labels over the Total and each

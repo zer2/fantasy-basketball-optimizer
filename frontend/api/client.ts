@@ -160,10 +160,11 @@ export function candidatesToPlayerResults(candidates: any[]): PlayerResult[] {
         win_rates:        c.win_rates,
         category_weights: c.category_weights,
         g_score_rows: c.g_score_rows.map((r: any) => ({
-            label:   r.label,
-            values:  r.values,
-            total:   r.total,
-            isTotal: r.is_total,
+            label:       r.label,
+            values:      r.values,
+            total:       r.total,
+            isTotal:     r.is_total,
+            isCandidate: r.is_candidate,
         })),
         flex_allocations: c.flex_allocations ? {
             base_positions: c.flex_allocations.base_positions,
