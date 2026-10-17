@@ -19,11 +19,22 @@ export const REPLACEMENT_PLAYER_ID = -1
 let entriesById: Map<number, PlayerRegistryEntry> | null = null
 let playerIdByName: Map<string, number> | null = null
 
+// Bumped by every install, so a response can tell whether the registry it would be read against is still the one in
+// place when it was requested (getRegistryGeneration).
+let registryGeneration = 0
+
+/** Which registry install is current: compare one taken before a request with one taken after it to see whether the
+ *  registry was replaced while the request was out. */
+export function getRegistryGeneration(): number {
+    return registryGeneration
+}
+
 /** Installs a session's registry (called by the api layer whenever a payload carries one).
  *  Announces the install as a document event rather than calling listeners directly, so
  *  reactions that need the api layer (the headshot preloader in player_display.ts) don't
  *  create an import cycle through this module. */
 export function setPlayerRegistry(entries: PlayerRegistryEntry[]): void {
+    registryGeneration += 1
     entriesById = new Map(entries.map(entry => [entry.player_id, entry]))
     playerIdByName = new Map(entries.map(entry => [entry.name, entry.player_id]))
     document.dispatchEvent(new Event('player-registry-updated'))
