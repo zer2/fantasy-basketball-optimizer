@@ -55,9 +55,9 @@ Gradient descent is possible whenever the underlying function that is being opti
     
     Adam takes a learning rate as a parameter. Learning rates for different kinds of input (category weights and flex shares) are hard-coded into the model and not user-settable. 
 
-One might note that Giannis Antetokounmpo ranks sixth by H-score. Fantasy veterans will be familiar with Giannis for being undervalued by static ranking systems like overall Z-score, because so much of his value is contingent on punting Free Throw %. H-scoring understands this punting strategy, and evaluates Giannis more appropriately.
+One might note that Giannis Antetokounmpo ranks seventh by H-score. Fantasy veterans will be familiar with Giannis for being undervalued by static ranking systems like overall Z-score, because so much of his value is contingent on punting Free Throw %. H-scoring understands this punting strategy, and evaluates Giannis more appropriately.
 
-The colored numbers to the right are category-level H-scores. They are _not direct reflections of the candidate player's characteristics_. Instead, they show what the algorithm expects the average win rate against all opponents will be, assuming the candidate player is taken. H-scoring calculates those expectations based on not just the characteristics of the candidate player, but also on previously chosen players and potential future picks. The statistics of future picks are estimated based on H-scoring's preferred strategy for future picks.
+The colored numbers to the right are category-level H-scores. They are _not direct reflections of the candidate player's characteristics_. Instead, they show what the algorithm expects the average win rate against all opponents will be, assuming the candidate player is taken (with continuous modeling, ties have zero probability). H-scoring calculates those expectations based on not just the characteristics of the candidate player, but also on previously chosen players and potential future picks. The statistics of future picks are estimated based on H-scoring's preferred strategy for future picks.
 
 Because other picks are taken into account, the categorical strengths and weaknesses presented in the H-score table are often quite different from those of the candidate players. For example, Shai Gilgeous-Alexander's row as a candidate for first pick shows a low probability of winning the Threes category, despite SGA hitting a decent number himself. This is because H-scoring's preferred strategy with SGA involves deprioritizing threes with future picks.
 
@@ -81,14 +81,14 @@ The exact degree to which punting is beneficial depends on many factors- the sco
 
 ### Head to Head: Most Categories
 
-An alternative to Each Category scoring is Most Categories scoring. In Most Categories, teams get wins for every opponent they get a majority of fantasy points against. To reflect that, with Most Categories scoring, the definition of the overall H-score is the probability of winning a majority of categories (assuming they are independent for the sake of making the calculation less intensive). Most Categories can be added to the blend with Each Category by moving the slider on the sidebar above its default level of 0. 
+An alternative to Each Category scoring is Most Categories scoring. In Most Categories, teams get wins for every opponent they get a majority of category wins against. To reflect that, with Most Categories scoring, the definition of the overall H-score is the probability of winning a majority of categories (assuming they are independent for the sake of making the calculation less intensive). Most Categories can be added to the blend with Each Category by moving the slider on the sidebar above its default level of 0. 
 
 ![Most Categories H-score table](img/hmc.png)
 /// caption
 Top 100% Most Categories H-scores for the first pick, 2024-25 season.
 ///
 
-The table above is based on the same dataset as the Each Category version, with different overall H-scores because it has Most Categories set to 100%. With Most Categories scoring, the algorithm is more incentivized to punt, since winning extra categories provides no marginal benefit. This leads to players like Giannis, who benefit greatly from punting, scoring better (In Each Category he is in a tie for sixth. In Most Categories, he is sole sixth by a significant margin).
+The table above is based on the same dataset as the Each Category version, with different overall H-scores because it has Most Categories set to 100%. With Most Categories scoring, the algorithm is more incentivized to punt, since winning extra categories provides no marginal benefit. This leads to players like Giannis, who benefit greatly from punting, ranking higher. 
 
 <video controls preload="metadata" width="100%" poster="../videos/most-categories-poster.jpg">
     <source src="../videos/most-categories.mp4" type="video/mp4">
@@ -105,12 +105,12 @@ The Head to Head formats can be blended together through the sidebar because the
 H-scores with a half-and-half Each Category and Most Categories objective.
 ///
 
-With a mixture, overall H-scores are somewhere between typical Each Category numbers and typical Most Categories numbers. It should be noted that H-scores for Most Categories tend to be more extreme, so in a sense at 50-50 the algorithm cares more about the Most Categories score. 
+With a mixture, overall H-scores are somewhere between typical Each Category numbers and typical Most Categories numbers. It should be noted that H-scores for Most Categories tend to be more extreme, so at 50-50 the algorithm is pulled more by Most Categories scoring. 
 
-With an even number of categories a Most Categories matchup can end level — four each out of eight, for example. By default the website treats that as half a win. The sidebar also presents an option for a tiebreaker category when the number of categories is even and the Most Categories weight is above zero. The tiebreaker category essentially counts for two, which makes the total odd and gives every matchup a winner. The tiebreaker option only applies to the Most Categories objective. If weight is given to the Each Category objective as well, the tiebreaker category is ignored for that component. 
+Categorical ties are impossible in the model, but with an even number of categories a Most Categories matchup can still end in a tie. By default, the website treats that as half a win. The sidebar also presents an option for a tiebreaker category when the number of categories is even and the Most Categories weight is above zero. The tiebreaker category essentially counts for two, which makes the total odd and gives every matchup a winner. The tiebreaker option only applies to the Most Categories objective. If weight is given to the Each Category objective as well, the tiebreaker category is ignored for that component. 
 
 ??? note "Why does counting a category twice behave equivalently to having it as a tiebreaker?"
-    Doubling the tiebreaker changes only the level matchups, which is exactly what a tiebreaker should do. Take eight categories, where nine points are then on offer and five are needed. Split them four-four: winning the tiebreaker gives $3 + 2 = 5$ and takes the matchup, while losing it leaves $4 < 5$. Now take a genuine five-three majority: with the tiebreaker among the five, the other four plus two is six; without it, five of the remaining seven is still five. Either way the majority holds. So the doubling settles ties without ever overturning a decided matchup.
+    Doubling points from the tiebreaker changes only the matchups which would otherwise be tied. If a matchup is four-four, the team that gets an extra point from the tiebreaker category wins five-four. If it is five-three or more extreme, the matchup is already won before the tiebreaker point is considered. 
 
     Since the tiebreaker is counted double, it has a different gradient than the other categories. It is decisive either with the total win count of other categories at one less than what is needed or two less than what is needed, so those possibilities are both included in its gradient.  
 
@@ -125,7 +125,11 @@ Rotisserie is another degree more complicated than Most Categories. When the sco
 Top Rotisserie H-scores, for the 2024-25 season.
 ///
 
-The ranking for Rotisserie is significantly different from both Each Category and Most Categories. Giannis barely hangs within the top twelve, which aligns with the traditional wisdom that punting is not as advantageous for that format. 
+Winning a league is harder than winning a matchup, so H-scores are systematically lower for Rotisserie than for the Head to Head formats. The average is around 8% instead of 50%. 
+
+When the format is Rotisserie, category-level H-scores are expected fantasy point totals per category instead of the likelihood to win a single matchup. One should keep in mind that the expected fantasy point total is just a general average, not what the algorithm expects to happen in a winning scenario. While it may look like it expects to e.g. not earn many points on turnovers with James Harden, it is at least partially banking on volatility allowing it to earn more. 
+
+The ranking for Rotisserie is significantly different from both Each Category and Most Categories. Giannis with his punt build barely hangs within the top twelve, which aligns with the traditional wisdom that punting is not as advantageous for that format. 
 
 <video controls preload="metadata" width="100%" poster="../videos/rotisserie-poster.jpg">
     <source src="../videos/rotisserie.mp4" type="video/mp4">
@@ -134,10 +138,6 @@ The ranking for Rotisserie is significantly different from both Each Category an
 An explanation of why the Rotisserie format favors balance, using the mathematical principles underlying the H-score
 algorithm for Rotisserie.
 ///
-
-Winning a league is harder than winning a matchup, so H-scores are systematically lower for Rotisserie than for the Head to Head formats. The average is around 8% instead of 50%. 
-
-When the format is Rotisserie, category-level H-scores are expected fantasy point totals per category instead of the likelihood to win a single matchup. One should keep in mind that the expected fantasy point total is just a general average, not what the algorithm expects to happen in a winning scenario. While it may look like it expects some categories to end up below-average, it is still hoping to get lucky and do better than expected in those categories. 
 
 ## Detailed drop-down
 
@@ -152,9 +152,9 @@ The first element of the drop-down is the expectation table. The expectation tab
 Expectations for a team considering Dyson Daniels in round two, having taken Giannis in round one. Each Category, 2024-25.
 ///
 
-'Current diff' represents the G-score differential for the draft so far, including players already drafted in the current round and excluding the candidate player. Teams that have not made their pick for the round are filled in with an estimate of the statistics of their next player. So in this case above, 'Current diff' represents other teams' picks so far vs. a team that has already taken Giannis, with estimates filled in for teams that have not yet drafted. 'Future diff' is the expected difference between future picks made by the drafter and those made by other teams, based on the strategy adopted by H-scoring. In this case the G-score for Free Throws is heavily negative because the algorithm wants to punt it with future picks. 'Current diff' plus the candidate player plus 'Future diff' equals the total differential versus other teams, which H-scoring uses to calculate win probabilities.
+"Current diff" represents the G-score differential for the draft so far, including players already drafted in the current round and excluding the candidate player. Teams that have not made their pick for the round are filled in with an estimate of the statistics of their next player. So in this case above, "Current diff" represents other teams' picks so far vs. a team that has already taken Giannis, with estimates filled in for teams that have not yet drafted. "Future diff" is the expected difference between future picks made by the drafter and those made by other teams, based on the strategy adopted by H-scoring. In this case the G-score for Free Throws is heavily negative because the algorithm wants to punt it with future picks. "Current diff" plus the candidate player plus "Future diff" equals the total differential versus other teams, which H-scoring uses to calculate win probabilities.
 
-'Future diff' depends on the strategy taken by the algorithm for future picks. The elements of that strategy are category weights, flex position shares, and roster allocations, the algorithm's choices for which are shown under the expectation table. 
+"Future diff" depends on the strategy taken by the algorithm for future picks. The elements of that strategy are category weights, flex position shares, and roster allocations, the algorithm's choices for which are shown under the expectation table. 
 
 ### Category weights
 
@@ -221,14 +221,14 @@ The fourth element of the drop-down shows how the algorithm intends to arrange i
 
 ![Roster assignments](img/hroster.png)
 /// caption
-Roster assignments for the same example — Giannis slots in at Power Forward and the Daniels candidate at Shooting Guard. Each Category, 2024-25.
+Roster assignments for the same example — Giannis slots in at Power Forward and the candidate Daniels at Shooting Guard.
 ///
 
-Hovering over a player triggers hovertext with their stats to pop up.
+Hovering over a player opens a window with their G-scores. 
 
 ![G-score hover card](img/hrosterhover.png)
 /// caption
-G-scores for Giannis, 2024-25.
+G-scores for Giannis triggered on hover.
 ///
 
 The roster allocation is strategically relevant because it can free up different positions to take with future draft picks. In the example above, the algorithm is choosing to categorize Daniels as a SG, likely because it does not want to take more SGs in general. It figures this out via a sub-algorithm, solving an assignment problem matching players to roster slots.
@@ -244,7 +244,7 @@ After the assignment problem is solved, the algorithm will have a strategy for w
 
 ### Example team
 
-If the 'Show example team' toggle in the Display section is switched on, the roster table gets filled in with hypothetical future picks. The hypothetical full team is for illustrative purposes only; its expected performance is not part of H-scoring.
+If the "Show example team" toggle in the Display section is switched on, the roster table gets filled in with hypothetical future picks. The hypothetical full team is for illustrative purposes only; its expected performance is not part of H-scoring.
 
 ![Roster assignments with an example team](img/hrosterexample.png)
 /// caption
@@ -430,7 +430,7 @@ Fantasy basketball analysts often advocate for taking the best player available 
 
 Ideally, the algorithm would model a probability distribution of how circumstances could change, and choose a strategy based on expected value. Instead, for practical reasons, the algorithm is designed to maximize the best strategy under a point estimate of how its strategies would turn out. The lack of understanding of alternate scenarios is a weakness of H-scoring. It does not consider a spectrum of possibilities, so it does not know which strategies are resilient and which are flimsy. 
 
-In general, the flexibility of a strategy is highly related to the degree of punting it involves. A drafter who is only softly planning on punting blocks is likely able to take advantage of a surprising shot-blocker more easily than a drafter planning on hard-punting the category. This motivates a regime of rewarding balance for early picks. The algorithm does this with a technique called regularization, which adds a small penalty for moving category weights into H-scores. The algorithm can still plan on a punt, but regularization incentivizes it to punt less harshly, and to choose players who rely less on punting specific categories for their value. This allows the algorithm to more easily pivot if the draft proceeds in a surprising way. 
+In general, the flexibility of a strategy is highly related to the degree of punting it involves. A drafter who is only softly planning on punting blocks is likely able to take advantage of a surprising shot-blocker more easily than a drafter planning on hard-punting the category. This motivates a regime of rewarding balance for early picks. The algorithm does this with a technique called regularization, which adds a small penalty for moving category weights away from neutral G-score weights. The algorithm can still plan on a punt, but regularization incentivizes it to punt less harshly, and to choose players who rely less on punting specific categories for their value. This allows the algorithm to more easily pivot if the draft proceeds in a surprising way. 
 
 The strength of that pull is the $λ_c$ (lambda) parameter in the sidebar, which defaults to 0.05. Raising it makes early picks hedge harder: weights stay nearer balanced, and the algorithm prefers players whose value does not depend on any one punt landing. Lowering it lets the algorithm commit sooner, which pays off when the punt it picks is the right one and costs flexibility when it is not. Setting it to zero removes the pull entirely, leaving the algorithm free to commit from the first pick. There is also a corresponding $λ_p$ for flex position shares, which defaults to 0.8. 
 
@@ -439,7 +439,7 @@ Both λs are scaled by a diminishing factor as the draft goes on. This ensures t
 ??? note "How does the website enforce regularization?"
     The algorithm regularizes by incorporating an L1 penalty on the difference between category weights and what they would be for standard G-scoring, plus the equivalent mechanism for flex positions. This encourages balanced strategies without overly penalizing punt strategies for players who rely on them. 
 
-    The L1 penalty weight decreases as the draft continues, since the importance of flexibility goes down as the team's shape becomes more defined. It goes down as a function of the Gaussian PDF. Specifically, the weight for pick $n$ is $\lambda$ multiplied by the phi function evaluated at $\frac{4n}{k}$ where $k$ is the total number of players to be picked. The hand-wavy motivation for this form of the decay schedule is that as teams stray from average, the probability they will snap back to average with Normally distributed players is roughly Gaussian. In practice, this decay schedule works because it is strong for the first few rounds and tapers to be very small as the draft continues. 
+    The L1 penalty weight decreases as the draft continues, since the importance of flexibility goes down as the team's shape becomes more defined. It goes down as a function of the Gaussian PDF. Specifically, the weight for pick $n$ is $\lambda$ multiplied by the phi function evaluated at $\frac{4n}{k}$ over phi of zero, where $k$ is the total number of players to be picked. The hand-wavy motivation for this form of the decay schedule is that as teams stray from average, the probability they will snap back to average with Normally distributed players is roughly Gaussian. In practice, this decay schedule works because it is strong for the first few rounds and tapers to be very small as the draft continues. 
 
     The flex position regularizer has the same scheduler, just scaled up because the flex position numbers tend to vary more. 
 
@@ -472,10 +472,25 @@ For Each Category and Most Categories, the website mitigates this flaw by choosi
       <source src="../videos/seed-menu.mp4" type="video/mp4">
 </video>
 /// caption
-An example of the multi-starting process which is used for the first few picks. 
+An example of the multi-starting process
 ///
 
 Punting is less common in Rotisserie, so gradient descent does not start at a punt. Instead it starts at a neutral position, slightly tilted towards categories that are robust like Points and Assists. That's where the Rotisserie algorithm generally wants to go, since it thinks it can rely more on luck for the unstable categories like Steals and Turnovers. 
+
+??? note "How do we know that this process finds global optimums?"
+    There is no theoretical guarantee that this multi-seeding approach finds global optima. However, it is possible to optimize a slightly modified Each Category objective with precise error bounds, and those results can be checked against the gradient descent results. 
+
+    The exact algorithm uses sigmoid programming, which applies a branch-and-bound technique to recursively eliminate portions of the decision space. The process produces upper bounds on regions, which can be compared to the best solutions found so far. After enough iterations, the best solution can be brought arbitrarily close to the upper bound. This can take a long time- 10+ minutes for a single candidate in some cases- so it is not practical for actual use, but provides a verifiable optimum to compare against. 
+
+    In practice, the gradient ascent approach with multi-seeding almost always finds the global optimum point, in a fraction of the time that sigmoid programming takes. I checked it for multiple candidates in Each Category 9cat and found that multi-seeding as performed by the app always got within 0.01% of the optimum when given an unlimited iteration budget, and was usually close after only 30. 
+
+    I think this happens because of three helpful properties of the problem. 
+    
+    1. Certain zones within the decision space are quasiconcave. Within particular punting regimes, there are two considerations balancing each other- the vicious cycle of the category-level gradient decreasing as the level decreases, and the diminishing marginal returns from lowering category weight. These two considerations push against each other with negative curvature, resulting in a single peak between the two. Empirically, the space around that peak tends to be quasiconcave, allowing gradient descent to consistently climb it. 
+    2. Within the parameters for 9cat, it turns out that generally, the entire decision space usually has only one peak. Gradient descent can get to it from almost any point in the decision space. This might be because across nine dimensions, there are many directions in which a local peak might be surpassed. Gradient descent does not get stuck on suboptimal punts because as it moves in other categories, it can gain some strength in the punted category, eventually bringing it out of the punt. 
+    3. The seed menu usually finds a promising starting place for gradient ascent, which is not far from the peak
+
+    The second and third properties happen to be true with the 9cat setup, and are not natural properties of the problem. It is entirely possible with different parameters, like more categories, the approach does not work as well. 
 
 ### Adjusting percentage categories for volume
 

@@ -22,7 +22,7 @@ When the data source from the left sidebar is one of the 'Retrieve from ...' pla
 
 ![Live draft candidate view](img/livedraft.png)
 
-The 'Refresh Analysis' button fetches new information on draft picks from the platform and re-runs H-scoring. 
+The table updates automatically. Once per second, the draft state is checked, and the candidate evaluation table is refreshed if the draft state has changed. 
 
 ## Evaluation views 
 
@@ -59,21 +59,21 @@ Autodrafters only look at the top 100 candidates by empty-board base score, beca
 
 ![Autodraft picture](img/autodraft.png)
 /// caption
-Team 2 and Team 3 toggled to autodrafting mode. When Team 1 selects a player, Team 2 and Team 3 will automatically make their picks after.
+Team 2 and Team 4 toggled to autodrafting mode. When Team 1 selects a player, Team 2 and Team 3 will automatically make their picks after.
 /// 
 
 Teams selected by autodrafting are typically much stronger than those chosen in empty board H-score order, since they form coherent strategies.
 
 ![Scottie Barnes autodraft team](img/scottie_autodraft.png)
 /// caption
-A team built by an autodrafter around Scottie Barnes at pick 5, 2025-2026, in a full-autodraft field, with a 50.6% H-score. It has a coherent punt strategy, hard-punting both Threes and Free Throw %.
+A team built by an autodrafter around Scottie Barnes at pick 5, 2025-2026, in a full-autodraft field, with a 48.5% H-score. It has a coherent punt strategy, hard-punting both Threes and Points.
 /// 
 
 This makes it difficult to maintain a high H-score, even with powerful top picks. 
 
 ![SGA autodraft team](img/sga_autodraft.png)
 /// caption
-A team built by an autodrafter around SGA at pick 2, 2025-2026, same draft as the Scottie Barnes example. Its H-score is 51.0%. Its punt-three strategy works, but is limited by competition for the best players for that build by the Scottie Barnes drafter.
+A team built by an autodrafter around SGA at pick 2, 2025-2026, same draft as the Scottie Barnes example. Its H-score is 50.2%, with a mild punt-Threes build. It was limited by competition for the best players for that build by the Scottie Barnes drafter.
 /// 
 
 With all drafters using H-scoring, final H-scores usually settle between 49% and 51%, with early seats scoring on the higher end. 

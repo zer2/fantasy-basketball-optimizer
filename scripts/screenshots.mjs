@@ -184,6 +184,8 @@ async function ensureFullAutodraft(page) {
 // The page is loaded ONCE (STATES.load, before the loop). Every other state is a live UI
 // transition — no reloads (a reload re-pulls Snowflake data and loses our mode/format).
 let current = null
+// The seat the live draft shot is taken from: the docs author's own team in the mock draft.
+const LIVE_DRAFT_SEAT = 'Zach'
 /** Turns the Display section's "Show example team" toggle on or off, as a user flipping it would. Open candidate
  *  panels rebuild with or without the example team. */
 async function setExampleTeamShown(page, isShown) {
@@ -432,6 +434,20 @@ const STATES = {
         await page.locator('#ls-yahoo-dialog .ls-dialog-box').waitFor({ state: 'visible', timeout: 10000 })
         await page.waitForTimeout(200)
     },
+    // The live draft view: Yahoo connected to a mock draft, from the docs author's own seat. Needs a Yahoo token in the
+    // Screenshot Bot's credential folder (.platform_credentials/yahoo/<its key>) and the mock draft's lobby URL or id in
+    // YAHOO_MOCK_DRAFT -- mock drafts expire, so none is written here.
+    async 'livedraft'(page) {
+        const mockDraft = process.env.YAHOO_MOCK_DRAFT
+        if (!mockDraft) throw new Error('set YAHOO_MOCK_DRAFT to a Yahoo mock draft lobby URL or id')
+        await ensure(page, 'league-yahoo')
+        const leagueIdBox = page.locator('#ls-yahoo-league-id')
+        await leagueIdBox.fill(mockDraft)
+        await leagueIdBox.press('Enter')   // the box connects on change
+        await waitEval(page)
+        await setSelect(page, 'seat-select', LIVE_DRAFT_SEAT)
+        await waitEval(page)
+    },
     // Reached after the Yahoo dialog shot, whose overlay is still up and would eat the platform
     // click. ESPN's own dialog then opens by itself, via the connector's onSelected.
     async 'league-espn'(page) {
@@ -641,7 +657,8 @@ const SHOTS = [
     { name: 'mdraft',      state: 'draft-manual', selector: '#right-header' },
     // autodraft is defined LAST (before the platform shots) — toggling the "A" autodrafters kicks
     // off autopilot, which mutates the persistent draft/candidate state for every shot after it.
-    { name: 'livedraft',   state: 'load',        selector: '#hscoretable', skip: 'needs a live platform connection' },
+    { name: 'livedraft',   state: 'livedraft',   viewport: true, throughRows: 3,
+      skip: 'needs a Yahoo token for Screenshot Bot and YAHOO_MOCK_DRAFT (see the livedraft state)' },
 
     // Player Stats config panels (`projections` / `1984-85`) are defined near the END — they switch
     // the data source away from the base historical 2025-26, which would otherwise leak into the
@@ -873,7 +890,11 @@ async function shootUnion(page, shot) {
 async function shootRows(page, name, selector, rows) {
     const table = page.locator(selector).first()
     await table.waitFor({ state: 'visible' })
-    await table.scrollIntoViewIfNeeded().catch(() => {})
+    // The table's top to the top of the viewport: scrollIntoViewIfNeeded only brings SOME of it into view, and a table
+    // lower on the page (the waiver tab's) then had its header and first rows above the clip. And the pointer out of the
+    // way, or the row it last crossed is captured hover-highlighted.
+    await table.evaluate(element => element.scrollIntoView({ block: 'start' }))
+    await page.mouse.move(0, 0)
     await page.waitForTimeout(150)
     const box = await table.boundingBox()
     const nth = page.locator(`${selector} .playerheaderdiv`).nth(rows - 1)
