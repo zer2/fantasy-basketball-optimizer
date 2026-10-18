@@ -34,6 +34,7 @@ export interface GScoreRow {
     values: number[];   // per-category score differences; length == categories.length
     total: number;      // sum across categories
     isTotal: boolean;   // true for the summary row (brighter styling)
+    isCandidate: boolean;   // the candidate's own row; the others are team-level sums and differentials
 }
 
 // ─── Flex position allocations table ──────────────────────────────────────────

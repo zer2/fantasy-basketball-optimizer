@@ -2,12 +2,14 @@
 // Builds the expandable detail panel beneath each player row in the main table.
 // Mirrors the detail panels in the original Streamlit app.
 
-import { stat_styler_primary, stat_styler_tertiary, G_SCORE_MULTIPLIER } from '../styles/styler_functions.js'
+import {
+    stat_styler_primary, stat_styler_tertiary, G_SCORE_MULTIPLIER, G_SCORE_AGGREGATE_MULTIPLIER,
+} from '../styles/styler_functions.js'
 import { PlayerResult, FlexAllocations, Roster, HypotheticalTeam, BoardRequest } from '../types.js'
 import { getPositionNames, getPositionStructure, getLatestScoredBoard } from '../app_state.js'
 import { makeSpacerTh } from './table_helpers.js'
 import { buildPlayerGScoreCard } from './gscore_table.js'
-import { makeMinimalPlayerDisplay, makeHypotheticalPlayerDisplay } from '../player_display.js'
+import { makeRosterPlayerDisplay, makeHypotheticalPlayerDisplay } from '../player_display.js'
 import { fetchHypotheticalTeam, HTTPError } from '../api/client.js'
 import { getRegistryEntry } from '../player_registry.js'
 import { isExampleTeamShown } from '../preferences.js'
@@ -282,7 +284,8 @@ function makePanelLabel(text: string, paddingLeft?: string): HTMLDivElement {
 
 // ─── G-score expectations table ───────────────────────────────────────────────
 // Rows: current diff, player contribution, future diff, total diff.
-// Category cells: stat_styler_primary (middle=0, multiplier=G_SCORE_MULTIPLIER).
+// Category cells: stat_styler_primary (middle=0), G_SCORE_MULTIPLIER on the candidate's row and
+// G_SCORE_AGGREGATE_MULTIPLIER on the team-level rows, which run several times larger.
 // Total column: celltypea / celltypeb for the summary row.
 
 /**
@@ -318,10 +321,16 @@ function makeGScoreTable(playerData: PlayerResult, categories: string[]): HTMLDi
         headerRow.appendChild(categoryHeader)
     }
 
-    // Data rows
+    // Data rows: the candidate's own row first, then the team-level rows. The two blocks colour on different multipliers,
+    // so the first team-level row opens with a darker line (.gscore-aggregate-start) marking where the scale changes.
     const tableBody = table.createTBody()
-    for (const rowData of playerData.g_score_rows) {
+    const orderedRows = [
+        ...playerData.g_score_rows.filter(rowData => rowData.isCandidate),
+        ...playerData.g_score_rows.filter(rowData => !rowData.isCandidate),
+    ]
+    for (const [rowIndex, rowData] of orderedRows.entries()) {
         const row = tableBody.insertRow(-1)
+        if (!rowData.isCandidate && orderedRows[rowIndex - 1]?.isCandidate) row.className = 'gscore-aggregate-start'
 
         const labelCell = document.createElement('th')
         labelCell.className = 'panel-rowlabel'
@@ -332,10 +341,11 @@ function makeGScoreTable(playerData: PlayerResult, categories: string[]): HTMLDi
         totalCell.textContent = rowData.total.toFixed(2)
         totalCell.className = 'panel-datacell' + (rowData.isTotal ? ' celltypeb' : ' celltypea')
 
+        const multiplier = rowData.isCandidate ? G_SCORE_MULTIPLIER : G_SCORE_AGGREGATE_MULTIPLIER
         for (const value of rowData.values) {
             const cell = row.insertCell(-1)
             cell.textContent = value.toFixed(2)
-            cell.style.cssText = stat_styler_primary(value, G_SCORE_MULTIPLIER, 0)
+            cell.style.cssText = stat_styler_primary(value, multiplier, 0)
             cell.className = 'panel-datacell'
         }
     }
@@ -589,7 +599,7 @@ function makeRosterGrid(
             } else {
                 cell.className = (assignment.kind === 'candidate' ? 'rostercandidate' : 'rosteronteam')
                     + ' panel-datacell roster-player-cell'
-                cell.appendChild(makeMinimalPlayerDisplay(assignment.player_id, false))   // the card shows the name
+                cell.appendChild(makeRosterPlayerDisplay(assignment.player_id))
                 cell.appendChild(makePositionEligibilityLabel(assignment.player_id))
                 attachGScoreCard(cell, assignment.player_id)
             }

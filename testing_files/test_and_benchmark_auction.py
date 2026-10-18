@@ -65,7 +65,7 @@ def test_evaluate_auction():
     # scored. Only your$ moves; generic$ and orig$ are empty boards, where every seat has the same cash.
     expected_auction_values = [
         ('Shai Gilgeous-Alexander',     -9.1,  90.2, 99.3, 97.2),
-        ('Tyrese Haliburton',           5.9,  60.0, 54.1, 52.9),
+        ('Tyrese Haliburton',           6.1,  60.1, 54.1, 52.9),
         ('Dyson Daniels',               18.3,  61.4, 43.1, 42.2),
         ('Jayson Tatum',                -1.4,  38.9, 40.4, 39.5),
     ]

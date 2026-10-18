@@ -53,7 +53,7 @@ _FIRST_ROUND_CONFIGS = [
     pytest.param(
         ('Each Category', [
             ('Karl-Anthony Towns',                  50.1),
-            ('Brook Lopez',                         49.8),
+            ('Brook Lopez',                         49.9),
             ('Jaren Jackson Jr.',                   50.0),
             ('Derrick White',                       49.7),
         ], None),
@@ -62,9 +62,9 @@ _FIRST_ROUND_CONFIGS = [
     pytest.param(
         ('Most Categories', [
             ('Karl-Anthony Towns',                  51.0),
-            ('Brook Lopez',                         49.3),
+            ('Brook Lopez',                         50.9),
             ('Jaren Jackson Jr.',                   51.5),
-            ('Myles Turner',                        47.7),
+            ('Myles Turner',                        50.0),
         ], None),
         id='MC-first-round',
     ),
@@ -81,8 +81,8 @@ _FIRST_ROUND_CONFIGS = [
         ('Each Category', [
             ('Karl-Anthony Towns',                  50.9),
             ('Cade Cunningham',                     51.3),
-            ('Devin Booker',                        50.8),
-            ('Jaren Jackson Jr.',                   50.9),
+            ('Devin Booker',                        50.6),
+            ('Jaren Jackson Jr.',                   51.0),
         ], _NO_TO_CATEGORIES),
         id='EC-first-round-noTO',
     ),
@@ -90,7 +90,7 @@ _FIRST_ROUND_CONFIGS = [
         ('Most Categories', [
             ('Karl-Anthony Towns',                  52.6),
             ('Cade Cunningham',                     52.8),
-            ('Devin Booker',                        52.2),
+            ('Devin Booker',                        51.9),
             ('Jaren Jackson Jr.',                   52.5),
         ], _NO_TO_CATEGORIES),
         id='MC-first-round-noTO',

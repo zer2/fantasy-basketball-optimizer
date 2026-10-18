@@ -15,7 +15,7 @@ import { getGScoreById } from '../../app_state.js'
 import { getRegistryEntry } from '../../player_registry.js'
 import { buildPlayerOption, buildMinimalPlayerDisplayHtml } from '../../player_display.js'
 import { getSelectedCategories } from '../../setting_collection/format_and_categories.js'
-import { stat_styler_primary, G_SCORE_MULTIPLIER } from '../../styles/styler_functions.js'
+import { stat_styler_primary, G_SCORE_MULTIPLIER, G_SCORE_AGGREGATE_MULTIPLIER } from '../../styles/styler_functions.js'
 import {
     DEFAULT_COMBOS, TRADE_SEARCH_ROUNDS, TRADE_THRESHOLD_FLOOR_PERCENT, SUGGESTION_ROWS_PER_PAGE,
 } from '../../setting_collection/trade_parameters.js'
@@ -106,7 +106,8 @@ function buildGScoreTable(sent: number[], received: number[]): HTMLElement {
 
     const tbody = table.createTBody()
 
-    function addRow(label: string, row: Row, cssClass: string, useGradient: boolean): void {
+    /** gradientMultiplier colours the cells (a player's row, or the team-level difference); null leaves them plain. */
+    function addRow(label: string, row: Row, cssClass: string, gradientMultiplier: number | null): void {
         const tr = tbody.insertRow()
         tr.className = cssClass
         const labelCell = tr.insertCell()
@@ -114,16 +115,16 @@ function buildGScoreTable(sent: number[], received: number[]): HTMLElement {
         labelCell.className = 'trade-row-label'
         const totalCell = tr.insertCell()
         totalCell.textContent = row.total.toFixed(2)
-        if (useGradient) {
-            totalCell.style.cssText = stat_styler_primary(row.total, G_SCORE_MULTIPLIER, 0)
+        if (gradientMultiplier !== null) {
+            totalCell.style.cssText = stat_styler_primary(row.total, gradientMultiplier, 0)
         } else {
             totalCell.className = 'celltypeb'
         }
         for (const v of row.values) {
             const td = tr.insertCell()
             td.textContent = v.toFixed(2)
-            if (useGradient) {
-                td.style.cssText = stat_styler_primary(v, G_SCORE_MULTIPLIER, 0)
+            if (gradientMultiplier !== null) {
+                td.style.cssText = stat_styler_primary(v, gradientMultiplier, 0)
             } else {
                 td.className = 'celltypeb'
             }
@@ -131,16 +132,16 @@ function buildGScoreTable(sent: number[], received: number[]): HTMLElement {
     }
 
     for (const row of sentRows) {
-        addRow(row.label, row, 'trade-row-sent', true)
+        addRow(row.label, row, 'trade-row-sent', G_SCORE_MULTIPLIER)
     }
-    addRow('Total Sent', sentTotal, 'trade-row-subtotal', false)
+    addRow('Total Sent', sentTotal, 'trade-row-subtotal', null)
 
     for (const row of receivedRows) {
-        addRow(row.label, row, 'trade-row-received', true)
+        addRow(row.label, row, 'trade-row-received', G_SCORE_MULTIPLIER)
     }
-    addRow('Total Received', recvTotal, 'trade-row-subtotal', false)
+    addRow('Total Received', recvTotal, 'trade-row-subtotal', null)
 
-    addRow('Total Difference', diff, 'trade-row-diff', true)
+    addRow('Total Difference', diff, 'trade-row-diff', G_SCORE_AGGREGATE_MULTIPLIER)
 
     container.append(table)
     return container

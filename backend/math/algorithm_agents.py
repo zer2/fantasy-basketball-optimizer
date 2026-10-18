@@ -2033,11 +2033,16 @@ class HAgent:
         seed_matrices = [self._project_forced_weights(matrix) for matrix in seed_matrices]
         seed_scores = score_seeds()
         best = np.argmax(seed_scores, axis=0)
-        if self._pass_weights_history and self._current_batch_index is not None:
+        if self._is_self_play_pass and self._pass_weights_history and self._current_batch_index is not None:
             # Hysteresis: the last history seed is each candidate's own most recent build —
             # the incumbent. It keeps its seat unless the best challenger clears
             # _SEED_INCUMBENT_MARGIN, so sub-noise belief shifts cannot flip a converged
             # build's basin at serve time (see the constant's comment).
+            # Self-play passes only. In a draft or auction evaluate the incumbent was built on the
+            # empty board, before the roster it is now asked to fit, so holding it is not stability:
+            # it keeps a stale build. Measured on a 2024-25 board after one round, with Jokic on the
+            # team: gentle Blocks was every guard's best seed, yet the margin kept the incumbent for
+            # four of the top 20 candidates, costing them 0.18-0.47 H-score points after the descent.
             incumbent_index = len(seed_matrices) - 1
             challenger_margin = (seed_scores[best, np.arange(n_candidates)]
                                  - seed_scores[incumbent_index])
@@ -2081,6 +2086,12 @@ class HAgent:
                 f'The forced category weights leave no room for the others: {heavy} together claim '
                 f'{100 * (1 - self._forced_budget):.0f}% of the total weight, and at most '
                 f'{100 * (1 - _FORCED_MINIMUM_BUDGET):.0f}% is allowed. Lower them and try again.')
+
+    @property
+    def _is_self_play_pass(self):
+        """Whether the solve in progress is a bootstrap or self-play pass (the serves included), as opposed to
+        an evaluate for a real board. _run_bootstrap_pass sets _unconstrained_run for exactly these passes."""
+        return self._unconstrained_run
 
     @property
     def _forcing(self):

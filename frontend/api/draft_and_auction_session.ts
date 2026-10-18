@@ -21,6 +21,7 @@ import {
 import { prefetchHeadshotsForDataSource } from '../player_display.js'
 import { patchSession, fetchGScores, evaluate, fetchDraftState, candidatesToPlayerResults, HTTPError } from './client.js'
 import { getForcedCategoryWeights } from '../table/force_weights.js'
+import { getRegistryGeneration } from '../player_registry.js'
 
 // Draft/waiver candidate batch size: score + paint the top players first, then fill in the
 // bench in follow-up requests. Auction is never batched (its $ values need the whole pool).
@@ -260,6 +261,13 @@ async function evaluateSeat(seat: string, forAutopilot = false): Promise<number 
             // reads "Updating..." — the session build above (the one-time self-play populate)
             // showed "Starting..." (see the busy state below and issue #420).
             if (stillOwner()) setIndicatorState('evaluating')
+            // A response is stale once a newer evaluate aborted this one, or once the player registry was replaced while
+            // it was out (a session update -- a data-source change, say -- whose caller then evaluates afresh). Its
+            // candidates were scored on the old pool and can name players the new registry lacks: reading them threw
+            // "Player id ... is not in the session registry" (a 2026-27 rookie from the projections the page opens on,
+            // answered after the switch to a historical season; seen 2026-10-17).
+            const registryGeneration = getRegistryGeneration()
+            const isStale = () => signal.aborted || getRegistryGeneration() !== registryGeneration
             const mode = getMode()
             const isLivePlatform = getLeagueSettings().platform !== 'Enter your own data'
 
@@ -299,6 +307,7 @@ async function evaluateSeat(seat: string, forAutopilot = false): Promise<number 
             const boardIsEmpty = Object.values(evalReq.player_assignments).flat().length === 0
             if (!forAutopilot && !basePlayersBySession.has(getSessionId()!) && !boardIsEmpty) {
                 const baseResp = await evaluate(getSessionId()!, buildEmptyBoardEvaluateRequest(mode), signal)
+                if (isStale()) return null
                 basePlayersBySession.set(getSessionId()!, candidatesToPlayerResults(baseResp.candidates))
             }
 
@@ -324,6 +333,7 @@ async function evaluateSeat(seat: string, forAutopilot = false): Promise<number 
                 // Auction scores the whole pool in one call (dollar values anchor on the full
                 // distribution). Rendered by runEvaluate, as before.
                 const resp = await evaluate(getSessionId()!, evalReq, signal)
+                if (isStale()) return null
                 players = candidatesToPlayerResults(resp.candidates)
             } else {
                 // Draft: score + paint in batches (top-ranked first) so the top of the board appears
@@ -337,7 +347,7 @@ async function evaluateSeat(seat: string, forAutopilot = false): Promise<number 
                         { ...evalReq, candidate_offset: offset, candidate_limit: CANDIDATE_BATCH_SIZE },
                         signal,
                     )
-                    if (signal.aborted) return null
+                    if (isStale()) return null
                     const batch = candidatesToPlayerResults(resp.candidates)
                     players.push(...batch)
                     if (forAutopilot) break   // the top pick is in the first batch; the rest is wasted work

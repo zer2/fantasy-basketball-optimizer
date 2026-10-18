@@ -74,27 +74,27 @@ _TEAM_2 = [
 # operation order: identical in exact arithmetic, ~1e-16 apart in floating point, and self-play
 # amplifies that into a new hash (and 0.3 of an H-score in the 16-category draft golden).
 _GOLDEN = {
-    ('Each Category',  'empty'): 'f4341827e061dd54b23cc3dd341ed6ccbbed6e6c933e629da702cb2d2cdebfdb',
-    ('Each Category',  'mid'):   '9c265753f7647dc72a38bd78e51c113f0067ca13730a61218198c979928ad7d8',
-    ('Half and Half',  'empty'): '2bea99492204dc73e473b9bc84f2844753df9f0204c84de8a5cce8e80e80ac28',
-    ('Half and Half',  'mid'):   'f9f06b2c19bfa0d52a2c43d0f2fa1fb84a541086f9fdbf1192d1d35258d0a70f',
-    ('Most Categories','empty'): 'd3148b8d737782e99f9fbd3238a95c758cdda09f5604f504a4550d1785dcc17f',
-    ('Most Categories','mid'):   '8335e088c76cab9fee275e624ec7da9ee4568fc9100aed4c49fbbf0a078dc177',
+    ('Each Category',  'empty'): 'c7b371b21706dda1f191d1c087dfdda8b293a6bb2f6e44026d239ad870546611',
+    ('Each Category',  'mid'):   '7c3b5680f50cee29b9f9fb92eca3da31a55e2a2f20f6ec29b674e1779b655495',
+    ('Half and Half',  'empty'): '4390066c2811f195f18a83c07375563560ad29877b3c3c6458e2a3b7e9251e81',
+    ('Half and Half',  'mid'):   '1251b1cfb0b806b2ab23a55a0f7209220e3659dd1aaf3f08df700ddbc0b45112',
+    ('Most Categories','empty'): '9a10cd484aab38f9467f6e6c81524153d2ca1ae56ea2832244f01669259019cc',
+    ('Most Categories','mid'):   'f9d39db74797bf1ffbfc8a1f726a6e9b0b9da056835c6fd7f608fe0eb9a132bc',
 
     # Eight categories (turnovers dropped), which is what a tiebreaker needs: a matchup that can
     # end level. Each objective appears with and without one named, so a change to the weighted
     # win-count DP, to what a category is worth in v, or to the G-score ranking the board is drawn
     # from has to show up here rather than only in a league nobody tested.
-    ('8cat Each Category',   'empty'): '24928972943ae3dc00e1689e65d5f720c587ce617c28e8a41b868979630c320a',
-    ('8cat Each Category',   'mid'):   '787ef40f864fd97fee40bcba6da2d7055af398644917fbb6d7b8dead8ffef018',
-    ('8cat Most Categories', 'empty'): '840464f06ee9914c2f8cb3b6626078e6e643a18bf8f5fafbc93a7470bb2972ce',
-    ('8cat Most Categories', 'mid'):   '0135622bcf227f561e23eb2ee77ba1a9a51eae505cb25bd2e6122e95ceab4628',
-    ('8cat MC + Points',     'empty'): '4a60d96b0bb30b40eca46b4de09b04138810d26a2042b0a94cbf9111dce919cc',
-    ('8cat MC + Points',     'mid'):   'e14688bcedcec5cbb8e5e450512ececfeb1a33dacdba1c4b185bc540f6cecde4',
-    ('8cat Half and Half',   'empty'): 'eb52265228041cad5ad496ee62edd050520c8d78969a44274e3e1f680e8dcc6f',
-    ('8cat Half and Half',   'mid'):   '1259261fec2ea9fd6fae8fe1377653eae9edea6d08ae07ceadb5b98e107ce49b',
-    ('8cat Half + Points',   'empty'): 'b21bd12dc282f42c79d8b6f5aa899908bcfb763374c62c82c45d8b286c50b878',
-    ('8cat Half + Points',   'mid'):   'c5c9a37791aafeddc2a16fe5f4847eae1984d685eee3b98e44792d5853673f53',
+    ('8cat Each Category',   'empty'): '5dc196d2bfc6df292b5f145f103fd1255d96b24b0a7eb924b9134719061bd604',
+    ('8cat Each Category',   'mid'):   '278ab952d025a2041a1bb966b99d63518d26c00d1be1c1955e80085ed2272379',
+    ('8cat Most Categories', 'empty'): '514a98f768fd45b86a2885de046f75f6f8f336ca4d7a8192edad2624a301143e',
+    ('8cat Most Categories', 'mid'):   'a04ee89ce5633a681cc4bd63f891f2c992de76a40b01e7b0f3ca57b5991e203f',
+    ('8cat MC + Points',     'empty'): 'c13b88dac88b803eaf69b1b40e201794cc784a7c49930f90d78fe09c4fe0c739',
+    ('8cat MC + Points',     'mid'):   '88b1dafbda4151fbf47462342366197c029cfbcfd2f03d8e2d1c3876e4ec6f84',
+    ('8cat Half and Half',   'empty'): 'e4582b76ae467499b4a3a70d287346cdd8f2bc9a4ed54e1160187556e6428e41',
+    ('8cat Half and Half',   'mid'):   '85e7605de350c9c79440d4d247168379c2decee7957d000f29d4b9d9eaf1c11e',
+    ('8cat Half + Points',   'empty'): 'fb9afbb70b04488d2684a73d978e785249caeaf4899def6944c32b2dd32e9ef0',
+    ('8cat Half + Points',   'mid'):   '26658c83fcb51ca9e952a1c6b03d36594a4c3b85a12a181cbf5548cdb3869e3f',
 }
 
 

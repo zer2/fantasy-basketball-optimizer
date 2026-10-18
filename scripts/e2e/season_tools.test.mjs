@@ -251,6 +251,19 @@ test('season tools on a self-built roster dataset', async t => {
             expectCleanSession(app, 'remembered team')
         })
 
+        await t.test('the inspected team is kept when the Rosters tab is drawn again', async () => {
+            // Every Season Mode layout pass and every visit to the Rosters tab redraws it, and the inspector opened on the
+            // first team each time: the inspection switched to another team while it was being read (2026-10-17).
+            const readInspectedTeam = () => page.locator('input#sr-team-select').inputValue()
+            await openSeasonTab('rosters')
+            await setSelect(page, 'sr-team-select', 'Team 3')
+            await waitAppSettled(app)
+            await openSeasonTab('waiver')
+            await openSeasonTab('rosters')
+            assert.match(await readInspectedTeam(), /Team 3/, 'the inspector keeps the chosen team through a redraw')
+            expectCleanSession(app, 'inspected team kept')
+        })
+
         await t.test('the indicator beside the tabs shows the backend working', async () => {
             const readIndicatorState = () => page.locator('#season-indicator').getAttribute('data-state')
             await openSeasonTab('waiver')

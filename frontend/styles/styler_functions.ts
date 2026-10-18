@@ -85,7 +85,9 @@ function lightTertiary(value: number, multiplier: number, middle: number): RGB {
 // The stat stylers compute raw = (value - middle) * multiplier and saturate as |raw|
 // approaches the blend divisor (~110 for primary). These are the two multipliers with
 // app-wide meaning; one-off multipliers stay at their call sites.
-export const G_SCORE_MULTIPLIER = 60   // G-score cells (middle 0): full colour ~ +-1.8 G
+export const G_SCORE_MULTIPLIER = 60   // a single player's G-score cells (middle 0): full colour ~ +-1.8 G
+export const G_SCORE_AGGREGATE_MULTIPLIER = G_SCORE_MULTIPLIER * 0.3   // team-level rows -- sums and differentials
+                                       // of several players, often +-10 G: full colour ~ +-6 G
 export const H_MULTIPLIER = 3          // per-category H cells: win % (middle 50); Rotisserie
                                        // standings points scale this by the (n_drafters - 1) range
 

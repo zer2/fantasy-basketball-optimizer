@@ -245,7 +245,7 @@ function buildAuctionBoard(): HTMLElement {
                 costEl.className   = 'auction-cell-cost'
                 costEl.textContent = `$${pick.cost}`
 
-                cell.append(makeMinimalPlayerDisplay(pick.playerId, true), costEl)
+                cell.append(makeMinimalPlayerDisplay(pick.playerId), costEl)
                 cell.classList.add('drafted')
             }
         }

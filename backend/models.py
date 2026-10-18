@@ -26,6 +26,7 @@ class GScoreRow:
     values: list[float]
     total: float
     is_total: bool
+    is_candidate: bool   # the candidate's own row; the others are team-level sums and differentials
 
 
 @dataclass
