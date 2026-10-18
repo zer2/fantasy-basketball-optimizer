@@ -17,7 +17,7 @@ G-score expectation breakdowns are available through the drop-down arrow. Waiver
 
 ![Waiver G-score breakdown](img/hwaiverexp.png)
 /// caption
-A breakdown of how Keyonte George contributes to a team in terms of G-score.
+A breakdown of how Paul George would contribute to a team in terms of G-score, 2025-26.
 ///
 
 ## Trading tab
