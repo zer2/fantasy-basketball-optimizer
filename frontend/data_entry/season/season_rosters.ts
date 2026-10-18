@@ -3,6 +3,7 @@
 // inspector table (right).  Used by layout.ts for Season → Rosters tab.
 
 import { makeCustomSelect, CustomSelect } from '../../custom_select.js'
+import { pref, savePref } from '../../preferences.js'
 import { getPlayerResults } from '../../app_state.js'
 import { getRegistryEntry, findPlayerIdByName } from '../../player_registry.js'
 import { buildFullPlayerDisplayHtml, buildPlayerOptionLabel } from '../../player_display.js'
@@ -290,10 +291,17 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
     label.textContent = 'Which team do you want to inspect?'
     wrap.append(label)
 
+    // The inspected team is remembered, as the Waiver and Trading tabs remember theirs: every Season Mode layout pass and
+    // every visit to the tab redraws it, and opening on the first team each time switched the inspection to another team
+    // while it was being read (an evaluate landing, a connected league's rosters arriving). A remembered team this league
+    // does not have falls back to the first.
+    const savedInspectedTeam = pref<string | null>('season-inspected-team', null)
+    const initialInspectedTeam = savedInspectedTeam !== null && teamNames.includes(savedInspectedTeam)
+        ? savedInspectedTeam : teamNames[0]
     const teamSel = makeCustomSelect(
         'sr-team-select',
         teamNames.map((name, index) => ({ value: name, label: isLivePlatform ? name : getTeamLabel(index) })),
-        undefined,
+        initialInspectedTeam,
         undefined,
         rosterListenerController.signal,
     )
@@ -312,7 +320,10 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
     }
 
     // Rebuild when the team selector changes
-    teamSel.element.addEventListener('change', rebuildInspector, listenerOpts)
+    teamSel.element.addEventListener('change', () => {
+        savePref('season-inspected-team', teamSel.getValue())
+        rebuildInspector()
+    }, listenerOpts)
 
     // Rebuild when any roster select changes
     for (const rowSelects of selects) {
