@@ -187,6 +187,8 @@ def run_trade_suggest(
         session.agent
         , get_trade_context(session, player_assignments, my_team, their_team)
         , all_combos
+        , my_candidates
+        , their_candidates
         , my_x_numpy
         , their_x_numpy
         , my_name_to_index
@@ -333,6 +335,8 @@ def _make_combo_df(
     h_agent: HAgent
     , ctx: dict
     , all_combos: pd.DataFrame
+    , my_roster: list[int]
+    , their_roster: list[int]
     , my_x_numpy: np.ndarray
     , their_x_numpy: np.ndarray
     , my_name_to_index: dict[str, int]
@@ -344,6 +348,8 @@ def _make_combo_df(
     opponent columns (my roster improved vs every opponent), with an extra shift on
     the counterparty column (their roster also weakened). Both perspectives are
     computed in a single batched call to compute_h_scores_batched. ctx is the pair's trade context (get_trade_context).
+    my_roster and their_roster are the rosters the X-score rows were taken from, in the same order: the name-to-index
+    maps point into them, and a roster can hold one id twice (every unscorable player counts as the replacement player).
     """
 
     n_combos = len(all_combos)
@@ -389,10 +395,8 @@ def _make_combo_df(
     if ctx['volume_my'] is not None:
         # The players exchanged move each side's percentage totals and season volume too.
         index = h_agent.volume_category_indices
-        my_candidates    = sorted(my_name_to_index,    key=my_name_to_index.get)
-        their_candidates = sorted(their_name_to_index, key=their_name_to_index.get)
-        my_units_numpy    = h_agent.player_volume_units.loc[my_candidates].to_numpy()
-        their_units_numpy = h_agent.player_volume_units.loc[their_candidates].to_numpy()
+        my_units_numpy    = h_agent.player_volume_units.loc[my_roster].to_numpy()
+        their_units_numpy = h_agent.player_volume_units.loc[their_roster].to_numpy()
         sent_units, received_units = sum_traded_rows(my_units_numpy, their_units_numpy)
         unit_deltas = received_units - sent_units                  # (n_combos, R): my side gains these
         x_deltas    = trade_deltas[:, index]
