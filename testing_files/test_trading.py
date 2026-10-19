@@ -219,3 +219,19 @@ def test_a_trade_search_below_the_threshold_floor_is_refused(trading_session):
     for side in ('your_differential_threshold', 'their_differential_threshold'):
         response = client.post(f'/sessions/{trading_session}/trade/suggest', json={**body, side: -0.05})
         assert response.status_code == 422, f'{side} below the floor must be refused'
+
+
+def test_a_roster_holding_the_replacement_player_twice_can_trade(trading_session):
+    """Every unscorable player counts as the replacement player, so a roster can hold its id twice. The combo math must
+    take every per-player row from the roster itself: rebuilding a row list from the id-to-index map dropped the
+    duplicate, and the last roster index then fell off the end (IndexError, 2026-10-19, live app)."""
+    from backend.player_identity import RP_PLAYER_ID
+    session = get_session(trading_session)
+    assignments = resolve_player_assignments(session, _DEFAULT_SEASON_ROSTERS)
+    # The duplicate goes first, so the real players after it -- the last one sits past the end of a deduplicated list --
+    # are the ones the trades send and receive.
+    assignments['Drafter 2'] = [RP_PLAYER_ID, RP_PLAYER_ID] + assignments['Drafter 2'][2:]
+    combos = [ComboParam(n_traded=1, n_received=1, threshold=None, searched_threshold=None)]
+    result = run_trade_suggest(session, assignments, 'Drafter 1', 'Drafter 2', combos, -0.02, -0.02, False)
+    last_player = assignments['Drafter 2'][-1]
+    assert any(last_player in suggestion.receive for suggestion in result.suggestions),         'the last player on the roster is offered in some trade'
