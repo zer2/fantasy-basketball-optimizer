@@ -197,3 +197,36 @@ export interface LeagueTradeImpact {
     competitive_balance_delta: number
 }
 
+// ─── Streamer Types ──────────────────────────────────────────────────────────
+
+export interface StreamerPlanMove {
+    date: string
+    add_player_id: number
+    drop_player_id: number
+    games_gained: number
+    projected_fp: number
+    dates_active: string[]
+    dates_played: string[]
+}
+
+export interface StreamerPlan {
+    strategy: string
+    moves: StreamerPlanMove[]
+    total_acquisitions: number
+    total_games_streamed: number
+    total_projected_fp: number
+    points_per_add: number
+    net_delta_fp: number
+}
+
+export interface StreamerOptimizeResponse {
+    optimal_plan: StreamerPlan
+    mode: string
+    total_acquisitions_used: number
+    total_streamed_games: number
+    total_net_delta_fp: number
+    points_per_add: number
+    alternative_plans?: Record<string, StreamerPlan>
+    daily_density_analysis?: Record<string, number>
+}
+

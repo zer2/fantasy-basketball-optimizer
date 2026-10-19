@@ -281,6 +281,20 @@ class TradeSuggestRequest(BaseModel):
         return self
 
 
+# ── /sessions/{id}/streamer/optimize ─────────────────────────────────────────
+
+class StreamerOptimizeRequest(BaseModel):
+    player_assignments: dict[str, list[int]]
+    my_team_id: str
+    horizon_days: int = 7
+    max_acquisitions: int = 7
+    mode: str = 'auto'  # 'auto', 'milp', 'tactical_multi', 'daily_churn'
+    streaming_slots: int = 1
+    designated_drops: Optional[list[int]] = None
+    solver: str = 'ortools'
+    candidate_limit: Optional[int] = 50
+
+
 # ── /platforms/* (live platform integration) ─────────────────────────────────
 
 class DivisionsResponse(BaseModel):

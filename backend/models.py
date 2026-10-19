@@ -7,7 +7,7 @@ responses live in `backend.api.schemas`.
 
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Literal, Optional
+from typing import Literal, Optional, Any
 from pydantic import BaseModel
 
 
@@ -237,4 +237,38 @@ class PointsTradeSuggestionModel(BaseModel):
 class PointsTradeSuggestResponse(BaseModel):
     scoring_system: str = 'points'
     suggestions: list[PointsTradeSuggestionModel]
+
+
+class StreamingMoveModel(BaseModel):
+    date: str
+    add_player_id: int
+    drop_player_id: Optional[int] = None
+    games_gained: int
+    projected_fp: float
+    dates_active: list[str] = []
+    dates_played: list[str] = []
+
+
+class StreamerPlanModel(BaseModel):
+    strategy: str
+    moves: list[StreamingMoveModel]
+    total_acquisitions: int
+    total_games_streamed: int
+    total_projected_fp: float
+    points_per_add: float
+    net_delta_fp: float
+
+
+class StreamerOptimizeResponse(BaseModel):
+    optimal_plan: StreamerPlanModel
+    mode: str
+    total_acquisitions_used: int
+    total_streamed_games: int
+    total_net_delta_fp: float
+    points_per_add: float
+    alternative_plans: dict[str, StreamerPlanModel] = {}
+    daily_density_analysis: dict[str, Any] = {}
+
+StreamerOptimizeResponse.model_rebuild()
+
 

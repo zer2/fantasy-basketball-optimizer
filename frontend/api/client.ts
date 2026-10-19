@@ -4,7 +4,7 @@
 
 import {
     PlayerResult, PlayerGScore, SessionRequest, SportConfig, Roster,
-    HypotheticalTeam, BoardRequest, LeagueTradeImpact,
+    HypotheticalTeam, BoardRequest, LeagueTradeImpact, StreamerOptimizeResponse,
 } from '../types.js'
 import { setPlayerRegistry } from '../player_registry.js'
 
@@ -447,6 +447,29 @@ export async function suggestTrades(
     }
 ): Promise<TradeSuggestResponse> {
     return jsonRequest(`${BASE_URL}/sessions/${sessionId}/trade/suggest`, 'Trade suggest', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(req),
+    })
+}
+
+// ── POST /sessions/{id}/streamer/optimize ────────────────────────────────────
+
+/** Optimizes weekly streaming acquisitions and churn schedules for Points mode. */
+export async function optimizeStreamer(
+    sessionId: string
+    , req: {
+        player_assignments: Record<string, number[]>
+        my_team_id: string
+        horizon_days?: number
+        max_acquisitions?: number
+        mode?: string
+        streaming_slots?: number
+        designated_drops?: number[]
+        candidate_limit?: number
+    }
+): Promise<StreamerOptimizeResponse> {
+    return jsonRequest(`${BASE_URL}/sessions/${sessionId}/streamer/optimize`, 'Streamer optimize', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify(req),
