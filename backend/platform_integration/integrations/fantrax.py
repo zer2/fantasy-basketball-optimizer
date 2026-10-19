@@ -25,7 +25,7 @@ logger = logging.getLogger('fbbo')
 from backend.platform_integration.base import (
     PlatformIntegration, LeagueShape, PlatformConfig, PlatformSelections,
 )
-from backend.platform_integration.helpers import deduplicate_team_names
+from backend.platform_integration.helpers import PlatformPlayerLookup, deduplicate_team_names
 from backend.player_identity import RP_PLAYER_ID
 
 
@@ -150,7 +150,7 @@ class FantraxIntegration(PlatformIntegration):
         self
         , config: PlatformConfig
         , mode: str
-        , player_id_lookup: dict[str, int]
+        , player_id_lookup: PlatformPlayerLookup
     ) -> PlatformSelections:
         """Read each team's current roster, mapping each player's Fantrax scorer id to a
         session player id (RP_PLAYER_ID for any player missing from the lookup, counted
@@ -180,7 +180,8 @@ class FantraxIntegration(PlatformIntegration):
                     unreadable.append(sorted(item))
                     continue
                 matched += 1
-                player_id = player_id_lookup.get(to_unified_fantrax_id(scorer_id), RP_PLAYER_ID)
+                # A roster entry names no player, only his scorer id: the lookup has no name to fall back on.
+                player_id = player_id_lookup.resolve_player_id(to_unified_fantrax_id(scorer_id), None)
                 unmatched_count += player_id == RP_PLAYER_ID
                 status = read_roster_field(item, _STATUS_FIELDS, 'status')
                 if exclude_injured and status is not None and status.upper() in _INJURED_RESERVE_STATUSES:
@@ -210,7 +211,7 @@ class FantraxIntegration(PlatformIntegration):
         self
         , config: PlatformConfig
         , mode: str
-        , player_id_lookup: dict[str, int]
+        , player_id_lookup: PlatformPlayerLookup
     ) -> Optional[PlatformSelections]:
         """Fantrax has no auction support, so this always returns None (matches Streamlit)."""
         return None

@@ -44,10 +44,9 @@ from backend.platform_integration.base import (
     PlatformIntegration, LeagueShape, PlatformConfig, PlatformSelections,
 )
 from backend.infra.secret_config import get_secret
-from backend.platform_integration.helpers import deduplicate_team_names
 from yfpy.exceptions import YahooFantasySportsDataNotFound
 
-from backend.player_identity import RP_PLAYER_ID
+from backend.platform_integration.helpers import PlatformPlayerLookup, deduplicate_team_names
 
 
 _logger = logging.getLogger('fbbo.yahoo')
@@ -486,7 +485,7 @@ class YahooIntegration(PlatformIntegration):
         self
         , config: PlatformConfig
         , mode: str
-        , player_id_lookup: dict[str, int]
+        , player_id_lookup: PlatformPlayerLookup
     ) -> PlatformSelections:
         """Season Mode → current rosters; otherwise → the live draft board."""
         if mode == 'Season Mode':
@@ -496,7 +495,7 @@ class YahooIntegration(PlatformIntegration):
     def _get_season_rosters(
         self
         , config: PlatformConfig
-        , player_id_lookup: dict[str, int]
+        , player_id_lookup: PlatformPlayerLookup
     ) -> PlatformSelections:
         query = self._make_query(config.league_id)
         injured_players: list[int] = []
@@ -507,8 +506,8 @@ class YahooIntegration(PlatformIntegration):
 
         for team_name, team_id in config.teams_dict.items():
             players: list[int] = []
-            for yahoo_player_id, position in roster_by_team_id[str(team_id)]:
-                canonical = player_id_lookup.get(yahoo_player_id, RP_PLAYER_ID)
+            for yahoo_player_id, position, player_name in roster_by_team_id[str(team_id)]:
+                canonical = player_id_lookup.resolve_player_id(yahoo_player_id, player_name)
                 if position in _INJURED_POSITIONS:
                     injured_players.append(canonical)
                 else:
@@ -522,13 +521,14 @@ class YahooIntegration(PlatformIntegration):
         )
 
     @staticmethod
-    def _read_all_rosters(query: YahooFantasySportsQuery) -> dict[str, list[tuple[int, str]]]:
-        """Every team's current roster as (Yahoo player id, selected position) pairs, keyed by team id, from ONE Yahoo
-        request (league/<key>/teams/roster).
+    def _read_all_rosters(query: YahooFantasySportsQuery) -> dict[str, list[tuple[int, str, str]]]:
+        """Every team's current roster as (Yahoo player id, selected position, full name) triples, keyed by team id,
+        from ONE Yahoo request (league/<key>/teams/roster). The name is the lookup's fallback for a player whose
+        unified row has no Yahoo id.
 
         It was one request per team, one after another: sixteen calls and 4.5 s for a sixteen-team league (2026-10-13).
         The single request then took 2.8 s, of which Yahoo's answer was 0.4 s: the response carries every field of all
-        ~176 players (1.6 MB), and yfpy's query() builds an object for each one, while three are read. So the JSON is
+        ~176 players (1.6 MB), and yfpy's query() builds an object for each one, while four fields are read. So the JSON is
         read directly, through yfpy's get_response -- its rate-limit check, re-authentication and retries -- in 0.3 s.
         Its rosters are today's lineup where the per-team call gave the current week's; on the league it was checked
         against, every team had the same players and the same injured-list slots both ways, and membership and the
@@ -544,7 +544,8 @@ class YahooIntegration(PlatformIntegration):
             for player_index in range(int(players['count']) if players else 0):
                 player = players[str(player_index)]['player']   # [metadata entries, {'selected_position': ...}]
                 entries.append((int(_read_yahoo_field(player[0], 'player_id')),
-                                _read_yahoo_field(player[1]['selected_position'], 'position')))
+                                _read_yahoo_field(player[1]['selected_position'], 'position'),
+                                _read_yahoo_field(player[0], 'name')['full']))
             rosters[str(_read_yahoo_field(team[0], 'team_id'))] = entries
         return rosters
 
@@ -592,7 +593,7 @@ class YahooIntegration(PlatformIntegration):
     def _get_draft_board(
         self
         , config: PlatformConfig
-        , player_id_lookup: dict[str, int]
+        , player_id_lookup: PlatformPlayerLookup
     ) -> PlatformSelections:
         query = self._make_query(config.league_id)
         try:
@@ -617,7 +618,7 @@ class YahooIntegration(PlatformIntegration):
         self
         , config: PlatformConfig
         , mode: str
-        , player_id_lookup: dict[str, int]
+        , player_id_lookup: PlatformPlayerLookup
     ) -> Optional[PlatformSelections]:
         """Auction board as team -> players plus per-player costs (costs[team][i] is what
         player_assignments[team][i] sold for). The route turns costs into remaining_cash."""
@@ -643,7 +644,7 @@ class YahooIntegration(PlatformIntegration):
         self
         , draft_results: list
         , config: PlatformConfig
-        , player_id_lookup: dict[str, int]
+        , player_id_lookup: PlatformPlayerLookup
     ) -> tuple[dict[str, list[int]], dict[str, list]]:
         """Group draft/auction picks into ({team: [player, ...]}, {team: [cost, ...]}).
 
@@ -666,7 +667,8 @@ class YahooIntegration(PlatformIntegration):
             player_id = int(draft_obj.player_key.split('.')[-1])
             team_id = draft_obj.team_key.split('.')[-1]
             team_name = team_name_by_id.get(team_id, f'Drafter {team_id}')
-            player_assignments.setdefault(team_name, []).append(player_id_lookup.get(player_id, RP_PLAYER_ID))
+            # A draft result names no player, only his key: the lookup has no name to fall back on.
+            player_assignments.setdefault(team_name, []).append(player_id_lookup.resolve_player_id(player_id, None))
             raw_cost = getattr(draft_obj, 'cost', None)
             costs.setdefault(team_name, []).append(float(raw_cost) if raw_cost is not None else None)
 

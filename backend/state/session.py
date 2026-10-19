@@ -20,6 +20,7 @@ from typing import Optional
 import pandas as pd
 
 from backend.platform_integration.base import PlatformConfig
+from backend.platform_integration.helpers import PlatformPlayerLookup
 
 
 @dataclass
@@ -67,10 +68,10 @@ class Session:
     # creation when a live platform is selected; used by the draft-state poll.
     platform_config: Optional[PlatformConfig] = None
 
-    # {platform player id/name -> session player id} lookup, rebuilt from the registry
-    # whenever the data changes (see refresh_platform_player_id_lookup). None until a
+    # Platform player -> session player id (by platform key, then by name), rebuilt from the
+    # registry whenever the data changes (see refresh_platform_player_id_lookup). None until a
     # live platform is connected.
-    platform_player_id_lookup: Optional[dict[str, int]] = None
+    platform_player_id_lookup: Optional[PlatformPlayerLookup] = None
 
     # Serialises work on this one session. An evaluate mutates shared agent state (warm-start
     # weights via get_h_scores), and a PATCH rebuilds the pipeline in place, so two overlapping
