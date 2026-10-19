@@ -112,8 +112,18 @@ class ESPNIntegration(PlatformIntegration):
     def _split_league_id(league_id: str) -> tuple[str, str, int]:
         """Our composite league_id carries the season: '<fan-api id>::<year>'."""
         fan_api_id, year_str = league_id.rsplit(_LEAGUE_ID_YEAR_SEP, 1)
-        prefix = 'wfba' if fan_api_id.startswith('wfba:') else 'fba'
-        numeric_id = fan_api_id.split(':', 1)[-1] if ':' in fan_api_id else fan_api_id
+        parts = fan_api_id.split(':')
+        if len(parts) >= 4:
+            # Live ESPN Fan API format: '<entryId>:<groupId>:<sportId>:<seasonId>'
+            numeric_id = parts[1]
+            prefix = 'wfba' if parts[2] == '5' else 'fba'
+        elif len(parts) == 2:
+            # Prefixed format: 'fba:12345' or 'wfba:12345'
+            numeric_id = parts[1]
+            prefix = 'wfba' if fan_api_id.startswith('wfba:') else 'fba'
+        else:
+            numeric_id = parts[0]
+            prefix = 'fba'
         return prefix, numeric_id, int(year_str)
 
     def _format_swid(self) -> Optional[str]:
@@ -127,9 +137,9 @@ class ESPNIntegration(PlatformIntegration):
         prefix, espn_id, year = self._split_league_id(league_id)
         swid = self._format_swid()
         if prefix == 'wfba':
-            return WNBALeague(league_id=espn_id, year=year, espn_s2=self._s2, swid=swid)
+            return WNBALeague(league_id=int(espn_id), year=year, espn_s2=self._s2, swid=swid)
         else:
-            return NBALeague(league_id=espn_id, year=year, espn_s2=self._s2, swid=swid)
+            return NBALeague(league_id=int(espn_id), year=year, espn_s2=self._s2, swid=swid)
 
     # ── Connection ─────────────────────────────────────────────────────────────
 
@@ -145,20 +155,43 @@ class ESPNIntegration(PlatformIntegration):
             f'{_ESPN_FAN_API}%7B{raw_swid}%7D?displayHiddenPrefs=true&context=fantasy'
             '&useCookieAuth=true&source=fantasyapp-ios&featureFlags=challengeEntries'
         )
-        response = requests.get(query)
+        cookies = {}
+        if self._s2:
+            cookies['espn_s2'] = self._s2
+        if self._swid:
+            cookies['SWID'] = self._format_swid() or ''
+
+        response = requests.get(query, cookies=cookies)
         response.raise_for_status()
         leagues = response.json()['preferences']
         leagues = sorted(leagues, key=lambda league: league['metaData']['entry']['seasonId'], reverse=True)
         result = []
         for league in leagues:
-            # Filter to only known basketball leagues to prevent NFL ('ffl:') crashes
             league_api_id = league.get('id', '')
-            if not isinstance(league_api_id, str) or not (league_api_id.startswith('fba:') or league_api_id.startswith('wfba:')):
+            entry = league.get('metaData', {}).get('entry', {})
+            groups = entry.get('groups', [{}])
+            group = groups[0] if groups else {}
+            href = group.get('href', '')
+
+            # Identify basketball leagues (NBA or WNBA) vs other sports (NFL, etc.)
+            parts = league_api_id.split(':') if isinstance(league_api_id, str) else []
+            sport_id = parts[2] if len(parts) >= 3 else None
+
+            # Skip NFL football (sport_id == '1' or '/football/' in href)
+            if sport_id == '1' or '/football/' in href:
                 continue
 
-            entry = league['metaData']['entry']
-            season = entry['seasonId']
-            name = entry['groups'][0]['groupName']
+            is_basketball = (
+                sport_id in ('3', '5')
+                or '/basketball/' in href
+                or '/womens-basketball/' in href
+                or (isinstance(league_api_id, str) and (league_api_id.startswith('fba:') or league_api_id.startswith('wfba:')))
+            )
+            if not is_basketball:
+                continue
+
+            season = entry.get('seasonId', 0)
+            name = group.get('groupName') or entry.get('name') or 'Unnamed League'
             result.append({
                 'id':     f"{league_api_id}{_LEAGUE_ID_YEAR_SEP}{season}",
                 'name':   f'{name} ({season - 1}-{season})',

@@ -199,3 +199,24 @@ def test_espn_fetch_league_shape_empty_rosters_fallback(monkeypatch):
     assert shape.n_drafters == 2
     assert shape.n_picks == 13  # Defaulted to 13 rather than 0
     assert shape.team_names == ['Team A', 'Team B']
+
+
+def test_espn_split_league_id_composite_fan_api():
+    # NBA live Fan API format: <entryId>:<groupId>:<sportId>:<seasonId>::<seasonId>
+    prefix, num_id, year = ESPNIntegration._split_league_id('1:1946378079:3:2027::2027')
+    assert prefix == 'fba'
+    assert num_id == '1946378079'
+    assert year == 2027
+
+    # WNBA live Fan API format: sportId 5
+    prefix_w, num_id_w, year_w = ESPNIntegration._split_league_id('1:562402811:5:2026::2026')
+    assert prefix_w == 'wfba'
+    assert num_id_w == '562402811'
+    assert year_w == 2026
+
+    # Legacy / mock prefixed formats
+    prefix_m, num_id_m, year_m = ESPNIntegration._split_league_id('fba:999::2025')
+    assert prefix_m == 'fba'
+    assert num_id_m == '999'
+    assert year_m == 2025
+
