@@ -9,7 +9,29 @@ from external services, which keeps these unit-testable.
 
 from __future__ import annotations
 
+import re
+import unicodedata
 import pandas as pd
+
+
+def normalize_player_name(name: str) -> str:
+    """Normalize a player name for fuzzy/flexible matching:
+    - Removes unicode diacritics/accents (e.g. Dončić -> Doncic, Jokić -> Jokic)
+    - Lowercases & strips whitespace
+    - Removes punctuation (periods, apostrophes, etc.)
+    - Removes common generational suffixes (Jr, Sr, II, III, IV)
+    - Normalizes internal hyphens and spaces
+    """
+    if not name or not isinstance(name, str):
+        return ''
+    decomposed = unicodedata.normalize('NFKD', name)
+    s = ''.join(c for c in decomposed if not unicodedata.combining(c))
+    s = s.strip().lower()
+    s = re.sub(r"['\.\`\"]", "", s)
+    s = re.sub(r"[-_/]", " ", s)
+    s = re.sub(r"\b(jr|sr|ii|iii|iv|v)\b", "", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
 
 
 def deduplicate_team_names(team_pairs: list[tuple[str, str]]) -> dict[str, str]:
@@ -47,14 +69,48 @@ def build_platform_player_id_lookup(
     is the authority on who exists in this session. Keys absent from either side are
     omitted, so a later `lookup.get(key, RP_PLAYER_ID)` yields the replacement-player
     fallback.
-
-    Replaces the name-composing lookup (platform key -> canonical 'Name (POS)') the
-    string-identity era used: the unified row's id is now kept instead of being
-    discarded after formatting a name.
     """
     rows = unified_player_table.dropna(subset=[player_name_column, 'NBA_PLAYER_ID'])
-    return {
+    lookup: dict[str, int] = {
         platform_name: int(nba_player_id)
         for platform_name, nba_player_id in zip(rows[player_name_column], rows['NBA_PLAYER_ID'])
         if int(nba_player_id) in player_registry
     }
+
+    # If this is a name-based platform column (e.g. ESPN_NAME), populate all cross-source
+    # name variants from Snowflake's UNIFIED_PLAYER_TABLE (DARKO_NAME, ROTOWIRE_NAME,
+    # BBM_NAME, HTB_NAME, MASTER_PLAYER_NAME) along with accent/punctuation-normalized
+    # variants so players match seamlessly without hardcoded alias dictionaries.
+    is_name_column = player_name_column in (
+        'ESPN_NAME', 'MASTER_PLAYER_NAME', 'DARKO_NAME', 'ROTOWIRE_NAME', 'HTB_NAME', 'BBM_NAME'
+    )
+    if is_name_column:
+        candidate_cols = [
+            'DARKO_NAME', 'ESPN_NAME', 'ROTOWIRE_NAME', 'HTB_NAME', 'BBM_NAME', 'MASTER_PLAYER_NAME'
+        ]
+        available_cols = [c for c in candidate_cols if c in unified_player_table.columns]
+        valid_rows = unified_player_table.dropna(subset=['NBA_PLAYER_ID'])
+        for _, row in valid_rows.iterrows():
+            nba_id = int(row['NBA_PLAYER_ID'])
+            if nba_id not in player_registry:
+                continue
+            for col in available_cols:
+                if pd.notna(row[col]):
+                    raw_val = str(row[col]).strip()
+                    if raw_val and raw_val not in lookup:
+                        lookup[raw_val] = nba_id
+                    norm = normalize_player_name(raw_val)
+                    if norm and norm not in lookup:
+                        lookup[norm] = nba_id
+
+        # Also map all names registered in the session registry
+        for p_id, identity in player_registry.items():
+            if hasattr(identity, 'name') and identity.name:
+                raw_name = identity.name
+                if raw_name not in lookup:
+                    lookup[raw_name] = p_id
+                norm = normalize_player_name(raw_name)
+                if norm and norm not in lookup:
+                    lookup[norm] = p_id
+
+    return lookup

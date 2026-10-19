@@ -27,17 +27,62 @@ from __future__ import annotations
 from typing import Optional
 
 import requests
-from espn_api.basketball import League
+from espn_api.basketball import League as NBALeague
+from espn_api.wbasketball import League as WNBALeague
 
 from backend.platform_integration.base import (
     PlatformIntegration, LeagueShape, PlatformConfig, PlatformSelections,
 )
-from backend.platform_integration.helpers import deduplicate_team_names
-from backend.player_identity import RP_PLAYER_ID
+from backend.platform_integration.helpers import (
+    deduplicate_team_names, normalize_player_name,
+)
 
 
 _ESPN_FAN_API = 'https://fan.api.espn.com/apis/v2/fans/'
 _LEAGUE_ID_YEAR_SEP = '::'   # league_id is "<fan-api id>::<year>"
+
+
+def resolve_espn_player(player, player_id_lookup: dict[str, int]) -> int:
+    """Resolve an ESPN player object to a canonical player ID with flexible matching:
+    1. Exact match on raw fullName
+    2. Normalized match (accents, punctuation, generational suffixes stripped)
+    3. Numeric ESPN ID match if present
+    4. Token (first & last name) match
+    5. Fallback to RP_PLAYER_ID (-1)
+    """
+    from backend.player_identity import RP_PLAYER_ID
+
+    raw_name = getattr(player, 'name', '') or ''
+    # 1. Exact raw match
+    if raw_name in player_id_lookup:
+        return player_id_lookup[raw_name]
+
+    # 2. Normalized match
+    norm = normalize_player_name(raw_name)
+    if norm in player_id_lookup:
+        return player_id_lookup[norm]
+
+    # 3. ESPN numeric ID match if keyed
+    player_id = getattr(player, 'playerId', None)
+    if player_id is not None:
+        espn_key = f"espn_{player_id}"
+        if espn_key in player_id_lookup:
+            return player_id_lookup[espn_key]
+        if str(player_id) in player_id_lookup:
+            return player_id_lookup[str(player_id)]
+
+    # 5. Token match: first and last name match uniquely
+    parts = norm.split(' ')
+    if len(parts) >= 2:
+        first, last = parts[0], parts[-1]
+        matches = {
+            pid for k, pid in player_id_lookup.items()
+            if isinstance(k, str) and ' ' in k and k.split(' ')[0] == first and k.split(' ')[-1] == last
+        }
+        if len(matches) == 1:
+            return next(iter(matches))
+
+    return RP_PLAYER_ID
 
 
 class ESPNIntegration(PlatformIntegration):
@@ -64,14 +109,27 @@ class ESPNIntegration(PlatformIntegration):
     # ── League id <-> (espn id, year) ──────────────────────────────────────────
 
     @staticmethod
-    def _split_league_id(league_id: str) -> tuple[str, int]:
+    def _split_league_id(league_id: str) -> tuple[str, str, int]:
         """Our composite league_id carries the season: '<fan-api id>::<year>'."""
-        fan_api_id, year = league_id.rsplit(_LEAGUE_ID_YEAR_SEP, 1)
-        return fan_api_id.split(':')[1], int(year)   # mirrors Streamlit split(':')[1]
+        fan_api_id, year_str = league_id.rsplit(_LEAGUE_ID_YEAR_SEP, 1)
+        prefix = 'wfba' if fan_api_id.startswith('wfba:') else 'fba'
+        numeric_id = fan_api_id.split(':', 1)[-1] if ':' in fan_api_id else fan_api_id
+        return prefix, numeric_id, int(year_str)
 
-    def _make_league(self, league_id: str) -> League:
-        espn_id, year = self._split_league_id(league_id)
-        return League(league_id=espn_id, year=year, espn_s2=self._s2, swid=self._swid)
+    def _format_swid(self) -> Optional[str]:
+        """ESPN cookie authentication requires SWID enclosed in curly braces."""
+        if not self._swid:
+            return None
+        raw = self._swid.strip().strip('{}')
+        return f"{{{raw}}}"
+
+    def _make_league(self, league_id: str):
+        prefix, espn_id, year = self._split_league_id(league_id)
+        swid = self._format_swid()
+        if prefix == 'wfba':
+            return WNBALeague(league_id=espn_id, year=year, espn_s2=self._s2, swid=swid)
+        else:
+            return NBALeague(league_id=espn_id, year=year, espn_s2=self._s2, swid=swid)
 
     # ── Connection ─────────────────────────────────────────────────────────────
 
@@ -82,8 +140,9 @@ class ESPNIntegration(PlatformIntegration):
     def list_leagues(self) -> list[dict]:
         """The user's ESPN leagues via the fan API (keyed by SWID), reverse-chronological.
         `id` is composite ('<fan-api id>::<year>') so connect/draft-state carry the season."""
+        raw_swid = self._swid.strip().strip('{}') if self._swid else ''
         query = (
-            f'{_ESPN_FAN_API}%7B{self._swid}%7D?displayHiddenPrefs=true&context=fantasy'
+            f'{_ESPN_FAN_API}%7B{raw_swid}%7D?displayHiddenPrefs=true&context=fantasy'
             '&useCookieAuth=true&source=fantasyapp-ios&featureFlags=challengeEntries'
         )
         response = requests.get(query)
@@ -92,11 +151,16 @@ class ESPNIntegration(PlatformIntegration):
         leagues = sorted(leagues, key=lambda league: league['metaData']['entry']['seasonId'], reverse=True)
         result = []
         for league in leagues:
+            # Filter to only known basketball leagues to prevent NFL ('ffl:') crashes
+            league_api_id = league.get('id', '')
+            if not isinstance(league_api_id, str) or not (league_api_id.startswith('fba:') or league_api_id.startswith('wfba:')):
+                continue
+
             entry = league['metaData']['entry']
             season = entry['seasonId']
             name = entry['groups'][0]['groupName']
             result.append({
-                'id':     f"{league['id']}{_LEAGUE_ID_YEAR_SEP}{season}",
+                'id':     f"{league_api_id}{_LEAGUE_ID_YEAR_SEP}{season}",
                 'name':   f'{name} ({season - 1}-{season})',
                 'season': season,
             })
@@ -112,7 +176,9 @@ class ESPNIntegration(PlatformIntegration):
     ) -> LeagueShape:
         league = self._make_league(league_id)
         teams_dict = deduplicate_team_names(self._team_pairs(league))
-        n_picks = max((len(team.roster) for team in league.teams), default=0)
+        n_picks = max((len(team.roster) for team in league.teams), default=13)
+        if n_picks == 0:
+            n_picks = 13
         return LeagueShape(
             team_names = list(teams_dict.keys()),
             n_drafters = len(teams_dict),
@@ -129,22 +195,49 @@ class ESPNIntegration(PlatformIntegration):
         , player_id_lookup: dict[str, int]
     ) -> PlatformSelections:
         """Current rosters per team (ESPN supports only Season Mode)."""
+        from backend.player_identity import RP_PLAYER_ID
 
         league = self._make_league(config.league_id)
-        team_by_id = {str(team.team_id): team for team in league.teams}
+        team_by_id = {}
+        team_by_name = {}
+        for team in league.teams:
+            team_by_id[str(team.team_id)] = team
+            team_by_id[team.team_id] = team
+            team_by_name[team.team_name] = team
+            team_by_name[team.team_name.strip()] = team
 
         player_assignments: dict[str, list[int]] = {}
-        for team_name, team_id in config.teams_dict.items():
-            team = team_by_id.get(team_id)
-            roster = [] if team is None else [
-                player_id_lookup.get(player.name, RP_PLAYER_ID) for player in team.roster
-            ]
+        injured_players: list[int] = []
+
+        team_list = list(league.teams)
+        for i, (team_name, team_id) in enumerate(config.teams_dict.items()):
+            team = (
+                team_by_id.get(str(team_id))
+                or team_by_id.get(team_id)
+                or team_by_name.get(team_name)
+                or team_by_name.get(team_name.strip())
+            )
+            # Fallback by positional index if ID and name both failed to match
+            if team is None and i < len(team_list):
+                team = team_list[i]
+
+            roster = []
+            if team is not None and getattr(team, 'roster', None):
+                for player in team.roster:
+                    p_id = resolve_espn_player(player, player_id_lookup)
+                    roster.append(p_id)
+                    is_injured = getattr(player, 'injured', False) or (
+                        getattr(player, 'lineupSlot', '') in ('IR', 'IL')
+                    )
+                    if is_injured and p_id != RP_PLAYER_ID and p_id not in injured_players:
+                        injured_players.append(p_id)
+
             player_assignments[team_name] = roster
 
         return PlatformSelections(
             player_assignments = player_assignments,
             status             = 'Success',
-            injured_players    = [],
+            injured_players    = injured_players,
         )
 
     def get_auction_results(
@@ -155,3 +248,4 @@ class ESPNIntegration(PlatformIntegration):
     ) -> Optional[PlatformSelections]:
         # ESPN auctions are not supported.
         return None
+

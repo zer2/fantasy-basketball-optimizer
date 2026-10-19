@@ -118,7 +118,7 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
             // current pool no longer has (the data source changed) leaves the cell blank.
             if (isLivePlatform) {
                 const prefillPlayerId = platformRosters?.[teamNames[d]]?.[r]
-                if (prefillPlayerId !== undefined) sel.setValue(String(prefillPlayerId))
+                if (prefillPlayerId !== undefined && prefillPlayerId !== -1) sel.setValue(String(prefillPlayerId))
             } else {
                 const enteredPlayerId = enteredPlayerIdsByCell!.get(`sr-player-${r}-${d}`)
                 if (enteredPlayerId !== undefined && poolPlayerIds.has(enteredPlayerId)) sel.setValue(enteredPlayerId)

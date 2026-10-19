@@ -489,7 +489,8 @@ class _FakeEspnLeague:
 
 
 def test_espn_split_league_id_carries_season():
-    assert ESPNIntegration._split_league_id('abc:12345::2024') == ('12345', 2024)
+    assert ESPNIntegration._split_league_id('abc:12345::2024') == ('fba', '12345', 2024)
+    assert ESPNIntegration._split_league_id('wfba:98765::2024') == ('wfba', '98765', 2024)
 
 
 def test_espn_get_draft_results_maps_rosters(monkeypatch):
