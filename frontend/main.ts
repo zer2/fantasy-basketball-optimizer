@@ -6,7 +6,7 @@
 
 import { createSection, addApplyBtn, makeSidebarToggle, MOBILE_BREAKPOINT_PX } from './helper_functions.js'
 import { makeDebouncer, withDisplayOwnership } from './api/session.js'
-import { setSportConfig } from './app_state.js'
+import { setSportConfig, isPointsMode } from './app_state.js'
 import {
     createOrPatchSession, runEvaluate, clearFullTeamResult, showDefaultRankings, SEASON_PLATFORM_CONNECTED,
     isConnectionWaitingForSlots,
@@ -352,6 +352,7 @@ const formatDebouncer = makeDebouncer(() => {
     if (!isCategorySelectionValid()) return   // the inline message explains the block
     applyFormatChange(4, { league: {
         scoring_format:         getScoringFormat(),
+        scoring_system:         isPointsMode() ? 'points' : 'categories',
         most_categories_weight: getMostCategoriesWeight(),
         tiebreaker_category:    getTiebreakerCategory(),
         categories:             getSelectedCategories(),

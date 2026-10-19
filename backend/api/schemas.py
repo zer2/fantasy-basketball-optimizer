@@ -58,7 +58,10 @@ class LeagueSettings(BaseModel):
         """Head to Head needs the dial; Rotisserie must not carry one. Rejected here rather than
         defaulted, so a client that forgets it hears about it instead of silently drafting to a
         different objective than the one it meant."""
-        if self.scoring_system == 'points':
+        if self.scoring_system == 'points' or self.scoring_format in ('Points', 'Points League'):
+            self.scoring_system = 'points'
+            if not self.categories:
+                self.categories = ['Points']
             return self
         if not self.categories:
             raise ValueError('categories must be a non-empty list. There is no server-side '
