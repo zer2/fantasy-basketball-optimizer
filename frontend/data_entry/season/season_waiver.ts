@@ -8,7 +8,7 @@ import { makeCustomSelect } from '../../custom_select.js'
 import { readRequiredIntInput } from '../../helper_functions.js'
 import { readRosterAssignments, readEmptyRostersMessage } from './season_helpers.js'
 import { getTeamIdentitiesFromSidebar } from '../../setting_collection/league_settings.js'
-import { getPlayerResultsById } from '../../app_state.js'
+import { getPlayerResultsById, isPointsMode } from '../../app_state.js'
 import { buildPlayerOption } from '../../player_display.js'
 import { runWaiverEvaluate } from '../../api/season_session.js'
 import { highlightCandidate } from '../../table/player_table.js'
@@ -16,6 +16,23 @@ import { pref, savePref } from '../../preferences.js'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+/** Returns the id of the player with the lowest projected points per game. */
+function lowestPointsPlayer(playerIds: number[]): number | null {
+    const byId = getPlayerResultsById()
+    let worst: number | null = null
+    let lowestPpg = Infinity
+    for (const playerId of playerIds) {
+        const p = byId.get(playerId)
+        if (p) {
+            const ppg = p.points_per_game ?? (p.h_score || 0)
+            if (ppg < lowestPpg) {
+                lowestPpg = ppg
+                worst = playerId
+            }
+        }
+    }
+    return worst
+}
 
 /** Returns the id of the player with the highest g_rank (worst) among the given ids.
  *  Returns null if none of the ids are found in the backend player data. */
@@ -112,7 +129,9 @@ export function renderWaiverControls(container: HTMLElement): void {
 
     const initialRoster  = assignments[initialTeam]
     // lowestGRankPlayer returns null if roster ids aren't in backend data yet
-    const initialDefault = lowestGRankPlayer(initialRoster) ?? initialRoster[0]
+    const initialDefault = isPointsMode()
+        ? (lowestPointsPlayer(initialRoster) ?? initialRoster[0])
+        : (lowestGRankPlayer(initialRoster) ?? initialRoster[0])
 
     const dropSel = makeCustomSelect(
         'waiver-drop-select',
@@ -145,7 +164,9 @@ export function renderWaiverControls(container: HTMLElement): void {
         const team        = teamSel.getValue()
         savePref('season-your-team', team)
         const roster      = assignments[team]
-        const defaultDrop = lowestGRankPlayer(roster) ?? roster[0]
+        const defaultDrop = isPointsMode()
+            ? (lowestPointsPlayer(roster) ?? roster[0])
+            : (lowestGRankPlayer(roster) ?? roster[0])
         dropSel.setOptions(buildDropOptions(team), String(defaultDrop))
         runWaiver().catch(err => console.error('Waiver evaluate failed:', err))
     })

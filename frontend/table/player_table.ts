@@ -25,7 +25,7 @@ import { buildExpandPanel } from './expand_view.js'
 import { PlayerResult } from '../types.js'
 import { getScoringFormat, getSelectedCategories } from '../setting_collection/format_and_categories.js'
 import { getLeagueSettings, getMode } from '../setting_collection/league_settings.js'
-import { getShortCategoryNames } from '../app_state.js'
+import { getShortCategoryNames, isPointsMode } from '../app_state.js'
 import { isMobileViewport, normalizeSearchText } from '../helper_functions.js'
 import { buildFullPlayerDisplayHtml } from '../player_display.js'
 import { buildForcedWeightsRow } from './force_weights.js'
@@ -95,6 +95,7 @@ let highlightedPlayerId: number | null = null
 interface RenderContext {
     categories: string[]
     isAuction:  boolean
+    isPoints:   boolean
     isRoto:     boolean
     rotoData:   { nDrafters: number; rotoMiddle: number } | null
     decimals:   number
@@ -171,6 +172,25 @@ export function buildTableHeader(): void {
         : '14rem'
     headerRow.append(playerTh)
 
+    if (isPointsMode()) {
+        const pointsCols = [
+            { label: 'FP/G', width: '3.5rem' },
+            { label: 'Tot FP', width: '3.5rem' },
+            { label: 'Marg. FP', width: '3.5rem' },
+            { label: 'Games', width: '2.5rem' },
+            { label: 'Drop Gms', width: '3rem' },
+            { label: 'Δ FP', width: '3rem' },
+        ]
+        for (const col of pointsCols) {
+            const th = document.createElement('th')
+            th.className = 'tableheader'
+            th.textContent = col.label
+            th.style.width = col.width
+            headerRow.append(th)
+        }
+        return
+    }
+
     if (isAuction) {
         for (const label of ['Diff.', 'Your $', 'Gnrc. $', 'Orig. $']) {
             const th = document.createElement('th')
@@ -219,6 +239,25 @@ function buildRowPairHtml(player: PlayerResult, ctx: RenderContext): string {
 
     // Player display cell (headshot + name + positions) with expand button
     html += `<th class='playerheader'><div class='playerheaderdiv'>${buildFullPlayerDisplayHtml(player.player_id)}<button class='playerpopup'>▶</button></div></th>`
+
+    if (ctx.isPoints) {
+        const fpg = player.points_per_game ?? 0
+        const tot = player.total_projected_points ?? 0
+        const marg = player.marginal_fp ?? player.delta_fp ?? 0
+        const cg = player.candidate_games ?? 0
+        const dg = player.dropped_games ?? 0
+        const dfp = player.delta_fp ?? marg
+
+        html += `<td class='categoricalhscore' style='font-weight:600;'>${fpg > 0 ? fpg.toFixed(1) : '—'}</td>`
+        html += `<td class='categoricalhscore'>${tot > 0 ? tot.toFixed(1) : '—'}</td>`
+        html += `<td class='categoricalhscore' style='font-weight:700; color: ${marg >= 0 ? '#48bb78' : '#f56565'};'>${marg >= 0 ? '+' : ''}${marg.toFixed(1)}</td>`
+        html += `<td class='categoricalhscore'>${cg}</td>`
+        html += `<td class='categoricalhscore'>${dg}</td>`
+        html += `<td class='categoricalhscore' style='color: ${dfp >= 0 ? '#48bb78' : '#f56565'};'>${dfp >= 0 ? '+' : ''}${dfp.toFixed(1)}</td>`
+        html += `</tr>`
+        html += `<tr class='expandedview' style='display:none'></tr>`
+        return html
+    }
 
     // Score column(s)
     if (ctx.isAuction) {
@@ -536,10 +575,12 @@ export function resetTable(): void {
     tbodyEl = table.createTBody()
     ensureScrollWired()
 
-    const isRoto = getScoringFormat() === 'Rotisserie'
+    const isPoints = isPointsMode()
+    const isRoto = !isPoints && getScoringFormat() === 'Rotisserie'
     renderCtx = {
-        categories: getSelectedCategories(),
-        isAuction:  getMode() === 'Auction Mode',
+        categories: isPoints ? [] : getSelectedCategories(),
+        isAuction:  !isPoints && getMode() === 'Auction Mode',
+        isPoints,
         isRoto,
         // Mobile shows integer-rounded values so columns stay narrow ("47" vs "47.5");
         // desktop keeps 1-decimal precision. H-Score always keeps 1 decimal (see buildRowPairHtml).
@@ -549,7 +590,7 @@ export function resetTable(): void {
                        return { nDrafters, rotoMiddle: computeRotoMiddle(nDrafters) } })()
             : null,
     }
-    columnCount = 1 + (renderCtx.isAuction ? 4 : 1) + renderCtx.categories.length
+    columnCount = isPoints ? 7 : (1 + (renderCtx.isAuction ? 4 : 1) + renderCtx.categories.length)
 }
 
 /** Merges one batch of already-H-score-sorted players into the current table.

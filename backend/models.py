@@ -131,7 +131,7 @@ class ComboParam(BaseModel):
 
 
 class TradeSuggestion(BaseModel):
-    their_team: str   # the team the trade is made with: a request may search several
+    their_team: str = ''   # the team the trade is made with: a request may search several
     send: list[int]
     receive: list[int]
     your_score: float
@@ -140,3 +140,101 @@ class TradeSuggestion(BaseModel):
 
 class TradeSuggestResponse(BaseModel):
     suggestions: list[TradeSuggestion]
+
+
+# ── /sessions/{id}/evaluate (points mode) ────────────────────────────────────
+
+class PointsAuctionValues(BaseModel):
+    reference_price:  float   # generic market reference (pooled budgets)
+    personal_value:   float   # this team's willingness-to-pay
+    legal_max_bid:    float   # B - m * (r - 1)
+    minimum_bid:      int
+    is_draftable:     bool    # False when all rosters are complete
+
+
+class PointsCandidate(BaseModel):
+    player_id:              int
+    projected_fp_per_game:  Optional[float] = None   # None for zero-GP rows
+    projected_fp_total:     Optional[float] = None
+    marginal_fp:            float                    # F(R + candidate) - F(R)
+    dynamic_value:          Optional[float] = None   # from DynamicPointsAgent
+    rank:                   int
+    is_exact_model:         bool = True
+    approximation_note:     Optional[str] = None
+    completion_ids:         list[int] = []
+    auction_values:         Optional[PointsAuctionValues] = None   # auction mode only
+    drop_player_id:         Optional[int] = None
+    delta_fp:               Optional[float] = None
+    candidate_games:        Optional[int] = None
+    dropped_games:          Optional[int] = None
+    daily_deltas:           Optional[dict[str, float]] = None
+
+
+class PointsEvaluateResponse(BaseModel):
+    scoring_system:  str = 'points'
+    objective:       str = 'expected_points'
+    units:           str = 'fantasy_points'
+    horizon:         Optional[str] = None
+    source_version:  Optional[str] = None
+    candidates:      list[PointsCandidate]
+    has_more:        bool = False
+    total_candidates: int = 0
+
+
+# ── /sessions/{id}/trade (points mode) ───────────────────────────────────────
+
+class LeagueTradeImpactModel(BaseModel):
+    pre_trade_points: dict[str, float]
+    post_trade_points: dict[str, float]
+    pre_trade_ranks: dict[str, int]
+    post_trade_ranks: dict[str, int]
+    rank_shifts: dict[str, int]
+    pre_trade_std: float
+    post_trade_std: float
+    pre_trade_spread: float
+    post_trade_spread: float
+    competitive_balance_delta: float
+
+
+class PointsTradeAnalyzeResponse(BaseModel):
+    scoring_system: str = 'points'
+    team_a_pre_fp: float
+    team_a_post_fp: float
+    team_a_delta_fp: float
+    team_a_net_delta_fp: float
+    team_a_streamer_boost: float = 0.0
+    team_b_pre_fp: float
+    team_b_post_fp: float
+    team_b_delta_fp: float
+    team_b_net_delta_fp: float
+    team_b_streamer_boost: float = 0.0
+    is_legal: bool = True
+    rejection_reason: Optional[str] = None
+    error: Optional[str] = None
+    team_a_opened_spots: int = 0
+    team_b_opened_spots: int = 0
+    league_impact: Optional[LeagueTradeImpactModel] = None
+    your_net_delta_fp: Optional[float] = None
+    their_net_delta_fp: Optional[float] = None
+
+
+class PointsTradeSuggestionModel(BaseModel):
+    partner_team_id: str
+    user_sends: list[int]
+    partner_sends: list[int]
+    user_gain: float
+    partner_gain: float
+    total_gain: float = 0.0
+    trade_format: str
+    send: Optional[list[int]] = None
+    receive: Optional[list[int]] = None
+    user_delta_fp: Optional[float] = None
+    partner_delta_fp: Optional[float] = None
+    net_delta_fp: Optional[float] = None
+    analysis: Optional[PointsTradeAnalyzeResponse] = None
+
+
+class PointsTradeSuggestResponse(BaseModel):
+    scoring_system: str = 'points'
+    suggestions: list[PointsTradeSuggestionModel]
+

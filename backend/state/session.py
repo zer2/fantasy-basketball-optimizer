@@ -89,8 +89,15 @@ class Session:
 
     # Each evaluated candidate's raw H-scoring category weights and win rates, by board
     # (services/ranking.store_candidate_strategies): {board key: (agent, {player id: (weights, rates)})}. The
-    # hypothetical team (services/hypothetical_team) reads the strategy the board showed instead of re-solving.
     candidate_strategy_cache: "OrderedDict[tuple, tuple]" = field(default_factory=OrderedDict)
+
+    @property
+    def current_params(self) -> dict:
+        return self.current_settings
+
+    @current_params.setter
+    def current_params(self, value: dict) -> None:
+        self.current_settings = value
 
 
 # ── Store ────────────────────────────────────────────────────────────────────

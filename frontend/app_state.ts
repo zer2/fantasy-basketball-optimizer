@@ -4,6 +4,33 @@
 // so that any module can read the state without creating circular dependencies.
 
 import { PlayerResult, PlayerGScore, SportConfig, BoardRequest } from './types.js'
+import { getAllPlayerIdentities } from './player_registry.js'
+
+// ── Scoring system (categories | points) ──────────────────────────────────────
+
+let scoringSystem: 'categories' | 'points' = 'categories'
+
+/** Returns the current scoring system ('categories' or 'points'). */
+export function getScoringSystem(): 'categories' | 'points' {
+    return scoringSystem
+}
+
+/** Sets the current scoring system ('categories' or 'points'). */
+export function setScoringSystem(s: 'categories' | 'points'): void {
+    scoringSystem = s
+}
+
+/** Returns true if currently operating in points league mode. */
+export function isPointsMode(): boolean {
+    if (scoringSystem === 'points') return true
+    try {
+        const elem = document.getElementById('fc-scoring-format') as HTMLInputElement | null
+        if (elem && elem.value && elem.value.toLowerCase().includes('points')) return true
+    } catch {
+        // DOM not accessible
+    }
+    return false
+}
 
 // ── Session phase ─────────────────────────────────────────────────────────────
 
@@ -74,17 +101,40 @@ export function setGScores(scores: PlayerGScore[]): void {
  * this context; Season Mode roster dropdowns only use player_id and g_rank.
  */
 export function setPlayerResultsFromGScores(): void {
-    const scores  = [...getGScoreById().values()].sort((a, b) => b.total - a.total)
-    const players = scores.map((gs, i) => ({
-        player_id: gs.player_id,
-        h_score: 0,
-        h_rank: 0,
-        g_rank: i + 1,
-        win_rates: [],
-        category_weights: [],
-        g_score_rows: [],
-    }))
-    setAllPlayerResults(players)
+    let scores: PlayerGScore[] = []
+    try {
+        scores = [...getGScoreById().values()].sort((a, b) => b.total - a.total)
+    } catch {
+        scores = []
+    }
+    if (scores.length > 0) {
+        const players = scores.map((gs, i) => ({
+            player_id: gs.player_id,
+            h_score: 0,
+            h_rank: 0,
+            g_rank: i + 1,
+            win_rates: [],
+            category_weights: [],
+            g_score_rows: [],
+        }))
+        setAllPlayerResults(players)
+    } else {
+        try {
+            const identities = getAllPlayerIdentities()
+            const players = identities.map((entry, i) => ({
+                player_id: entry.player_id,
+                h_score: 0,
+                h_rank: 0,
+                g_rank: i + 1,
+                win_rates: [],
+                category_weights: [],
+                g_score_rows: [],
+            }))
+            setAllPlayerResults(players)
+        } catch {
+            // registry not loaded yet
+        }
+    }
 }
 
 // ── Seat selector state ───────────────────────────────────────────────────────

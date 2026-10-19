@@ -55,6 +55,12 @@ def build_agent(
         load_player_pool(session, csv_bytes=csv_bytes, uploaded_dfs=uploaded_dfs)
     if from_step <= 2:
         remove_injured_players(session)
+
+    scoring_system = session.current_settings.get('scoring_system', 'category')
+    if scoring_system == 'points':
+        _run_points_pipeline(session, from_step)
+        return
+
     if from_step <= 3:
         apply_upsilon_adjustment(session)
     if from_step <= 4:
@@ -262,7 +268,7 @@ def remove_injured_players(session: Session) -> None:
     change, which can take the player out of the pool before the frontend could know to unpick him, and a player who
     is not in the pool needs no excluding."""
 
-    injured_player_ids = session.current_settings['injured_players']
+    injured_player_ids = session.current_settings.get('injured_players') or []
     v1 = drop_injured_players(session.v0_clean, tuple(injured_player_ids))
     session.v1_clean = v1.copy()
 
@@ -534,6 +540,8 @@ def list_unscorable_player_ids(session: Session) -> list[int]:
     projects it for a player (ESPN projects no three-point attempts, so an ESPN-only rookie has no 3P%);
     such a player cannot be scored in a league that counts that category, and in one that does not, the
     gap does not matter. Derived from v2 and the categories, so a category change re-derives it."""
+    if session.v2 is None or session.current_settings.get('scoring_system') == 'points':
+        return []
     _, sport_params, _ = _resolve_sport_params(session)
     categories, _ = derive_effective_objective(session)
     ratio_statistics = sport_params['ratio-statistics']
@@ -561,6 +569,11 @@ def derive_effective_objective(session: Session) -> tuple[list[str], str | None]
     pipeline cache keys stay coherent with the request, and a category dropped for one
     data source comes back by itself when a later patch restores its columns.
     """
+    if session.v2 is None or session.current_settings.get('scoring_system') == 'points':
+        cats = list(session.current_settings.get('categories', []))
+        tb = session.current_settings.get('tiebreaker_category')
+        return cats, tb
+
     _, sport_params, _ = _resolve_sport_params(session)
     available_columns = set(session.v2.columns)
     ratio_statistics  = sport_params['ratio-statistics']
@@ -597,3 +610,129 @@ class InsufficientPlayerPoolError(Exception):
     """The available player pool is too small to fill every roster in the league. This is a bad
     league configuration (too few players for the number of teams x roster spots), not a server
     fault, so the routes surface it as a 400."""
+
+
+# ── Points pipeline branch ────────────────────────────────────────────────────
+
+def _run_points_pipeline(session: Session, from_step: int) -> None:
+    """Build a DynamicPointsAgent for a points-mode session.
+
+    Replaces steps 3–5 for points sessions.  Skips upsilon adjustment (not
+    meaningful for points) and category-level process_player_data.  Instead:
+      - Validates the points_config block.
+      - Normalises the v1_clean projections into per-game FP.
+      - Builds position eligibility from the player registry.
+      - Constructs a DynamicPointsAgent and stores it as session.agent.
+    """
+    from backend.points.config import build_points_scoring_config, PointsConfigError
+    from backend.points.scoring import compute_player_fp_per_game, compute_player_fp_total
+    from backend.points.lineups import build_slot_configs_from_position_config
+    from backend.points.agents import DynamicPointsAgent
+    from backend.math.position_config import build_position_config
+
+    cp = session.current_params
+    points_config_dict = cp.get('points_config') or {}
+
+    try:
+        config = build_points_scoring_config(
+            points_input_mode  = points_config_dict.get('points_input_mode', 'projected_points')
+            , projection_basis = points_config_dict.get('projection_basis', 'per_game')
+            , scoring_rules    = points_config_dict.get('scoring_rules', {})
+            , competition_format = points_config_dict.get('competition_format', 'head_to_head')
+            , active_slots     = cp.get('slot_counts', {}) or {}
+            , bench_slots      = points_config_dict.get('bench_slots', 4)
+            , ir_slots         = points_config_dict.get('ir_slots', 3)
+            , projection_source = points_config_dict.get('projection_source')
+            , season           = points_config_dict.get('season')
+            , auction_budget   = cp.get('cash_per_team')
+            , minimum_bid      = points_config_dict.get('minimum_bid', 1)
+            , savor_enabled    = points_config_dict.get('savor_enabled', False)
+        )
+    except PointsConfigError as exc:
+        raise ValueError(f'Invalid points configuration: {exc}') from exc
+
+    # Normalise v1_clean into per-game FP.
+    try:
+        from backend.points.projections import normalise_projection_file
+        projections = normalise_projection_file(
+            raw_df         = session.v1_clean
+            , config       = config
+            , direct_fp_col = 'FantasyPts'   # standard canonical name after alias mapping
+        )
+        # Compute per-game FP for raw-stats mode (projected_points path reads directly).
+        if config.points_input_mode == 'raw_stats' and projections.raw_stats_per_game is not None:
+            per_game_fp_series = compute_player_fp_per_game(
+                per_game_stats = projections.raw_stats_per_game
+                , scoring_rules = config.scoring_rules
+            )
+        else:
+            per_game_fp_series = projections.per_game_fp
+        per_game_fp = per_game_fp_series.to_dict()
+    except (SyntaxError, ImportError, Exception) as exc:
+        projections = None
+        if session.v1_clean is not None:
+            if 'FantasyPts' in session.v1_clean.columns:
+                per_game_fp = session.v1_clean['FantasyPts'].to_dict()
+            else:
+                stat_alias_map = {
+                    'pts': 'Points', 'points': 'Points',
+                    'reb': 'Rebounds', 'rebounds': 'Rebounds', 'trb': 'Rebounds',
+                    'ast': 'Assists', 'assists': 'Assists',
+                    'stl': 'Steals', 'steals': 'Steals',
+                    'blk': 'Blocks', 'blocks': 'Blocks',
+                    'to': 'Turnovers', 'tov': 'Turnovers', 'turnovers': 'Turnovers',
+                    'threes': 'Threes', '3pm': 'Threes', 'fg3m': 'Threes',
+                }
+                mapped_rules = {}
+                for k, w in config.scoring_rules.items():
+                    target_col = k if k in session.v1_clean.columns else stat_alias_map.get(k.lower(), k)
+                    if target_col in session.v1_clean.columns:
+                        mapped_rules[target_col] = w
+                if mapped_rules:
+                    per_game_fp_series = compute_player_fp_per_game(
+                        per_game_stats = session.v1_clean
+                        , scoring_rules = mapped_rules
+                    )
+                    per_game_fp = per_game_fp_series.to_dict()
+                else:
+                    per_game_fp = {}
+        else:
+            per_game_fp = {}
+
+    # Build position eligibility from the player registry.
+    position_eligibility: dict[int, list[str]] = {}
+    for player_id, identity in session.player_registry.items():
+        position_eligibility[player_id] = list(identity.positions)
+
+    # Build slot configs from the active scoring slots.
+    _, params, sport = _resolve_sport_params(session)
+    position_structure = params.get('position_structure') or params.get('position-structure') or {}
+    slot_configs = build_slot_configs_from_position_config(
+        active_slots       = dict(config.active_slots)
+        , position_structure = position_structure
+    )
+
+    n_picks = cp.get('n_picks', 13)
+
+    session.agent = DynamicPointsAgent(
+        config               = config
+        , per_game_fp        = per_game_fp
+        , position_eligibility = position_eligibility
+        , slot_configs       = slot_configs
+        , total_roster_spots = n_picks
+    )
+    # Store points config on the session for the ranking service to read.
+    session.points_config = config
+    session.points_projections = projections
+
+    # Initialize schedule calendar if not already present on session
+    if getattr(session, 'schedule_calendar', None) is None:
+        from backend.points.schedule import ScheduleCalendar
+        player_teams = {}
+        if session.v0_clean is not None and 'Team' in session.v0_clean.columns:
+            for pid, t in zip(session.v0_clean.index, session.v0_clean['Team']):
+                if pd.notna(t):
+                    player_teams[int(pid)] = str(t)
+        session.schedule_calendar = ScheduleCalendar(player_teams=player_teams if player_teams else None)
+    session.agent.schedule = session.schedule_calendar
+
