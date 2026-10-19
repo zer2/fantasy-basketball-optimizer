@@ -13,7 +13,7 @@ from typing import Optional
 
 from backend.state.session import Session, create_session, delete_session
 from backend.services.build_agent import POOL_SOURCE_SETTINGS, build_agent, load_player_pool
-from backend.data_retrieval import get_unified_player_table
+from backend.data_retrieval import get_player_name_resolvers, get_unified_player_table
 from backend.platform_integration.base import PlatformConfig
 from backend.platform_integration.helpers import build_platform_player_id_lookup
 
@@ -226,4 +226,5 @@ def refresh_platform_player_id_lookup(session: Session) -> None:
         session.player_registry,
         session.platform_config.player_name_column,
         get_unified_player_table(),
+        get_player_name_resolvers(),
     )

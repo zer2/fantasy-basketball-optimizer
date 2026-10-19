@@ -24,6 +24,7 @@ Risks / gaps to check first at E2E:
 
 from __future__ import annotations
 
+import logging
 from typing import Optional
 
 import requests
@@ -33,56 +34,14 @@ from espn_api.wbasketball import League as WNBALeague
 from backend.platform_integration.base import (
     PlatformIntegration, LeagueShape, PlatformConfig, PlatformSelections,
 )
-from backend.platform_integration.helpers import (
-    deduplicate_team_names, normalize_player_name,
-)
+from backend.platform_integration.helpers import PlatformPlayerLookup, deduplicate_team_names
+from backend.player_identity import RP_PLAYER_ID
 
+
+logger = logging.getLogger('fbbo')
 
 _ESPN_FAN_API = 'https://fan.api.espn.com/apis/v2/fans/'
 _LEAGUE_ID_YEAR_SEP = '::'   # league_id is "<fan-api id>::<year>"
-
-
-def resolve_espn_player(player, player_id_lookup: dict[str, int]) -> int:
-    """Resolve an ESPN player object to a canonical player ID with flexible matching:
-    1. Exact match on raw fullName
-    2. Normalized match (accents, punctuation, generational suffixes stripped)
-    3. Numeric ESPN ID match if present
-    4. Token (first & last name) match
-    5. Fallback to RP_PLAYER_ID (-1)
-    """
-    from backend.player_identity import RP_PLAYER_ID
-
-    raw_name = getattr(player, 'name', '') or ''
-    # 1. Exact raw match
-    if raw_name in player_id_lookup:
-        return player_id_lookup[raw_name]
-
-    # 2. Normalized match
-    norm = normalize_player_name(raw_name)
-    if norm in player_id_lookup:
-        return player_id_lookup[norm]
-
-    # 3. ESPN numeric ID match if keyed
-    player_id = getattr(player, 'playerId', None)
-    if player_id is not None:
-        espn_key = f"espn_{player_id}"
-        if espn_key in player_id_lookup:
-            return player_id_lookup[espn_key]
-        if str(player_id) in player_id_lookup:
-            return player_id_lookup[str(player_id)]
-
-    # 5. Token match: first and last name match uniquely
-    parts = norm.split(' ')
-    if len(parts) >= 2:
-        first, last = parts[0], parts[-1]
-        matches = {
-            pid for k, pid in player_id_lookup.items()
-            if isinstance(k, str) and ' ' in k and k.split(' ')[0] == first and k.split(' ')[-1] == last
-        }
-        if len(matches) == 1:
-            return next(iter(matches))
-
-    return RP_PLAYER_ID
 
 
 class ESPNIntegration(PlatformIntegration):
@@ -225,10 +184,10 @@ class ESPNIntegration(PlatformIntegration):
         self
         , config: PlatformConfig
         , mode: str
-        , player_id_lookup: dict[str, int]
+        , player_id_lookup: PlatformPlayerLookup
     ) -> PlatformSelections:
-        """Current rosters per team (ESPN supports only Season Mode)."""
-        from backend.player_identity import RP_PLAYER_ID
+        """Current rosters per team (ESPN supports only Season Mode). ESPN's key is the player's name, so the name
+        fallback (PlatformPlayerLookup) tries the same name against every spelling the session knows."""
 
         league = self._make_league(config.league_id)
         team_by_id = {}
@@ -250,14 +209,17 @@ class ESPNIntegration(PlatformIntegration):
                 or team_by_name.get(team_name)
                 or team_by_name.get(team_name.strip())
             )
-            # Fallback by positional index if ID and name both failed to match
+            # Fallback by positional index if ID and name both failed to match. Whole ESPN teams have been seen to go
+            # unmatched, for a reason not yet understood; the warning names the case so it can be found.
             if team is None and i < len(team_list):
                 team = team_list[i]
+                logger.warning('ESPN: team %r (id %r) matched no team by id or name; using ESPN team %d, %r (id %r), '
+                               'by position', team_name, team_id, i, team.team_name, team.team_id)
 
             roster = []
             if team is not None and getattr(team, 'roster', None):
                 for player in team.roster:
-                    p_id = resolve_espn_player(player, player_id_lookup)
+                    p_id = player_id_lookup.resolve_player_id(player.name, player.name)
                     roster.append(p_id)
                     is_injured = getattr(player, 'injured', False) or (
                         getattr(player, 'lineupSlot', '') in ('IR', 'IL')
@@ -277,7 +239,7 @@ class ESPNIntegration(PlatformIntegration):
         self
         , config: PlatformConfig
         , mode: str
-        , player_id_lookup: dict[str, int]
+        , player_id_lookup: PlatformPlayerLookup
     ) -> Optional[PlatformSelections]:
         # ESPN auctions are not supported.
         return None

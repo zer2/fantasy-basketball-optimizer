@@ -17,6 +17,8 @@ import abc
 from dataclasses import dataclass
 from typing import Optional
 
+from backend.platform_integration.helpers import PlatformPlayerLookup
+
 
 @dataclass
 class LeagueShape:
@@ -114,18 +116,18 @@ class PlatformIntegration(abc.ABC):
         self
         , config: PlatformConfig
         , mode: str
-        , player_id_lookup: dict[str, int]
+        , player_id_lookup: PlatformPlayerLookup
     ) -> PlatformSelections:
-        """Fetch the current draft board / rosters, mapping platform keys to session
-        player ids via player_id_lookup (built once upstream from the session registry;
-        unmatched keys fall back to RP_PLAYER_ID)."""
+        """Fetch the current draft board / rosters, mapping each rostered player to a session
+        player id via player_id_lookup (built once upstream from the session registry): by
+        platform key, then by name where the platform gives one, else RP_PLAYER_ID."""
 
     @abc.abstractmethod
     def get_auction_results(
         self
         , config: PlatformConfig
         , mode: str
-        , player_id_lookup: dict[str, int]
+        , player_id_lookup: PlatformPlayerLookup
     ) -> Optional[PlatformSelections]:
         """Fetch the current auction state (with `costs`), or None when the platform has
         no auction support."""
