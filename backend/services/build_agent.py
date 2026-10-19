@@ -57,7 +57,8 @@ def build_agent(
         remove_injured_players(session)
 
     scoring_system = session.current_settings.get('scoring_system', 'category')
-    if scoring_system == 'points':
+    if scoring_system == 'points' or session.current_settings.get('scoring_format') in ('Points', 'Points League'):
+        session.current_settings['scoring_system'] = 'points'
         _run_points_pipeline(session, from_step)
         return
 
@@ -569,7 +570,11 @@ def derive_effective_objective(session: Session) -> tuple[list[str], str | None]
     pipeline cache keys stay coherent with the request, and a category dropped for one
     data source comes back by itself when a later patch restores its columns.
     """
-    if session.v2 is None or session.current_settings.get('scoring_system') == 'points':
+    if (
+        session.v2 is None
+        or session.current_settings.get('scoring_system') == 'points'
+        or session.current_settings.get('scoring_format') in ('Points', 'Points League')
+    ):
         cats = list(session.current_settings.get('categories', []))
         tb = session.current_settings.get('tiebreaker_category')
         return cats, tb
