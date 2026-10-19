@@ -13,6 +13,13 @@ export const DEFAULT_COMBOS: TradeComboRow[] = [
     { n_traded: 3, n_received: 3 },
 ]
 
+export const POINTS_COMBOS: TradeComboRow[] = [
+    { n_traded: 1, n_received: 1 },
+    { n_traded: 2, n_received: 1 },
+    { n_traded: 1, n_received: 2 },
+    { n_traded: 2, n_received: 2 },
+]
+
 /** One round of the suggestion search: the value window it covers, in percentage points of summed general value (base
  *  H-score) between the two sides. `threshold` is the widest gap searched (null: every gap); gaps within
  *  `searchedThreshold` were searched by the round before (null: none was). */

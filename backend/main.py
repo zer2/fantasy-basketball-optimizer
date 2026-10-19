@@ -57,7 +57,7 @@ urllib3.util.connection.allowed_gai_family = lambda: socket.AF_INET
 
 from backend.infra.auth import session_secret_key, session_https_only
 from backend.infra.rate_limit import configure_rate_limits
-from backend.api.routers import auth, reference, health, data, sessions, ranking, trade, platforms
+from backend.api.routers import auth, reference, health, data, sessions, ranking, trade, platforms, streamer
 
 # Read the per-client request limits here, at startup: signing in is optional, so these are what
 # cap how fast one caller can ask for the expensive work, and malformed configuration should stop
@@ -132,6 +132,7 @@ app.include_router(sessions.router)
 app.include_router(ranking.router)
 app.include_router(trade.router)
 app.include_router(platforms.router)
+app.include_router(streamer.router)
 
 
 # ── Static frontend ────────────────────────────────────────────────────────────

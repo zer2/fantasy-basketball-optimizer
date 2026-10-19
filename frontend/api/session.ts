@@ -3,7 +3,7 @@
 // Indicator state is centralised here so all modes share a single source of truth.
 
 import { SessionRequest } from '../types.js'
-import { setGScores } from '../app_state.js'
+import { setGScores, isPointsMode } from '../app_state.js'
 import { getLeagueSettings, getPlatformConfig } from '../setting_collection/league_settings.js'
 import {
     getScoringFormat, getMostCategoriesWeight, getTiebreakerCategory, getSelectedCategories,
@@ -177,9 +177,10 @@ async function createSessionFromSidebar(signal?: AbortSignal): Promise<void> {
     const most_categories_weight = getMostCategoriesWeight()
     const categories     = getSelectedCategories()
     const { data_source, injured_players } = getPlayerStatsSettings()
+    const scoring_system = isPointsMode() ? 'points' : 'categories'
     const league: SessionRequest['league'] = {
         sport, n_drafters, n_picks, scoring_format, most_categories_weight,
-        tiebreaker_category: getTiebreakerCategory(), categories,
+        tiebreaker_category: getTiebreakerCategory(), categories, scoring_system,
     }
     if (mode === 'Auction Mode') league.cash_per_team = cash_per_team
     const platformConfig = getPlatformConfig()

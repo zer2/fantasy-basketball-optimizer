@@ -11,17 +11,18 @@ import {
 } from '../../helper_functions.js'
 import { readRosterAssignments, readEmptyRostersMessage } from './season_helpers.js'
 import { getTeamIdentitiesFromSidebar } from '../../setting_collection/league_settings.js'
-import { getGScoreById } from '../../app_state.js'
+import { getGScoreById, isPointsMode } from '../../app_state.js'
 import { getRegistryEntry } from '../../player_registry.js'
 import { buildPlayerOption, buildMinimalPlayerDisplayHtml } from '../../player_display.js'
 import { getSelectedCategories } from '../../setting_collection/format_and_categories.js'
 import { stat_styler_primary, G_SCORE_MULTIPLIER, G_SCORE_AGGREGATE_MULTIPLIER } from '../../styles/styler_functions.js'
 import {
-    DEFAULT_COMBOS, TRADE_SEARCH_ROUNDS, TRADE_THRESHOLD_FLOOR_PERCENT, SUGGESTION_ROWS_PER_PAGE,
+    DEFAULT_COMBOS, POINTS_COMBOS, TRADE_SEARCH_ROUNDS, TRADE_THRESHOLD_FLOOR_PERCENT, SUGGESTION_ROWS_PER_PAGE,
 } from '../../setting_collection/trade_parameters.js'
 import { pref, savePref } from '../../preferences.js'
 import { runTradeAnalyze, runTradeSuggest } from '../../api/season_session.js'
 import type { TradeAnalyzeResponse, TradeSuggestion } from '../../api/client.js'
+import type { LeagueTradeImpact } from '../../types.js'
 
 // ─── Player id <-> multiselect value helpers ─────────────────────────────────
 
@@ -145,6 +146,303 @@ function buildGScoreTable(sent: number[], received: number[]): HTMLElement {
 
     container.append(table)
     return container
+}
+
+// ─── Points mode trade analysis ─────────────────────────────────────────────
+
+/** Builds the Points-mode trade result display with net delta FP and league impact. */
+function buildPointsTradeResult(
+    mainPane: HTMLElement
+    , leaguePane: HTMLElement
+    , assignments: Record<string, number[]>
+    , yourTeam: string
+    , theirTeam: string
+    , sent: number[]
+    , received: number[]
+): void {
+    mainPane.innerHTML = ''
+    leaguePane.innerHTML = ''
+
+    const loading = document.createElement('div')
+    loading.className = 'trade-hscore-stub'
+    loading.textContent = 'Analyzing points trade...'
+    mainPane.append(loading)
+
+    const checkPositionsInput = document.getElementById('ts-check-positions') as HTMLInputElement | null
+    const positionCheck = checkPositionsInput ? checkPositionsInput.checked : true
+    runTradeAnalyze(assignments, yourTeam, theirTeam, sent, received, positionCheck)
+        .then(resp => renderPointsTradeResult(mainPane, leaguePane, resp, yourTeam, theirTeam))
+        .catch(err => {
+            mainPane.innerHTML = ''
+            const msg = document.createElement('div')
+            msg.className = 'trade-hscore-stub'
+            msg.textContent = `Error: ${err.message}`
+            mainPane.append(msg)
+        })
+}
+
+function renderPointsTradeResult(
+    mainPane: HTMLElement
+    , leaguePane: HTMLElement
+    , resp: TradeAnalyzeResponse
+    , yourTeam: string
+    , theirTeam: string
+): void {
+    mainPane.innerHTML = ''
+    leaguePane.innerHTML = ''
+
+    if (resp.error || resp.is_legal === false) {
+        const msg = document.createElement('div')
+        msg.className = 'trade-hscore-stub'
+        msg.style.color = '#e05555'
+        msg.textContent = resp.rejection_reason || resp.error || 'This trade is impermissible.'
+        mainPane.append(msg)
+        return
+    }
+
+    const yourNet = resp.team_a_net_delta_fp ?? resp.your_net_delta_fp ?? 0
+    const theirNet = resp.team_b_net_delta_fp ?? resp.their_net_delta_fp ?? 0
+    const isWinWin = yourNet >= 0 && theirNet >= 0
+
+    // Top status banner
+    const banner = document.createElement('div')
+    banner.style.display = 'flex'
+    banner.style.alignItems = 'center'
+    banner.style.justifyContent = 'space-between'
+    banner.style.padding = '8px 12px'
+    banner.style.marginBottom = '12px'
+    banner.style.borderRadius = '6px'
+    banner.style.backgroundColor = isWinWin ? 'rgba(76, 175, 80, 0.12)' : 'rgba(33, 150, 243, 0.08)'
+    banner.style.border = `1px solid ${isWinWin ? '#4caf50' : '#2196f3'}`
+
+    const bannerTitle = document.createElement('span')
+    bannerTitle.style.fontWeight = '600'
+    bannerTitle.style.fontSize = '0.88rem'
+    bannerTitle.textContent = isWinWin ? '🤝 Win-Win Trade Proposal' : '⚖️ Asymmetric Trade Proposal'
+
+    const bannerSummary = document.createElement('span')
+    bannerSummary.style.fontSize = '0.82rem'
+    bannerSummary.style.color = isWinWin ? '#2e7d32' : 'inherit'
+    bannerSummary.textContent = `Your Net: ${yourNet >= 0 ? '+' : ''}${yourNet.toFixed(1)} FP | Their Net: ${theirNet >= 0 ? '+' : ''}${theirNet.toFixed(1)} FP`
+
+    banner.append(bannerTitle, bannerSummary)
+    mainPane.append(banner)
+
+    // Points comparison table
+    const table = document.createElement('table')
+    table.className = 'trade-result-table'
+
+    const thead = table.createTHead()
+    const hrow = thead.insertRow()
+    const cols = ['Team', 'Pre-Trade FP', 'Player Swap Δ', 'Streamer Spot Boost', 'Post-Trade Net FP', 'Net Delta FP']
+    for (const c of cols) {
+        const th = document.createElement('th')
+        th.textContent = c
+        if (c === 'Team') th.style.textAlign = 'left'
+        hrow.append(th)
+    }
+
+    const tbody = table.createTBody()
+
+    function addTeamRow(
+        teamLabel: string
+        , preFP: number
+        , swapDelta: number
+        , openedSpots: number
+        , streamerBoost: number
+        , postFP: number
+        , netDelta: number
+    ): void {
+        const tr = tbody.insertRow()
+
+        const teamCell = tr.insertCell()
+        teamCell.textContent = teamLabel
+        teamCell.className = 'trade-row-label'
+
+        const preCell = tr.insertCell()
+        preCell.textContent = preFP.toFixed(1)
+        preCell.className = 'celltypeb'
+
+        const swapCell = tr.insertCell()
+        swapCell.textContent = `${swapDelta >= 0 ? '+' : ''}${swapDelta.toFixed(1)} FP`
+        swapCell.className = 'celltypeb'
+
+        const boostCell = tr.insertCell()
+        if (openedSpots > 0 || streamerBoost > 0) {
+            boostCell.textContent = `+${streamerBoost.toFixed(1)} FP (${openedSpots} open spot${openedSpots > 1 ? 's' : ''})`
+            boostCell.style.color = '#2e7d32'
+            boostCell.style.fontWeight = '600'
+        } else {
+            boostCell.textContent = '—'
+            boostCell.className = 'celltypeb'
+        }
+
+        const postCell = tr.insertCell()
+        postCell.textContent = postFP.toFixed(1)
+        postCell.className = 'celltypeb'
+
+        const netCell = tr.insertCell()
+        netCell.textContent = `${netDelta >= 0 ? '+' : ''}${netDelta.toFixed(1)} FP`
+        netCell.style.cssText = stat_styler_primary(netDelta, 60, 0)
+        netCell.style.fontWeight = '700'
+    }
+
+    addTeamRow(
+        `Your Team (${yourTeam})`,
+        resp.team_a_pre_fp ?? 0,
+        resp.team_a_delta_fp ?? 0,
+        resp.team_a_opened_spots ?? 0,
+        resp.team_a_streamer_boost ?? 0,
+        resp.team_a_post_fp ?? 0,
+        yourNet,
+    )
+
+    addTeamRow(
+        `Their Team (${theirTeam})`,
+        resp.team_b_pre_fp ?? 0,
+        resp.team_b_delta_fp ?? 0,
+        resp.team_b_opened_spots ?? 0,
+        resp.team_b_streamer_boost ?? 0,
+        resp.team_b_post_fp ?? 0,
+        theirNet,
+    )
+
+    mainPane.append(table)
+
+    // Populate League Impact pane
+    if (resp.league_impact) {
+        renderLeagueImpact(leaguePane, resp.league_impact, yourTeam, theirTeam)
+    } else {
+        const noLeague = document.createElement('div')
+        noLeague.className = 'trade-hscore-stub'
+        noLeague.textContent = 'To view full league standings impact and competitive balance metrics, populate all league rosters on the Rosters tab.'
+        leaguePane.append(noLeague)
+    }
+}
+
+function renderLeagueImpact(
+    pane: HTMLElement
+    , impact: LeagueTradeImpact
+    , yourTeam: string
+    , theirTeam: string
+): void {
+    pane.innerHTML = ''
+
+    // Parity / Competitive Balance Summary Cards
+    const summaryRow = document.createElement('div')
+    summaryRow.style.display = 'grid'
+    summaryRow.style.gridTemplateColumns = 'repeat(auto-fit, minmax(140px, 1fr))'
+    summaryRow.style.gap = '8px'
+    summaryRow.style.marginBottom = '12px'
+
+    function makeMetricCard(label: string, value: string, subtext?: string): HTMLElement {
+        const card = document.createElement('div')
+        card.style.padding = '8px 10px'
+        card.style.borderRadius = '6px'
+        card.style.border = '1px solid light-dark(#e0e0e0, #333355)'
+        card.style.backgroundColor = 'light-dark(#fafafa, #1e1e2f)'
+
+        const l = document.createElement('div')
+        l.style.fontSize = '0.72rem'
+        l.style.color = 'light-dark(#666, #99a)'
+        l.textContent = label
+
+        const v = document.createElement('div')
+        v.style.fontSize = '0.95rem'
+        v.style.fontWeight = '700'
+        v.style.marginTop = '2px'
+        v.textContent = value
+
+        card.append(l, v)
+        if (subtext) {
+            const s = document.createElement('div')
+            s.style.fontSize = '0.68rem'
+            s.style.color = 'light-dark(#888, #778)'
+            s.textContent = subtext
+            card.append(s)
+        }
+        return card
+    }
+
+    summaryRow.append(
+        makeMetricCard('Pre-Trade Spread', `${impact.pre_trade_spread.toFixed(1)} FP`, '1st vs Last place'),
+        makeMetricCard('Post-Trade Spread', `${impact.post_trade_spread.toFixed(1)} FP`, '1st vs Last place'),
+        makeMetricCard('Competitive Balance Δ', `${impact.competitive_balance_delta >= 0 ? '+' : ''}${impact.competitive_balance_delta.toFixed(2)}`, 'Std dev change'),
+    )
+    pane.append(summaryRow)
+
+    // Standings Impact Table
+    const table = document.createElement('table')
+    table.className = 'trade-result-table'
+
+    const thead = table.createTHead()
+    const hrow = thead.insertRow()
+    const headers = ['Rank', 'Team', 'Pre FP', 'Post FP', 'Net Δ FP', 'Rank Shift']
+    for (const h of headers) {
+        const th = document.createElement('th')
+        th.textContent = h
+        if (h === 'Team') th.style.textAlign = 'left'
+        hrow.append(th)
+    }
+
+    const tbody = table.createTBody()
+
+    // Get all teams and sort by post-trade points descending
+    const teams = Object.keys(impact.post_trade_points).sort((a, b) => {
+        return (impact.post_trade_points[b] ?? 0) - (impact.post_trade_points[a] ?? 0)
+    })
+
+    for (let idx = 0; idx < teams.length; idx++) {
+        const teamName = teams[idx]
+        const tr = tbody.insertRow()
+
+        const isTraded = teamName === yourTeam || teamName === theirTeam
+        if (isTraded) {
+            tr.style.backgroundColor = teamName === yourTeam ? 'rgba(33, 150, 243, 0.08)' : 'rgba(255, 152, 0, 0.08)'
+        }
+
+        const rankCell = tr.insertCell()
+        const postRank = impact.post_trade_ranks[teamName] ?? (idx + 1)
+        rankCell.textContent = `#${postRank}`
+        rankCell.style.fontWeight = '600'
+
+        const nameCell = tr.insertCell()
+        nameCell.className = 'trade-row-label'
+        nameCell.textContent = teamName + (teamName === yourTeam ? ' (You)' : teamName === theirTeam ? ' (Partner)' : '')
+
+        const preFp = impact.pre_trade_points[teamName] ?? 0
+        const postFp = impact.post_trade_points[teamName] ?? 0
+        const delta = postFp - preFp
+        const shift = impact.rank_shifts[teamName] ?? 0
+
+        const preCell = tr.insertCell()
+        preCell.textContent = preFp.toFixed(1)
+        preCell.className = 'celltypeb'
+
+        const postCell = tr.insertCell()
+        postCell.textContent = postFp.toFixed(1)
+        postCell.className = 'celltypeb'
+
+        const deltaCell = tr.insertCell()
+        deltaCell.textContent = `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}`
+        if (Math.abs(delta) > 0.01) {
+            deltaCell.style.cssText = stat_styler_primary(delta, 60, 0)
+            deltaCell.style.fontWeight = '600'
+        } else {
+            deltaCell.className = 'celltypeb'
+        }
+
+        const shiftCell = tr.insertCell()
+        if (shift !== 0) {
+            shiftCell.textContent = `${shift > 0 ? '▲' : '▼'} ${Math.abs(shift)}`
+            shiftCell.style.color = shift > 0 ? '#2e7d32' : '#c62828'
+            shiftCell.style.fontWeight = '600'
+        } else {
+            shiftCell.textContent = '—'
+            shiftCell.className = 'celltypeb'
+        }
+    }
+    pane.append(table)
 }
 
 // ─── H-score trade analysis ─────────────────────────────────────────────────
@@ -287,6 +585,10 @@ function readTradeSizeLabel(suggestion: TradeSuggestion): string {
     return `${suggestion.send.length} for ${suggestion.receive.length}`
 }
 
+function getSuggestionScore(s: TradeSuggestion): number {
+    return s.user_delta_fp ?? s.user_gain ?? s.your_score ?? 0
+}
+
 /**
  * Merges a band's batch of suggestions into the suggestions already found, both sorted by your score, highest first:
  * the merge step of mergesort, so each batch slots in as it arrives without re-sorting what is already shown. On a tie
@@ -300,7 +602,7 @@ function mergeSuggestionsByYourScore(
     let foundIndex = 0
     let batchIndex = 0
     while (foundIndex < found.length && batchIndex < batch.length) {
-        if (batch[batchIndex].suggestion.your_score > found[foundIndex].suggestion.your_score) {
+        if (getSuggestionScore(batch[batchIndex].suggestion) > getSuggestionScore(found[foundIndex].suggestion)) {
             merged.push(batch[batchIndex++])
         } else {
             merged.push(found[foundIndex++])
@@ -328,13 +630,17 @@ function buildSuggestionTable(
     const table = document.createElement('table')
     table.className = 'trade-result-table trade-suggestion-table'
 
+    const points = isPointsMode()
     const thead = table.createTHead()
     const hrow = thead.insertRow()
-    for (const header of ['Team', 'Send', 'Receive', 'Your Score', 'Their Score']) {
+    const headers = points
+        ? ['Team', 'Send', 'Receive', 'Your Delta FP', 'Their Delta FP']
+        : ['Team', 'Send', 'Receive', 'Your Score', 'Their Score']
+    for (const header of headers) {
         const th = document.createElement('th')
         th.textContent = header
         if (header === 'Team') th.className = 'trade-suggestion-team-cell'
-        if (header === 'Your Score' || header === 'Their Score') th.className = 'trade-suggestion-score'
+        if (header.includes('Score') || header.includes('Delta FP')) th.className = 'trade-suggestion-score'
         if (header === 'Team' || header === 'Send' || header === 'Receive') th.style.textAlign = 'left'
         hrow.append(th)
     }
@@ -368,13 +674,26 @@ function buildSuggestionTable(
 
         const yourCell = tr.insertCell()
         yourCell.className = 'trade-suggestion-score'
-        yourCell.textContent = (suggestion.your_score * 100).toFixed(2) + '%'
-        yourCell.style.cssText = stat_styler_primary(suggestion.your_score, SUGGESTION_SCORE_MULTIPLIER, 0)
 
         const theirCell = tr.insertCell()
         theirCell.className = 'trade-suggestion-score'
-        theirCell.textContent = (suggestion.their_score * 100).toFixed(2) + '%'
-        theirCell.style.cssText = stat_styler_primary(suggestion.their_score, SUGGESTION_SCORE_MULTIPLIER, 0)
+
+        if (points) {
+            const yourVal = suggestion.user_delta_fp ?? suggestion.user_gain ?? suggestion.your_score ?? 0
+            const theirVal = suggestion.partner_delta_fp ?? suggestion.partner_gain ?? suggestion.their_score ?? 0
+
+            yourCell.textContent = `${yourVal >= 0 ? '+' : ''}${yourVal.toFixed(1)} FP`
+            yourCell.style.cssText = `color: ${yourVal >= 0 ? '#48bb78' : '#f56565'}; font-weight: 600; text-align: center;`
+
+            theirCell.textContent = `${theirVal >= 0 ? '+' : ''}${theirVal.toFixed(1)} FP`
+            theirCell.style.cssText = `color: ${theirVal >= 0 ? '#48bb78' : '#f56565'}; font-weight: 600; text-align: center;`
+        } else {
+            yourCell.textContent = (suggestion.your_score * 100).toFixed(2) + '%'
+            yourCell.style.cssText = stat_styler_primary(suggestion.your_score, SUGGESTION_SCORE_MULTIPLIER, 0)
+
+            theirCell.textContent = (suggestion.their_score * 100).toFixed(2) + '%'
+            theirCell.style.cssText = stat_styler_primary(suggestion.their_score, SUGGESTION_SCORE_MULTIPLIER, 0)
+        }
 
         tr.addEventListener('click', () => onSuggestionChosen(chosen))
     }
@@ -385,9 +704,9 @@ function buildSuggestionTable(
 /** A threshold input's value as the backend takes it: a percentage, as a fraction. Throws on a value that is not a
  *  number, rather than sending NaN (which matches no trade). */
 function readThreshold(input: HTMLInputElement): number {
-    const percentage = parseFloat(input.value)
-    if (Number.isNaN(percentage)) throw new Error(`Trade threshold ${input.id} is not a number: "${input.value}"`)
-    return percentage / 100
+    const val = parseFloat(input.value)
+    if (Number.isNaN(val)) throw new Error(`Trade threshold ${input.id} is not a number: "${input.value}"`)
+    return isPointsMode() ? val : val / 100
 }
 
 /** The Trade sizes the user chose last time, among those offered; the first size when none of them is remembered. */
@@ -532,7 +851,8 @@ export function renderSeasonTrading(container: HTMLElement): void {
     comboSizeLabel.className = 'trade-threshold-label'
     comboSizeLabel.textContent = 'Trade sizes'
 
-    const comboOptions = DEFAULT_COMBOS.map(cp => `${cp.n_traded} for ${cp.n_received}`)
+    const activeCombos = isPointsMode() ? POINTS_COMBOS : DEFAULT_COMBOS
+    const comboOptions = activeCombos.map(cp => `${cp.n_traded} for ${cp.n_received}`)
     const comboSel = makeMultiSelectWidget('', comboOptions.map(combo => ({ value: combo, label: combo })))
     comboSel.element.classList.add('trade-combo-select')
     comboSel.setSelectedSilently(readRememberedTradeSizes(comboOptions))
@@ -550,7 +870,9 @@ export function renderSeasonTrading(container: HTMLElement): void {
     yourThreshInfo.type = 'button'
     yourThreshInfo.className = 'info-btn'
     yourThreshInfo.textContent = 'ⓘ'
-    yourThreshInfo.dataset.tooltip = 'Minimum H-score improvement required for a trade to be suggested for your team, as a percentage, down to -2. Default: 0.'
+    yourThreshInfo.dataset.tooltip = isPointsMode()
+        ? 'Minimum Net Fantasy Points improvement required for a trade to be suggested for your team, in FP. Default: 0.'
+        : 'Minimum H-score improvement required for a trade to be suggested for your team, as a percentage, down to -2. Default: 0.'
     const yourThreshInput = makeNumberInput('ts-your-threshold', Math.max(pref('ts-your-threshold', 0), TRADE_THRESHOLD_FLOOR_PERCENT),
         TRADE_THRESHOLD_FLOOR_PERCENT)
     yourThreshInput.className = ''
@@ -571,7 +893,9 @@ export function renderSeasonTrading(container: HTMLElement): void {
     theirThreshInfo.type = 'button'
     theirThreshInfo.className = 'info-btn'
     theirThreshInfo.textContent = 'ⓘ'
-    theirThreshInfo.dataset.tooltip = 'Minimum H-score improvement for the counterparty team, as a percentage. Negative values allow trades that hurt them slightly, down to -2. Default: 0.'
+    theirThreshInfo.dataset.tooltip = isPointsMode()
+        ? 'Minimum Net Fantasy Points improvement for the counterparty team, in FP. Negative values allow trades that hurt them slightly. Default: 0.'
+        : 'Minimum H-score improvement for the counterparty team, as a percentage. Negative values allow trades that hurt them slightly, down to -2. Default: 0.'
     const theirThreshInput = makeNumberInput('ts-their-threshold', Math.max(pref('ts-their-threshold', 0), TRADE_THRESHOLD_FLOOR_PERCENT),
         TRADE_THRESHOLD_FLOOR_PERCENT)
     theirThreshInput.className = ''
@@ -781,11 +1105,11 @@ export function renderSeasonTrading(container: HTMLElement): void {
         const hBtn = document.createElement('button')
         hBtn.type = 'button'
         hBtn.className = 'trade-tab-btn active'
-        hBtn.textContent = 'H-score'
+        hBtn.textContent = isPointsMode() ? 'Points Analysis' : 'H-score'
         const gBtn = document.createElement('button')
         gBtn.type = 'button'
         gBtn.className = 'trade-tab-btn'
-        gBtn.textContent = 'G-score'
+        gBtn.textContent = isPointsMode() ? 'League Impact' : 'G-score'
         tabNav.append(hBtn, gBtn)
         rightCol.append(tabNav)
 
@@ -824,7 +1148,7 @@ export function renderSeasonTrading(container: HTMLElement): void {
                 return
             }
 
-            if (sent.length !== received.length) {
+            if (!isPointsMode() && sent.length !== received.length) {
                 const msg = document.createElement('p')
                 msg.className = 'coming-soon'
                 msg.textContent = 'Trades must include an equal number of players from both teams.'
@@ -833,8 +1157,12 @@ export function renderSeasonTrading(container: HTMLElement): void {
                 return
             }
 
-            buildHScoreResult(hPane, assignments, yourTeam, theirTeam, sent, received)
-            gPane.append(buildGScoreTable(sent, received))
+            if (isPointsMode()) {
+                buildPointsTradeResult(hPane, gPane, assignments, yourTeam, theirTeam, sent, received)
+            } else {
+                buildHScoreResult(hPane, assignments, yourTeam, theirTeam, sent, received)
+                gPane.append(buildGScoreTable(sent, received))
+            }
         }
 
         currentUpdateResults = updateResults

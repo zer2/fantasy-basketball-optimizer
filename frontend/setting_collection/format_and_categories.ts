@@ -6,7 +6,7 @@
 
 import { makeCustomSelect } from '../custom_select.js'
 import { makeLabel, makeWeightSlider, renderMultiselect } from '../helper_functions.js'
-import { getSportConfig } from '../app_state.js'
+import { getSportConfig, setScoringSystem } from '../app_state.js'
 import { pref, savePref } from '../preferences.js'
 
 // Live reference to the multiselect's selected-items array.
@@ -20,6 +20,7 @@ let _selectedCategories: string[]
 // from before the change maps onto the new pair exactly.
 const HEAD_TO_HEAD = 'Head to Head'
 const ROTISSERIE   = 'Rotisserie'
+export const POINTS_LEAGUE = 'Points League'
 
 const LEGACY_FORMAT_ENDPOINTS: Record<string, { format: string; weight: number }> = {
     'Head to Head: Each Category':   { format: HEAD_TO_HEAD, weight: 0 },
@@ -81,7 +82,7 @@ export function renderFormatAndCategories(container: HTMLElement): void {
 
     const fmtSelect = makeCustomSelect(
         'fc-scoring-format',
-        [HEAD_TO_HEAD, ROTISSERIE].map(format => ({ value: format, label: format })),
+        [HEAD_TO_HEAD, ROTISSERIE, POINTS_LEAGUE].map(format => ({ value: format, label: format })),
         storedFormat.format,
     )
     container.append(fmtSelect.element)
@@ -90,7 +91,13 @@ export function renderFormatAndCategories(container: HTMLElement): void {
     container.append(weightRow)
 
     const showWeightForFormat = (): void => {
-        weightRow.style.display = fmtSelect.getValue() === ROTISSERIE ? 'none' : ''
+        const val = fmtSelect.getValue()
+        weightRow.style.display = (val === ROTISSERIE || val === POINTS_LEAGUE) ? 'none' : ''
+        if (val === POINTS_LEAGUE) {
+            setScoringSystem('points')
+        } else {
+            setScoringSystem('categories')
+        }
     }
     showWeightForFormat()
     fmtSelect.element.addEventListener('change', () => {
@@ -296,8 +303,10 @@ export function getScoringFormat(): string {
  *  Rotisserie, which scores neither way — the backend rejects a number there rather than
  *  ignoring it. */
 export function getMostCategoriesWeight(): number | null {
-    if (getScoringFormat() === ROTISSERIE) return null
-    return parseFloat((document.getElementById('fc-most-categories-weight') as HTMLInputElement).value)
+    if (getScoringFormat() === ROTISSERIE || getScoringFormat() === POINTS_LEAGUE) return null
+    const elem = document.getElementById('fc-most-categories-weight') as HTMLInputElement | null
+    if (!elem) return null
+    return parseFloat(elem.value)
 }
 
 /** Returns a snapshot of the currently selected stat categories, ordered canonically — the order
@@ -316,5 +325,6 @@ export function getSelectedCategories(): string[] {
  *  backend, mirroring isSlotCountsValid — the inline message under the multiselect explains
  *  the block to the user. */
 export function isCategorySelectionValid(): boolean {
+    if (getScoringFormat() === POINTS_LEAGUE) return true
     return _selectedCategories.length > 0
 }

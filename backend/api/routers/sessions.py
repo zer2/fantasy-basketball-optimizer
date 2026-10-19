@@ -73,12 +73,17 @@ def create_session_route(req: SessionRequest, user_key: Optional[str] = Depends(
     except Exception:
         raise fail(500, 'Failed to build projections for this session.')
 
+    is_points = session.current_settings.get('scoring_system') == 'points'
+    g_scores = [] if is_points else _serialize_g_scores(session)
+    categories = [] if is_points else derive_effective_objective(session)[0]
+
     return SessionResponse(
         session_id=session.id,
         n_players_loaded=len(session.v0_clean),
-        categories=derive_effective_objective(session)[0],
+        scoring_system=session.current_settings.get('scoring_system', 'categories'),
+        categories=categories,
         players=_serialize_player_registry(session),
-        g_scores=_serialize_g_scores(session),
+        g_scores=g_scores,
         expires_at=(datetime.now(timezone.utc) + timedelta(seconds=4 * 3600)).strftime('%Y-%m-%dT%H:%M:%SZ'),
     )
 
@@ -169,6 +174,8 @@ def _build_current_settings(req: SessionRequest) -> dict:
         'n_drafters':       n,
         'n_picks':          req.league.n_picks,
         'scoring_format':   req.league.scoring_format,
+        'scoring_system':   req.league.scoring_system,
+        'points_config':    req.league.points_config.model_dump() if req.league.points_config else None,
         'most_categories_weight': req.league.most_categories_weight,
         'tiebreaker_category':    req.league.tiebreaker_category,
         'categories':       categories,

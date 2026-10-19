@@ -192,15 +192,26 @@ def normalize_objective_settings(current_settings: dict) -> None:
     and experiments (HAgent.__init__, plus narrower checks in process_player_data and
     algorithm_helpers). Removing any one layer loses a distinct guarantee.
     """
-    if not current_settings['categories']:
+    if (
+        current_settings.get('scoring_system') == 'points'
+        or current_settings.get('scoring_format') in ('Points', 'Points League')
+    ):
+        current_settings['scoring_system'] = 'points'
+        current_settings['most_categories_weight'] = None
+        current_settings['tiebreaker_category']    = None
+        if not current_settings.get('categories'):
+            current_settings['categories'] = ['Points']
+        return
+
+    if not current_settings.get('categories'):
         raise ValueError('categories must be a non-empty list — a session cannot score nothing.')
 
-    if current_settings['scoring_format'] == 'Rotisserie':
+    if current_settings.get('scoring_format') == 'Rotisserie':
         current_settings['most_categories_weight'] = None
         current_settings['tiebreaker_category']    = None
         return
 
-    weight = current_settings['most_categories_weight']
+    weight = current_settings.get('most_categories_weight')
     if weight is None or not 0.0 <= weight <= 1.0:
         raise ValueError('most_categories_weight must be between 0 and 1 for Head to Head '
                          f'(0 = Each Category, 1 = Most Categories). Got {weight!r}.')
