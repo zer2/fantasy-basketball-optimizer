@@ -3,24 +3,37 @@
 // "A". Clicking toggles the drafter between manual entry and being an H-scoring autodrafter; the
 // highlighted (active) state means autodrafting is on.
 
-import { getDrafterMethod, setDrafterMethod } from './drafter_methods.js'
+import {
+    getDrafterMethod,
+    setDrafterMethod,
+    getAuctionDrafterMethod,
+    setAuctionDrafterMethod,
+} from './drafter_methods.js'
 
 /** Builds the compact autodraft toggle for a drafter. `onChange` runs after each toggle. */
 export function makeAutodraftToggle(
     drafterIndex: number
   , onChange: () => void
   , signal?: AbortSignal
+  , isAuction: boolean = false
 ): HTMLElement {
     const wrap = document.createElement('div')
     wrap.className = 'method-dd'
+
+    const getMethod = isAuction ? getAuctionDrafterMethod : getDrafterMethod
+    const setMethod = isAuction ? setAuctionDrafterMethod : setDrafterMethod
 
     const button = document.createElement('button')
     button.type        = 'button'
     button.className   = 'method-dd-trigger'
     button.textContent = 'A'
 
+    function checkIsAuto(): boolean {
+        return getMethod(drafterIndex) !== 'Manual input'
+    }
+
     function refresh(): void {
-        const autodrafting = getDrafterMethod(drafterIndex) !== 'Manual input'
+        const autodrafting = checkIsAuto()
         button.classList.toggle('is-autodrafting', autodrafting)
         button.title = autodrafting
             ? 'H-scoring autodrafter (click to turn off)'
@@ -30,8 +43,8 @@ export function makeAutodraftToggle(
 
     button.addEventListener('click', (event) => {
         event.stopPropagation()
-        const autodrafting = getDrafterMethod(drafterIndex) !== 'Manual input'
-        setDrafterMethod(drafterIndex, autodrafting ? 'Manual input' : 'H-scoring')
+        const autodrafting = checkIsAuto()
+        setMethod(drafterIndex, autodrafting ? 'Manual input' : 'H-scoring')
         refresh()
         onChange()
     }, { signal })

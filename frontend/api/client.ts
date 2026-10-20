@@ -328,6 +328,58 @@ export async function fetchHypotheticalTeam(
     return { roster: convertRoster(response.roster), hypothetical_picks: response.hypothetical_picks }
 }
 
+// ── POST /sessions/{id}/auction-autodraft/* ───────────────────────────────────
+
+export interface AuctionBoardRequest {
+    player_assignments: Record<string, number[]>
+    remaining_cash:     Record<string, number>
+}
+
+export interface AuctionNominationResult {
+    nominated_player_id:   number
+    nominated_player_name: string
+    opening_bid:           number
+    valuations:            Record<string, number>   // team -> dollar valuation, for the requested autodrafters
+    max_allowed_bids:      Record<string, number>   // team -> most it may bid, keeping $1 per other empty slot
+}
+
+/** Opens bidding on a player. An autodrafter nominator sends nominated_player_id and opening_bid as null and
+ *  the backend picks its player, opening at $1; a manual nominator sends both. The browser runs the bidding. */
+export async function nominateAuctionPlayer(
+    sessionId: string
+    , request: AuctionBoardRequest & {
+        nominator_id:        string
+        nominated_player_id: number | null
+        opening_bid:         number | null
+        valuation_team_ids:  string[]
+    }
+    , signal?: AbortSignal
+): Promise<AuctionNominationResult> {
+    return jsonRequest(`${BASE_URL}/sessions/${sessionId}/auction-autodraft/nominate`, 'Auction nomination', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(request),
+        signal,
+    })
+}
+
+/** Valuations of a player already up for bid, for teams switched to autodraft mid-nomination. */
+export async function valueAuctionPlayer(
+    sessionId: string
+    , request: AuctionBoardRequest & {
+        player_id:          number
+        valuation_team_ids: string[]
+    }
+): Promise<Record<string, number>> {
+    const result = await jsonRequest<{ valuations: Record<string, number> }>(
+        `${BASE_URL}/sessions/${sessionId}/auction-autodraft/valuations`, 'Auction valuation', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify(request),
+        })
+    return result.valuations
+}
+
 // ── POST /sessions/{id}/trade/analyze ────────────────────────────────────────
 
 export interface TeamHScore {

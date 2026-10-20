@@ -12,8 +12,12 @@ from backend.infra.rate_limit import enforce_rate_limit, COMPUTE_POLICY
 from backend.math.algorithm_agents import ForcedWeightsInfeasibleError
 from backend.services.ranking import rank_candidates, UnknownRosterPlayersError, UnknownTeamError
 from backend.services.hypothetical_team import build_hypothetical_team, StaleBoardError
+from backend.services.auction_autodraft import nominate_auction_player, value_auction_player
 from backend.infra.server_timing import begin_timing, server_timing_header
-from backend.api.schemas import EvaluateRequest, HypotheticalTeamRequest
+from backend.api.schemas import (
+    EvaluateRequest, HypotheticalTeamRequest, AuctionNominationRequest, AuctionNominationResponse,
+    AuctionValuationRequest, AuctionValuationResponse,
+)
 from backend.models import EvaluateResponse, HypotheticalTeamResponse
 
 router = APIRouter()
@@ -98,3 +102,70 @@ def build_hypothetical_team_route(req: HypotheticalTeamRequest, session: Session
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception:
         raise fail(500, 'Finding a hypothetical team failed.')
+
+
+@router.post('/sessions/{session_id}/auction-autodraft/nominate', response_model=AuctionNominationResponse,
+             dependencies=[Depends(enforce_rate_limit(COMPUTE_POLICY))])
+def nominate_auction_player_route(req: AuctionNominationRequest, response: Response,
+                                  session: Session = Depends(require_session)):
+    begin_timing()
+    logging.getLogger('fbbo').info('auction nomination request: %s', req.model_dump_json())
+    require_auction_league(session)
+    try:
+        with session.lock:
+            nomination = nominate_auction_player(
+                session             = session,
+                player_assignments  = req.player_assignments,
+                remaining_cash      = req.remaining_cash,
+                nominator_id        = req.nominator_id,
+                nominated_player_id = req.nominated_player_id,
+                opening_bid         = req.opening_bid,
+                valuation_team_ids  = req.valuation_team_ids,
+            )
+    except (UnknownRosterPlayersError, UnknownTeamError, ForcedWeightsInfeasibleError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        logging.getLogger('fbbo').error('Auction nomination failed: %s', exc, exc_info=True)
+        raise fail(500, f'Auction nomination failed: {exc}')
+
+    response.headers['Server-Timing'] = server_timing_header()
+    return AuctionNominationResponse(
+        nominated_player_id   = nomination.nominated_player_id,
+        nominated_player_name = nomination.nominated_player_name,
+        opening_bid           = nomination.opening_bid,
+        valuations            = nomination.valuations,
+        max_allowed_bids      = nomination.max_allowed_bids,
+    )
+
+
+@router.post('/sessions/{session_id}/auction-autodraft/valuations', response_model=AuctionValuationResponse,
+             dependencies=[Depends(enforce_rate_limit(COMPUTE_POLICY))])
+def value_auction_player_route(req: AuctionValuationRequest, response: Response,
+                               session: Session = Depends(require_session)):
+    begin_timing()
+    logging.getLogger('fbbo').info('auction valuation request: %s', req.model_dump_json())
+    require_auction_league(session)
+    try:
+        with session.lock:
+            valuations = value_auction_player(
+                session            = session,
+                player_assignments = req.player_assignments,
+                remaining_cash     = req.remaining_cash,
+                player_id          = req.player_id,
+                valuation_team_ids = req.valuation_team_ids,
+            )
+    except (UnknownRosterPlayersError, UnknownTeamError, ForcedWeightsInfeasibleError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        logging.getLogger('fbbo').error('Auction valuation failed: %s', exc, exc_info=True)
+        raise fail(500, f'Auction valuation failed: {exc}')
+
+    response.headers['Server-Timing'] = server_timing_header()
+    return AuctionValuationResponse(valuations=valuations)
+
+
+def require_auction_league(session: Session) -> None:
+    if not session.current_settings.get('is_auction'):
+        raise HTTPException(status_code=400, detail='Auction autodraft is only available for auction leagues.')
+    if session.current_settings.get('cash_per_team') is None:
+        raise HTTPException(status_code=400, detail='cash_per_team must be set on the session for auction leagues.')

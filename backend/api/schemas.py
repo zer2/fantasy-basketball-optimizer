@@ -228,6 +228,38 @@ class HypotheticalTeamRequest(BaseModel):
     candidate_player_id: int
 
 
+# ── /sessions/{id}/auction-autodraft ──────────────────────────────────────────
+
+class AuctionNominationRequest(BaseModel):
+    player_assignments: dict[str, list[int]]
+    remaining_cash: dict[str, float]
+    nominator_id: str
+    # Both None: the nominator is an autodrafter and picks its own player, opening at $1.
+    # Both set: a manual nomination.
+    nominated_player_id: Optional[int]
+    opening_bid: Optional[int]
+    valuation_team_ids: list[str]
+
+
+class AuctionNominationResponse(BaseModel):
+    nominated_player_id: int
+    nominated_player_name: str
+    opening_bid: int
+    valuations: dict[str, float]
+    max_allowed_bids: dict[str, int]
+
+
+class AuctionValuationRequest(BaseModel):
+    player_assignments: dict[str, list[int]]
+    remaining_cash: dict[str, float]
+    player_id: int
+    valuation_team_ids: list[str]
+
+
+class AuctionValuationResponse(BaseModel):
+    valuations: dict[str, float]
+
+
 # ── /sessions/{id}/trade/analyze ─────────────────────────────────────────────
 
 class TradeAnalyzeRequest(BaseModel):

@@ -19,3 +19,19 @@ export function getDrafterMethod(index: number): DrafterMethod {
 export function setDrafterMethod(index: number, method: DrafterMethod): void {
     savePref(`drafter_mode_${index}`, method)
 }
+
+// Stored under a key of its own, not the first build's `auction_drafter_mode_N`: that build defaulted every seat
+// but the user's to autodraft, so choices saved under it would switch random seats back on.
+const AUCTION_DRAFTER_METHOD_KEY = 'auction_drafter_method_'
+
+/** The auction method for a drafter index; defaults to 'Manual input', as in draft mode, so the board stays a
+ *  plain record of an auction until the user turns autodrafters on. */
+export function getAuctionDrafterMethod(index: number): DrafterMethod {
+    return pref(`${AUCTION_DRAFTER_METHOD_KEY}${index}`, 'Manual input') === 'Manual input' ? 'Manual input' : 'H-scoring'
+}
+
+/** Persists an auction drafter's method. */
+export function setAuctionDrafterMethod(index: number, method: DrafterMethod): void {
+    savePref(`${AUCTION_DRAFTER_METHOD_KEY}${index}`, method)
+}
+

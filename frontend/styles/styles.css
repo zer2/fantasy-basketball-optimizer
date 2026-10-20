@@ -2017,6 +2017,29 @@ tr {
     margin-left: auto;
 }
 
+.auction-pick-control .pick-control-label {
+    white-space: normal;
+    margin-bottom: 4px;
+}
+
+.pick-btn-nominate {
+    font-weight: 600;
+}
+
+/* Auction autodraft stopped, or failed: the reason and a Continue button, above the pick control. */
+.auction-autodraft-halt {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+    font-size: 0.85rem;
+    color: light-dark(#555555, #aaaaaa);
+}
+
+.auction-autodraft-halt.is-error {
+    color: #e06c6c;
+}
+
 /* Mobile pick-control-row layout. Mode-specific grid templates are defined
    below via :has() — auction uses a 3-column grid with a fixed 5rem Cost
    track, draft uses a single-column grid. Lives AFTER the base
@@ -2848,3 +2871,126 @@ tr {
     -webkit-appearance: none;
     margin: 0;
 }
+
+/* ─── Auction team bid status header badges ───────────────────────────────────── */
+
+.auction-team-header-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    width: 100%;
+}
+
+.auction-team-bid-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1.1;
+    padding: 3px 4px;
+    border-radius: 4px;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-height: 20px;
+    box-sizing: border-box;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+/* Idle / no active nomination */
+.auction-team-bid-status.status-idle {
+    background: transparent;
+    color: light-dark(#999999, #777788);
+    border: 1px dashed light-dark(#e0e0e0, #3a3a4c);
+}
+
+.auction-team-bid-status.status-next-nominator {
+    background: light-dark(#f0f4ff, #20263c);
+    color: light-dark(#3366cc, #88aaff);
+    border: 1px solid light-dark(#c2d4ff, #384870);
+}
+
+/* Haven't bid yet on active nomination */
+.auction-team-bid-status.status-not-bid {
+    background: light-dark(#f4f4f6, #23232f);
+    color: light-dark(#777777, #9999aa);
+    border: 1px solid light-dark(#e2e2e6, #363648);
+}
+
+/* High / Winning Bidder */
+.auction-team-bid-status.status-high-bid {
+    background: light-dark(#e8f8ec, #193822);
+    color: light-dark(#1f7a37, #5ddb82);
+    border: 1px solid light-dark(#a3e5b3, #2a5f3a);
+    font-weight: 700;
+}
+
+/* Outbid (placed bid earlier, but not currently the highest) */
+.auction-team-bid-status.status-outbid {
+    background: light-dark(#fff8eb, #332717);
+    color: light-dark(#b36b00, #e6a83d);
+    border: 1px solid light-dark(#ffe0a3, #544023);
+}
+
+/* Passed */
+.auction-team-bid-status.status-passed {
+    background: light-dark(#fbebeb, #331d20);
+    color: light-dark(#c0392b, #e57373);
+    border: 1px solid light-dark(#f5c2c7, #592e35);
+    opacity: 0.85;
+}
+
+/* Active turn indicator: border highlight when waiting for this drafter to bid or pass */
+.auction-team-bid-status.is-turn {
+    box-shadow: 0 0 0 2px light-dark(#3388ff, #4488ff);
+    animation: turn-pulse 1.2s infinite ease-in-out;
+}
+
+@keyframes turn-pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 1.5px light-dark(#3388ff, #4488ff);
+    }
+    50% {
+        box-shadow: 0 0 0 3px light-dark(#66aaff, #77aaff);
+    }
+}
+
+/* Active nomination manual bidding row */
+.auction-bidding-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    min-height: 32px;
+}
+
+.auction-turn-indicator {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: light-dark(#1f2d5a, #d4e0ff);
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    background: light-dark(#eef4ff, #1d253d);
+    border: 1px solid light-dark(#c2d4f8, #36446e);
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+.auction-bid-input {
+    width: 6.5rem;
+    min-height: 28px;
+    box-sizing: border-box;
+    padding: 4px 6px;
+    font-size: 0.8rem;
+    font-family: inherit;
+    background: light-dark(white, #1e1e28);
+    border: 1px solid light-dark(#cccccc, #444455);
+    border-radius: 4px;
+    color: light-dark(black, white);
+    flex-shrink: 0;
+}
+
