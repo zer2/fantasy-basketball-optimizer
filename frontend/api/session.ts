@@ -9,7 +9,7 @@ import {
     getScoringFormat, getMostCategoriesWeight, getTiebreakerCategory, getSelectedCategories,
     syncCategoriesFromBackend,
 } from '../setting_collection/format_and_categories.js'
-import { getPlayerStatsSettings, markUploadedSourcesExpired } from '../setting_collection/player_stats.js'
+import { getPlayerStatsSettings, markUploadedSourcesExpired, waitForSeasons } from '../setting_collection/player_stats.js'
 import { getModelSettings } from '../setting_collection/model_parameters.js'
 import { getSlotCounts } from '../setting_collection/slot_counts.js'
 import { createSession, HTTPError } from './client.js'
@@ -172,6 +172,10 @@ export async function waitForSessionCreationInFlight(): Promise<void> {
 }
 
 async function createSessionFromSidebar(signal?: AbortSignal): Promise<void> {
+    // A Historical source reads its season from a dropdown that loads asynchronously. With a live platform it can be
+    // the source a connection builds the session from (Historical was own-data only until 2026-10-21), and a
+    // reconnect after a reload ran before the seasons arrived.
+    await waitForSeasons()
     const { sport, platform, mode, n_drafters, n_picks, cash_per_team } = getLeagueSettings()
     const scoring_format = getScoringFormat()
     const most_categories_weight = getMostCategoriesWeight()

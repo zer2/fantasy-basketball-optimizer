@@ -84,6 +84,8 @@ def resolve_platform_config(
             platform_config_request.league_id,
             platform_config_request.division_id,
         )
+    except (PermissionError, LookupError) as error:
+        raise fail(403 if isinstance(error, PermissionError) else 404, str(error))
     except Exception:
         raise fail(502, 'Could not reach the fantasy platform for this league.')
     return PlatformConfig(
@@ -104,8 +106,10 @@ def build_credentials_for(platform: str, client_id: Optional[str]) -> Optional[d
             raise HTTPException(status_code=401, detail='Not authenticated with Yahoo; complete the auth flow first.')
         return {'auth_dir': yahoo_auth_dir(client_id)}
     if platform == 'Retrieve from ESPN' and client_id:
+        # Without saved cookies the integration reaches public leagues only; a private league fails at ESPN
+        # with its own message (ESPNIntegration._make_league).
         if not has_espn_credentials(client_id):
-            raise HTTPException(status_code=401, detail='Not authenticated with ESPN; save your s2/SWID cookies first.')
+            return None
         return get_espn_credentials(client_id)   # {'s2': ..., 'swid': ...} -> spread into ESPNIntegration
     return None
 

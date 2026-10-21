@@ -311,9 +311,16 @@ class ConnectResponse(BaseModel):
     slot_counts: Optional[dict[str, int]] = None
 
 
+class EspnLeagueSeasonsResponse(BaseModel):
+    seasons: list[int]               # ESPN's season numbers (2027 is 2026-27), newest first
+
+
 class DraftStateResponse(BaseModel):
     player_assignments: dict[str, list[int]]
     injured_players: list[int]
+    # team -> {position in that team's player_assignments: the platform's name}, for the players the session could not
+    # match (carried there as the replacement player, -1). See PlatformSelections.
+    unmatched_player_names: dict[str, dict[int, str]]
     status: str
     remaining_cash: Optional[dict[str, float]] = None   # Auction Mode only
 

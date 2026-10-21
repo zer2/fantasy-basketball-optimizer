@@ -6,7 +6,7 @@
 
 import { makeCustomSelect } from '../../custom_select.js'
 import { readRequiredIntInput } from '../../helper_functions.js'
-import { readRosterAssignments, readEmptyRostersMessage } from './season_helpers.js'
+import { readRosterAssignments, readEmptyRostersMessage, listMovablePlayers } from './season_helpers.js'
 import { getTeamIdentitiesFromSidebar } from '../../setting_collection/league_settings.js'
 import { getPlayerResultsById } from '../../app_state.js'
 import { buildPlayerOption } from '../../player_display.js'
@@ -108,9 +108,9 @@ export function renderWaiverControls(container: HTMLElement): void {
     dropWrap.append(dropLabel)
 
     // teams in fullTeams are guaranteed to have entries in assignments
-    const buildDropOptions = (team: string) => assignments[team].map(buildPlayerOption)
+    const buildDropOptions = (team: string) => listMovablePlayers(assignments[team]).map(buildPlayerOption)
 
-    const initialRoster  = assignments[initialTeam]
+    const initialRoster  = listMovablePlayers(assignments[initialTeam])
     // lowestGRankPlayer returns null if roster ids aren't in backend data yet
     const initialDefault = lowestGRankPlayer(initialRoster) ?? initialRoster[0]
 
@@ -144,7 +144,7 @@ export function renderWaiverControls(container: HTMLElement): void {
     teamSel.element.addEventListener('change', () => {
         const team        = teamSel.getValue()
         savePref('season-your-team', team)
-        const roster      = assignments[team]
+        const roster      = listMovablePlayers(assignments[team])
         const defaultDrop = lowestGRankPlayer(roster) ?? roster[0]
         dropSel.setOptions(buildDropOptions(team), String(defaultDrop))
         runWaiver().catch(err => console.error('Waiver evaluate failed:', err))

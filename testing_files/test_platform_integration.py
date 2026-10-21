@@ -483,7 +483,9 @@ def test_yahoo_list_leagues_still_raises_on_other_failures(monkeypatch):
 # ── ESPN (composite league id + roster mapping, no espn_api network) ───────────
 
 class _FakeEspnPlayer:
-    def __init__(self, name): self.name = name
+    def __init__(self, name):
+        self.name = name
+        self.lineupSlot = 'BE'
 
 
 class _FakeEspnTeam:
@@ -511,6 +513,7 @@ def test_yahoo_season_rosters_fall_back_to_the_players_name(monkeypatch):
     lookup = PlatformPlayerLookup({100: _JOKIC_ID}, {'Player 777': _HARDEN_ID}, {})
     state = integration.get_draft_results(_two_team_config(), 'Season Mode', lookup)
     assert state.player_assignments['Team One'] == [_JOKIC_ID, _HARDEN_ID, RP_PLAYER_ID]
+    assert state.unmatched_player_names == {'Team One': {2: 'Player 999'}}, 'the unmatched player is named in place'
 
 
 def test_espn_get_draft_results_maps_rosters(monkeypatch):
