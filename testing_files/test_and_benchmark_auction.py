@@ -10,7 +10,7 @@ import os
 from benchmark_helpers import (
     client
     , _SCORE_TOL
-    , _build_session_request
+    , build_golden_session_request
     , resolve_player_ids
     , name_candidates
 )
@@ -20,7 +20,7 @@ from backend.services.ranking import rank_candidates
 
 def test_evaluate_auction():
     """EC auction, 12 drafters, Drafter 1 has Giannis ($50), Drafter 2 has Jokic ($50)."""
-    session_request = _build_session_request(
+    session_request = build_golden_session_request(
         objective = 'Each Category'
         , cash_per_team = 200
     )

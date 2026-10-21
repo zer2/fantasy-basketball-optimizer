@@ -432,7 +432,7 @@ Ideally, the algorithm would model a probability distribution of how circumstanc
 
 In general, the flexibility of a strategy is highly related to the degree of punting it involves. A drafter who is only softly planning on punting blocks is likely able to take advantage of a surprising shot-blocker more easily than a drafter planning on hard-punting the category. This motivates a regime of rewarding balance for early picks. The algorithm does this with a technique called regularization, which adds a small penalty for moving category weights away from neutral G-score weights. The algorithm can still plan on a punt, but regularization incentivizes it to punt less harshly, and to choose players who rely less on punting specific categories for their value. This allows the algorithm to more easily pivot if the draft proceeds in a surprising way. 
 
-The strength of that pull is the $λ_c$ (lambda) parameter in the sidebar, which defaults to 0.05. Raising it makes early picks hedge harder: weights stay nearer balanced, and the algorithm prefers players whose value does not depend on any one punt landing. Lowering it lets the algorithm commit sooner, which pays off when the punt it picks is the right one and costs flexibility when it is not. Setting it to zero removes the pull entirely, leaving the algorithm free to commit from the first pick. There is also a corresponding $λ_p$ for flex position shares, which defaults to 0.8. 
+The strength of that pull is the $λ_c$ (lambda) parameter in the sidebar, which defaults to 0.05. Raising it makes early picks hedge harder: weights stay nearer balanced, and the algorithm prefers players whose value does not depend on any one punt landing. Lowering it lets the algorithm commit sooner, which pays off when the punt it picks is the right one and costs flexibility when it is not. Setting it to zero removes the pull entirely, leaving the algorithm free to commit from the first pick. There is also a corresponding $λ_p$ for flex position shares, which defaults to 3. 
 
 Both λs are scaled by a diminishing factor as the draft goes on. This ensures that regularization applies most for early picks; once the algorithm settles on a strategy, it stops applying as much. 
 
@@ -472,7 +472,7 @@ For Each Category and Most Categories, the website mitigates this flaw by choosi
       <source src="../videos/seed-menu.mp4" type="video/mp4">
 </video>
 /// caption
-An example of the multi-starting process
+An example of the multi-starting process.
 ///
 
 Punting is less common in Rotisserie, so gradient descent does not start at a punt. Instead it starts at a neutral position, slightly tilted towards categories that are robust like Points and Assists. That's where the Rotisserie algorithm generally wants to go, since it thinks it can rely more on luck for the unstable categories like Steals and Turnovers. 
@@ -480,7 +480,7 @@ Punting is less common in Rotisserie, so gradient descent does not start at a pu
 ??? note "How do we know that this process finds global optimums?"
     There is no theoretical guarantee that this multi-seeding approach finds global optima. However, it is possible to optimize a slightly modified Each Category objective with precise error bounds, and those results can be checked against the gradient descent results. 
 
-    The exact algorithm uses sigmoid programming, which applies a branch-and-bound technique to recursively eliminate portions of the decision space. The process produces upper bounds on regions, which can be compared to the best solutions found so far. After enough iterations, the best solution can be brought arbitrarily close to the upper bound. This can take a long time- 10+ minutes for a single candidate in some cases- so it is not practical for actual use, but provides a verifiable optimum to compare against. 
+    The exact algorithm uses [sigmoidal programming](https://web.stanford.edu/~udell/doc/max_sum_sigmoids.pdf), which applies a branch-and-bound technique to recursively eliminate portions of the decision space. The process produces upper bounds on regions, which can be compared to the best solutions found so far. After enough iterations, the best solution can be brought arbitrarily close to the upper bound. This can take a long time- 10+ minutes for a single candidate in some cases- so it is not practical for actual use, but provides a verifiable optimum to compare against. 
 
     In practice, the gradient ascent approach with multi-seeding almost always finds the global optimum point, in a fraction of the time that sigmoid programming takes. I checked it for multiple candidates in Each Category 9cat and found that multi-seeding as performed by the app always got within 0.01% of the optimum when given an unlimited iteration budget, and was usually close after only 30. 
 
