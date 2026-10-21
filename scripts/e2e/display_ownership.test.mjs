@@ -32,8 +32,7 @@ test('a superseded evaluate cannot repaint the board or the indicator', async t 
     const { page } = app
     try {
         await loadApp(app)
-        // Projections, not a historical season: a live platform offers only projections, so starting from Historical
-        // would make the platform switch below also rebuild the session -- a second request racing the one held.
+        // A fixed source to start from, so the platform switch below sends exactly one request.
         await setSelect(page, 'ps-data-type', 'Projections')
         await waitAppSettled(app, { timeout: 120000 })
         expectCleanSession(app, 'initial load')

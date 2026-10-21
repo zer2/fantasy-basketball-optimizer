@@ -47,6 +47,7 @@ from backend.infra.secret_config import get_secret
 from yfpy.exceptions import YahooFantasySportsDataNotFound
 
 from backend.platform_integration.helpers import PlatformPlayerLookup, deduplicate_team_names
+from backend.player_identity import RP_PLAYER_ID
 
 
 _logger = logging.getLogger('fbbo.yahoo')
@@ -504,20 +505,24 @@ class YahooIntegration(PlatformIntegration):
         player_assignments: dict[str, list[int]] = {seat: [] for seat in config.seat_names}
         roster_by_team_id = self._read_all_rosters(query)
 
+        unmatched_player_names: dict[str, dict[int, str]] = {}
         for team_name, team_id in config.teams_dict.items():
             players: list[int] = []
             for yahoo_player_id, position, player_name in roster_by_team_id[str(team_id)]:
                 canonical = player_id_lookup.resolve_player_id(yahoo_player_id, player_name)
                 if position in _INJURED_POSITIONS:
                     injured_players.append(canonical)
-                else:
-                    players.append(canonical)
+                    continue
+                if canonical == RP_PLAYER_ID:
+                    unmatched_player_names.setdefault(team_name, {})[len(players)] = player_name
+                players.append(canonical)
             player_assignments[team_name] = players
 
         return PlatformSelections(
-            player_assignments = player_assignments,
-            status             = 'Success',
-            injured_players    = injured_players,
+            player_assignments     = player_assignments,
+            status                 = 'Success',
+            injured_players        = injured_players,
+            unmatched_player_names = unmatched_player_names,
         )
 
     @staticmethod
@@ -568,10 +573,11 @@ class YahooIntegration(PlatformIntegration):
         auction league).
         """
         return PlatformSelections(
-            player_assignments = {seat: [] for seat in config.seat_names},
-            status             = status,
-            injured_players    = [],
-            costs              = {seat: [] for seat in config.seat_names} if with_costs else None,
+            player_assignments     = {seat: [] for seat in config.seat_names},
+            status                 = status,
+            injured_players        = [],
+            unmatched_player_names = {},
+            costs                  = {seat: [] for seat in config.seat_names} if with_costs else None,
         )
 
     @staticmethod
@@ -609,9 +615,10 @@ class YahooIntegration(PlatformIntegration):
 
         player_assignments, _ = self._assignments_from_draft(draft_results, config, player_id_lookup)
         return PlatformSelections(
-            player_assignments = player_assignments,
-            status             = 'Success',
-            injured_players    = [],
+            player_assignments     = player_assignments,
+            status                 = 'Success',
+            injured_players        = [],
+            unmatched_player_names = {},   # draft results carry Yahoo ids only
         )
 
     def get_auction_results(
@@ -634,10 +641,11 @@ class YahooIntegration(PlatformIntegration):
 
         player_assignments, costs = self._assignments_from_draft(draft_results, config, player_id_lookup)
         return PlatformSelections(
-            player_assignments = player_assignments,
-            status             = 'Success',
-            injured_players    = [],
-            costs              = costs,
+            player_assignments     = player_assignments,
+            status                 = 'Success',
+            injured_players        = [],
+            unmatched_player_names = {},   # draft results carry Yahoo ids only
+            costs                  = costs,
         )
 
     def _assignments_from_draft(

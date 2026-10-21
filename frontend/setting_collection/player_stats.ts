@@ -120,40 +120,10 @@ export function markUploadedSourcesExpired(): boolean {
 // kicked off by switching the data source to Historical later.
 let _seasonsPromise: Promise<void> = Promise.resolve()
 
-// The data-source select and the sections it shows, held for limitDataSourcesToPlatform.
-let dataTypeSelect: ReturnType<typeof makeCustomSelect> | null = null
-let showSectionsForDataType: ((type: string) => void) | null = null
-
+// Historical is offered with a live platform too: an ESPN league can be connected in a past season, and that season's
+// own stats are what describe it (2026-10-21). It used to be own-data only, as in the Streamlit app.
 const PROJECTIONS_OPTION = { value: 'projections', label: 'Projections' }
 const HISTORICAL_OPTION  = { value: 'historical',  label: 'Historical'  }
-
-/**
- * Offers Historical only with your own data, as the Streamlit app did: a live platform means a draft
- * or season being played now, which only projections describe -- a past season's stats would rank
- * players for a year that is over. Switching to a live platform therefore moves a Historical source
- * to Projections; switching back to your own data offers Historical again (without choosing it).
- *
- * `announceChange` sends the switch through the select's change event, which saves it and rebuilds
- * the session like a choice made by hand. At start-up it is left quiet instead: no session exists
- * yet, and the first one is built from the corrected source.
- */
-export function limitDataSourcesToPlatform(
-    platform: string
-  , { announceChange }: { announceChange: boolean }
-): void {
-    if (dataTypeSelect === null || showSectionsForDataType === null) {
-        throw new Error('limitDataSourcesToPlatform called before renderPlayerStats')
-    }
-    const isOwnData = platform === 'Enter your own data'
-    const wasHistorical = dataTypeSelect.getValue() === 'historical'
-    dataTypeSelect.setOptions(isOwnData ? [PROJECTIONS_OPTION, HISTORICAL_OPTION] : [PROJECTIONS_OPTION])
-    if (isOwnData || !wasHistorical) return
-    if (announceChange) {
-        dataTypeSelect.setValue(PROJECTIONS_OPTION.value)
-    } else {
-        showSectionsForDataType(PROJECTIONS_OPTION.value)
-    }
-}
 
 /** Returns a promise that resolves once the seasons dropdown is ready (immediately when
  *  no fetch is needed or one has already completed). Anything that reads the data source
@@ -230,14 +200,13 @@ export function renderPlayerStats(container: HTMLElement): void {
         }
     }
 
-    dataTypeSelect = typeSelect
-    showSectionsForDataType = (type: string) => {
+    const showSectionsForDataType = (type: string) => {
         projSection.style.display = type === 'projections' ? '' : 'none'
         histSection.style.display = type === 'historical'  ? '' : 'none'
     }
     typeSelect.element.addEventListener('change', () => {
         const type = typeSelect.getValue()
-        showSectionsForDataType!(type)
+        showSectionsForDataType(type)
         // Published so the change handlers that react to this same event can await the
         // fetch; without it they read ps-season before the dropdown exists. Cheap to
         // re-assign — loadSeasons returns immediately once the seasons are in.

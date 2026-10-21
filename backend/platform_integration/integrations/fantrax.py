@@ -202,9 +202,10 @@ class FantraxIntegration(PlatformIntegration):
         if unmatched_count:
             logger.warning('Fantrax roster mapping: %d player(s) fell back to RP', unmatched_count)
         return PlatformSelections(
-            player_assignments = player_assignments,
-            status             = 'Success',
-            injured_players    = injured_players,
+            player_assignments     = player_assignments,
+            status                 = 'Success',
+            injured_players        = injured_players,
+            unmatched_player_names = {},   # Fantrax rosters are read by scorer id, without names
         )
 
     def get_auction_results(

@@ -483,6 +483,9 @@ export interface PlatformConnectResponse {
 export interface DraftStateResponse {
     player_assignments: Record<string, number[]>
     injured_players: number[]
+    // team -> {position in that team's player_assignments: the platform's name} for the players the session could not
+    // match, which player_assignments carries as the replacement player (-1).
+    unmatched_player_names: Record<string, Record<string, string>>
     status: string
     remaining_cash?: Record<string, number>   // Auction Mode only
 }
@@ -513,6 +516,16 @@ export async function fetchLeagues(platform: string): Promise<PlatformLeague[]> 
         , 'Platform leagues'
     )
     return response.leagues
+}
+
+/** The seasons an ESPN league has (ESPN's numbers, 2027 = 2026-27), newest first. An ESPN league keeps its id across
+ *  seasons, so a typed id is paired with one of these. */
+export async function fetchEspnLeagueSeasons(leagueId: string): Promise<number[]> {
+    const response = await jsonRequest<{ seasons: number[] }>(
+        `${BASE_URL}/platforms/espn/league-seasons?league_id=${encodeURIComponent(leagueId)}`
+        , 'ESPN league seasons'
+    )
+    return response.seasons
 }
 
 /** Returns the Yahoo OAuth authorization URL for the user to visit. */

@@ -1164,6 +1164,21 @@ tr {
     white-space: nowrap;
 }
 
+/* A rostered player the session could not match (shown by the platform's name): muted, with a small marker. */
+.unmatched-player {
+    color: light-dark(#7a7a86, #9a9aac);
+    font-style: italic;
+}
+
+.unmatched-player-marker {
+    margin-left: 6px;
+    padding: 0 5px;
+    border: 1px solid currentColor;
+    border-radius: 8px;
+    font-size: 0.75em;
+    font-style: normal;
+}
+
 /* Positions suffix inside the full player display — lighter than the name so the
    name stays the visual anchor. */
 .player-positions {
