@@ -22,7 +22,7 @@ from benchmark_helpers import (
     , _SEASON
     , _NO_TO_CATEGORIES
     , _ALL_CATEGORIES
-    , _build_session_request
+    , build_golden_session_request
     , check_top_scores
     , resolve_player_ids
     , record_benchmark
@@ -179,7 +179,7 @@ _FORMAT_CONFIGS = [
 def session_for_format(request):
     """Create one session per scoring format / category set. Shared across all parametrized tests."""
     objective, expected_top_scores, categories = request.param
-    session_request = _build_session_request(objective=objective, categories=categories)
+    session_request = build_golden_session_request(objective=objective, categories=categories)
     n_drafters      = session_request['league']['n_drafters']
 
     start    = time.perf_counter()
@@ -299,7 +299,7 @@ def test_evaluate_mid_draft(session_for_format):
 def session_for_first_round(request):
     """Create one session per scoring format / category set for the first-round board state test."""
     objective, expected_top_scores, categories = request.param
-    session_request = _build_session_request(objective=objective, categories=categories)
+    session_request = build_golden_session_request(objective=objective, categories=categories)
     n_drafters      = session_request['league']['n_drafters']
 
     start    = time.perf_counter()
@@ -350,7 +350,7 @@ def test_evaluate_first_round(session_for_first_round):
 
 def test_evaluate_two_category_roto():
     """Smoke + correctness test: Rotisserie with only Points and Threes, Team 12 after first round."""
-    session_request = _build_session_request(
+    session_request = build_golden_session_request(
         objective = 'Rotisserie'
         , categories   = ['Points', 'Threes']
     )
@@ -396,7 +396,7 @@ def test_evaluate_two_category_roto():
 
 def test_evaluate_twenty_five_drafters():
     """Smoke + correctness test: EC with 25 drafters, default categories, empty board."""
-    session_request = _build_session_request(
+    session_request = build_golden_session_request(
         objective = 'Each Category'
         , n_drafters   = 25
     )
@@ -434,7 +434,7 @@ def test_evaluate_twenty_five_drafters():
 
 def test_evaluate_three_drafters():
     """Smoke + correctness test: EC with 3 drafters, default categories, empty board."""
-    session_request = _build_session_request(
+    session_request = build_golden_session_request(
         objective = 'Each Category'
         , n_drafters   = 3
     )

@@ -25,7 +25,9 @@ in an eligible slot, fills each flex slot type with each base position as often 
   - draft:   takes one player per remaining round, each one whose predicted round (his place in the predicted draft
              order / number of teams, rounded up) is that round or later. The predicted order is the caller's: base
              H-score order, or that blended with market draft positions (services/market_draft_values). Deliberately
-             approximate -- it ignores where in the round my pick falls -- and needs no platform draft order.
+             approximate -- it ignores where in the round my pick falls -- and needs no platform draft order. Given my
+             remaining pick numbers, the exact pick order replaces it: before each of my later picks, the other drafters
+             take the players ahead of it in the predicted order (nested prefixes too, so the family stays laminar).
   - auction: pays every player's predicted price (generic dollars, whole, at least $1) out of my remaining cash.
 When NBA teams are known (the market data's, for the season being drafted), no two players predicted to go in a draft's
 first DRAFT_DISTINCT_TEAM_ROUNDS rounds share an NBA team, and an auction roster holds at most AUCTION_PLAYERS_PER_TEAM
@@ -89,6 +91,7 @@ class TeamSolveProblem:
     seat_slot_types: np.ndarray           # (n_seats,) index into slot_types
     seat_bases: np.ndarray                # (n_seats,) index into base_positions
     flex_cell_bounds: dict[tuple[str, str], tuple[int, int]]   # (flex slot type, base) -> open players (low, high)
+    anchors_to_h_scoring: bool            # held to H-scoring's plan: its seating, flex allocation and win rates
     inequality_rows: np.ndarray           # A_ub over seats
     inequality_bounds: np.ndarray         # b_ub
     equality_rows: np.ndarray             # A_eq over seats
@@ -119,24 +122,42 @@ def build_team_solve_problem(
     , candidate_player_id: int
     , exclusion_list: list[int]
     , availability_order: list[int]
-    , fixed_slot_types: list[str]
-    , expected_flex_position_counts: dict[str, dict[str, float]]
+    , anchors_to_h_scoring: bool
+    , fixed_slot_types: Optional[list[str]]
+    , expected_flex_position_counts: Optional[dict[str, dict[str, float]]]
     , remaining_cash: Optional[float]
     , predicted_prices: Optional[pd.Series]
     , player_teams: Optional[pd.Series]
+    , my_remaining_pick_numbers: Optional[list[int]]
 ) -> TeamSolveProblem:
     """The pool and every constraint row of a team solve for one candidate. Draft when remaining_cash and
-    predicted_prices are both None; auction when both are given. fixed_slot_types holds the slot type H-scoring seated
-    each of my players and the candidate in (board order, then the candidate): they stay there, and only the open
-    slots are solved for. availability_order lists the players in the order other drafters are predicted to take them
-    (whom the round rule and the swaps' candidate limit go by). expected_flex_position_counts is H-scoring's flex
-    allocation of the open slots, flex slot type -> base position -> expected count; the open players filling each pair
-    are held to it, rounded down or up. player_teams maps player ids to NBA teams for the team rules (None: no team
-    rules; a player it does not name is bound by none)."""
+    predicted_prices are both None; auction when both are given. availability_order lists the players in the order
+    other drafters are predicted to take them (whom the round rule and the swaps' candidate limit go by). player_teams
+    maps player ids to NBA teams for the team rules (None: no team rules; a player it does not name is bound by none).
+
+    anchors_to_h_scoring holds the team to H-scoring's plan, as the example team is: fixed_slot_types gives the slot type
+    H-scoring seated each of my players and the candidate in (board order, then the candidate), and they stay there;
+    expected_flex_position_counts gives H-scoring's flex allocation of the open slots (flex slot type -> base position ->
+    expected count), and the open players filling each pair are held to it, rounded down or up; and the objective
+    penalizes win rates below H-scoring's (score_team_totals). Without it, the objective is the complete-team H-score
+    alone and every player may take any slot he is eligible for -- the planner on its own terms -- and the two plan
+    arguments must be None.
+
+    my_remaining_pick_numbers (drafts only) gives the overall numbers of my remaining picks (1 = the draft's first pick),
+    the candidate's first. With them, availability follows the actual pick order: the other drafters take the available
+    players in availability_order, so before my i-th later pick at overall number q (the candidate's at t) they take
+    q - t - i of them, and at most i - 1 of my later players may be among those. Without them, the round rule: one open
+    pick per round, each taking a player predicted for that round or later."""
+    if anchors_to_h_scoring != (fixed_slot_types is not None) or anchors_to_h_scoring != (
+            expected_flex_position_counts is not None):
+        raise ValueError('An anchored team solve takes H-scoring\'s slot types and flex counts; an unanchored one takes '
+                         'neither.')
     if (remaining_cash is None) != (predicted_prices is None):
         raise ValueError('An auction team solve needs both the remaining cash and the predicted prices; '
                          'a draft solve takes neither.')
     is_auction = remaining_cash is not None
+    if is_auction and my_remaining_pick_numbers is not None:
+        raise ValueError('An auction has no pick order; my_remaining_pick_numbers is for drafts.')
 
     my_players = [p for p in player_assignments[my_team_id] if p == p]
     if candidate_player_id in my_players:
@@ -153,7 +174,7 @@ def build_team_solve_problem(
                  if p not in taken and p != candidate_player_id and p in h_agent.positions.index]
     pool_player_ids = my_players + [candidate_player_id] + available
     n_fixed_players = len(my_players) + 1
-    if len(fixed_slot_types) != n_fixed_players:
+    if anchors_to_h_scoring and len(fixed_slot_types) != n_fixed_players:
         raise ValueError(f'{len(fixed_slot_types)} fixed slots given for {n_fixed_players} fixed players.')
     n_pool = len(pool_player_ids)
 
@@ -166,7 +187,7 @@ def build_team_solve_problem(
     seats = [(index, slot_index, base_positions.index(base))
              for index, player in enumerate(pool_player_ids)
              for slot_index, slot in enumerate(slot_types)
-             if index >= n_fixed_players or slot == fixed_slot_types[index]
+             if index >= n_fixed_players or not anchors_to_h_scoring or slot == fixed_slot_types[index]
              for base in slot_bases[slot]
              if base in h_agent.positions.loc[player]]
     seat_players = np.array([index for index, _, _ in seats])
@@ -190,7 +211,7 @@ def build_team_solve_problem(
     # H-scoring's flex allocation: the open players filling each (flex slot type, base position) pair.
     flex_cell_bounds = {}
     for slot_index, slot in enumerate(slot_types):
-        if slot not in flex:
+        if slot not in flex or not anchors_to_h_scoring:
             continue
         for base in slot_bases[slot]:
             expected = expected_flex_position_counts[slot][base]
@@ -213,6 +234,18 @@ def build_team_solve_problem(
         candidate_and_open = (seat_players >= candidate_index).astype(float)
         inequality_rows.append(predicted_price_array[seat_players] * candidate_and_open)
         inequality_bounds.append(float(remaining_cash))
+    elif my_remaining_pick_numbers is not None:
+        if len(my_remaining_pick_numbers) != n_roster - len(my_players):
+            raise ValueError(f'{len(my_remaining_pick_numbers)} remaining pick numbers given for '
+                             f'{n_roster - len(my_players)} remaining picks.')
+        # The open players are the available players in availability order, so an open player's place among them is
+        # how many of them the other drafters take before him.
+        availability_places = np.where(seat_players >= n_fixed_players, seat_players - n_fixed_players, n_pool)
+        candidate_pick = my_remaining_pick_numbers[0]
+        for later_index, later_pick in enumerate(my_remaining_pick_numbers[1:], start=1):
+            taken_by_others = later_pick - candidate_pick - later_index
+            inequality_rows.append((availability_places < taken_by_others).astype(float))
+            inequality_bounds.append(float(later_index - 1))
     else:
         # One open pick per round after the candidate's; the pick in round r takes a player of base round r or
         # later, i.e. at most (open picks before round r) of the open players come from base rounds before r.
@@ -266,6 +299,7 @@ def build_team_solve_problem(
         seat_slot_types         = seat_slot_types,
         seat_bases              = seat_bases,
         flex_cell_bounds        = flex_cell_bounds,
+        anchors_to_h_scoring    = anchors_to_h_scoring,
         inequality_rows         = np.array(inequality_rows),
         inequality_bounds       = np.array(inequality_bounds),
         equality_rows           = np.array(equality_rows),
@@ -370,9 +404,9 @@ def score_team_totals(
     , team_units: Optional[np.ndarray]
     , h_scoring_win_rates: np.ndarray
 ) -> np.ndarray:
-    """(N,) the penalized objective of N teams given by their category totals (N, C) and volume units (N, R):
-    complete-team H-score minus WIN_RATE_PENALTY times the squared shortfall of each category's win rate below
-    H-scoring's predicted one."""
+    """(N,) the objective of N teams given by their category totals (N, C) and volume units (N, R): the complete-team
+    H-score, less -- for a problem anchored to H-scoring -- WIN_RATE_PENALTY times the squared shortfall of each
+    category's win rate below H-scoring's predicted one."""
     diff_means = field.diff_means + (team_totals - field.reference_totals)[:, :, np.newaxis]
     volume_context = None
     if problem.volume_units is not None:
@@ -383,6 +417,8 @@ def score_team_totals(
         }
     scores, win_rates = h_agent.compute_complete_team_scores_and_win_rates_batched(
         diff_means, field.diff_vars, volume_context)
+    if not problem.anchors_to_h_scoring:
+        return scores
     shortfalls = np.maximum(h_scoring_win_rates - win_rates, 0.0)
     return scores - WIN_RATE_PENALTY * (shortfalls ** 2).sum(axis=1)
 

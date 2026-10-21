@@ -65,8 +65,8 @@ const PARAM_SPECS: ParamSpec[] = [
         id: 'mp-lambda-p', key: 'lambda_p', label: 'λ<sub>p</sub> (position reg)', step: 0.05,
         caption: 'How strongly the flex-position strategy for future picks is pulled back toward a '
                + 'balanced positional mix. Higher values hedge across positions; 0 lets the strategy '
-               + 'commit entirely to the positions that fit the build, and 1 holds it fully balanced '
-               + 'through the early draft.',
+               + 'commit entirely to the positions that fit the build; 1 holds it balanced on the first '
+               + 'pick, and higher values hold it balanced for more of the early draft.',
     },
     {
         id: 'mp-pick-pool-size', key: 'pick_pool_size', label: 'M (pool size)', step: 1,
