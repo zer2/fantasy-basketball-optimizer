@@ -82,8 +82,13 @@ def build_hypothetical_team(
         strategy.flex_shares, fixed_slot_types, h_agent.position_config.position_numbers)
     problem = exact_team_solves.build_team_solve_problem(
         h_agent, player_assignments, my_team_id, candidate_player_id, exclusion_list, availability_order,
-        fixed_slot_types, expected_flex_position_counts, my_remaining_cash, predicted_prices,
-        None if market_values is None else market_values['team'].dropna())
+        anchors_to_h_scoring          = True,   # the example team illustrates H-scoring's plan
+        fixed_slot_types              = fixed_slot_types,
+        expected_flex_position_counts = expected_flex_position_counts,
+        remaining_cash                = my_remaining_cash,
+        predicted_prices              = predicted_prices,
+        player_teams                  = None if market_values is None else market_values['team'].dropna(),
+        my_remaining_pick_numbers     = None)
     if is_auction:
         naive_seating = exact_team_solves.solve_naive_exact_team_for_auction(problem, strategy.category_weights)
     else:
