@@ -189,6 +189,63 @@ _SECTION_EXPLANATIONS = {
         "with each method. S1-S12 are the seats in draft order; each cell is that seat's complete-team H-score "
         'drafting with the planner minus its H-score drafting by H-scoring. The chart averages each seat over the '
         'pairs.',
+    'Smooth vs simple scaling':
+        'The problem. "Your $" is scaled so that all the players\' values add up to the money in the auction, as if '
+        'every team will spend its last dollar on players worth exactly that much. Teams cannot pack their budgets '
+        'that well, and late in an auction a team can hold more money than the players it could still draft are '
+        'worth: with $40 left, two open slots and the best two available players worth $20 and $10 to it, $10 is '
+        'unusable whatever it does.\n'
+        "The simple fix is to scale up in those cases: once a team's cash exceeds what its best options are worth, add "
+        'the surplus to their values so it bids the money rather than keeping it. By then it is often too late. A '
+        'player goes for about what the second-highest bidder can pay, and late in an auction the other teams are '
+        'nearly out of money, so a rich team wins its last players cheaply and still finishes with cash left over. '
+        'Could the drafter be forewarned instead -- raising its values a little before the surplus arrives, while '
+        'there is still competition to spend the money against?\n'
+        "The two rules, with r₁ = the team's spendable cash (its cash minus $1 per empty bench slot) over what its best "
+        'options (its top players, one per open slot) are worth:\n'
+        '- Simple scaling: when r₁ is above 1, the best options are scaled up by r₁, so together they spend the cash '
+        'exactly; nothing before that, and no one else.\n'
+        '- Smooth, with softness s: r₂ = 1 + s ln(1 + e^((r₁ - 1) / s)), a smoothed max(1, r₁) -- about 1 well below '
+        'r₁ = 1, about r₁ well above it, and rising from around r₁ = 1 - 3s. Every player the team can roster gets an '
+        'extra (r₂ - 1) v² / v̄, where v is his value and v̄ the value-weighted average value of the best options, so '
+        'the best options together are scaled by r₂, bigger players get a bigger share, and there is no cliff after '
+        'the last best option.\n'
+        "The simulation. Complete auctions of 12 teams, $200 each, 13 players a team, Each Category, on each season's "
+        'actual statistics (2020-21 to 2025-26). Every team is an autodrafter: it nominates, bids $1 at a time up to '
+        'its own valuation or its maximum allowed bid, and the highest bidder wins at about the next-highest\'s limit. '
+        'Each team values players from its own noisy view of them (noise of SD 0.2 on each X-score for the stars, '
+        'halving every 156 players), and each seed is a new draw of those views. Two settings differ from the app:\n'
+        '- SAVOR is off (S_σ = 0 and S_R = 0). SAVOR reshapes dollar values for streaming, but finished teams are '
+        'scored by H-score, which has no streaming, so a drafter relying on it would be judged on a value it never '
+        'priced.\n'
+        "- beth = 0. The season's actual statistics are the truth here, so the Bayesian self-doubt that shrinks "
+        'projections would only blur the comparison (at the default it scores every finished team below 50% against a '
+        'field of its peers).\n'
+        'Each pair of auctions puts half the teams (alternate seats) on each rule, then swaps them, so each rule drafts '
+        "from every seat: 40 pairs per season and softness, 240 per softness in all. The gap is the smooth teams' mean "
+        "H-score minus the simple-scaling teams', averaged over the pair, with its standard error across pairs. Own "
+        "view -- each drafter's H-score through its own expectation, which is what it maximises -- is the measure that "
+        "matters; actual is on the true statistics. Spending by round shows where the smooth teams' money goes; paid "
+        "extra is each sale's price above what the same bidding reaches without any cash share.",
+    'Cash-share rules: builds (own view)':
+        "Every team's build in the head-to-head auctions, as it sees it, by rule: the categories it punts (expected "
+        "win rate under 40%; ! under 15%). Value in punted is the share of its players' positive X-score value lying "
+        'in those categories; categories punted is what that share would be if players were bought regardless of the '
+        'build. A misfit is a player with at least half his value in categories the team punts.',
+    'Dollar shape: replacement level and SAVOR':
+        'Vanilla SAVOR assumes a player realizes his value whenever he ends up worth a positive amount of money: his '
+        'outcome is normal around his dollar value, with standard deviation S (the SAVOR noise), and every outcome '
+        'above $0 counts. But a player who ends up worth a dollar might be used as a streaming slot instead of being '
+        'kept on the team. So this version raises the cutoff to a replacement threshold: a player only counts outcomes '
+        'above it, and is worth his expected value above the threshold minus a flyer\'s, a $0 player who is worth '
+        'something only through his chance of clearing it. A threshold of $0 is vanilla SAVOR; with no noise, a player '
+        'is worth his dollar value above the threshold.\n'
+        'The grid crosses the threshold ($0, the app\'s $2, and $4) with the noise (S = 0, the app\'s 10, and 20), on '
+        'the dollar values at the start of an auction (the neutral board; 12 teams x $200, Each Category). Each cell '
+        'is the change '
+        'in percent of the average player\'s dollars in the top 10%, the middle 80% and the bottom 10% of the drafted '
+        'players (by value), against both off, which shows the dollars themselves. The charts show each rank\'s '
+        'change.'
 }
 
 
@@ -1111,3 +1168,163 @@ def test_planner_versus_h_scoring_drafts():
                              f'{draft["planner_mean"] - draft["h_scoring_mean"]:+.2f}']
                             + [f'{"P" if seat in planner_seats else "H"} {score:.2f}'
                                for seat, score in enumerate(draft['seat_scores'])])
+
+
+# ── Auction cash-share rules ──────────────────────────────────────────────────
+
+RULES_SECTION = 'Smooth vs simple scaling'
+RULE_BUILDS_SECTION = 'Cash-share rules: builds (own view)'
+
+# The smooth rule's softnesses measured against simple scaling (auction_pricing.smooth_spending_scale).
+_CASH_SHARE_SOFTNESSES = (0.1, 0.2, 0.3)
+# Noise seeds per season and softness: each seed is a pair of auctions (the two seatings), every team drawing its own
+# view of the players from it (auction_autodraft.read_team_x_scores).
+_AUCTION_NOISE_SEEDS = int(os.environ.get('EXPERIMENT_AUCTION_SEEDS', '40'))
+_AUCTION_ROUNDS = 13
+_RULE_LABELS = {'smooth': 'smooth', 'simple_scaling': 'simple scaling'}
+
+
+def _summarize_rule_pairs(records):
+    """(pairs, own-view gaps, actual gaps) over the complete pairs: per (season, seed) the smooth teams' mean H-score
+    minus the simple-scaling teams', averaged over the two seatings."""
+    by_pair = {}
+    for record in records:
+        teams = list(record['teams'].values())
+        gaps = [float(np.mean([team[measure] for team in teams if team['rule'] == 'smooth'])
+                      - np.mean([team[measure] for team in teams if team['rule'] == 'simple_scaling']))
+                for measure in ('own_view', 'actual')]
+        by_pair.setdefault((record['season'], record['noise_seed']), {})[record['smooth_parity']] = gaps
+    complete = [seatings for seatings in by_pair.values() if len(seatings) == 2]
+    own_gaps = np.array([np.mean([seatings[parity][0] for parity in (0, 1)]) for seatings in complete])
+    actual_gaps = np.array([np.mean([seatings[parity][1] for parity in (0, 1)]) for seatings in complete])
+    return len(complete), own_gaps, actual_gaps
+
+
+def _format_gap(gaps):
+    """The pair gaps' mean and standard error, as text."""
+    if len(gaps) < 2:
+        raise ValueError(f'A standard error needs at least two pairs; there are {len(gaps)}.')
+    return f'{gaps.mean():+.3f}', f'{gaps.std(ddof=1) / np.sqrt(len(gaps)):.3f}'
+
+
+def _record_rule_rows(softness_label, season_label, records, columns):
+    """One row of the rules section: the head-to-head gaps, cash left and paid extra per drafter by rule, and each
+    rule's mean spend per drafter after every round."""
+    pairs, own_gaps, actual_gaps = _summarize_rule_pairs(records)
+    teams_by_rule = {rule: [team for record in records for team in record['teams'].values() if team['rule'] == rule]
+                     for rule in _RULE_LABELS}
+    means = [f'{np.mean([team[measure] for team in teams_by_rule[rule]]):.2f}'
+             for measure in ('cash_left', 'paid_extra') for rule in _RULE_LABELS]
+    spending = [f'{np.mean([team["spent_after_round"][round_index] for team in teams_by_rule[rule]]):.1f}'
+                for round_index in range(_AUCTION_ROUNDS) for rule in _RULE_LABELS]
+    _record_row(RULES_SECTION, columns,
+                [softness_label, season_label, pairs, *_format_gap(own_gaps), *_format_gap(actual_gaps)]
+                + means + spending)
+
+
+@sims
+def test_cash_share_rules_head_to_head():
+    """The smooth cash-share rule against simple scaling, at each softness: per season and noise seed, a pair of
+    auctions (smooth on even seats, then on odd), every team's own-view and actual H-score, its cash left, what it paid
+    extra and what it had spent by each round; and every team's build, by rule. Measurements only, apart from every
+    auction completing."""
+    from experiment_harnesses.auction_simulation import run_rule_matches_in_parallel
+    # Every auction is kept here as it finishes, so a stopped run resumes rather than restarting (about three hours on
+    # 18 workers for the full set).
+    record_path = Path(__file__).resolve().parent / 'experiment_results' / 'cash_share_rule_matches.jsonl'
+    records, failures = run_rule_matches_in_parallel(_SEASONS, list(_CASH_SHARE_SOFTNESSES),
+                                                     list(range(1, _AUCTION_NOISE_SEEDS + 1)), _SHORT_CATEGORY,
+                                                     _EXPERIMENT_WORKERS, record_path)
+    columns = (['Softness', 'Season', 'Pairs', 'Own view gap', 'Own view SE', 'Actual gap', 'Actual SE']
+               + [f'{measure} ({label})' for measure in ('Unspent', 'Paid extra') for label in _RULE_LABELS.values()]
+               + [f'Spent after round {round_number} ({label})' for round_number in range(1, _AUCTION_ROUNDS + 1)
+                  for label in _RULE_LABELS.values()])
+    build_columns = ['Softness', 'Rule', 'Teams', 'Value in punted', 'Categories punted', 'Misfits per team',
+                     'Most common punts']
+    for softness in _CASH_SHARE_SOFTNESSES:
+        softness_records = [record for record in records if record['smooth_rule_softness'] == softness]
+        for season in _SEASONS:
+            _record_rule_rows(f'{softness:.2f}', season,
+                              [record for record in softness_records if record['season'] == season], columns)
+        _record_rule_rows(f'{softness:.2f}', f'ALL ({len(_SEASONS)} seasons)', softness_records, columns)
+        for rule, rule_label in _RULE_LABELS.items():
+            teams = [team for record in softness_records for team in record['teams'].values() if team['rule'] == rule]
+            punt_counts = Counter('/'.join(team['punted']) or '(none)' for team in teams)
+            _record_row(RULE_BUILDS_SECTION, build_columns,
+                        [f'{softness:.2f}', rule_label, len(teams),
+                         f'{100 * np.mean([team["punted_value_share"] for team in teams]):.0f}%',
+                         f'{100 * np.mean([team["punted_category_share"] for team in teams]):.0f}%',
+                         f'{np.mean([len(team["misfits"]) for team in teams]):.2f}',
+                         ', '.join(f'{build} ({count})' for build, count in punt_counts.most_common(3))])
+    for failure in failures:
+        print(f'auction {failure["job"]} failed:\n{failure["traceback"]}')
+    assert not failures, f'{len(failures)} of the auctions failed (tracebacks above)'
+
+
+# ── Auction dollar values: replacement level and SAVOR ────────────────────────
+
+DOLLAR_SHAPE_SECTION = 'Dollar shape: replacement level and SAVOR'
+
+# (label, value) for each axis of the grid: SAVOR's replacement threshold in dollars (algorithm_helpers.
+# savor_calculation; 2 is the app's default), and its streaming noise S (0 is off; 10 is the app's default).
+_REPLACEMENT_LEVELS = (('off', 0.0), ('medium', 2.0), ('high', 4.0))
+_SAVOR_NOISES = (('off', 0.0), ('medium', 10.0), ('high', 20.0))
+# The drafted players' tiers, best first: (name, share of the drafted players).
+_DOLLAR_TIERS = (('Top 10%', 0.10), ('Middle 80%', 0.80), ('Bottom 10%', 0.10))
+
+
+def _split_into_dollar_tiers(dollars, total_picks):
+    """The drafted players' dollars (best first): the average player's within each tier."""
+    top_count = round(total_picks * _DOLLAR_TIERS[0][1])
+    bottom_count = round(total_picks * _DOLLAR_TIERS[2][1])
+    drafted = dollars.iloc[:total_picks].to_numpy()
+    return [float(drafted[:top_count].mean()), float(drafted[top_count:total_picks - bottom_count].mean()),
+            float(drafted[total_picks - bottom_count:].mean())]
+
+
+def test_dollar_shape_by_replacement_level_and_savor(sessions):
+    """The start of an auction's dollar values (the neutral board, all the league's cash) under each replacement level
+    and SAVOR noise: the average player's dollars in the top 10%, the middle 80% and the bottom 10% of the drafted
+    players, and their change in percent against both off.
+    Measurements only."""
+    from backend.math.algorithm_helpers import auction_value_adjuster
+    tier_names = [name for name, _ in _DOLLAR_TIERS]
+    columns = None
+    tiers_by_cell = {}
+    for season in _SEASONS:
+        session = sessions('EC', auction=True, season=season)
+        agent = session.agent
+        total_picks = agent.n_drafters * agent.n_picks
+        total_cash = agent.n_drafters * session.current_settings['cash_per_team']
+        if columns is None:
+            columns = (['Season', 'Replacement level', 'Replacement threshold', 'SAVOR', 'SAVOR noise']
+                       + [f'{name} $ per player' for name in tier_names] + [f'{name} change' for name in tier_names]
+                       + ['Players over $1'] + [f'Rank {rank} $' for rank in range(1, total_picks + 1)])
+        for replacement_label, replacement_threshold in _REPLACEMENT_LEVELS:
+            for savor_label, savor_noise in _SAVOR_NOISES:
+                dollars = auction_value_adjuster(agent.default_h_scores, total_picks, total_cash, savor_noise,
+                                                 replacement_threshold).sort_values(ascending=False)
+                tiers = _split_into_dollar_tiers(dollars, total_picks)
+                tiers_by_cell.setdefault((replacement_label, savor_label), []).append(tiers)
+                baseline = tiers_by_cell[('off', 'off')][-1]
+                _record_row(DOLLAR_SHAPE_SECTION, columns,
+                            [season, replacement_label, replacement_threshold, savor_label, savor_noise]
+                            + [f'{value:.2f}' for value in tiers]
+                            + [f'{100 * (value / base - 1):+.1f}%' for value, base in zip(tiers, baseline)]
+                            + [int((dollars.iloc[:total_picks] > 1).sum())]
+                            + [f'{value:.2f}' for value in dollars.iloc[:total_picks]])
+    curve_start = columns.index('Rank 1 $')
+    baseline = np.mean(tiers_by_cell[('off', 'off')], axis=0)
+    for replacement_label, replacement_threshold in _REPLACEMENT_LEVELS:
+        for savor_label, savor_noise in _SAVOR_NOISES:
+            rows = [row for row in _REPORT[DOLLAR_SHAPE_SECTION]['rows']
+                    if row[1] == replacement_label and row[3] == savor_label]
+            tiers = np.mean(tiers_by_cell[(replacement_label, savor_label)], axis=0)
+            curve = [f'{np.mean([float(row[index]) for row in rows]):.2f}'
+                     for index in range(curve_start, len(columns))]
+            players_over_one = np.mean([float(row[columns.index('Players over $1')]) for row in rows])
+            _record_row(DOLLAR_SHAPE_SECTION, columns,
+                        [f'ALL ({len(_SEASONS)} seasons)', replacement_label, replacement_threshold, savor_label,
+                         savor_noise] + [f'{value:.2f}' for value in tiers]
+                        + [f'{100 * (value / base - 1):+.1f}%' for value, base in zip(tiers, baseline)]
+                        + [f'{players_over_one:.0f}'] + curve)

@@ -31,14 +31,16 @@ PAGE_CSS = """
   main { max-width: 1400px; margin: 0 auto; padding: 28px 20px 64px; }
   h1 { font-size: 1.35rem; margin: 0 0 2px; }
   .stamp { color: var(--muted); font-size: .85rem; margin-bottom: 18px; }
-  nav { display:flex; flex-wrap:wrap; gap:10px 22px; margin-bottom:18px; padding-bottom:14px;
-        border-bottom:1px solid var(--line); }
-  .tab-group-name { color:var(--muted); font-size:.75rem; font-weight:600; text-transform:uppercase;
-                    letter-spacing:.04em; margin-bottom:4px; }
-  .tab-buttons { display:flex; flex-wrap:wrap; gap:6px; }
-  nav button { background:var(--card); color:var(--fg); border:1px solid var(--line); border-radius:8px;
-               padding:6px 11px; font-size:.85rem; cursor:pointer; }
-  nav button.active { border-color:var(--accent); color:var(--accent); font-weight:600; }
+  nav { margin-bottom:18px; padding-bottom:10px; border-bottom:1px solid var(--line); }
+  .group-tabs { display:flex; flex-wrap:wrap; gap:2px 18px; border-bottom:1px solid var(--line); margin-bottom:10px; }
+  .group-tabs button { background:none; border:none; border-bottom:2px solid transparent; color:var(--muted);
+                       padding:6px 2px; font-size:.9rem; font-weight:600; cursor:pointer; margin-bottom:-1px; }
+  .group-tabs button.active { color:var(--accent); border-bottom-color:var(--accent); }
+  .tab-buttons { display:none; flex-wrap:wrap; gap:6px; }
+  .tab-buttons.active { display:flex; }
+  .tab-buttons button { background:var(--card); color:var(--fg); border:1px solid var(--line); border-radius:8px;
+                        padding:5px 10px; font-size:.82rem; cursor:pointer; }
+  .tab-buttons button.active { border-color:var(--accent); color:var(--accent); font-weight:600; }
   section { display:none; }
   section.active { display:block; }
   h2 { font-size: 1.05rem; margin: 4px 0 2px; color: var(--accent); }
@@ -72,6 +74,14 @@ PAGE_CSS = """
   .bar-track { display:flex; gap:2px; height:22px; border-radius:6px; overflow:hidden; }
   .bar-segment { flex-grow:0; flex-shrink:0; min-width:3px; }
   .note { color:var(--muted); font-size:.85rem; margin:0 0 8px; }
+  .tiles { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:8px; margin:8px 0 12px; }
+  .tile { background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:8px 11px; }
+  .tile-value { font-size:1.4rem; font-weight:650; line-height:1.25; color:var(--fg);
+                font-variant-numeric:tabular-nums; }
+  .tile-value.good { color:var(--good); } .tile-value.bad { color:rgb(var(--bad-rgb)); }
+  .tile-value.warn { color:var(--warn); }
+  .tile-label { color:var(--muted); font-size:.8rem; line-height:1.35; }
+  .card h3 { font-size:.92rem; font-weight:600; color:var(--fg); margin:16px 0 2px; }
   .tablewrap { background:var(--card); border:1px solid var(--line); border-radius:10px;
                padding: 4px 12px; overflow-x:auto; }
   table { border-collapse: collapse; width:100%; font-size:.88rem; }
@@ -161,25 +171,32 @@ def render_chart(
     , value_places: int = 2
     , height: int = 240
     , background_series: tuple = ()
+    , width: int = 1100
+    , show_points: bool = True
 ) -> str:
-    """A chart over categorical x positions: 'line' (lines with points), 'dots', or 'bars' (grouped). Reference lines
-    are dashed (red for a floor). A legend is drawn below when there is more than one series."""
-    width, left, right, top, bottom = 1100, 58, 120, 14, 46
+    """A chart over categorical x positions: 'line' (lines with points), 'dots', 'bars' (grouped) or 'stacked' (one bar
+    per position, the series stacked bottom first). Reference lines are dashed (red for a floor). A legend is drawn
+    below when there is more than one series. width is the drawing's own width, so a chart set beside another (in
+    .multiples) keeps legible text by being drawn narrow rather than scaled down; show_points False draws a line
+    chart's lines alone, for curves too dense for a marker at every point."""
+    left, right, top, bottom = 58, (120 if width > 700 else 70), 14, 46
     plot_width, plot_height = width - left - right, height - top - bottom
     values = [value for one in list(series) + list(background_series)
               for value, error in zip(one.values, one.errors or [0] * len(one.values))
               for value in ((value - error, value + error) if value is not None else ()) if value is not None]
     values += [reference.value for reference in references]
+    if kind == 'stacked':
+        values = [sum(one.values[index] or 0.0 for one in series) for index in range(len(x_labels))] + [0.0]
     low = min(values) if values else 0.0
     high = max(values) if values else 1.0
-    if kind == 'bars':
+    if kind in ('bars', 'stacked'):
         low, high = min(low, 0.0), max(high, 0.0)
     if y_floor is not None:
         low = min(low, y_floor)
     if y_ceiling is not None:
         high = max(high, y_ceiling)
     padding = (high - low) * 0.08 or 1.0
-    low, high = (low - padding if kind != 'bars' or low < 0 else low), high + padding
+    low, high = (low - padding if kind not in ('bars', 'stacked') or low < 0 else low), high + padding
     ticks = compute_nice_ticks(low, high)
     low, high = min(low, ticks[0]), max(high, ticks[-1])
 
@@ -201,7 +218,7 @@ def render_chart(
                  f'y2="{top + plot_height}"/>')
     parts.append(f'<text x="14" y="{top + plot_height / 2:.0f}" transform="rotate(-90 14 {top + plot_height / 2:.0f})" '
                  f'text-anchor="middle">{escape(y_title)}</text>')
-    label_step = max(1, int(np.ceil(n / 22)))
+    label_step = max(1, int(np.ceil(n / (22 * width / 1100))))
     for index, label in enumerate(x_labels):
         if index % label_step == 0:
             parts.append(f'<text x="{x_of(index):.1f}" y="{top + plot_height + 16}" text-anchor="middle">'
@@ -219,6 +236,7 @@ def render_chart(
                      f'stroke-width:1.5"><title>{escape(one.name)}</title></polyline>')
     group_width = slot * 0.72
     bar_width = group_width / max(len(series), 1)
+    stack_tops = [0.0] * n
     for series_index, one in enumerate(series):
         color = f'var(--series-{series_index % 6})'
         points = []
@@ -227,7 +245,14 @@ def render_chart(
                 points.append(None)
                 continue
             tip = escape(f'{one.name} · {x_labels[index]}: {value:.{value_places}f}{value_suffix}')
-            if kind == 'bars' and value == 0:
+            if kind in ('bars', 'stacked') and value == 0:
+                continue
+            if kind == 'stacked':
+                x = x_of(index) - group_width / 2
+                y0, y1 = y_of(stack_tops[index] + value), y_of(stack_tops[index])
+                parts.append(f'<rect x="{x:.1f}" y="{y0:.1f}" width="{group_width:.1f}" height="{max(y1 - y0, 1):.1f}" '
+                             f'style="fill:{color};stroke:var(--card);stroke-width:2"><title>{tip}</title></rect>')
+                stack_tops[index] += value
                 continue
             if kind == 'bars':
                 x = x_of(index) - group_width / 2 + bar_width * series_index
@@ -243,7 +268,7 @@ def render_chart(
                 error = one.errors[index]
                 parts.append(f'<line x1="{center:.1f}" x2="{center:.1f}" y1="{y_of(value - error):.1f}" '
                              f'y2="{y_of(value + error):.1f}" style="stroke:{color};stroke-width:1.5"/>')
-            if kind != 'bars':
+            if kind != 'bars' and (show_points or kind != 'line'):
                 parts.append(f'<circle cx="{center:.1f}" cy="{y_of(value):.1f}" r="{3.2 if n > 30 else 4}" '
                              f'style="fill:{color};stroke:var(--card);stroke-width:1.5"><title>{tip}</title></circle>')
         if kind == 'line':
@@ -268,6 +293,14 @@ def render_chart(
             f'<span><span class="swatch series-{index % 6}"></span>{escape(one.name)}</span>'
             for index, one in enumerate(series)) + '</div>'
     return ''.join(parts) + legend
+
+
+def render_stat_tiles(tiles: list[tuple[str, str, str]]) -> str:
+    """A row of headline numbers, each (value, what it is, status): status is '' or good / warn / bad, which colours
+    the value. Labels are text tokens, never the series colours."""
+    return '<div class="tiles">' + ''.join(
+        f'<div class="tile"><div class="tile-value {status}">{escape(value)}</div>'
+        f'<div class="tile-label">{escape(label)}</div></div>' for value, label, status in tiles) + '</div>'
 
 
 def render_takeaway(status: str, status_text: str, text: str) -> str:
@@ -977,6 +1010,263 @@ def styles_planner_pairs(columns, rows):
     return styles
 
 
+# Auction cash-share rules
+RULE_LABELS = ('smooth', 'simple scaling')
+AUCTION_ROUNDS = 13
+
+
+def read_rule_summaries(columns, rows):
+    """{softness: its ALL row} in the rules section."""
+    return {row[0]: row for row in rows if is_summary_row(row)}
+
+
+def card_rules_head_to_head(columns, rows):
+    """The answer first -- the best softness's own-view gain, how many seasons it wins, the money left unspent -- then
+    the evidence: the gain season by season, where the smooth drafters' money went round by round, and what each rule
+    left at the end."""
+    summaries = read_rule_summaries(columns, rows)
+    softnesses = list(summaries)
+
+    def read(softness, name):
+        return read_leading_number(summaries[softness][columns.index(name)])
+
+    best = max(softnesses, key=lambda softness: read(softness, 'Own view gap'))
+    worst = min(softnesses, key=lambda softness: read(softness, 'Own view gap'))
+    best_gap, best_error = read(best, 'Own view gap'), read(best, 'Own view SE')
+    worst_gap, worst_error = read(worst, 'Own view gap'), read(worst, 'Own view SE')
+    seasons = sorted({row[1] for row in candidate_rows(rows)})
+    by_season = {(row[0], row[1]): row for row in candidate_rows(rows)}
+    seasons_ahead = sum(1 for season in seasons
+                        if read_leading_number(by_season[(best, season)][columns.index('Own view gap')]) > 0)
+
+    def judge(gap, error):
+        return 'good' if gap - 2 * error > 0 else 'bad' if gap + 2 * error < 0 else 'warn'
+
+    tiles = render_stat_tiles([
+        (f'{best_gap:+.2f}', f'own-view H-score points per team for the smooth rule at s = {best} '
+                             f'(±{2 * best_error:.2f})', judge(best_gap, best_error)),
+        (f'{seasons_ahead} of {len(seasons)}', f'seasons in which s = {best} comes out ahead', ''),
+        (f'${read(best, "Unspent (smooth)"):.2f} vs ${read(best, "Unspent (simple scaling)"):.2f}',
+         f'left unspent per team at the end: smooth (s = {best}) vs simple scaling', ''),
+        (f'{worst_gap:+.2f}', f'at s = {worst}: it spends too much too early', judge(worst_gap, worst_error)),
+    ])
+    clear = best_gap - 2 * best_error > 0
+    status = ('good', 'smooth ahead') if clear else ('warn', 'no clear winner')
+    text = (f'Spending surplus cash smoothly, from a little before it is surplus, beats waiting for the surplus: at '
+            f'<b>s = {escape(best)}</b> the smooth drafters finish ahead of the simple-scaling drafters in their own '
+            f'view in {seasons_ahead} of {len(seasons)} seasons and leave a fraction of the money on the table. Softer '
+            f'is not better without limit: at s = {escape(worst)} they overpay early and lose.')
+
+    groups = seasons + ['All']
+
+    def read_season(softness, season, name):
+        row = summaries[softness] if season == 'All' else by_season[(softness, season)]
+        return read_leading_number(row[columns.index(name)])
+
+    gap_chart = render_chart(
+        [season[2:] if season != 'All' else season for season in groups],
+        [Series(f's = {softness}', [read_season(softness, season, 'Own view gap') for season in groups],
+                [2 * read_season(softness, season, 'Own view SE') for season in groups])
+         for softness in softnesses],
+        'Own-view H-score points, smooth - simple', kind='bars', references=(ReferenceLine(0.0, 'no difference'),),
+        value_places=2, height=250)
+
+    def spending_gap(softness, round_number):
+        return (read(softness, f'Spent after round {round_number} (smooth)')
+                - read(softness, f'Spent after round {round_number} (simple scaling)'))
+
+    rounds = list(range(1, AUCTION_ROUNDS + 1))
+    spending_chart = render_chart(
+        [str(round_number) for round_number in rounds],
+        [Series(f's = {softness}', [spending_gap(softness, round_number) for round_number in rounds])
+         for softness in softnesses],
+        '$ spent so far, smooth - simple', references=(ReferenceLine(0.0, 'even'),), value_places=1, height=280,
+        width=540)
+    unspent_chart = render_chart(
+        [f's = {softness}' for softness in softnesses],
+        [Series(label, [read(softness, f'Unspent ({label})') for softness in softnesses]) for label in RULE_LABELS],
+        '$ left per team', kind='bars', value_places=2, height=280, width=540)
+    return (render_takeaway(*status, text) + tiles
+            + '<h3>Does it win every season?</h3><div class="note">Own view, each season and pooled; whiskers are ±2 '
+              'standard errors across 40 pairs of auctions per season.</div>' + gap_chart
+            + '<div class="multiples"><div><h3>Where the money goes</h3><div class="note">How much more the smooth '
+              'drafters had spent by the end of each round (one sale per team).</div>' + spending_chart + '</div>'
+            + '<div><h3>Money left at the end</h3><div class="note">Per team, in the same auctions.</div>'
+            + unspent_chart + '</div></div>')
+
+
+def derive_rules_table(columns, rows):
+    """The rules table as shown: each gap with its standard error, and cash left and paid extra by rule (the
+    by-round spending is in the chart)."""
+    shown = ['Softness', 'Season', 'Pairs', 'Own view gap ± SE', 'Actual gap ± SE', 'Unspent (smooth)',
+             'Unspent (simple scaling)', 'Paid extra (smooth)', 'Paid extra (simple scaling)']
+
+    def cell(row, name):
+        if name.endswith(' ± SE'):
+            gap_name = name.removesuffix(' ± SE')
+            return f'{row[columns.index(gap_name)]} ± {row[columns.index(gap_name.replace("gap", "SE"))]}'
+        return row[columns.index(name)]
+
+    return shown, [[cell(row, name) for name in shown] for row in rows]
+
+
+def styles_rules_table(columns, rows):
+    """A gap in green when it is more than two standard errors above zero, red when more than two below."""
+    styles = []
+    for row in rows:
+        row_styles = [''] * len(row)
+        for name in ('Own view gap ± SE', 'Actual gap ± SE'):
+            index = columns.index(name)
+            gap, error = (float(part) for part in str(row[index]).split(' ± '))
+            if gap - 2 * error > 0:
+                row_styles[index] = GOOD
+            elif gap + 2 * error < 0:
+                row_styles[index] = BAD
+        styles.append(row_styles)
+    return styles
+
+
+def card_rule_builds(columns, rows):
+    """Whether bidding up stars costs a coherent build: each rule's misfits and value in punted categories, side by
+    side at each softness."""
+    softnesses = sorted({row[0] for row in rows})
+    by_key = {(row[0], row[1]): row for row in rows}
+
+    def read(softness, rule, name):
+        return read_leading_number(by_key[(softness, rule)][columns.index(name)])
+
+    no_cost = [softness for softness in softnesses
+               if read(softness, 'smooth', 'Misfits per team') <= read(softness, 'simple scaling', 'Misfits per team')
+               and read(softness, 'smooth', 'Value in punted') <= read(softness, 'simple scaling', 'Value in punted')]
+    tiles = render_stat_tiles([
+        (f'{read(softness, "smooth", "Misfits per team"):.2f} vs {read(softness, "simple scaling", "Misfits per team"):.2f}',
+         f'misfits per team at s = {softness}, smooth vs simple scaling',
+         'good' if softness in no_cost else 'warn')
+        for softness in softnesses])
+    text = ('Bidding up the stars does not cost the smooth drafters their builds: they put the same share of their '
+            'value into the categories they punt as the simple-scaling drafters, and carry about as many misfits'
+            + (f' (no more at s = {", ".join(no_cost)}).' if no_cost else '.'))
+    misfit_chart = render_chart(
+        [f's = {softness}' for softness in softnesses],
+        [Series(rule, [read(softness, rule, 'Misfits per team') for softness in softnesses]) for rule in RULE_LABELS],
+        'Misfits per team', kind='bars', value_places=2, height=260, width=540)
+    punted_chart = render_chart(
+        [f's = {softness}' for softness in softnesses],
+        [Series(rule, [read(softness, rule, 'Value in punted') for softness in softnesses]) for rule in RULE_LABELS],
+        'Value in punted categories', kind='bars', value_suffix='%', value_places=0, height=260, width=540)
+    return (render_takeaway('good' if no_cost else 'warn', 'builds hold' if no_cost else 'builds slip', text) + tiles
+            + '<div class="multiples"><div><h3>Misfits</h3><div class="note">Players with at least half their value '
+              'in categories the team punts.</div>' + misfit_chart + '</div>'
+            + '<div><h3>Value in punted categories</h3><div class="note">Share of the team\'s positive value; a '
+              'build bought regardless of its punts would put about 17% there.</div>' + punted_chart + '</div></div>')
+
+
+# Auction dollar values
+DOLLAR_LEVELS = ('off', 'medium', 'high')
+
+
+def read_dollar_shape_summaries(columns, rows):
+    """{(replacement level, SAVOR level): its ALL row}."""
+    return {(row[1], row[3]): row for row in rows if is_summary_row(row)}
+
+
+DOLLAR_TIERS = ('Top 10%', 'Middle 80%', 'Bottom 10%')
+
+
+# The grid's medium settings are the app's defaults (test_experiments._REPLACEMENT_LEVELS and _SAVOR_NOISES).
+APP_DOLLAR_CELL = ('medium', 'medium')
+
+
+def card_dollar_shape(columns, rows):
+    """What the app's setting does to the dollar curve, then how each adjustment adds to it: each rank's change in
+    percent, against neither adjustment."""
+    summaries = read_dollar_shape_summaries(columns, rows)
+
+    def read(replacement, savor, name):
+        return read_leading_number(summaries[(replacement, savor)][columns.index(name)])
+
+    def describe(replacement, savor):
+        return ' / '.join(f'{read(replacement, savor, f"{tier} change"):+.0f}%' for tier in DOLLAR_TIERS)
+
+    app_replacement, app_savor = APP_DOLLAR_CELL
+    threshold = read(app_replacement, app_savor, 'Replacement threshold')
+    noise = read(app_replacement, app_savor, 'SAVOR noise')
+    tiles = render_stat_tiles([
+        (f'{read(app_replacement, app_savor, f"{tier} change"):+.0f}%',
+         f'{tier.lower()} of the drafted players, at the app\'s setting (S = {noise:g}, S_R = ${threshold:g})',
+         'good' if tier == DOLLAR_TIERS[0] else '')
+        for tier in DOLLAR_TIERS])
+    text = (f'SAVOR moves money from the bottom of the draft to the top, and the replacement threshold adds to it. At '
+            f'the app\'s noise (S = {noise:g}), vanilla SAVOR moves the top 10% / middle 80% / bottom 10% by '
+            f'<b>{describe("off", app_savor)}</b>; with the app\'s threshold of ${threshold:g}, '
+            f'<b>{describe(app_replacement, app_savor)}</b>. With no noise a threshold simply cuts everyone below it to '
+            f'zero (the first column of the grid); noise softens that, since a cheap player may still clear it.')
+    rank_columns = [name for name in columns if name.startswith('Rank ')]
+    ranks = [name.split()[1] for name in rank_columns]
+
+    def percent_change(replacement, savor):
+        """Each rank's dollars in this cell, in percent against neither adjustment."""
+        return [100 * (read(replacement, savor, name) / read('off', 'off', name) - 1) for name in rank_columns]
+
+    cells = [('off', app_savor, f'vanilla SAVOR (S = {noise:g})'),
+             (app_replacement, app_savor, f'the app: S = {noise:g}, S_R = ${threshold:g}'),
+             ('high', app_savor, f'S = {noise:g}, S_R = ${read("high", app_savor, "Replacement threshold"):g}'),
+             (app_replacement, 'high', f'S = {read(app_replacement, "high", "SAVOR noise"):g}, S_R = ${threshold:g}')]
+    shape_chart = render_chart(
+        ranks, [Series(label, percent_change(replacement, savor)) for replacement, savor, label in cells],
+        '% change in dollars', references=(ReferenceLine(0.0, 'neither'),), value_suffix='%', value_places=0,
+        height=280, show_points=False)
+    return (render_takeaway('good', 'shape', text) + tiles
+            + '<h3>Who gains and who pays</h3><div class="note">Each drafted rank\'s dollars at the start of an '
+              'auction, in percent against neither adjustment, mean over the six seasons. The top ranks gain what the '
+              'bottom ones lose.</div>' + shape_chart)
+
+
+def styles_dollar_shape_table(columns, rows):
+    """Each cell shaded by how much its top 10% gains (deepest at the largest gain in the grid); the app's cell bold."""
+    gains = {}
+    for row_index, row in enumerate(rows):
+        for column_index, cell in enumerate(row[1:], 1):
+            if cell.endswith('%'):
+                gains[(row_index, column_index)] = read_leading_number(cell)
+    largest = max(gains.values())
+    styles = []
+    for row_index, row in enumerate(rows):
+        row_styles = [''] * len(row)
+        for column_index in range(1, len(row)):
+            gain = gains.get((row_index, column_index))
+            shade = style_heat(gain / largest) if gain is not None else ''
+            if row[0].startswith(APP_DOLLAR_CELL[0]) and columns[column_index].startswith(f'SAVOR {APP_DOLLAR_CELL[1]}'):
+                shade = shade[:-1] + ';font-weight:700"' if shade else ' style="font-weight:700"'
+            row_styles[column_index] = shade
+        styles.append(row_styles)
+    return styles
+
+
+def derive_dollar_shape_table(columns, rows):
+    """The 3x3 grid over the seasons: replacement level down, SAVOR across. Each cell is the average player's dollars in
+    the top 10% / middle 80% / bottom 10% of the drafted players: with both off in dollars, elsewhere their change
+    against it in percent."""
+    summaries = read_dollar_shape_summaries(columns, rows)
+
+    def cell(replacement, savor):
+        row = summaries[(replacement, savor)]
+        if (replacement, savor) == ('off', 'off'):
+            return ' / '.join(f'${float(row[columns.index(f"{tier} $ per player")]):.2f}' for tier in DOLLAR_TIERS)
+        return ' / '.join(f'{read_leading_number(row[columns.index(f"{tier} change")]):+.0f}%'
+                          for tier in DOLLAR_TIERS)
+
+    def label(level, name, prefix):
+        row = next(row for key, row in summaries.items() if key[0 if prefix == 'replacement' else 1] == level)
+        value = float(row[columns.index(name)])
+        app = ', the app' if level == (APP_DOLLAR_CELL[0] if prefix == 'replacement' else APP_DOLLAR_CELL[1]) else ''
+        return f'{level} (${value:g}{app})' if prefix == 'replacement' else f'SAVOR {level} (S = {value:g}{app})'
+
+    shown = ['Replacement level'] + [label(level, 'SAVOR noise', 'savor') for level in DOLLAR_LEVELS]
+    return shown, [[label(replacement, 'Replacement threshold', 'replacement')]
+                   + [cell(replacement, savor) for savor in DOLLAR_LEVELS] for replacement in DOLLAR_LEVELS]
+
+
 # Where the app loses to the optimum
 LOSS_COLUMNS = ['Seed choice', 'Seed menu', 'Iterations', 'Remaining gap', 'Total loss']
 
@@ -1030,6 +1320,12 @@ def styles_loss(columns, rows):
 
 
 SECTION_VIEWS: dict[str, SectionView] = {
+    'Smooth vs simple scaling': SectionView(card=card_rules_head_to_head, derive_table=derive_rules_table,
+                                            cell_styles=styles_rules_table),
+    'Cash-share rules: builds (own view)': SectionView(card=card_rule_builds, wrap_columns=('Most common punts',)),
+    'Dollar shape: replacement level and SAVOR': SectionView(card=card_dollar_shape,
+                                                             derive_table=derive_dollar_shape_table,
+                                                             cell_styles=styles_dollar_shape_table),
     'H-scoring vs a G-score field': SectionView(
         card=card_h_versus_g,
         cell_styles=make_rule_styles({'Mean win rate': rule_season_win_rate,
@@ -1224,6 +1520,11 @@ SECTION_GROUPS = {
         'Loop gain at the optimum',
         'Quasiconcavity along weight segments',
     ],
+    'Auctions': [
+        'Smooth vs simple scaling',
+        'Cash-share rules: builds (own view)',
+        'Dollar shape: replacement level and SAVOR',
+    ],
 }
 
 
@@ -1236,18 +1537,48 @@ def group_sections(sections: list[dict]) -> list[tuple[str, list[dict]]]:
     return [(name, members) for name, members in groups if members]
 
 
+# The page's tab switching: a group tab shows its row of section tabs and the section last open in it.
+PAGE_SCRIPT = """
+function showSection(button) {
+  document.querySelectorAll('.tab-buttons button, section').forEach(function (node) {
+    node.classList.remove('active');
+  });
+  button.classList.add('active');
+  button.parentElement.dataset.lastTab = button.dataset.tab;
+  document.getElementById('tab-' + button.dataset.tab).classList.add('active');
+}
+document.querySelectorAll('.tab-buttons button').forEach(function (button) {
+  button.addEventListener('click', function () { showSection(button); });
+});
+document.querySelectorAll('.group-tabs button').forEach(function (button) {
+  button.addEventListener('click', function () {
+    document.querySelectorAll('.group-tabs button, .tab-buttons').forEach(function (node) {
+      node.classList.remove('active');
+    });
+    button.classList.add('active');
+    var row = document.querySelector('.tab-buttons[data-group="' + button.dataset.group + '"]');
+    row.classList.add('active');
+    var last = row.dataset.lastTab;
+    showSection(last ? row.querySelector('button[data-tab="' + last + '"]') : row.querySelector('button'));
+  });
+});
+"""
+
+
 def render_report_page(sections: list[dict], subtitle: str) -> str:
-    """The whole page: the tabs in their groups, one panel per section."""
-    groups, panels, position = [], [], 0
-    for group_name, members in group_sections(sections):
+    """The whole page: a row of group tabs, under it the chosen group's section tabs, one panel per section."""
+    group_buttons, section_rows, panels, position = [], [], [], 0
+    for group_index, (group_name, members) in enumerate(group_sections(sections)):
+        group_active = ' class="active"' if group_index == 0 else ''
+        group_buttons.append(f'<button data-group="{group_index}"{group_active}>{escape(group_name)}</button>')
         buttons = []
         for data in members:
             active = ' class="active"' if position == 0 else ''
             buttons.append(f'<button data-tab="{position}"{active}>{escape(data["title"].split(" (")[0])}</button>')
             panels.append(render_section_panel(data, position))
             position += 1
-        groups.append(f'<div class="tab-group"><div class="tab-group-name">{escape(group_name)}</div>'
-                      f'<div class="tab-buttons">{"".join(buttons)}</div></div>')
+        row_class = 'tab-buttons active' if group_index == 0 else 'tab-buttons'
+        section_rows.append(f'<div class="{row_class}" data-group="{group_index}">{"".join(buttons)}</div>')
     newline = '\n'
     return (
         '<!DOCTYPE html>\n<html lang="en"><head><meta charset="utf-8">\n'
@@ -1256,17 +1587,7 @@ def render_report_page(sections: list[dict], subtitle: str) -> str:
         f'<style>{PAGE_CSS}</style></head><body><main>\n'
         '<h1>Experiment report</h1>\n'
         f'<div class="stamp">{subtitle}</div>\n'
-        f'<nav>{"".join(groups)}</nav>\n'
+        f'<nav><div class="group-tabs">{"".join(group_buttons)}</div>{"".join(section_rows)}</nav>\n'
         f'{newline.join(panels)}\n'
-        '<script>\n'
-        'document.querySelectorAll("nav button").forEach(function (button) {\n'
-        '  button.addEventListener("click", function () {\n'
-        '    document.querySelectorAll("nav button, section").forEach(function (node) {\n'
-        '      node.classList.remove("active");\n'
-        '    });\n'
-        '    button.classList.add("active");\n'
-        '    document.getElementById("tab-" + button.dataset.tab).classList.add("active");\n'
-        '  });\n'
-        '});\n'
-        '</script>\n</main></body></html>'
+        f'<script>{PAGE_SCRIPT}</script>\n</main></body></html>'
     )
