@@ -1164,6 +1164,36 @@ tr {
     white-space: nowrap;
 }
 
+/* A rostered player the session could not match (shown by the platform's name): muted, with a small marker. */
+.unmatched-player {
+    color: light-dark(#7a7a86, #9a9aac);
+    font-style: italic;
+}
+
+.unmatched-player-marker {
+    margin-left: 6px;
+    padding: 0 5px;
+    border: 1px solid currentColor;
+    border-radius: 8px;
+    font-size: 0.75em;
+    font-style: normal;
+}
+
+/* A "Your $" raised by the team's cash (backend/services/auction_pricing.py), coloured by its cash-to-cost ratio r
+   (table_helpers.classifyCashPressure): amber from r = 0.7, deepening to red by r = 1, with the reason on hover.
+   Paired with the cell classes it sits on, which set their own colour. */
+.celltypeb.cash-pressure,
+.celltypea.cash-pressure {
+    font-weight: 600;
+    text-decoration: underline dotted;
+    cursor: help;
+}
+.celltypeb.cash-pressure-1, .celltypea.cash-pressure-1 { color: light-dark(#b07800, #f2c35a); }
+.celltypeb.cash-pressure-2, .celltypea.cash-pressure-2 { color: light-dark(#a86200, #f2a94b); }
+.celltypeb.cash-pressure-3, .celltypea.cash-pressure-3 { color: light-dark(#a44a00, #f28b42); }
+.celltypeb.cash-pressure-4, .celltypea.cash-pressure-4 { color: light-dark(#a83200, #f26c3e); }
+.celltypeb.cash-pressure-5, .celltypea.cash-pressure-5 { color: light-dark(#b01a1a, #f25454); }
+
 /* Positions suffix inside the full player display — lighter than the name so the
    name stays the visual anchor. */
 .player-positions {

@@ -58,6 +58,8 @@ def _build_default_session_request() -> dict:
             , 'aleph':         opts['aleph']['default']
             , 'n_iterations':  opts['n_iterations']['default']
             , 'streaming_noise': opts['S']['default']
+            , 'replacement_threshold': opts['S_R']['default']
+            , 'cash_share_softness': opts['cash_share_softness']['default']
         }
         , 'data_source': {'type': 'historical', 'season': '2024-25'}
     }

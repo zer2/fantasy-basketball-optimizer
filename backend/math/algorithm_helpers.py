@@ -22,11 +22,12 @@ _CORRECTION_NODE_CACHE: dict[int, tuple] = {}
 def auction_value_adjuster(raw_values_unselected: pd.Series
                             , n_remaining_players: int
                             , remaining_cash: int
-                            , noise: float) -> pd.Series:
+                            , noise: float
+                            , replacement_threshold: float) -> pd.Series:
     dollar_values = dollar_scale_adjustment(raw_values_unselected,
                                             remaining_cash,
                                             n_remaining_players)
-    return savor_calculation(dollar_values, noise)
+    return savor_calculation(dollar_values, noise, replacement_threshold)
 
 
 def dollar_scale_adjustment(raw_values_unselected: pd.Series
@@ -40,12 +41,28 @@ def dollar_scale_adjustment(raw_values_unselected: pd.Series
     return value_above_replacement * dollar_per_value
 
 
-def savor_calculation(dollar_value: pd.Series, noise: float) -> pd.Series:
+def savor_calculation(dollar_value: pd.Series
+                      , noise: float
+                      , replacement_threshold: float) -> pd.Series:
+    """Each player's value for the slot he takes: his dollar value D is his expected worth, his outcome is normal around
+    it with standard deviation noise, and only an outcome above the replacement threshold counts (below it the slot
+    would be better used for streaming): E[max(outcome - threshold, 0)]. A flyer, a player at replacement level ($0),
+    is worth something too, through his chance of ending above the threshold; each player is worth what he adds over
+    the flyer, and the values are rescaled to the original total. A threshold of 0 is the original SAVOR; a higher one
+    is a streaming slot worth more, so a marginal player is worth less over the flyer (the user, 2026-10-21). With no
+    noise, the value is D above the threshold."""
+    if replacement_threshold < 0:
+        raise ValueError(f'The replacement threshold must not be negative; got {replacement_threshold}.')
     if noise == 0:
-        return dollar_value
-    probability_of_non_streaming = norm.cdf(dollar_value / noise)
-    adjustment_factor = (noise) / (2 * np.pi) ** 0.5 * (1 - np.exp((-dollar_value ** 2) / (2 * noise ** 2)))
-    adjusted_value = dollar_value * probability_of_non_streaming - adjustment_factor
+        adjusted_value = np.clip(dollar_value - replacement_threshold, 0, None)
+        return adjusted_value * dollar_value.sum() / adjusted_value.sum()
+
+    def compute_expected_value_above_threshold(mean):
+        standardized_gap = (mean - replacement_threshold) / noise
+        return (mean - replacement_threshold) * norm.cdf(standardized_gap) + noise * norm.pdf(standardized_gap)
+
+    adjusted_value = (compute_expected_value_above_threshold(dollar_value)
+                      - compute_expected_value_above_threshold(0.0))
     return adjusted_value * dollar_value.sum() / adjusted_value.sum()
 
 

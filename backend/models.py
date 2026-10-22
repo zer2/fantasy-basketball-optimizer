@@ -55,7 +55,11 @@ class Roster:
 
 
 class AuctionValues(BaseModel):
-    your_dollar:   float   # SAVOR on H-scores, team-specific, current cash/picks
+    your_dollar:   float   # SAVOR on H-scores, team-specific, current cash/picks, plus unusable_cash_share
+    unusable_cash_share: float   # the part of your_dollar that is the team's otherwise unusable cash (auction_pricing)
+    # The team's spendable cash over what its best options cost (auction_pricing.compute_cash_to_cost_ratio), the
+    # ratio the smooth rule acts on; the same for every candidate. None when no available player fits an open slot.
+    cash_to_cost_ratio: Optional[float]
     generic_dollar:   float   # SAVOR on H-scores, current cash/picks (generic baseline)
     original_dollar:   float   # SAVOR on H-scores, full original cash/picks
     generic_dollar_g_score: float   # SAVOR on G-scores, current cash/picks

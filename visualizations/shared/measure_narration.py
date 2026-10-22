@@ -64,7 +64,7 @@ def main() -> None:
     voice = NarrationVoice()
     before = previous_seconds()
     characters = 0
-    for folder in sorted(_VISUALIZATIONS.glob('[1-8]_*')):
+    for folder in sorted(_VISUALIZATIONS.glob('scenes/[1-8]_*')):
         print(f'\n{folder.name}')
         total_now = total_before = 0.0
         paced_now = paced_before = 0.0

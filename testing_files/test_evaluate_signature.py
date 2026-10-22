@@ -25,7 +25,7 @@ import os
 
 import pytest
 
-from benchmark_helpers import (client, _build_session_request, resolve_player_ids,
+from benchmark_helpers import (client, build_golden_session_request, resolve_player_ids,
                                _DEFAULT_CATEGORIES)
 from backend.state.session import get_session
 from backend.services.ranking import rank_candidates
@@ -134,7 +134,7 @@ def warmed_session(request):
     a repriced board, so each is pinned separately. The neutral baseline the throttle primes from
     is built at session creation, so no warm-up evaluate is needed for reproducibility."""
     label, objective, categories, tiebreaker = request.param
-    response = client.post('/sessions', json=_build_session_request(
+    response = client.post('/sessions', json=build_golden_session_request(
         objective=objective, categories=categories, tiebreaker_category=tiebreaker))
     assert response.status_code == 201, f'Session creation failed ({label}): {response.text}'
     session    = get_session(response.json()['session_id'])

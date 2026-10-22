@@ -7,7 +7,7 @@ import {
 } from '../styles/styler_functions.js'
 import { PlayerResult, FlexAllocations, Roster, HypotheticalTeam, BoardRequest } from '../types.js'
 import { getPositionNames, getPositionStructure, getLatestScoredBoard } from '../app_state.js'
-import { makeSpacerTh } from './table_helpers.js'
+import { classifyCashPressure, describeCashPressure, makeSpacerTh } from './table_helpers.js'
 import { buildPlayerGScoreCard } from './gscore_table.js'
 import { makeRosterPlayerDisplay, makeHypotheticalPlayerDisplay } from '../player_display.js'
 import { fetchHypotheticalTeam, HTTPError } from '../api/client.js'
@@ -494,6 +494,11 @@ function makeAuctionValuesTable(playerData: PlayerResult): HTMLTableElement {
         const cell = hScoreRow.insertCell(-1)
         cell.className = 'panel-datacell celltypea'
         cell.textContent = value.toFixed(1)
+        const pressureClass = classifyCashPressure(auctionValues.cash_to_cost_ratio)
+        if (value === auctionValues.your_dollar && pressureClass) {
+            cell.classList.add(...pressureClass.split(' '))
+            cell.title = describeCashPressure(auctionValues.cash_to_cost_ratio!, auctionValues.unusable_cash_share)
+        }
     }
 
     // G-score row (Your $ is not applicable for G-scores)

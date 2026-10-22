@@ -93,6 +93,23 @@ class Session:
     # hypothetical team (services/hypothetical_team) reads the strategy the board showed instead of re-solving.
     candidate_strategy_cache: "OrderedDict[tuple, tuple]" = field(default_factory=OrderedDict)
 
+    # Each auction autodrafter's raw H-scores between nominations (services/auction_autodraft.read_team_h_scores):
+    # {team: TeamHScores}. Every entry remembers the agent and board it was computed on, and is used only while the
+    # session holds that agent and the board has only grown since.
+    auction_team_h_scores: dict = field(default_factory=dict)
+
+    # Each auction autodrafter's noisy view of the players' X-scores (services/auction_autodraft.read_team_x_scores):
+    # {team: (agent, X-scores)}, drawn once per agent so a team's valuations stay consistent between nominations.
+    auction_team_x_scores: dict = field(default_factory=dict)
+
+    # The cash-share rule each autodrafter prices with, where an experiment sets one (services/auction_autodraft.
+    # read_cash_share_rule): {team: rule from auction_pricing.CASH_SHARE_RULES}. Teams it does not name use the app's.
+    auction_cash_share_rules: dict = field(default_factory=dict)
+
+    # Seeds every auction autodrafter's noisy view together with its team name (services/auction_autodraft.
+    # read_team_x_scores). 0 is the app's draw; an experiment sets others to run independent auctions.
+    auction_noise_seed: int = 0
+
 
 # ── Store ────────────────────────────────────────────────────────────────────
 # Grouped here rather than above Session because the _store annotation below is

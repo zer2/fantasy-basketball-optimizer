@@ -5,6 +5,8 @@
 import { readRequiredIntInput } from '../../helper_functions.js'
 import { defaultTeamLabel } from '../team_labels.js'
 import { getTeamIdentitiesFromSidebar, getLeagueSettings } from '../../setting_collection/league_settings.js'
+import { REPLACEMENT_PLAYER_ID } from '../../player_registry.js'
+import { getLivePlatformRosterError, getLivePlatformRosters } from '../../api/season_session.js'
 
 
 /** Reads roster assignments from the Rosters tab grid (sr-player-{row}-{col}). The single
@@ -34,13 +36,30 @@ export function readRosterAssignments(): Record<string, number[]> {
     return assignments
 }
 
+/** The players of a roster that can be dropped or traded: all but the unmatched ones, which the roster carries as the
+ *  replacement player (a stand-in for whoever the platform rostered, not a player to move). */
+export function listMovablePlayers(roster: number[]): number[] {
+    return roster.filter(playerId => playerId !== REPLACEMENT_PLAYER_ID)
+}
+
 /** What a Season Mode tab says before it has the full teams it needs. A connected league's rosters are on their way
  *  (the tab is drawn again when they arrive), so asking the user to fill them in read as broken (2026-10-13). */
 export function readEmptyRostersMessage(
     teamsNeeded: string
     , toolName: string
 ): string {
-    return getLeagueSettings().platform === 'Enter your own data'
-        ? `Fill out at least ${teamsNeeded} on the Rosters tab to use ${toolName}.`
-        : "Loading your league's rosters…"
+    if (getLeagueSettings().platform === 'Enter your own data') {
+        return `Fill out at least ${teamsNeeded} on the Rosters tab to use ${toolName}.`
+    }
+    const rosterError = getLivePlatformRosterError()
+    if (rosterError !== null) return `Could not load your league's rosters: ${rosterError}`
+    // The league answered and its rosters are empty: a season that has not drafted yet (an ESPN league keeps its id
+    // across seasons, and the newest season is chosen by default). Saying "loading" there never ended (2026-10-21).
+    const platformRosters = getLivePlatformRosters()
+    if (platformRosters !== null && Object.values(platformRosters).every(roster => roster.length === 0)) {
+        return "This league's rosters are empty for the season it is connected to (has it drafted yet?)."
+            + (getLeagueSettings().platform === 'Retrieve from ESPN'
+                ? ' Choose another season under League Settings to see that one.' : '')
+    }
+    return "Loading your league's rosters…"
 }

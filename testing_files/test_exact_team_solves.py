@@ -128,7 +128,7 @@ def test_frank_wolfe_never_ends_below_the_naive_team(draft_session):
             strategy.flex_shares, fixed_slot_types, agent.position_config.position_numbers)
         problem = exact_team_solves.build_team_solve_problem(
             agent, board, 'Drafter 1', candidate, [], [int(p) for p in agent.default_h_scores.index],
-            fixed_slot_types, expected, None, None, None)
+            True, fixed_slot_types, expected, None, None, None, None)
         naive = exact_team_solves.solve_naive_exact_team_for_draft(problem, strategy.category_weights)
         field = exact_team_solves.capture_complete_team_field(agent, problem, board, 'Drafter 1', [], naive, None)
         frank_wolfe = exact_team_solves.run_frank_wolfe(agent, problem, field, strategy.win_rates, naive)
@@ -159,6 +159,90 @@ def test_frank_wolfe_never_ends_below_the_naive_team(draft_session):
                        & (np.array(problem.base_positions)[problem.seat_bases] == base))
             assert low <= refined[in_cell].sum() <= high, (slot, base)
             assert low <= reseated[in_cell].sum() <= high, (slot, base)
+
+
+def test_an_unanchored_solve_drops_h_scorings_plan(draft_session):
+    """Without anchoring, my players may take any slot they are eligible for, there are no flex-allocation rows, the
+    objective is the plain complete-team H-score, and the solve still returns a legal team that never ends below the naive
+    one. Mixing the switch with plan arguments it does not take is refused."""
+    session_id, session = draft_session
+    agent = session.agent
+    board = make_two_round_board(session)
+    request = {'player_assignments': board, 'my_team_id': 'Drafter 1'}
+    candidate = client.post(f'/sessions/{session_id}/evaluate', json=request).json()['candidates'][0]['player_id']
+    strategy = session.candidate_strategy_cache[make_candidate_strategy_key(board, 'Drafter 1', [], None, None)][1][candidate]
+    order = [int(p) for p in agent.default_h_scores.index]
+    slot_names = make_slot_names(agent.position_config)
+    fixed_slot_types = [slot_names[slot_index].rstrip('0123456789') for slot_index in strategy.seating]
+    expected = compute_expected_flex_position_counts(
+        strategy.flex_shares, fixed_slot_types, agent.position_config.position_numbers)
+    anchored = exact_team_solves.build_team_solve_problem(
+        agent, board, 'Drafter 1', candidate, [], order, True, fixed_slot_types, expected, None, None, None, None)
+    unanchored = exact_team_solves.build_team_solve_problem(
+        agent, board, 'Drafter 1', candidate, [], order, False, None, None, None, None, None, None)
+
+    assert unanchored.flex_cell_bounds == {} and anchored.flex_cell_bounds != {}
+    flex_rows = 2 * len(anchored.flex_cell_bounds)
+    assert len(unanchored.inequality_rows) == len(anchored.inequality_rows) - flex_rows
+    for index in range(anchored.n_fixed_players):
+        locked = set(anchored.seat_slot_types[anchored.seat_players == index])
+        free = set(unanchored.seat_slot_types[unanchored.seat_players == index])
+        assert len(locked) == 1 and locked < free, (index, locked, free)
+
+    naive = exact_team_solves.solve_naive_exact_team_for_draft(unanchored, strategy.category_weights)
+    field = exact_team_solves.capture_complete_team_field(agent, unanchored, board, 'Drafter 1', [], naive, None)
+    seating = exact_team_solves.solve_fw_exact_team_for_draft(agent, unanchored, field, strategy.win_rates, naive)
+    assert np.all(unanchored.inequality_rows @ seating <= unanchored.inequality_bounds + 1e-9), 'every constraint holds'
+    assert np.allclose(unanchored.equality_rows @ seating, unanchored.equality_bounds)
+    naive_objective, final_objective = exact_team_solves.score_seatings(
+        agent, unanchored, field, np.array([naive, seating]), strategy.win_rates)
+    assert final_objective >= naive_objective - 1e-12
+    selection = exact_team_solves.convert_seatings_to_selections(unanchored, seating[np.newaxis, :])
+    totals = selection @ unanchored.x_scores
+    units = None if unanchored.volume_units is None else selection @ unanchored.volume_units
+    plain = exact_team_solves.score_team_totals(agent, unanchored, field, totals, units, np.ones_like(strategy.win_rates))
+    assert np.isclose(plain[0], final_objective), 'no penalty, even against impossible win-rate targets'
+
+    with pytest.raises(ValueError):
+        exact_team_solves.build_team_solve_problem(
+            agent, board, 'Drafter 1', candidate, [], order, False, fixed_slot_types, expected, None, None, None, None)
+    with pytest.raises(ValueError):
+        exact_team_solves.build_team_solve_problem(
+            agent, board, 'Drafter 1', candidate, [], order, True, None, None, None, None, None, None)
+
+
+def test_a_solve_given_pick_numbers_follows_the_pick_order(draft_session):
+    """With my remaining pick numbers, the planned team is draftable in the actual snake order: before each of my later
+    picks the other drafters take the players ahead of it in the availability order, and at most i - 1 of my later
+    players come from those taken before my i-th later pick. A wrong count of pick numbers is refused."""
+    session_id, session = draft_session
+    agent = session.agent
+    board = make_two_round_board(session)
+    request = {'player_assignments': board, 'my_team_id': 'Drafter 1'}
+    candidate = client.post(f'/sessions/{session_id}/evaluate', json=request).json()['candidates'][0]['player_id']
+    strategy = session.candidate_strategy_cache[make_candidate_strategy_key(board, 'Drafter 1', [], None, None)][1][candidate]
+    order = [int(p) for p in agent.default_h_scores.index]
+    n_drafters = agent.n_drafters
+    # Drafter 1 picks first in odd rounds and last in even ones; two rounds are done, so the candidate is pick 25.
+    my_pick_numbers = [n_drafters * (draft_round - 1) + 1 if draft_round % 2 == 1 else n_drafters * draft_round
+                       for draft_round in range(3, agent.n_picks + 1)]
+    problem = exact_team_solves.build_team_solve_problem(
+        agent, board, 'Drafter 1', candidate, [], order, False, None, None, None, None, None, my_pick_numbers)
+
+    naive = exact_team_solves.solve_naive_exact_team_for_draft(problem, strategy.category_weights)
+    field = exact_team_solves.capture_complete_team_field(agent, problem, board, 'Drafter 1', [], naive, None)
+    seating = exact_team_solves.solve_fw_exact_team_for_draft(agent, problem, field, strategy.win_rates, naive)
+    assert np.all(problem.inequality_rows @ seating <= problem.inequality_bounds + 1e-9), 'every constraint holds'
+    assert np.allclose(problem.equality_rows @ seating, problem.equality_bounds)
+    chosen_places = sorted(problem.seat_players[(seating > 0.5) & (problem.seat_players >= problem.n_fixed_players)]
+                           - problem.n_fixed_players)
+    for later_index, later_pick in enumerate(my_pick_numbers[1:], start=1):
+        taken_by_others = later_pick - my_pick_numbers[0] - later_index
+        assert sum(place < taken_by_others for place in chosen_places) <= later_index - 1, later_pick
+
+    with pytest.raises(ValueError):
+        exact_team_solves.build_team_solve_problem(
+            agent, board, 'Drafter 1', candidate, [], order, False, None, None, None, None, None, my_pick_numbers[1:])
 
 
 def test_hypothetical_team_changes_nothing_the_evaluate_returns(draft_session):
@@ -210,7 +294,7 @@ def solve_team_with_teams(agent, strategy, board, candidate, player_teams, remai
         strategy.flex_shares, fixed_slot_types, agent.position_config.position_numbers)
     problem = exact_team_solves.build_team_solve_problem(
         agent, board, 'Drafter 1', candidate, [], [int(p) for p in agent.default_h_scores.index],
-        fixed_slot_types, expected, remaining_cash, predicted_prices, player_teams)
+        True, fixed_slot_types, expected, remaining_cash, predicted_prices, player_teams, None)
     if remaining_cash is None:
         naive = exact_team_solves.solve_naive_exact_team_for_draft(problem, strategy.category_weights)
     else:
@@ -261,8 +345,10 @@ def test_auction_example_team_holds_at_most_two_players_per_nba_team():
     player_teams = pd.Series({int(p): f'team {int(p) % 10}' for p in agent.default_h_scores.index})
     # Generic dollars for the whole available pool, as the service computes them.
     _, prices = compute_original_and_generic_dollars(
-        agent.default_h_scores, agent.x_scores.index, agent.n_drafters * agent.n_picks, agent.n_drafters * 200,
-        sum(remaining_cash.values()), session.current_settings['streaming_noise'])
+        agent.default_h_scores, agent.x_scores.index, agent.n_drafters, agent.n_picks,
+        session.current_settings['n_picks'], 200, sum(remaining_cash.values()),
+        session.current_settings['streaming_noise'], session.current_settings['replacement_threshold'],
+        session.current_settings['cash_share_softness'])
     candidate = next(c for c in candidates if c['auction_values']['generic_dollar'] < 60)['player_id']
     problem, seating = solve_team_with_teams(agent, strategies[candidate], board, candidate, player_teams,
                                              remaining_cash=200.0, predicted_prices=prices)

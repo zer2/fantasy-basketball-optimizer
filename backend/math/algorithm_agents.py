@@ -9,6 +9,8 @@ Rotisserie helpers, AdamOptimizer) are unchanged from that original.
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+
 import logging
 
 from typing import Optional
@@ -107,8 +109,14 @@ _REG_FLOOR = 0.0
 # With this unit, lambda_p = 1 is exactly the pick-one pinning threshold (the shrink
 # removes at least a full step per iteration, so shares can never leave uniform); the
 # Gaussian schedule lowers the bar as the roster fills. Values below 1 are a continuous
-# dial; 0.8 is (within 5%) the strength shipped as old-units 4.
-_LAMBDA_P_DEFAULT = 0.8
+# dial. Default 3.0 (2026-10-19, from H-vs-G drafts over the 26 seasons with positions): the
+# shares stay pinned at uniform while 3 x the schedule is at least 1 -- my first five picks --
+# and lean after. Against the 0.8 shipped before it (chosen by eye on live boards), 3.0 gains
+# +1.48pp Most Categories and +0.35pp Each Category, and 10.4 and 30 gain no more. Leaning
+# shares early were overconfident: they planned flex slots around players a scarce position
+# then could not supply (2001-02 to 2003-04, the seasons with the fewest PG-eligible
+# players, lost 5-7pp in Most Categories).
+_LAMBDA_P_DEFAULT = 3.0
 
 
 # Gaussian (phi) reg-decay shape: lambda_k = peak*(phi(B k/n) - phi(B))/(phi(0)-phi(B)) -- peak on an
@@ -2048,6 +2056,20 @@ class HAgent:
                                  - seed_scores[incumbent_index])
             best = np.where(challenger_margin < _SEED_INCUMBENT_MARGIN, incumbent_index, best)
         return np.array([seed_matrices[b][i] for i, b in enumerate(best)])
+
+    @contextmanager
+    def substituting_x_scores(self, x_scores: pd.DataFrame):
+        """Solve with `x_scores` in place of the agent's own for the duration: the auction autodraft gives each
+        autodrafter its own noisy view of the players (services/auction_autodraft). Same index and columns as the
+        agent's; restored on exit, also when the solve fails."""
+        if not (x_scores.index.equals(self.x_scores.index) and x_scores.columns.equals(self.x_scores.columns)):
+            raise ValueError('Substitute X-scores must have the same players and categories as the agent\'s.')
+        own_x_scores = self.x_scores
+        self.x_scores = x_scores
+        try:
+            yield
+        finally:
+            self.x_scores = own_x_scores
 
     def set_forced_category_weights(self, allow_force_weighting: bool, forced_category_weights: dict):
         """Pin, repin, or release the forced category weights on an already-built agent.

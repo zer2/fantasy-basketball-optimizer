@@ -5,13 +5,15 @@
 import { makeCustomSelect, CustomSelect } from '../../custom_select.js'
 import { pref, savePref } from '../../preferences.js'
 import { getPlayerResults } from '../../app_state.js'
-import { getRegistryEntry, findPlayerIdByName } from '../../player_registry.js'
-import { buildFullPlayerDisplayHtml, buildPlayerOptionLabel } from '../../player_display.js'
+import { getRegistryEntry, findPlayerIdByName, REPLACEMENT_PLAYER_ID } from '../../player_registry.js'
+import { buildFullPlayerDisplayHtml, buildPlayerOptionLabel, buildUnmatchedPlayerDisplayHtml } from '../../player_display.js'
 import { isMobileViewport, readRequiredIntInput } from '../../helper_functions.js'
 import { getTeamLabel, makeTeamLabelInput } from '../team_labels.js'
 import { getSelectedCategories } from '../../setting_collection/format_and_categories.js'
 import { getLeagueSettings, getTeamIdentitiesFromSidebar } from '../../setting_collection/league_settings.js'
-import { evaluateTeamHScore, getLivePlatformRosters } from '../../api/season_session.js'
+import {
+    evaluateTeamHScore, getLivePlatformRosters, getLivePlatformUnmatchedNames,
+} from '../../api/season_session.js'
 import { makeSpacerTh } from '../../table/table_helpers.js'
 import {
     GScoreRowData, getGScoreRowOrThrow, appendGScoreHeaderRow,
@@ -53,6 +55,7 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
     // async poll populates the cache); own data → whatever the grid held before this redraw.
     const isLivePlatform = getLeagueSettings().platform !== 'Enter your own data'
     const platformRosters = isLivePlatform ? getLivePlatformRosters() : null
+    const platformUnmatchedNames = isLivePlatform ? getLivePlatformUnmatchedNames() : null
     const enteredPlayerIdsByCell = isLivePlatform ? null : readEnteredPlayerIdsByCell()
     const poolPlayerIds = new Set(playerResults.map(p => String(p.player_id)))
 
@@ -105,9 +108,19 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
 
         for (let d = 0; d < nDrafters; d++) {
             const cell = row.insertCell()
+            // A rostered player the session could not match keeps his place, as the replacement player he is counted as,
+            // shown by the platform's name with a marker (an empty cell hid him, and the team then fell short of a full
+            // roster and out of the Waiver and Trading tabs, 2026-10-20).
+            const prefillPlayerId = isLivePlatform ? platformRosters?.[teamNames[d]]?.[r] : undefined
+            const unmatchedOption = prefillPlayerId === REPLACEMENT_PLAYER_ID
+                ? [{ value: String(REPLACEMENT_PLAYER_ID)
+                   , label: platformUnmatchedNames?.[teamNames[d]]?.[String(r)] ?? 'Unmatched player'
+                   , html: buildUnmatchedPlayerDisplayHtml(
+                         platformUnmatchedNames?.[teamNames[d]]?.[String(r)] ?? 'Unmatched player') }]
+                : []
             const sel  = makeCustomSelect(
                 `sr-player-${r}-${d}`
-              , [...blankOption, ...playerOptions]
+              , [...blankOption, ...unmatchedOption, ...playerOptions]
               , undefined
               , true
               , rosterListenerController.signal
@@ -117,8 +130,7 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
             // be hidden by refilling built-in sample rosters (removed 2026-10-13) and now would empty it. A player the
             // current pool no longer has (the data source changed) leaves the cell blank.
             if (isLivePlatform) {
-                const prefillPlayerId = platformRosters?.[teamNames[d]]?.[r]
-                if (prefillPlayerId !== undefined && prefillPlayerId !== -1) sel.setValue(String(prefillPlayerId))
+                if (prefillPlayerId !== undefined) sel.setValue(String(prefillPlayerId))
             } else {
                 const enteredPlayerId = enteredPlayerIdsByCell!.get(`sr-player-${r}-${d}`)
                 if (enteredPlayerId !== undefined && poolPlayerIds.has(enteredPlayerId)) sel.setValue(enteredPlayerId)
@@ -353,11 +365,16 @@ async function buildTeamGScoreTable(
     container.innerHTML = ''
     const categories = getSelectedCategories()
 
-    // Collect G-scores for players on this team
+    // Collect G-scores for players on this team, and the platform's name for each unmatched one (by its table row)
     const rows: GScoreRowData[] = []
+    const unmatchedNameByRow = new Map<number, string>()
+    const platformUnmatchedNames = getLivePlatformUnmatchedNames()?.[teamNames[teamIdx]]
     for (let r = 0; r < nPicks; r++) {
         const playerId = readSelectedPlayerId(selects[r][teamIdx])
         if (playerId === null) continue
+        if (playerId === REPLACEMENT_PLAYER_ID) {
+            unmatchedNameByRow.set(rows.length, platformUnmatchedNames?.[String(r)] ?? 'Unmatched player')
+        }
         rows.push(getGScoreRowOrThrow(playerId))
     }
 
@@ -383,6 +400,13 @@ async function buildTeamGScoreTable(
     const isMobile = isMobileViewport()
     appendGScoreHeaderRow(tHead, categories, isMobile)
     appendGScoreBodyAndTotals(tbl, rows, categories)
+    // An unmatched player's row is the replacement player's G-scores; label it with who the platform rostered.
+    const bodyRows = tbl.tBodies[0]?.rows
+    for (const [rowIndex, platformName] of unmatchedNameByRow) {
+        const labelCell = bodyRows?.[rowIndex]?.querySelector('th.panel-rowlabel')
+        if (!labelCell) throw new Error(`Inspector row ${rowIndex} has no label cell`)
+        labelCell.innerHTML = buildUnmatchedPlayerDisplayHtml(platformName)
+    }
 
     container.appendChild(tbl)
 

@@ -85,15 +85,22 @@ class ModelSettings(BaseModel):
     # optimizer's per-iteration step (0.05 shrinks up to 5% of a step; see REG_LAMBDA_UNIT).
     # lambda_p pulls the flex-position shares toward uniform, as a fraction of the SHARES
     # optimizer's step, derived per agent from the base-position count — 1.0 pins shares at
-    # uniform on the first pick, values below are a continuous dial. Named lambda_c /
+    # uniform on the first pick, values below are a continuous dial; the default 3.0 pins them
+    # through the first five picks. Named lambda_c /
     # lambda_p rather than lambda, which is a Python keyword.
     lambda_c: float = 0.05
-    lambda_p: float = 0.8
+    lambda_p: float = 3.0
     # How sharply opponents are expected to pursue their predicted punts, and at 0 whether they are
     # modelled as strategic at all. Pinned to 1.0 under Rotisserie by the agent.
     opponent_model_confidence: float = 0.5
     n_iterations: int
     streaming_noise: float
+    # SAVOR's replacement threshold in dollars (algorithm_helpers.savor_calculation): only outcomes above it count, a
+    # slot below it being better used for streaming. 0 is vanilla SAVOR.
+    replacement_threshold: float
+    # How early the smooth cash-share rule starts raising a team's values to use cash it could not otherwise spend
+    # (auction_pricing.smooth_spending_scale): 0 waits for an actual surplus, higher starts earlier.
+    cash_share_softness: float
     # Force-weighting: when on, a category with a pinned weight is held at it and excluded from the
     # descent, constraining the optimiser into a chosen build. The pins themselves ride on the
     # evaluate request, not here -- they change the served board but nothing the pipeline builds, so
@@ -310,9 +317,16 @@ class ConnectResponse(BaseModel):
     slot_counts: Optional[dict[str, int]] = None
 
 
+class EspnLeagueSeasonsResponse(BaseModel):
+    seasons: list[int]               # ESPN's season numbers (2027 is 2026-27), newest first
+
+
 class DraftStateResponse(BaseModel):
     player_assignments: dict[str, list[int]]
     injured_players: list[int]
+    # team -> {position in that team's player_assignments: the platform's name}, for the players the session could not
+    # match (carried there as the replacement player, -1). See PlatformSelections.
+    unmatched_player_names: dict[str, dict[int, str]]
     status: str
     remaining_cash: Optional[dict[str, float]] = None   # Auction Mode only
 

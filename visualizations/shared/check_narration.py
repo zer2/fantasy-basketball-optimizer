@@ -116,12 +116,10 @@ def lines_the_render_does_not_say(folder: Path) -> tuple[list[str], str]:
 
 def main() -> int:
     faults = 0
-    # The numbered scenes, then any wireframe drafts. Wireframes are checked for exactly
-    # the same faults -- a joined word is a joined word whichever voice reads it -- but
-    # they have no render to fall behind, so that part simply finds nothing.
-    folders = (sorted(_VISUALIZATIONS.glob('[1-8]_*'))
-               + sorted(path for path in _VISUALIZATIONS.glob('wireframes/*')
-                        if (path / 'narration.py').exists()))
+    # Every scene, finished or draft. Drafts are checked for exactly the same faults -- a joined
+    # word is a joined word whichever voice reads it -- but one with no render to fall behind
+    # simply finds nothing for that part.
+    folders = sorted(path for path in _VISUALIZATIONS.glob('scenes/*') if (path / 'narration.py').exists())
     for folder in folders:
         source = (folder / 'narration.py').read_text(encoding='utf-8')
         joined = find_joined_words(source)
@@ -130,8 +128,7 @@ def main() -> int:
         unread = sorted(written - subscripted - mentioned)
         missing = sorted(subscripted - written)
 
-        print(folder.name if folder.parent == _VISUALIZATIONS
-              else f'{folder.parent.name}/{folder.name}')
+        print(folder.name)
         for line_number, sample in joined:
             print(f'   JOINED at line {line_number}: "{sample}"')
         for key in missing:

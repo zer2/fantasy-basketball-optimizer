@@ -145,12 +145,27 @@ def _build_session_request(
             # exactly the opponent-punt softening the app ships with.
             'opponent_model_confidence': nba_options['opponent_model_confidence']['default'],
             'streaming_noise': nba_options['S']['default'],
+            'replacement_threshold': nba_options['S_R']['default'],
+            'cash_share_softness': nba_options['cash_share_softness']['default'],
         },
         'data_source': {
             'type':   'historical',
             'season': _SEASON,
         },
     }
+
+
+# The draft, auction and evaluate-signature goldens were recorded at lambda_p 0.8, the default until 2026-10-19 (now 3.0,
+# from the H-vs-G drafts). They guard the machinery, not the default's value, so they keep the value they were recorded at
+# rather than being regenerated for a change of default.
+GOLDEN_LAMBDA_P = 0.8
+
+
+def build_golden_session_request(**request_arguments) -> dict:
+    """_build_session_request with the settings the goldens were recorded at."""
+    session_request = _build_session_request(**request_arguments)
+    session_request['model_settings']['lambda_p'] = GOLDEN_LAMBDA_P
+    return session_request
 
 
 def resolve_player_ids(session, player_names):

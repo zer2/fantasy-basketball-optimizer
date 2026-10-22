@@ -10,7 +10,7 @@ import os
 from benchmark_helpers import (
     client
     , _SCORE_TOL
-    , _build_session_request
+    , build_golden_session_request
     , resolve_player_ids
     , name_candidates
 )
@@ -20,7 +20,7 @@ from backend.services.ranking import rank_candidates
 
 def test_evaluate_auction():
     """EC auction, 12 drafters, Drafter 1 has Giannis ($50), Drafter 2 has Jokic ($50)."""
-    session_request = _build_session_request(
+    session_request = build_golden_session_request(
         objective = 'Each Category'
         , cash_per_team = 200
     )
@@ -63,11 +63,14 @@ def test_evaluate_auction():
     # replacement's value over an empty game, so every G- and X-score moves. Then once more for the cash
     # term (get_category_value_direction): cash used to convert at ~0.6 of the market rate when Turnovers is
     # scored. Only your$ moves; generic$ and orig$ are empty boards, where every seat has the same cash.
+    # Regenerated 2026-10-21 for SAVOR's replacement threshold (S_R, default $2), which moves dollars toward the top
+    # players in every column, and the smooth cash-share rule (s = 0.2), whose start-of-auction share now enters
+    # orig$ and so gnrc$. H-scores are unchanged.
     expected_auction_values = [
-        ('Shai Gilgeous-Alexander',     -9.1,  90.2, 99.3, 97.2),
-        ('Tyrese Haliburton',           6.1,  60.1, 54.1, 52.9),
-        ('Dyson Daniels',               18.3,  61.4, 43.1, 42.2),
-        ('Jayson Tatum',                -1.4,  38.9, 40.4, 39.5),
+        ('Shai Gilgeous-Alexander',     -9.2,  95.2, 104.4, 102.2),
+        ('Tyrese Haliburton',           6.8,  62.8, 56.0, 54.8),
+        ('Dyson Daniels',               19.9,  64.2, 44.2, 43.3),
+        ('Jayson Tatum',                -1.3,  40.0, 41.4, 40.5),
     ]
     candidates_by_name = name_candidates(session, candidates)
     if os.environ.get('REGEN_GOLDENS'):
