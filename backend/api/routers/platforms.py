@@ -13,6 +13,7 @@ from backend.infra.auth import current_user_key
 from backend.state.session import Session
 from backend.platform_integration.registry import get_integration
 from backend.platform_integration.credential_store import yahoo_auth_dir, store_espn_credentials
+from backend.platform_integration.helpers import fill_empty_slots_with_replacement
 from backend.platform_integration.integrations.yahoo import YahooIntegration
 from backend.api.helpers import (
     fail, require_session,
@@ -150,10 +151,16 @@ def get_draft_state_route(mode: str, session: Session = Depends(require_session)
             team: cash_per_team - sum(team_costs)
             for team, team_costs in selections.costs.items()
         }
+    # A season roster short of the league's size: its open slots count as replacement-level players.
+    player_assignments, empty_slots = selections.player_assignments, {}
+    if mode == 'Season Mode':
+        player_assignments, empty_slots = fill_empty_slots_with_replacement(
+            selections.player_assignments, session.current_settings['n_picks'])
     return DraftStateResponse(
-        player_assignments     = selections.player_assignments,
+        player_assignments     = player_assignments,
         injured_players        = selections.injured_players,
         unmatched_player_names = selections.unmatched_player_names,
+        empty_slots            = empty_slots,
         status                 = selections.status,
         remaining_cash         = remaining_cash,
     )

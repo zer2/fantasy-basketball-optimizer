@@ -488,6 +488,9 @@ export interface DraftStateResponse {
     // team -> {position in that team's player_assignments: the platform's name} for the players the session could not
     // match, which player_assignments carries as the replacement player (-1).
     unmatched_player_names: Record<string, Record<string, string>>
+    // Season Mode: team -> the positions in its player_assignments that were empty on the platform, filled with the
+    // replacement player (-1) so the team is full. Empty otherwise.
+    empty_slots: Record<string, number[]>
     status: string
     remaining_cash?: Record<string, number>   // Auction Mode only
 }

@@ -10,7 +10,7 @@ from yfpy.models import League
 from yfpy.query import YahooFantasySportsQuery
 
 from backend.platform_integration.helpers import (
-    PlatformPlayerLookup, deduplicate_team_names, build_platform_player_id_lookup,
+    PlatformPlayerLookup, deduplicate_team_names, build_platform_player_id_lookup, fill_empty_slots_with_replacement,
 )
 from backend.platform_integration.integrations.fantrax import (
     FantraxIntegration, to_unified_fantrax_id,
@@ -536,3 +536,13 @@ def test_espn_get_draft_results_maps_rosters(monkeypatch):
         'Team One': [_JOKIC_ID],
         'Team Two': [_HARDEN_ID, RP_PLAYER_ID],
     }
+
+
+def test_a_short_season_roster_is_filled_with_replacement_players():
+    # 13 slots: one team two short, one full. The open slots become the replacement player (-1), and their positions
+    # are reported so the roster can show them as empty slots.
+    rosters = {'Team A': list(range(11)), 'Team B': list(range(100, 113))}
+    filled, empty_slots = fill_empty_slots_with_replacement(rosters, 13)
+    assert filled['Team A'] == list(range(11)) + [-1, -1]
+    assert filled['Team B'] == rosters['Team B']
+    assert empty_slots == {'Team A': [11, 12]}

@@ -55,7 +55,8 @@ async function stubLivePlatform(page, { availableModes, picksPerTeam = 13, slotC
         }
         return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
             player_assignments: platformBoard.assignments,
-            injured_players: [], unmatched_player_names: {}, status: 'Success', remaining_cash: null,
+            injured_players: [], unmatched_player_names: {}, empty_slots: {}, status: 'Success',
+            remaining_cash: null,
         }) })
     })
     return platformBoard

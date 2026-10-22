@@ -302,14 +302,19 @@ const applyPlayerStats = async (signal?: AbortSignal, keepsPlayerPool = false) =
     // The boards reset when the player pool's identity changes (data source, season,
     // uploads, injured list) so stale names are never sent to the backend. A blend-weight
     // change re-weights the same pool, so in-progress draft/auction boards survive it.
+    // A connected league's season rosters too: they were matched against the old pool, so they can name players the
+    // new one lacks (or keep a player unmatched who is now there). They are pulled again once the session has the new
+    // pool (2026-10-21).
     if (!keepsPlayerPool) {
         resetDraftBoard()
         resetAuctionEntry()
+        clearLivePlatformRosters()
     }
     buildTableHeader()
     createOrPatchSession(1, { data_source, injured_players }, signal)
         .then(() => { if (!signal || !signal.aborted) return runModeEval() })
         .then(() => { if (!signal || !signal.aborted) applyLayout() })
+        .then(() => { if (!keepsPlayerPool && (!signal || !signal.aborted)) refreshSeasonRostersIfLive() })
         .catch(err => {
             if (err.name === 'AbortError') return
             console.error('Player stats apply failed:', err)

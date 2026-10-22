@@ -23,6 +23,7 @@ import type { TradeAnalyzeResponse, TradeSuggestResponse, TradeComboParam } from
 
 let livePlatformRosters: Record<string, number[]> | null = null
 let livePlatformUnmatchedNames: Record<string, Record<string, string>> | null = null
+let livePlatformEmptySlots: Record<string, number[]> | null = null
 // Why the last pull of the platform's rosters failed, or null. Kept so the Season tabs can say so: the failure used to
 // reach only the console, and the tabs said "Loading your league's rosters…" for good (2026-10-21).
 let livePlatformRosterError: string | null = null
@@ -39,6 +40,12 @@ export function getLivePlatformUnmatchedNames(): Record<string, Record<string, s
     return livePlatformUnmatchedNames
 }
 
+/** The roster positions that were empty on the platform and hold the replacement player, as team -> positions (see
+ *  DraftStateResponse); null alongside getLivePlatformRosters. */
+export function getLivePlatformEmptySlots(): Record<string, number[]> | null {
+    return livePlatformEmptySlots
+}
+
 /** Why the last pull of the platform's rosters failed, or null when it did not (or none has run). */
 export function getLivePlatformRosterError(): string | null {
     return livePlatformRosterError
@@ -47,6 +54,7 @@ export function getLivePlatformRosterError(): string | null {
 export function clearLivePlatformRosters(): void {
     livePlatformRosters = null
     livePlatformUnmatchedNames = null
+    livePlatformEmptySlots = null
     livePlatformRosterError = null
 }
 
@@ -59,6 +67,7 @@ export async function refreshSeasonRostersFromPlatform(): Promise<void> {
             const state = await fetchDraftState(getSessionId()!, 'Season Mode')
             livePlatformRosters = state.player_assignments
             livePlatformUnmatchedNames = state.unmatched_player_names
+            livePlatformEmptySlots = state.empty_slots
         })
     } catch (error) {
         // The server's sentence, not the HTTP envelope around it.
