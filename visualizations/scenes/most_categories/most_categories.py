@@ -1,7 +1,7 @@
 """Most Categories: every way the week can go, and the shortcut that makes it computable.
 
 WIREFRAME -- a first draft to find out whether the argument lands, drafted against gTTS rather
-than the shipped voice. See wireframes/README.md.
+than the shipped voice. See visualizations/README.md.
 
 The argument in four moves:
 
@@ -26,7 +26,7 @@ The argument in four moves:
 Nothing here is measured against the real objective yet. The win probabilities are stand-ins
 chosen to make the shape legible; a prep script comes once the beats are settled.
 
-    manim -ql visualizations/wireframes/most_categories/most_categories.py MostCategories
+    manim -ql visualizations/scenes/most_categories/most_categories.py MostCategories
 """
 
 from __future__ import annotations
@@ -622,7 +622,7 @@ class MostCategories(VoiceoverScene, ThreeDScene):
         if not TABLE_IMAGE_PATH.exists():
             raise FileNotFoundError(
                 f'{TABLE_IMAGE_PATH.name} is missing. Run '
-                f'python visualizations/wireframes/most_categories/prepare_outcome_table.py')
+                f'python visualizations/scenes/most_categories/prepare_outcome_table.py')
         record = json.loads(TABLE_RECORD_PATH.read_text(encoding='utf-8'))
         baked = (record['rows'], record['row_gap'], tuple(record['win_chances']))
         wanted = (TABLE_ROWS_BUILT, TABLE_ROW_GAP, WIN_CHANCES)

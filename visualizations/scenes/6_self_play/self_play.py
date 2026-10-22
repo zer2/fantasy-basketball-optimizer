@@ -15,10 +15,10 @@ The board opens full rather than empty: Level 0 has already solved everybody aga
 field before the first pass runs, and that is what the opening frame shows.
 
 Everything on screen is a recording of the shipped bootstrap, not a model of it -- the same loop
-that runs at session build. Run `python visualizations/6_self_play/prepare_self_play_data.py`
+that runs at session build. Run `python visualizations/scenes/6_self_play/prepare_self_play_data.py`
 first, which re-runs it with the recorders attached and writes what it saw.
 
-    manim -ql visualizations/6_self_play/self_play.py SelfPlayLoop
+    manim -ql visualizations/scenes/6_self_play/self_play.py SelfPlayLoop
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ from manim_voiceover import VoiceoverScene
 from manim_voiceover.modify_audio import get_duration
 
 import sys
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from shared.narration_voice import NarrationVoice   # noqa: E402
 from narration import NARRATION
 
@@ -65,14 +65,14 @@ INTENSITY_CAP           = 110   # where the app's ramp stops getting stronger
 # the narration does, instead of speeding up and slowing down beat by beat.
 PASS_NARRATION_KEYS = ('early_passes', 're_estimation', 'late_passes')
 
-_DATA_PATH = Path(__file__).resolve().parent.parent / 'prepared_data' / 'self_play.json'
+_DATA_PATH = Path(__file__).resolve().parent.parent.parent / 'prepared_data' / 'self_play.json'
 
 
 def load_measurements() -> dict:
     if not _DATA_PATH.exists():
         raise FileNotFoundError(
             f'{_DATA_PATH} is missing. Run '
-            f'`python visualizations/6_self_play/prepare_self_play_data.py` first.')
+            f'`python visualizations/scenes/6_self_play/prepare_self_play_data.py` first.')
     return json.loads(_DATA_PATH.read_text(encoding='utf-8'))
 
 

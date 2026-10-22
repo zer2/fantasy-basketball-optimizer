@@ -18,8 +18,8 @@ of it, red is what abandoning the category gave back.
 
 The scene carries no words; see `visualizations/narration_notes.md` for what it is saying.
 
-    manim -ql visualizations/5_punting/punting.py PuntingSearch
-    manim -qh visualizations/5_punting/punting.py PuntingSearch
+    manim -ql visualizations/scenes/5_punting/punting.py PuntingSearch
+    manim -qh visualizations/scenes/5_punting/punting.py PuntingSearch
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ from manim_voiceover import VoiceoverScene
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from shared.narration_timing import seconds_until_phrase, wait_until_phrase   # noqa: E402
 from shared.narration_voice import NarrationVoice   # noqa: E402
 from narration import NARRATION

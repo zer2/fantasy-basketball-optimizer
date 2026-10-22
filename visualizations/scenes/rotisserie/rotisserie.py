@@ -1,7 +1,7 @@
 """Rotisserie: why the algorithm wants your season to be uncertain.
 
 WIREFRAME -- a first draft to find out whether the argument lands, drafted against gTTS rather
-than the shipped voice. See wireframes/README.md.
+than the shipped voice. See visualizations/README.md.
 
 The docs put the claim in one sentence: winning a league needs an aberrant result, so variance
 is worth having, and a Bernoulli's variance p(1-p) is largest at p = 0.5 -- which is why the
@@ -23,7 +23,7 @@ than asserted:
 The committed team scores MORE on average and wins the league about forty times less often. It
 is pinned too tightly to its own average ever to reach a bar that sits around 75.
 
-    manim -ql visualizations/wireframes/rotisserie/rotisserie.py Rotisserie
+    manim -ql visualizations/scenes/rotisserie/rotisserie.py Rotisserie
 """
 
 from __future__ import annotations

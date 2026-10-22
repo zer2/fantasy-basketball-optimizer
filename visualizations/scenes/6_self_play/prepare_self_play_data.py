@@ -25,7 +25,7 @@ Nothing here models anything. An earlier version of this script simulated a twel
 was thrown away: it converged in a single pass, which said more about the toy than about the
 algorithm.
 
-    python visualizations/6_self_play/prepare_self_play_data.py
+    python visualizations/scenes/6_self_play/prepare_self_play_data.py
 """
 
 from __future__ import annotations
@@ -36,15 +36,15 @@ from pathlib import Path
 
 import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))   # the repository
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))          # visualizations/
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent.parent))   # the repository
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))          # visualizations/
 
 from backend.api.routers.sessions import _build_current_settings            # noqa: E402
 from backend.services.session_management import build_session               # noqa: E402
 from backend.math.algorithm_agents import HAgent                            # noqa: E402
 from shared.prepare_season_data import build_default_session_request, SEASON, SPORT    # noqa: E402
 
-_VISUALIZATIONS_DIR = Path(__file__).resolve().parent.parent
+_VISUALIZATIONS_DIR = Path(__file__).resolve().parent.parent.parent
 
 # How many of the field's players the scene draws. The bootstrap tracks the whole top-player
 # universe; a few more rows than fit on screen would be recorded and never shown.

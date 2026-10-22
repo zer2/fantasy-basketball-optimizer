@@ -16,8 +16,8 @@ that average is hiding.
 
 Render one act while tuning it, the whole thing when it is right:
 
-    manim -ql visualizations/1_z_score/z_score.py ActOneSingleDraw
-    manim -qh visualizations/1_z_score/z_score.py TeamDifferentialFull
+    manim -ql visualizations/scenes/1_z_score/z_score.py ActOneSingleDraw
+    manim -qh visualizations/scenes/1_z_score/z_score.py TeamDifferentialFull
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ from manim import (
 )
 from manim_voiceover import VoiceoverScene
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from shared.differential_base import DifferentialSceneBase   # noqa: E402
 from shared.narration_timing import wait_until_phrase   # noqa: E402
 from shooting_percentage import ShootingPercentageAct   # noqa: E402

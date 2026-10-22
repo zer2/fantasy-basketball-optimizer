@@ -3,7 +3,7 @@
 Run `python visualizations/shared/prepare_weight_surface_data.py` first: one bootstrap run
 measures the slices both this scene and its sibling read.
 
-    manim -ql visualizations/7_seed_menu/seed_menu.py SeedMenu
+    manim -ql visualizations/scenes/7_seed_menu/seed_menu.py SeedMenu
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from pathlib import Path
 from manim import Create, FadeIn, FadeOut, WHITE, PURPLE_A
 from manim_voiceover import VoiceoverScene
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from shared.weight_surface_base import (                              # noqa: E402
     WeightSurfaceScene, CAMERA_DRIFT, READOUT_PURPLE,
 )

@@ -60,7 +60,7 @@ def narration_of(folder: Path) -> dict[str, str]:
 def main() -> int:
     cached = cached_lines()
     owed = 0
-    for folder in sorted(_VISUALIZATIONS.glob('[1-8]_*')):
+    for folder in sorted(_VISUALIZATIONS.glob('scenes/[1-8]_*')):
         pending = [(key, ' '.join(line.split()))
                    for key, line in narration_of(folder).items()
                    if ' '.join(line.split()) not in cached]

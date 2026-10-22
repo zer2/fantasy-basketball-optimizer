@@ -15,7 +15,7 @@ setup rather than the answer, and the frame is worth more to the answer.
 The images are written here rather than drawn in the scene because a smooth field is an image,
 not ten thousand mobjects: Manim would spend the whole render on it and still band.
 
-    python visualizations/4_category_weights/prepare_plane_story_data.py
+    python visualizations/scenes/4_category_weights/prepare_plane_story_data.py
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 CATEGORIES = ['Free Throw %', 'Blocks']
 POOL_SIZE = 25                  # M, the app's default: how many survivors a pick chooses among
@@ -48,7 +48,7 @@ ALTERNATIVE_WEIGHTS = np.array([1.5, 0.5])
 NEUTRAL_COLOUR = (255, 214, 80)
 ALTERNATIVE_COLOUR = (110, 170, 255)
 
-_VISUALIZATIONS_DIR = Path(__file__).resolve().parent.parent
+_VISUALIZATIONS_DIR = Path(__file__).resolve().parent.parent.parent
 _IMAGE_DIR = _VISUALIZATIONS_DIR / 'prepared_assets' / 'plane_story'
 _CORRELATION_PATH = (_VISUALIZATIONS_DIR.parent / 'coefficient_exploration_output'
                      / 'correlations_2024-25.csv')

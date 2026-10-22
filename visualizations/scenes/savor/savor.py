@@ -1,27 +1,28 @@
 """SAVOR: what a player is worth once you can drop them.
 
 WIREFRAME -- a first draft to find out whether the argument lands, drafted against gTTS rather
-than the shipped voice. See wireframes/README.md.
+than the shipped voice. See visualizations/README.md.
 
 The whole adjustment is one picture: a projection is a Normal, there is a floor under it because
-a player who busts gets dropped for a free agent, and the alternative you are bidding against is
-itself a free player with the same floor.
+a player who ends up below replacement level (S_R, the value of a streaming slot) gets dropped
+for a streamer, and the alternative you are bidding against is a flyer -- a player projected at
+$0 -- with the same floor.
 
-    value = E[max(mu + noise, 0)] - E[max(noise, 0)]
+    value = E[max(mu + noise - S_R, 0)] - E[max(noise - S_R, 0)]
 
-which is exactly the formula in the docs,
+which is the formula in the docs; at S_R = 0 it is the original SAVOR,
 
     mu * Phi(mu/sigma) - (sigma / sqrt(2 pi)) * (1 - exp(-mu^2 / (2 sigma^2)))
 
-The two terms are the two things drawn: a Normal truncated at the replacement line, minus a
-half-normal for the flyer. The scene's job is to make the asymmetry obvious -- the cut
+The two terms are the two things drawn: a Normal truncated at the replacement line, minus the
+flyer's own chance of clearing it. The scene's job is to make the asymmetry obvious -- the cut
 takes almost nothing from a star and a great deal from a marginal player -- which is why money
 concentrates at the top of an auction.
 
 Both halves are computed here in closed form rather than measured, because they ARE closed form;
 what a prep script would add is real dollar values from a session to land the last beat on.
 
-    manim -ql visualizations/wireframes/savor/savor.py Savor
+    manim -ql visualizations/scenes/savor/savor.py Savor
 """
 
 from __future__ import annotations
@@ -53,9 +54,9 @@ AXIS_HALF_WIDTH = 6.2
 CURVE_PEAK = 1.9
 CURVE_SAMPLES = 260
 
-# Value in units of sigma above replacement. The replacement line sits at zero by definition:
-# it is the value of a player you can have for nothing.
-REPLACEMENT = 0.0
+# Values in units of sigma above a flyer, a player projected at $0. The replacement line sits at
+# REPLACEMENT (below), the app's S_R: a streaming slot is worth something, so the line is a little
+# to the right of the flyer rather than on it.
 NOISE_SPREAD = 1.0
 
 # All three on one axis, which is what makes the comparison legible. Their marginal value is
@@ -117,12 +118,12 @@ POSSIBLE_OUTCOMES = (
 )
 
 # The auction board the last act works on. Dollar values a drafter would recognise, against a
-# replacement player worth nothing.
-# A $100 pot, every figure being value ABOVE REPLACEMENT -- which is what the
-# adjustment is defined on and what the axis of the curve act is already ticked in. Replacement
-# level is zero by definition: it is what a freely available player is worth. A one dollar
-# minimum bid is a different idea altogether, and mixing the two is what made the bottom of this
-# table read as a player going to nothing and back.
+# flyer projected at $0.
+# A $100 pot, every figure being value above that flyer -- which is what the adjustment is defined
+# on and what the axis of the curve act is already ticked in. The replacement level, S_R_DOLLARS,
+# is a separate number: where a player's outcomes start to count. A one dollar minimum bid is a
+# different idea again, and mixing it in is what made the bottom of this table read as a player
+# going to nothing and back.
 #
 # A hundred rather than two hundred, so nobody reads these as one team's budget: the adjustment
 # redistributes across the whole pot, not within a single roster.
@@ -149,6 +150,12 @@ PROJECTED_DOLLARS = (40, 28, 23, 18, 14, 10, 7, 5, 3, 2)
 # forty dollar player, the star curve and the top of the pot are now one number rather than
 # three unrelated ones. Nothing outside this scene reads it.
 S_SIGMA = 40.0 / 2.20
+# The replacement level in dollars: the value of a streaming slot, the app's default S_R. A player only counts
+# the part of his outcome above it, and so does the flyer the others are measured against.
+S_R_DOLLARS = 2.0
+# The same line in the curves' units (sigma above a flyer): 0.11, so the shares the narration quotes are
+# Phi(value - 0.11) -- 45.6% for the flyer, 67.0% for the starter, 98.2% for the star.
+REPLACEMENT = S_R_DOLLARS / S_SIGMA
 # Ticks in dollars above replacement. The axis reaches about ninety-eight dollars either side,
 # so forty-dollar steps span it without running past its end.
 AXIS_DOLLAR_TICKS = (-40, 0, 40, 80)
@@ -204,10 +211,9 @@ class Savor(VoiceoverScene):
     def build_axis(self) -> VGroup:
         """The value axis, ticked in dollars rather than left as a bare line.
 
-        A projection's spread is S-sigma, which ships at ten dollars, so the scene's unit IS a
-        ten dollar step and the axis can simply say so. That also lets the replacement line be
-        labelled with what it is worth -- nothing -- and connects this act to the dollar table
-        the scene ends on.
+        The scene's unit is S_SIGMA dollars, so the axis can say what each position is worth in
+        money. That connects this act to the dollar table the scene ends on, and puts the
+        replacement line where S_R is, just past the flyer at $0.
         """
         axis = Line([-AXIS_HALF_WIDTH, BASELINE_Y, 0.0], [AXIS_HALF_WIDTH, BASELINE_Y, 0.0],
                     color=GREY_B, stroke_width=3)
@@ -229,7 +235,8 @@ class Savor(VoiceoverScene):
                           color=YELLOW, stroke_width=3, dash_length=0.12)
         # Above the line it names, which is where it belongs. It sits clear of the players'
         # own labels because the tallest of those is lower than the top of this line.
-        label = Text('replacement level', font_size=21, color=YELLOW)
+        # Named as the narration names it: the value of a streaming slot, S_R.
+        label = Text(f'streaming slot (${S_R_DOLLARS:g})', font_size=21, color=YELLOW)
         label.move_to([self.to_scene_x(REPLACEMENT), BASELINE_Y + 3.38, 0.0])
         return VGroup(line, label)
 
@@ -268,18 +275,23 @@ class Savor(VoiceoverScene):
         return Polygon(*points, color=GREY_D, fill_color=GREY_D,
                        fill_opacity=0.55, stroke_width=0)
 
-    def savor_value(self, mean: float, spread: float = NOISE_SPREAD) -> float:  # noqa: D401
+    def savor_value(self, mean: float, spread: float, threshold: float) -> float:  # noqa: D401
         """The docs' formula, written as the two expectations it actually is.
 
-        E[max(mu + noise, 0)] - E[max(noise, 0)], the second being the flyer. Expanding
-        the first gives mu*Phi(mu/sigma) + sigma*phi(mu/sigma) and the second sigma/sqrt(2 pi),
-        which is the published closed form.
+        E[max(mu + noise - threshold, 0)] - E[max(noise - threshold, 0)], the second being the
+        flyer. Each is (m - threshold) * Phi(z) + sigma * phi(z), z = (m - threshold) / sigma, as in
+        backend/math/algorithm_helpers.savor_calculation; at a threshold of 0 it is the original
+        closed form.
         """
         from math import erf, exp, pi, sqrt
-        standardised = mean / spread
-        cumulative = 0.5 * (1.0 + erf(standardised / sqrt(2.0)))
-        density = exp(-0.5 * standardised ** 2) / sqrt(2.0 * pi)
-        return mean * cumulative + spread * density - spread / sqrt(2.0 * pi)
+
+        def expected_value_above_threshold(centre: float) -> float:
+            standardised = (centre - threshold) / spread
+            cumulative = 0.5 * (1.0 + erf(standardised / sqrt(2.0)))
+            density = exp(-0.5 * standardised ** 2) / sqrt(2.0 * pi)
+            return (centre - threshold) * cumulative + spread * density
+
+        return expected_value_above_threshold(mean) - expected_value_above_threshold(0.0)
 
     # -- Act one: three players, one floor --------------------------------------------
 
@@ -364,11 +376,11 @@ class Savor(VoiceoverScene):
             # above the line, banking on a good outcome -- and it used to be spoken over a
             # picture that had stopped moving. The dip is that sentence, drawn.
             starter = PLAYERS[1]
-            wait_until_phrase(self, tracker, 'banking on their positive outcome')
+            wait_until_phrase(self, tracker, 'banking on their right-tail outcome')
             self.kept = self.build_kept_head(starter['value'], starter['colour'])
             self.play(FadeIn(self.kept), run_time=0.8)
 
-            wait_until_phrase(self, tracker, 'dip a little')
+            wait_until_phrase(self, tracker, 'get a bit worse')
             dipped = starter['value'] - FLOOR_DIP
             self.play(Transform(self.curves[1], self.build_curve(dipped, starter['colour'])),
                       Transform(self.lost[1], self.build_lost_tail(dipped)),
@@ -490,10 +502,10 @@ class Savor(VoiceoverScene):
 
     def build_value_table(self) -> dict:
         """Projected dollars, their SAVOR values, the scale-up, and what each player ends on."""
-        # All three columns on one baseline: value above replacement. There is no baseline to
-        # add back, because replacement is zero -- so a player projected at replacement is worth
-        # nothing above a free one, in every column, which is the whole point of the flyer.
-        exact_raw = [self.savor_value(value, S_SIGMA) for value in PROJECTED_DOLLARS]
+        # All three columns on one baseline: value above a flyer, a player projected at $0. The
+        # replacement level, S_R dollars, is where outcomes start to count, for the flyer as for
+        # everyone else -- with the line at $2 the scaled column still prints a total of $150.0.
+        exact_raw = [self.savor_value(value, S_SIGMA, S_R_DOLLARS) for value in PROJECTED_DOLLARS]
         scaling = sum(PROJECTED_DOLLARS) / sum(exact_raw)
 
         # Rounded to what is actually PRINTED, and every total summed from those same rounded

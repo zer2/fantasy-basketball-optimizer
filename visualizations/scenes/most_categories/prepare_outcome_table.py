@@ -6,7 +6,7 @@ seconds of a 258 second render, in one animation. As an image it costs one objec
 
 Run from the repository root whenever WIN_CHANCES, the row count or the cell layout changes:
 
-    python visualizations/wireframes/most_categories/prepare_outcome_table.py
+    python visualizations/scenes/most_categories/prepare_outcome_table.py
 
 The scene fails loudly if the image is missing or was baked from different numbers, so a stale
 image cannot quietly survive an edit to the odds.

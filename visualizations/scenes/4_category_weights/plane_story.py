@@ -16,9 +16,9 @@ distribution is x(w) -- the quantity the model exists to compute. The gap betwee
 is the tilt: (+1.01, -1.28), a strategy buying Free Throw % and paying for it in Blocks.
 
 The scene carries no explanatory text; see `narration_notes.md`. Run
-`python visualizations/4_category_weights/prepare_plane_story_data.py` first.
+`python visualizations/scenes/4_category_weights/prepare_plane_story_data.py` first.
 
-    manim -ql visualizations/4_category_weights/plane_story.py PlaneStory
+    manim -ql visualizations/scenes/4_category_weights/plane_story.py PlaneStory
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ from manim import (
 from manim_voiceover import VoiceoverScene
 
 import sys
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from shared.narration_timing import wait_until_phrase   # noqa: E402
 from shared.narration_voice import NarrationVoice   # noqa: E402
 from narration import NARRATION
@@ -55,14 +55,14 @@ PLAYER_DOT_RADIUS = 0.055
 NEUTRAL_COLOUR = '#FFD650'
 ALTERNATIVE_COLOUR = '#6EAAFF'
 
-_DATA_PATH = Path(__file__).resolve().parent.parent / 'prepared_data' / 'plane_story.json'
-_IMAGE_DIR = Path(__file__).resolve().parent.parent / 'prepared_assets' / 'plane_story'
+_DATA_PATH = Path(__file__).resolve().parent.parent.parent / 'prepared_data' / 'plane_story.json'
+_IMAGE_DIR = Path(__file__).resolve().parent.parent.parent / 'prepared_assets' / 'plane_story'
 
 
 def load_plane_story() -> dict:
     if not _DATA_PATH.exists():
         raise FileNotFoundError(
-            f'{_DATA_PATH} is missing. Run `python visualizations/4_category_weights/prepare_plane_story_data.py` '
+            f'{_DATA_PATH} is missing. Run `python visualizations/scenes/4_category_weights/prepare_plane_story_data.py` '
             f'first -- the scene deliberately does no sampling of its own.')
     return json.loads(_DATA_PATH.read_text(encoding='utf-8'))
 
