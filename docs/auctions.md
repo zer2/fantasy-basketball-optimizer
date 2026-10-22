@@ -91,7 +91,12 @@ a single number, and anyone below replacement level can be swapped out from the 
 the downside is capped and the upside is not.
 ///
 
-SAVOR takes an input parameter, $S_{\sigma}$ (S-sigma). It controls the degree to which players are expected to move up and down in dollar value across the season according to the SAVOR model. Its default value of 10 is sourced by vibes- different values may be just as or more reasonable. 
+SAVOR takes two input parameters, $S_{\sigma}$ (S-sigma) and $S_R$.
+
+- $S_{\sigma}$ controls the degree to which players are expected to move up and down in dollar value across the season according to the SAVOR model.
+- $S_R$ is the value of a streaming slot. SAVOR assumes that players actualize their value if they end up above $S_R$ after perturbation.
+
+The default values of $10 and $2 are sourced by vibes- different values may be just as or more reasonable. 
 
 ??? note "What is the theoretical framework behind the SAVOR calculation?"
 
@@ -111,4 +116,27 @@ SAVOR takes an input parameter, $S_{\sigma}$ (S-sigma). It controls the degree t
 
     ![Pre- and post-SAVOR value table](img/savor.png)
 
+    The original version of the SAVOR calculation had no $S_R$, it just assumed the cut-off for value was 0. When the calculation is traced through with $S_R$ as the cutoff, it becomes 
 
+    $$
+    (\mu - S_R)\,\Phi\left(\frac{\mu - S_R}{\sigma}\right) + S_R\,\Phi\left(-\frac{S_R}{\sigma}\right) + \frac{\sigma}{\sqrt{2\pi}}\left(e^{-\frac{(\mu - S_R)^2}{2\sigma^2}} - e^{-\frac{S_R^2}{2\sigma^2}}\right)
+    $$
+
+### Cash increases for packing efficiency 
+
+The standard auction heuristic assigns dollar values to players such that their total value equals the amount of money in the pot. The implicit assumption in that formulation is that all teams will be able to spend all their money on players at those valuations. In reality, that is likely impossible: it would take luck to find thirteen players that add up to exactly $200. 
+
+This inefficiency is felt most acutely when the number of options for players dwindles. If managers wait too long to spend their money, there might not be enough high-value players left for them to spend all of their money on. E.g. if a manager has $40 with two slots left, and the top two players are worth $20 and $10 to them, they will leave some money on the table no matter what. 
+
+The fix for that is an inflation factor which increases the value of players as efficiency starts to get squeezed. It is calculated through a three-step process 
+
+1. The base ratio $r_1$ is calculated. It is the team's spendable cash (its cash minus $1 per empty bench slot) over the base value of the top options (its top players, one per open slot).
+2. The ratio is adjusted through a formula: $r_2 = 1 + s\ln\left(1 + e^{(r_1-1)/s}\right)$, where $s$ is a parameter
+3. A player worth $v$ is given an extra $(r_2 - 1)\frac{v^2}{\bar{v}}$ worth of value, where $\bar{v}$ is the value-weighted average value of the top options
+
+
+The base ratio $r_1$ is a measure of how much the auction drafter needs to worry about spending their money. When it gets above $1$, they cannot spend their money perfectly efficiently anymore, even if they win all their bids. The site automatically will change the color of value numbers as $r_1$ gets close to $1$. 
+
+The transformation is a smoothed version of max(1,$r_1$). At the limit when $r_1$ is small, the formula simplifies to approximately one. When $r_1$ is large, the limit simplifies to approximately $r_1$. The idea is having the multiplier go from about parity when $r_1$ is small, to exactly $r_1$ when it is needed to scale values up such that there will be no entirely wasted money. $s = 0.2$ was found to work well in testing. 
+
+The third step is a modification that makes the additional value proportional to value squared, instead of just value. In the example where two players are worth $20 and $10, the $20 player gets 4x the excess value from the adjustment, making the final values $28 and $12. The idea is that the highest-value players are the most unique and therefore the most important to prioritize. There might be a nine dollar player available, for example, which makes it less important to get the ten dollar player. 
