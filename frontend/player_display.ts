@@ -184,6 +184,23 @@ export function buildFullPlayerDisplayHtml(playerId: number): string {
         + `<span class='playername'>${entry.name}${buildPositionsHtml(entry.positions)}</span>`
 }
 
+/** A rostered player the session could not match to its player data (the platform's name, the session's replacement
+ *  player in the roster), with a marker saying so. The name comes from the platform, so it is escaped. */
+export function buildUnmatchedPlayerDisplayHtml(platformName: string): string {
+    const escapedName = platformName.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+    return `<span class='playername unmatched-player' `
+        + `title='Not matched to a player in this data; counted as a replacement-level player'>`
+        + `${escapedName}<span class='unmatched-player-marker'>not matched</span></span>`
+}
+
+/** A roster slot that was empty on the platform, filled with the session's replacement player. */
+export function buildEmptySlotDisplayHtml(): string {
+    return `<span class='playername unmatched-player' `
+        + `title='An empty roster slot, counted as a replacement-level player'>`
+        + `Empty slot<span class='unmatched-player-marker'>replacement</span></span>`
+}
+
 /** Minimal display (headshot + last name) as an HTML string, for string-built contexts. */
 export function buildMinimalPlayerDisplayHtml(playerId: number): string {
     const entry = getRegistryEntry(playerId)

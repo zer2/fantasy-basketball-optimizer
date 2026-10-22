@@ -111,6 +111,8 @@ export interface ModelSettings {
     opponent_model_confidence: number
     n_iterations: number
     streaming_noise: number   // S_σ: SAVOR noise parameter, only meaningful in Auction Mode
+    replacement_threshold: number   // S_R: SAVOR replacement threshold in dollars, only meaningful in Auction Mode
+    cash_share_softness: number   // s: how early unusable cash starts raising values, only meaningful in Auction Mode
 }
 
 export interface DataSource {
@@ -154,7 +156,11 @@ export interface SessionRequest {
 // ─── Top-level player ─────────────────────────────────────────────────────────
 
 export interface AuctionValues {
-    your_dollar:   number;   // SAVOR on H-scores, team-specific, current cash/picks
+    your_dollar:   number;   // SAVOR on H-scores, team-specific, current cash/picks, plus unusable_cash_share
+    unusable_cash_share: number;   // the part of your_dollar that is the team's otherwise unusable cash
+    // The team's spendable cash over what its best options cost, the ratio the smooth cash-share rule acts on; the
+    // same for every candidate. null when no available player fits an open slot.
+    cash_to_cost_ratio: number | null;
     generic_dollar:   number;   // SAVOR on H-scores, current cash/picks (generic baseline)
     original_dollar:   number;   // SAVOR on H-scores, full original cash/picks
     generic_dollar_g_score: number;   // SAVOR on G-scores, current cash/picks

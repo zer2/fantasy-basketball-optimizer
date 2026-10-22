@@ -34,6 +34,19 @@ const PARAM_SPECS: ParamSpec[] = [
         caption: 'SAVOR noise parameter. Only used in Auction Mode. Roughly represents the standard deviation of dollar values expected for players during the season. Higher values down-weight low-dollar players more aggressively.',
     },
     {
+        id: 'mp-s-r', key: 'S_R', label: 'S<sub>R</sub> (SAVOR)', step: 0.5,
+        caption: 'SAVOR replacement threshold, in dollars. Only used in Auction Mode. A player only counts '
+               + 'the part of his outcome above it, since a player who ends up worth less might be used as a '
+               + 'streaming slot instead of being kept. 0 is vanilla SAVOR; higher values move value from '
+               + 'marginal players to the top.',
+    },
+    {
+        id: 'mp-cash-share-softness', key: 'cash_share_softness', label: 's (cash scaling)', step: 0.05,
+        caption: 'How early your values start rising to use cash you could not otherwise spend. Only used in '
+               + 'Auction Mode. 0 waits until your cash exceeds what your best remaining options are worth; higher '
+               + 'values start earlier. 0.2 did best in simulated auctions.',
+    },
+    {
         id: 'mp-upsilon', key: 'upsilon', label: 'υ (upsilon)', step: 0.05,
         caption: 'Scales injury rates down. At 1.0 full projected injury rates apply; at 0.0 all players are treated as healthy.',
     },
@@ -65,8 +78,8 @@ const PARAM_SPECS: ParamSpec[] = [
         id: 'mp-lambda-p', key: 'lambda_p', label: 'λ<sub>p</sub> (position reg)', step: 0.05,
         caption: 'How strongly the flex-position strategy for future picks is pulled back toward a '
                + 'balanced positional mix. Higher values hedge across positions; 0 lets the strategy '
-               + 'commit entirely to the positions that fit the build, and 1 holds it fully balanced '
-               + 'through the early draft.',
+               + 'commit entirely to the positions that fit the build; 1 holds it balanced on the first '
+               + 'pick, and higher values hold it balanced for more of the early draft.',
     },
     {
         id: 'mp-pick-pool-size', key: 'pick_pool_size', label: 'M (pool size)', step: 1,
@@ -156,12 +169,15 @@ export function refreshFormatParameterControls(
     setVisible('mp-aleph', isRotisserie || (mostCategoriesWeight ?? 0) > 0)
 }
 
-/** Shows the SAVOR streaming-noise control only in Auction Mode — the parameter is inert in
- *  Draft and Season Modes, and the sidebar's standard is to hide parameters that cannot apply. */
-export function refreshStreamingNoiseControl(mode: string): void {
-    const item = document.getElementById('mp-s')?.closest('.param-item')
-    if (item instanceof HTMLElement) {
-        item.style.display = mode === 'Auction Mode' ? '' : 'none'
+/** Shows the auction-only controls (SAVOR's noise and replacement threshold, and the cash-scaling softness) only
+ *  in Auction Mode — the parameters are inert in Draft and Season Modes, and the sidebar's standard is to hide
+ *  parameters that cannot apply. */
+export function refreshAuctionParameterControls(mode: string): void {
+    for (const id of ['mp-s', 'mp-s-r', 'mp-cash-share-softness']) {
+        const item = document.getElementById(id)?.closest('.param-item')
+        if (item instanceof HTMLElement) {
+            item.style.display = mode === 'Auction Mode' ? '' : 'none'
+        }
     }
 }
 
@@ -249,6 +265,8 @@ export function getModelSettings(): ModelSettings {
         beth:            readNumberInput('mp-beth'),
         n_iterations:    readNumberInput('mp-n-iterations'),
         streaming_noise: readNumberInput('mp-s'),
+        replacement_threshold: readNumberInput('mp-s-r'),
+        cash_share_softness: readNumberInput('mp-cash-share-softness'),
         allow_force_weighting: readCheckboxInput(FORCE_WEIGHTING_SPEC.id),
     }
 }

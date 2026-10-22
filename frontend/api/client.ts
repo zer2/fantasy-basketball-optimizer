@@ -180,6 +180,8 @@ export function candidatesToPlayerResults(candidates: any[]): PlayerResult[] {
         roster: c.roster ? convertRoster(c.roster) : undefined,
         auction_values: c.auction_values ? {
             your_dollar:   c.auction_values.your_dollar,
+            unusable_cash_share: c.auction_values.unusable_cash_share,
+            cash_to_cost_ratio: c.auction_values.cash_to_cost_ratio,
             generic_dollar:   c.auction_values.generic_dollar,
             original_dollar:   c.auction_values.original_dollar,
             generic_dollar_g_score: c.auction_values.generic_dollar_g_score,
@@ -338,6 +340,58 @@ export async function fetchHypotheticalTeam(
     return { roster: convertRoster(response.roster), hypothetical_picks: response.hypothetical_picks }
 }
 
+// ── POST /sessions/{id}/auction-autodraft/* ───────────────────────────────────
+
+export interface AuctionBoardRequest {
+    player_assignments: Record<string, number[]>
+    remaining_cash:     Record<string, number>
+}
+
+export interface AuctionNominationResult {
+    nominated_player_id:   number
+    nominated_player_name: string
+    opening_bid:           number
+    valuations:            Record<string, number>   // team -> dollar valuation, for the requested autodrafters
+    max_allowed_bids:      Record<string, number>   // team -> most it may bid, keeping $1 per other empty slot
+}
+
+/** Opens bidding on a player. An autodrafter nominator sends nominated_player_id and opening_bid as null and
+ *  the backend picks its player, opening at $1; a manual nominator sends both. The browser runs the bidding. */
+export async function nominateAuctionPlayer(
+    sessionId: string
+    , request: AuctionBoardRequest & {
+        nominator_id:        string
+        nominated_player_id: number | null
+        opening_bid:         number | null
+        valuation_team_ids:  string[]
+    }
+    , signal?: AbortSignal
+): Promise<AuctionNominationResult> {
+    return jsonRequest(`${BASE_URL}/sessions/${sessionId}/auction-autodraft/nominate`, 'Auction nomination', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(request),
+        signal,
+    })
+}
+
+/** Valuations of a player already up for bid, for teams switched to autodraft mid-nomination. */
+export async function valueAuctionPlayer(
+    sessionId: string
+    , request: AuctionBoardRequest & {
+        player_id:          number
+        valuation_team_ids: string[]
+    }
+): Promise<Record<string, number>> {
+    const result = await jsonRequest<{ valuations: Record<string, number> }>(
+        `${BASE_URL}/sessions/${sessionId}/auction-autodraft/valuations`, 'Auction valuation', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify(request),
+        })
+    return result.valuations
+}
+
 // ── POST /sessions/{id}/trade/analyze ────────────────────────────────────────
 
 export interface TeamHScore {
@@ -475,6 +529,12 @@ export interface PlatformConnectResponse {
 export interface DraftStateResponse {
     player_assignments: Record<string, number[]>
     injured_players: number[]
+    // team -> {position in that team's player_assignments: the platform's name} for the players the session could not
+    // match, which player_assignments carries as the replacement player (-1).
+    unmatched_player_names: Record<string, Record<string, string>>
+    // Season Mode: team -> the positions in its player_assignments that were empty on the platform, filled with the
+    // replacement player (-1) so the team is full. Empty otherwise.
+    empty_slots: Record<string, number[]>
     status: string
     remaining_cash?: Record<string, number>   // Auction Mode only
 }
@@ -505,6 +565,16 @@ export async function fetchLeagues(platform: string): Promise<PlatformLeague[]> 
         , 'Platform leagues'
     )
     return response.leagues
+}
+
+/** The seasons an ESPN league has (ESPN's numbers, 2027 = 2026-27), newest first. An ESPN league keeps its id across
+ *  seasons, so a typed id is paired with one of these. */
+export async function fetchEspnLeagueSeasons(leagueId: string): Promise<number[]> {
+    const response = await jsonRequest<{ seasons: number[] }>(
+        `${BASE_URL}/platforms/espn/league-seasons?league_id=${encodeURIComponent(leagueId)}`
+        , 'ESPN league seasons'
+    )
+    return response.seasons
 }
 
 /** Returns the Yahoo OAuth authorization URL for the user to visit. */

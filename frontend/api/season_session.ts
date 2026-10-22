@@ -9,7 +9,9 @@ import {
     ensureSession, getSessionId,
     withDisplayOwnership, withSessionRetry,
 } from './session.js'
-import { evaluate, candidatesToPlayerResults, analyzeTrade, suggestTrades, fetchDraftState } from './client.js'
+import {
+    evaluate, candidatesToPlayerResults, analyzeTrade, suggestTrades, fetchDraftState, HTTPError, readErrorDetail,
+} from './client.js'
 import type { TradeAnalyzeResponse, TradeSuggestResponse, TradeComboParam } from './client.js'
 
 // ─── Live-platform season rosters ──────────────────────────────────────────────
@@ -20,6 +22,11 @@ import type { TradeAnalyzeResponse, TradeSuggestResponse, TradeComboParam } from
 // (not in season_rosters) keeps the import one-way: season_rosters → season_session.
 
 let livePlatformRosters: Record<string, number[]> | null = null
+let livePlatformUnmatchedNames: Record<string, Record<string, string>> | null = null
+let livePlatformEmptySlots: Record<string, number[]> | null = null
+// Why the last pull of the platform's rosters failed, or null. Kept so the Season tabs can say so: the failure used to
+// reach only the console, and the tabs said "Loading your league's rosters…" for good (2026-10-21).
+let livePlatformRosterError: string | null = null
 
 /** Platform-provided season rosters ({team: [player ids]}), or null when not loaded
  *  (own data, or before the first platform refresh). */
@@ -27,17 +34,47 @@ export function getLivePlatformRosters(): Record<string, number[]> | null {
     return livePlatformRosters
 }
 
+/** The platform's name for each rostered player the session could not match, as team -> {roster position: name}
+ *  (see DraftStateResponse); null alongside getLivePlatformRosters. */
+export function getLivePlatformUnmatchedNames(): Record<string, Record<string, string>> | null {
+    return livePlatformUnmatchedNames
+}
+
+/** The roster positions that were empty on the platform and hold the replacement player, as team -> positions (see
+ *  DraftStateResponse); null alongside getLivePlatformRosters. */
+export function getLivePlatformEmptySlots(): Record<string, number[]> | null {
+    return livePlatformEmptySlots
+}
+
+/** Why the last pull of the platform's rosters failed, or null when it did not (or none has run). */
+export function getLivePlatformRosterError(): string | null {
+    return livePlatformRosterError
+}
+
 export function clearLivePlatformRosters(): void {
     livePlatformRosters = null
+    livePlatformUnmatchedNames = null
+    livePlatformEmptySlots = null
+    livePlatformRosterError = null
 }
 
 /** Pull the connected platform's current rosters for Season Mode and cache them.
  *  The caller re-renders the season layout so renderSeasonRosters picks them up. */
 export async function refreshSeasonRostersFromPlatform(): Promise<void> {
-    await withSessionRetry(async () => {
-        const state = await fetchDraftState(getSessionId()!, 'Season Mode')
-        livePlatformRosters = state.player_assignments
-    })
+    livePlatformRosterError = null
+    try {
+        await withSessionRetry(async () => {
+            const state = await fetchDraftState(getSessionId()!, 'Season Mode')
+            livePlatformRosters = state.player_assignments
+            livePlatformUnmatchedNames = state.unmatched_player_names
+            livePlatformEmptySlots = state.empty_slots
+        })
+    } catch (error) {
+        // The server's sentence, not the HTTP envelope around it.
+        livePlatformRosterError = error instanceof HTTPError ? readErrorDetail(error.body)
+            : error instanceof Error ? error.message : String(error)
+        throw error
+    }
 }
 
 // ─── Team H-score ────────────────────────────────────────────────────────────

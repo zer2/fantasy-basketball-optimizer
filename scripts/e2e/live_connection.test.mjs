@@ -55,7 +55,8 @@ async function stubLivePlatform(page, { availableModes, picksPerTeam = 13, slotC
         }
         return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
             player_assignments: platformBoard.assignments,
-            injured_players: [], status: 'Success', remaining_cash: null,
+            injured_players: [], unmatched_player_names: {}, empty_slots: {}, status: 'Success',
+            remaining_cash: null,
         }) })
     })
     return platformBoard
@@ -199,6 +200,9 @@ test('a hidden tab keeps following the draft, through the last pick', async () =
         team, [...players.slice(index * 12, index * 12 + 12), ...(index < picksMade ? [lastPicks[index]] : [])]]))
     try {
         await loadApp(app)
+        // The stub's rosters are current players (2025 rookies among them), who are in the projections pool only.
+        await setSelect(page, 'ps-data-type', 'Projections')
+        await waitAppSettled(app, { timeout: 120000 })
         const platformBoard = await stubLivePlatform(page, { availableModes: ALL_MODES })
         await connectYahooLeague(app, '12345')
         platformBoard.assignments = boardWith(0)
@@ -225,9 +229,10 @@ test('a hidden tab keeps following the draft, through the last pick', async () =
     }
 })
 
-test('a live platform uses projections: Historical is offered only with your own data', async () => {
-    // As in the Streamlit app. A live platform is a draft or season being played now, which a past season's stats
-    // would rank for a year that is over (a user drafting from Historical data saw a board that made no sense).
+test('Historical data stays available, and chosen, with a live platform', async () => {
+    // A league can be connected in a past season (ESPN keeps a league's id across seasons), and that season's own stats
+    // describe it. Historical used to be own-data only, switching the source to Projections on connecting (until
+    // 2026-10-21).
     const app = await launchAppPage()
     const { page } = app
     const dataSource = () => page.locator('[data-testid="ps-data-type-wrapper"] .cs-search-input').inputValue()
@@ -244,18 +249,14 @@ test('a live platform uses projections: Historical is offered only with your own
 
         await setSelect(page, 'ls-platform', 'Retrieve from Yahoo')
         await waitAppSettled(app, { timeout: 120000 })
-        assert.equal(await dataSource(), 'Projections', 'a live platform must switch the data source to projections')
-        assert.deepEqual(await readDataSourceOptions(), ['Projections'])
+        assert.equal(await dataSource(), 'Historical', 'a live platform keeps the historical source')
+        assert.deepEqual(await readDataSourceOptions(), ['Projections', 'Historical'])
 
         await page.reload({ waitUntil: 'domcontentloaded' })
         await page.locator('#hscoretable .playerheaderdiv').first().waitFor({ timeout: 120000 })
         await waitAppSettled(app, { timeout: 120000 })
-        assert.equal(await dataSource(), 'Projections', 'a remembered live platform must not reload into Historical')
-
-        await setSelect(page, 'ls-platform', 'Enter your own data')
-        await waitAppSettled(app, { timeout: 120000 })
-        assert.deepEqual(await readDataSourceOptions(), ['Projections', 'Historical'])
-        expectCleanSession(app, 'data source follows the platform')
+        assert.equal(await dataSource(), 'Historical', 'a remembered live platform reloads with the remembered source')
+        expectCleanSession(app, 'historical data with a live platform')
     } finally {
         await app.close()
     }
@@ -472,6 +473,9 @@ test("a Waiver tab drawn before the league's rosters arrive is redrawn when they
                      203497, 1630166, 1628404, 1629614, 1642273, 1631217, 1630174, 1629029]
     try {
         await loadApp(app)
+        // The stub's rosters are current players (2025 rookies among them), who are in the projections pool only.
+        await setSelect(page, 'ps-data-type', 'Projections')
+        await waitAppSettled(app, { timeout: 120000 })
         await setSelect(page, 'ls-mode', 'Season Mode')
         await waitAppSettled(app, { timeout: 120000 })
         const platformBoard = await stubLivePlatform(page, { availableModes: ['Season Mode'] })

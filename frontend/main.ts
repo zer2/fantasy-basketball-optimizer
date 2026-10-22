@@ -33,8 +33,8 @@ import {
     renderFormatAndCategories, getScoringFormat, getMostCategoriesWeight, getTiebreakerCategory,
     getSelectedCategories, isCategorySelectionValid,
 } from './setting_collection/format_and_categories.js'
-import { renderPlayerStats, getPlayerStatsSettings, waitForSeasons, limitDataSourcesToPlatform } from './setting_collection/player_stats.js'
-import { renderModelSettings, refreshFormatParameterControls, refreshStreamingNoiseControl, getModelSettings } from './setting_collection/model_parameters.js'
+import { renderPlayerStats, getPlayerStatsSettings, waitForSeasons } from './setting_collection/player_stats.js'
+import { renderModelSettings, refreshFormatParameterControls, refreshAuctionParameterControls, getModelSettings } from './setting_collection/model_parameters.js'
 import { renderSlotCounts, getSlotCounts, isSlotCountsValid, revalidateSlotCounts } from './setting_collection/slot_counts.js'
 
 // Dispatches to runSeasonInit (Season Mode) or runEvaluate (Draft / Auction Mode)
@@ -181,7 +181,10 @@ function refreshSeasonRostersIfLive(): void {
                 // The tab on screen was drawn before these rosters existed (applyLayout redraws only the Rosters grid).
                 redrawActiveSeasonTab()
             })
-            .catch(err => console.error('Season roster refresh failed:', err))
+            .catch(err => {
+                console.error('Season roster refresh failed:', err)
+                redrawActiveSeasonTab()   // the tab says why (getLivePlatformRosterError) instead of "Loading…"
+            })
     } else {
         clearLivePlatformRosters()
     }
@@ -196,7 +199,7 @@ getModeSelectElement().addEventListener('change', () => {
     patchSessionForModeChange()                                     // 1. patch the session's league type
     if (getLeagueSettings().mode !== 'Season Mode') applyLayout()   // 2. instant layout (Season defers to the patch)
     refreshSeasonRostersIfLive()                                    // 3. season live-roster sync
-    refreshStreamingNoiseControl(getLeagueSettings().mode)          // 4. SAVOR noise is Auction-only
+    refreshAuctionParameterControls(getLeagueSettings().mode)       // 4. SAVOR and cash scaling are Auction-only
 })
 
 // On a platform switch (Draft/Auction), set up the seat selector and run the right evaluation
@@ -226,7 +229,6 @@ function syncForPlatformSwitch(): void {
     }
 }
 getPlatformSelectElement().addEventListener('change', () => {
-    limitDataSourcesToPlatform(getLeagueSettings().platform, { announceChange: true })   // 0. live platforms: projections only
     applyLayout()                 // 1. swap the layout for the new platform
     refreshSeasonRostersIfLive()  // 2. season live-roster sync
     // 3. Back to own data: manual entry's league shape is on screen again (league_settings restored it), and the
@@ -289,8 +291,6 @@ document.addEventListener(TEAM_LABELS_CHANGED, () => { refreshSeatOptions() })
 
 const playerStatsSection = createSection(sidebarSections, 'Player Stats')
 renderPlayerStats(playerStatsSection)
-// A remembered live platform rules out a remembered Historical source before the first session is built.
-limitDataSourcesToPlatform(getLeagueSettings().platform, { announceChange: false })
 
 const applyPlayerStats = async (signal?: AbortSignal, keepsPlayerPool = false) => {
     // Switching the data source to Historical starts an async seasons fetch and fires this
@@ -302,14 +302,19 @@ const applyPlayerStats = async (signal?: AbortSignal, keepsPlayerPool = false) =
     // The boards reset when the player pool's identity changes (data source, season,
     // uploads, injured list) so stale names are never sent to the backend. A blend-weight
     // change re-weights the same pool, so in-progress draft/auction boards survive it.
+    // A connected league's season rosters too: they were matched against the old pool, so they can name players the
+    // new one lacks (or keep a player unmatched who is now there). They are pulled again once the session has the new
+    // pool (2026-10-21).
     if (!keepsPlayerPool) {
         resetDraftBoard()
         resetAuctionEntry()
+        clearLivePlatformRosters()
     }
     buildTableHeader()
     createOrPatchSession(1, { data_source, injured_players }, signal)
         .then(() => { if (!signal || !signal.aborted) return runModeEval() })
         .then(() => { if (!signal || !signal.aborted) applyLayout() })
+        .then(() => { if (!keepsPlayerPool && (!signal || !signal.aborted)) refreshSeasonRostersIfLive() })
         .catch(err => {
             if (err.name === 'AbortError') return
             console.error('Player stats apply failed:', err)
@@ -371,7 +376,7 @@ renderModelSettings(modelSection)
 // The format section is built first, so its current value decides these controls' initial visibility.
 refreshFormatParameterControls(getScoringFormat(), getMostCategoriesWeight())
 // Likewise the league section: the current mode decides whether the SAVOR control shows at all.
-refreshStreamingNoiseControl(getLeagueSettings().mode)
+refreshAuctionParameterControls(getLeagueSettings().mode)
 const applyModelSettings = makeApplyChain('Model parameters apply')
 modelSection.addEventListener('change', () => {
     applyModelSettings(3, { model_settings: getModelSettings() })

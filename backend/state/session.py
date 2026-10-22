@@ -20,6 +20,7 @@ from typing import Optional
 import pandas as pd
 
 from backend.platform_integration.base import PlatformConfig
+from backend.platform_integration.helpers import PlatformPlayerLookup
 
 
 @dataclass
@@ -67,10 +68,10 @@ class Session:
     # creation when a live platform is selected; used by the draft-state poll.
     platform_config: Optional[PlatformConfig] = None
 
-    # {platform player id/name -> session player id} lookup, rebuilt from the registry
-    # whenever the data changes (see refresh_platform_player_id_lookup). None until a
+    # Platform player -> session player id (by platform key, then by name), rebuilt from the
+    # registry whenever the data changes (see refresh_platform_player_id_lookup). None until a
     # live platform is connected.
-    platform_player_id_lookup: Optional[dict[str, int]] = None
+    platform_player_id_lookup: Optional[PlatformPlayerLookup] = None
 
     # Serialises work on this one session. An evaluate mutates shared agent state (warm-start
     # weights via get_h_scores), and a PATCH rebuilds the pipeline in place, so two overlapping
@@ -90,6 +91,23 @@ class Session:
     # Each evaluated candidate's raw H-scoring category weights and win rates, by board
     # (services/ranking.store_candidate_strategies): {board key: (agent, {player id: (weights, rates)})}. The
     candidate_strategy_cache: "OrderedDict[tuple, tuple]" = field(default_factory=OrderedDict)
+
+    # Each auction autodrafter's raw H-scores between nominations (services/auction_autodraft.read_team_h_scores):
+    # {team: TeamHScores}. Every entry remembers the agent and board it was computed on, and is used only while the
+    # session holds that agent and the board has only grown since.
+    auction_team_h_scores: dict = field(default_factory=dict)
+
+    # Each auction autodrafter's noisy view of the players' X-scores (services/auction_autodraft.read_team_x_scores):
+    # {team: (agent, X-scores)}, drawn once per agent so a team's valuations stay consistent between nominations.
+    auction_team_x_scores: dict = field(default_factory=dict)
+
+    # The cash-share rule each autodrafter prices with, where an experiment sets one (services/auction_autodraft.
+    # read_cash_share_rule): {team: rule from auction_pricing.CASH_SHARE_RULES}. Teams it does not name use the app's.
+    auction_cash_share_rules: dict = field(default_factory=dict)
+
+    # Seeds every auction autodrafter's noisy view together with its team name (services/auction_autodraft.
+    # read_team_x_scores). 0 is the app's draw; an experiment sets others to run independent auctions.
+    auction_noise_seed: int = 0
 
     @property
     def current_params(self) -> dict:

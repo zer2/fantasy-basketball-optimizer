@@ -9,7 +9,7 @@ import { makeCustomSelect } from '../../custom_select.js'
 import {
     makeMultiSelectWidget, MultiSelectWidget, makeNumberInput, makeSidebarToggle, readRequiredIntInput, normalizeSearchText,
 } from '../../helper_functions.js'
-import { readRosterAssignments, readEmptyRostersMessage } from './season_helpers.js'
+import { readRosterAssignments, readEmptyRostersMessage, listMovablePlayers } from './season_helpers.js'
 import { getTeamIdentitiesFromSidebar } from '../../setting_collection/league_settings.js'
 import { getGScoreById, isPointsMode } from '../../app_state.js'
 import { getRegistryEntry } from '../../player_registry.js'
@@ -1074,8 +1074,8 @@ export function renderSeasonTrading(container: HTMLElement): void {
         const yourTeam  = readYourTeam()
         const theirTeam = theirTeamSel.getValue()
 
-        const yourPlayers  = assignments[yourTeam]
-        const theirPlayers = assignments[theirTeam]
+        const yourPlayers  = listMovablePlayers(assignments[yourTeam])
+        const theirPlayers = listMovablePlayers(assignments[theirTeam])
 
         const bodyRow = document.createElement('div')
         bodyRow.className = 'trade-body-row'

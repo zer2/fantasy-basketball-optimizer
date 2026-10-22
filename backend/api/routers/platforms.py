@@ -13,13 +13,14 @@ from backend.infra.auth import current_user_key
 from backend.state.session import Session
 from backend.platform_integration.registry import get_integration
 from backend.platform_integration.credential_store import yahoo_auth_dir, store_espn_credentials
+from backend.platform_integration.helpers import fill_empty_slots_with_replacement
 from backend.platform_integration.integrations.yahoo import YahooIntegration
 from backend.api.helpers import (
     fail, require_session,
     build_credentials_for, read_yahoo_app_credentials, resolve_live_integration,
 )
 from backend.api.schemas import (
-    YahooAuthUrlResponse, YahooTokenRequest, EspnCredentialsRequest,
+    YahooAuthUrlResponse, YahooTokenRequest, EspnCredentialsRequest, EspnLeagueSeasonsResponse,
     LeaguesResponse, DivisionsResponse, PlatformConfigRequest, ConnectResponse, DraftStateResponse,
 )
 
@@ -54,6 +55,19 @@ def store_espn_credentials_route(req: EspnCredentialsRequest, user_key: str = De
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+@router.get('/platforms/espn/league-seasons', response_model=EspnLeagueSeasonsResponse)
+def get_espn_league_seasons_route(league_id: str, user_key: str = Depends(current_user_key)):
+    # An ESPN league keeps its id across seasons, so a typed id is paired with a season chosen from these.
+    integration = resolve_live_integration('Retrieve from ESPN', user_key)
+    try:
+        seasons = integration.list_league_seasons(league_id)
+    except (PermissionError, LookupError) as error:
+        raise fail(403 if isinstance(error, PermissionError) else 404, str(error))
+    except Exception:
+        raise fail(502, "Could not read the league's seasons from ESPN.")
+    return EspnLeagueSeasonsResponse(seasons=seasons)
+
+
 @router.get('/platforms/{platform}/leagues', response_model=LeaguesResponse)
 def get_platform_leagues_route(platform: str, user_key: str = Depends(current_user_key)):
     integration = resolve_live_integration(platform, user_key)
@@ -79,6 +93,9 @@ def connect_platform_route(platform: str, req: PlatformConfigRequest, user_key: 
     integration = resolve_live_integration(platform, user_key)
     try:
         shape = integration.fetch_league_shape(req.league_id, req.division_id)
+    except (PermissionError, LookupError) as error:
+        # The platform's own answer about this league (ESPN: private, or no such league), worth showing as is.
+        raise fail(403 if isinstance(error, PermissionError) else 404, str(error))
     except Exception:
         raise fail(502, 'Failed to connect to the platform league.')
     return ConnectResponse(
@@ -110,6 +127,8 @@ def get_draft_state_route(mode: str, session: Session = Depends(require_session)
             selections = integration.get_draft_results(config, mode, session.platform_player_id_lookup)
     except HTTPException:
         raise
+    except (PermissionError, LookupError) as error:
+        raise fail(403 if isinstance(error, PermissionError) else 404, str(error))
     except HTTPError as error:
         # Yahoo answered with a status rather than data. 401 is the one the user can act on:
         # the token has expired or been revoked, and reconnecting fixes it. Anything else is
@@ -132,9 +151,16 @@ def get_draft_state_route(mode: str, session: Session = Depends(require_session)
             team: cash_per_team - sum(team_costs)
             for team, team_costs in selections.costs.items()
         }
+    # A season roster short of the league's size: its open slots count as replacement-level players.
+    player_assignments, empty_slots = selections.player_assignments, {}
+    if mode == 'Season Mode':
+        player_assignments, empty_slots = fill_empty_slots_with_replacement(
+            selections.player_assignments, session.current_settings['n_picks'])
     return DraftStateResponse(
-        player_assignments = selections.player_assignments,
-        injured_players    = selections.injured_players,
-        status             = selections.status,
-        remaining_cash     = remaining_cash,
+        player_assignments     = player_assignments,
+        injured_players        = selections.injured_players,
+        unmatched_player_names = selections.unmatched_player_names,
+        empty_slots            = empty_slots,
+        status                 = selections.status,
+        remaining_cash         = remaining_cash,
     )

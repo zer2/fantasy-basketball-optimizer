@@ -17,6 +17,8 @@ import abc
 from dataclasses import dataclass
 from typing import Optional
 
+from backend.platform_integration.helpers import PlatformPlayerLookup
+
 
 @dataclass
 class LeagueShape:
@@ -62,13 +64,17 @@ class PlatformSelections:
 
     `player_assignments` maps each team to its list of player ids (the shape /evaluate
     expects). `injured_players` lists the ids of players the platform flags as out
-    (Season Mode only); empty otherwise. `costs` is populated
-    only for auctions: costs[team][i] is the price paid for player_assignments[team][i].
+    (Season Mode only); empty otherwise. `unmatched_player_names` names the rostered players the session could not
+    match, which player_assignments carries as RP_PLAYER_ID: unmatched_player_names[team][i] is the platform's name for
+    player_assignments[team][i], so the roster can show who it is. Empty where the platform gives no names (a draft
+    board read by id). `costs` is populated only for auctions: costs[team][i] is the price paid for
+    player_assignments[team][i].
     """
-    player_assignments: dict[str, list[int]]
-    status:             str
-    injured_players:    list[int]
-    costs:              Optional[dict[str, list[float]]] = None
+    player_assignments:     dict[str, list[int]]
+    status:                 str
+    injured_players:        list[int]
+    unmatched_player_names: dict[str, dict[int, str]]
+    costs:                  Optional[dict[str, list[float]]] = None
 
 
 class PlatformIntegration(abc.ABC):
@@ -114,18 +120,18 @@ class PlatformIntegration(abc.ABC):
         self
         , config: PlatformConfig
         , mode: str
-        , player_id_lookup: dict[str, int]
+        , player_id_lookup: PlatformPlayerLookup
     ) -> PlatformSelections:
-        """Fetch the current draft board / rosters, mapping platform keys to session
-        player ids via player_id_lookup (built once upstream from the session registry;
-        unmatched keys fall back to RP_PLAYER_ID)."""
+        """Fetch the current draft board / rosters, mapping each rostered player to a session
+        player id via player_id_lookup (built once upstream from the session registry): by
+        platform key, then by name where the platform gives one, else RP_PLAYER_ID."""
 
     @abc.abstractmethod
     def get_auction_results(
         self
         , config: PlatformConfig
         , mode: str
-        , player_id_lookup: dict[str, int]
+        , player_id_lookup: PlatformPlayerLookup
     ) -> Optional[PlatformSelections]:
         """Fetch the current auction state (with `costs`), or None when the platform has
         no auction support."""

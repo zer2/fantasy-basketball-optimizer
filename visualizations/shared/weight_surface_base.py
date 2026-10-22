@@ -20,8 +20,8 @@ Run `python visualizations/prepare_weight_surface_data.py` first. It builds a 20
 lets the self-play bootstrap settle the field, and records this surface and these climbs from the
 real objective, from inside the bootstrap itself.
 
-    manim -ql visualizations/8_gradient_descent/gradient_descent.py GradientDescent
-    manim -ql visualizations/7_seed_menu/seed_menu.py SeedMenu
+    manim -ql visualizations/scenes/8_gradient_descent/gradient_descent.py GradientDescent
+    manim -ql visualizations/scenes/7_seed_menu/seed_menu.py SeedMenu
 """
 
 from __future__ import annotations

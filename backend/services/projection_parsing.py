@@ -258,6 +258,10 @@ def _parse_with_renamer(
     df = df.drop(columns=['Games Played', 'Minutes'], errors='ignore')
 
     if 'Player' in df.columns:
+        # Whitespace around a name is formatting, never part of it: a Basketball Monster export padded 430 of its 463
+        # names with a trailing space (2026-10-19), and the exact-spelling lookup then resolved none of them, so every
+        # player it shared with another source appeared twice, once under a synthetic id.
+        df['Player'] = df['Player'].astype(str).str.strip()
         df = df.set_index('Player')
 
     return df

@@ -22,6 +22,7 @@ import {
     convertWinRateToRotoPoints, computeRotoMiddle,
 } from '../styles/styler_functions.js'
 import { buildExpandPanel } from './expand_view.js'
+import { classifyCashPressure, describeCashPressure } from './table_helpers.js'
 import { PlayerResult } from '../types.js'
 import { getScoringFormat, getSelectedCategories } from '../setting_collection/format_and_categories.js'
 import { getLeagueSettings, getMode } from '../setting_collection/league_settings.js'
@@ -265,7 +266,11 @@ function buildRowPairHtml(player: PlayerResult, ctx: RenderContext): string {
         if (av) {
             const diff = av.your_dollar - av.generic_dollar
             html += `<td class='auction-dollar' style='${stat_styler_secondary(diff, 10, 0)}'>${diff.toFixed(ctx.decimals)}</td>`
-            for (const val of [av.your_dollar, av.generic_dollar, av.original_dollar]) {
+            const pressureClass = classifyCashPressure(av.cash_to_cost_ratio)
+            html += `<td class='auction-dollar celltypeb${pressureClass ? ` ${pressureClass}` : ''}'`
+                + `${pressureClass ? ` title='${describeCashPressure(av.cash_to_cost_ratio!, av.unusable_cash_share)}'` : ''}>`
+                + `${av.your_dollar.toFixed(ctx.decimals)}</td>`
+            for (const val of [av.generic_dollar, av.original_dollar]) {
                 html += `<td class='auction-dollar celltypeb'>${val.toFixed(ctx.decimals)}</td>`
             }
         } else {

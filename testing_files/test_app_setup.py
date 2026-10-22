@@ -58,6 +58,8 @@ def _build_default_session_request() -> dict:
             , 'aleph':         opts['aleph']['default']
             , 'n_iterations':  opts['n_iterations']['default']
             , 'streaming_noise': opts['S']['default']
+            , 'replacement_threshold': opts['S_R']['default']
+            , 'cash_share_softness': opts['cash_share_softness']['default']
         }
         , 'data_source': {'type': 'historical', 'season': '2024-25'}
     }
@@ -470,6 +472,21 @@ def test_parse_projection_upload_drops_repeated_header_rows_even_when_a_spreadsh
     parsed = parse_projection_upload(csv, params)
     assert sorted(parsed.index) == ['First Player', 'Second Player', 'Third Player']
     assert parsed.loc['Second Player', 'Threes'] == 2.5
+
+
+def test_parse_projection_upload_strips_whitespace_around_names():
+    """A Basketball Monster export padded its names with a trailing space ('Nikola Jokic ', 2026-10-19). The name lookup
+    is exact, so none resolved and every player the upload shared with another source appeared twice, once under a
+    synthetic id. Names are read without the whitespace around them, and still resolve exactly."""
+    from backend.services.projection_parsing import parse_projection_upload
+    params = _load_params()['NBA']
+    csv = ('R#,PLAYER,ADP,POS,TEAM,GP,MPG,FG%,FT%,3PM,PTS,TREB,AST,STL,BLK,TO,TOTAL\r\n'
+           '1,Nikola Jokic ,1.5,C,DEN,72,35.1,0.573 (10.5/18.3) ,0.816 (5.6/6.8) ,1.8,28.4,12.7,10.4,1.6,0.7,3.5,15.87\r\n'
+           '2, Victor Wembanyama,1.9,C,SA,66,30.4,0.502 (9.2/18.3) ,0.831 (5.1/6.1) ,2.2,25.6,11.8,3.6,1.1,3.2,2.9,14.22\r\n'
+           ).encode()
+    parsed = parse_projection_upload(csv, params)
+    assert sorted(parsed.index) == ['Nikola Jokic', 'Victor Wembanyama']
+    assert parsed.loc['Nikola Jokic', 'Points'] == 28.4
 
 
 def test_parse_projection_upload_reads_shares_as_fractions_either_way():
