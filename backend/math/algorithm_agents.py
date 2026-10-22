@@ -9,6 +9,8 @@ Rotisserie helpers, AdamOptimizer) are unchanged from that original.
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+
 import logging
 
 from typing import Optional
@@ -2054,6 +2056,20 @@ class HAgent:
                                  - seed_scores[incumbent_index])
             best = np.where(challenger_margin < _SEED_INCUMBENT_MARGIN, incumbent_index, best)
         return np.array([seed_matrices[b][i] for i, b in enumerate(best)])
+
+    @contextmanager
+    def substituting_x_scores(self, x_scores: pd.DataFrame):
+        """Solve with `x_scores` in place of the agent's own for the duration: the auction autodraft gives each
+        autodrafter its own noisy view of the players (services/auction_autodraft). Same index and columns as the
+        agent's; restored on exit, also when the solve fails."""
+        if not (x_scores.index.equals(self.x_scores.index) and x_scores.columns.equals(self.x_scores.columns)):
+            raise ValueError('Substitute X-scores must have the same players and categories as the agent\'s.')
+        own_x_scores = self.x_scores
+        self.x_scores = x_scores
+        try:
+            yield
+        finally:
+            self.x_scores = own_x_scores
 
     def set_forced_category_weights(self, allow_force_weighting: bool, forced_category_weights: dict):
         """Pin, repin, or release the forced category weights on an already-built agent.

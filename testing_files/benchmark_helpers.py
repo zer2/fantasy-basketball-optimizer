@@ -145,6 +145,8 @@ def _build_session_request(
             # exactly the opponent-punt softening the app ships with.
             'opponent_model_confidence': nba_options['opponent_model_confidence']['default'],
             'streaming_noise': nba_options['S']['default'],
+            'replacement_threshold': nba_options['S_R']['default'],
+            'cash_share_softness': nba_options['cash_share_softness']['default'],
         },
         'data_source': {
             'type':   'historical',

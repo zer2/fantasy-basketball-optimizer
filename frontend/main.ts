@@ -34,7 +34,7 @@ import {
     getSelectedCategories, isCategorySelectionValid,
 } from './setting_collection/format_and_categories.js'
 import { renderPlayerStats, getPlayerStatsSettings, waitForSeasons } from './setting_collection/player_stats.js'
-import { renderModelSettings, refreshFormatParameterControls, refreshStreamingNoiseControl, getModelSettings } from './setting_collection/model_parameters.js'
+import { renderModelSettings, refreshFormatParameterControls, refreshAuctionParameterControls, getModelSettings } from './setting_collection/model_parameters.js'
 import { renderSlotCounts, getSlotCounts, isSlotCountsValid, revalidateSlotCounts } from './setting_collection/slot_counts.js'
 
 // Dispatches to runSeasonInit (Season Mode) or runEvaluate (Draft / Auction Mode)
@@ -199,7 +199,7 @@ getModeSelectElement().addEventListener('change', () => {
     patchSessionForModeChange()                                     // 1. patch the session's league type
     if (getLeagueSettings().mode !== 'Season Mode') applyLayout()   // 2. instant layout (Season defers to the patch)
     refreshSeasonRostersIfLive()                                    // 3. season live-roster sync
-    refreshStreamingNoiseControl(getLeagueSettings().mode)          // 4. SAVOR noise is Auction-only
+    refreshAuctionParameterControls(getLeagueSettings().mode)       // 4. SAVOR and cash scaling are Auction-only
 })
 
 // On a platform switch (Draft/Auction), set up the seat selector and run the right evaluation
@@ -370,7 +370,7 @@ renderModelSettings(modelSection)
 // The format section is built first, so its current value decides these controls' initial visibility.
 refreshFormatParameterControls(getScoringFormat(), getMostCategoriesWeight())
 // Likewise the league section: the current mode decides whether the SAVOR control shows at all.
-refreshStreamingNoiseControl(getLeagueSettings().mode)
+refreshAuctionParameterControls(getLeagueSettings().mode)
 const applyModelSettings = makeApplyChain('Model parameters apply')
 modelSection.addEventListener('change', () => {
     applyModelSettings(3, { model_settings: getModelSettings() })

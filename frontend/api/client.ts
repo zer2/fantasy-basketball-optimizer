@@ -177,6 +177,8 @@ export function candidatesToPlayerResults(candidates: any[]): PlayerResult[] {
         roster: c.roster ? convertRoster(c.roster) : undefined,
         auction_values: c.auction_values ? {
             your_dollar:   c.auction_values.your_dollar,
+            unusable_cash_share: c.auction_values.unusable_cash_share,
+            cash_to_cost_ratio: c.auction_values.cash_to_cost_ratio,
             generic_dollar:   c.auction_values.generic_dollar,
             original_dollar:   c.auction_values.original_dollar,
             generic_dollar_g_score: c.auction_values.generic_dollar_g_score,

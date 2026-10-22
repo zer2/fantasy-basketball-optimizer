@@ -95,6 +95,12 @@ class ModelSettings(BaseModel):
     opponent_model_confidence: float = 0.5
     n_iterations: int
     streaming_noise: float
+    # SAVOR's replacement threshold in dollars (algorithm_helpers.savor_calculation): only outcomes above it count, a
+    # slot below it being better used for streaming. 0 is vanilla SAVOR.
+    replacement_threshold: float
+    # How early the smooth cash-share rule starts raising a team's values to use cash it could not otherwise spend
+    # (auction_pricing.smooth_spending_scale): 0 waits for an actual surplus, higher starts earlier.
+    cash_share_softness: float
     # Force-weighting: when on, a category with a pinned weight is held at it and excluded from the
     # descent, constraining the optimiser into a chosen build. The pins themselves ride on the
     # evaluate request, not here -- they change the served board but nothing the pipeline builds, so

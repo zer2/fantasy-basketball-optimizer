@@ -65,6 +65,8 @@ def _build_default_session_request() -> dict:
             , 'aleph':           opts['aleph']['default']
             , 'n_iterations':    opts['n_iterations']['default']
             , 'streaming_noise': opts['S']['default']
+            , 'replacement_threshold': opts['S_R']['default']
+            , 'cash_share_softness': opts['cash_share_softness']['default']
         }
         , 'data_source': {'type': 'historical', 'season': '2024-25'}
     }
@@ -584,7 +586,7 @@ def test_savor_calculation():
     values = pd.Series([1, 2, 3, 4, 5]).sort_values(ascending=False)
     noise  = 2
 
-    savor_result = savor_calculation(values, noise)
+    savor_result = savor_calculation(values, noise, 0.0)
 
     replacement_ev = np.mean(np.clip(np.random.normal(scale=noise, size=100_000), 0, None))
 
@@ -602,6 +604,52 @@ def test_savor_calculation():
 
 
 # ─── Gradient check helpers ───────────────────────────────────────────────────
+
+def test_savor_at_a_zero_threshold_is_the_original_formula():
+    values = pd.Series([30.0, 20.0, 10.0, 5.0, 1.0, 0.0])
+    noise = 10.0
+    original = values * norm.cdf(values / noise) - noise / (2 * np.pi) ** 0.5 * (1 - np.exp(-values ** 2 / (2 * noise ** 2)))
+    original = original * values.sum() / original.sum()
+    assert savor_calculation(values, noise, 0.0).tolist() == pytest.approx(original.tolist())
+
+
+def test_savor_with_a_threshold_values_each_player_over_a_flyer_above_it():
+    # Simulated: a player is worth E[max(outcome - threshold, 0)] minus the same for a flyer at $0, rescaled.
+    values = pd.Series([30.0, 15.0, 6.0, 2.0, 0.5])
+    noise, threshold = 8.0, 3.0
+    generator = np.random.default_rng(7)
+    draws = generator.normal(size=400_000) * noise
+    flyer = np.mean(np.clip(draws - threshold, 0, None))
+    simulated = np.array([np.mean(np.clip(value + draws - threshold, 0, None)) - flyer for value in values])
+    simulated = simulated * values.sum() / simulated.sum()
+    assert savor_calculation(values, noise, threshold).tolist() == pytest.approx(simulated.tolist(), abs=0.05)
+    assert savor_calculation(values, noise, threshold).iloc[-1] > 0, 'a player just above a flyer keeps some value'
+
+
+def test_a_replacement_threshold_moves_value_from_the_bottom_to_the_top():
+    # A draft-like curve ($2,400 over 156 players, $73 down to $0.65) at the app's noise: against vanilla SAVOR, a
+    # threshold raises the top player and lowers the bottom one, each rank by less than the one above it, and keeps
+    # the total; a higher threshold moves more.
+    values = pd.Series(60 * 0.97 ** np.arange(156))
+    values = values * 2400 / values.sum()
+    vanilla = savor_calculation(values, 10.0, 0.0)
+    ratios = {}
+    for threshold in (2.0, 4.0):
+        adjusted = savor_calculation(values, 10.0, threshold)
+        ratios[threshold] = (adjusted / vanilla).to_numpy()
+        assert adjusted.sum() == pytest.approx(vanilla.sum())
+        assert ratios[threshold][0] > 1 > ratios[threshold][-1], 'the top gains and the bottom loses'
+        assert (np.diff(ratios[threshold]) <= 1e-12).all(), 'the gain falls steadily down the ranks'
+        assert adjusted.iloc[-1] > 0, 'with noise, the bottom player keeps some value'
+    assert ratios[4.0][0] > ratios[2.0][0] and ratios[4.0][-1] < ratios[2.0][-1], 'a higher threshold moves more'
+
+
+def test_savor_without_noise_is_the_value_above_the_threshold():
+    values = pd.Series([10.0, 6.0, 3.0, 1.0])
+    assert savor_calculation(values, 0.0, 2.0).tolist() == pytest.approx([8 * 20 / 13, 4 * 20 / 13, 1 * 20 / 13, 0.0])
+    with pytest.raises(ValueError):
+        savor_calculation(values, 0.0, -1.0)
+
 
 def _check_all_gradients(c, func, del_func):
     for j in range(9):

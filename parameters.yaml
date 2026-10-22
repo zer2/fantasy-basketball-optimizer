@@ -388,6 +388,14 @@ NBA:
       default : 10
       min : 0
       max : 200
+    S_R:
+      default : 2
+      min : 0
+      max : 50
+    cash_share_softness:
+      default : 0.2
+      min : 0
+      max : 1
     positions: 
      13:
       base:
@@ -665,6 +673,14 @@ WNBA:
       default : 10
       min : 0
       max : 200
+    S_R:
+      default : 2
+      min : 0
+      max : 50
+    cash_share_softness:
+      default : 0.2
+      min : 0
+      max : 1
     positions: 
      9: 
       base:
@@ -1039,6 +1055,14 @@ MLB:
       default : 10
       min : 0
       max : 200
+    S_R:
+      default : 2
+      min : 0
+      max : 50
+    cash_share_softness:
+      default : 0.2
+      min : 0
+      max : 1
     positions: 
      25:
       base:

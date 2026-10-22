@@ -345,8 +345,10 @@ def test_auction_example_team_holds_at_most_two_players_per_nba_team():
     player_teams = pd.Series({int(p): f'team {int(p) % 10}' for p in agent.default_h_scores.index})
     # Generic dollars for the whole available pool, as the service computes them.
     _, prices = compute_original_and_generic_dollars(
-        agent.default_h_scores, agent.x_scores.index, agent.n_drafters * agent.n_picks, agent.n_drafters * 200,
-        sum(remaining_cash.values()), session.current_settings['streaming_noise'])
+        agent.default_h_scores, agent.x_scores.index, agent.n_drafters, agent.n_picks,
+        session.current_settings['n_picks'], 200, sum(remaining_cash.values()),
+        session.current_settings['streaming_noise'], session.current_settings['replacement_threshold'],
+        session.current_settings['cash_share_softness'])
     candidate = next(c for c in candidates if c['auction_values']['generic_dollar'] < 60)['player_id']
     problem, seating = solve_team_with_teams(agent, strategies[candidate], board, candidate, player_teams,
                                              remaining_cash=200.0, predicted_prices=prices)

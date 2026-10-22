@@ -19,13 +19,25 @@ database the app uses):
 
     .venv\Scripts\python testing_files\simulate_auction_cash.py --label baseline
     .venv\Scripts\python testing_files\simulate_auction_cash.py --label smoke --max-nominations 5
+    .venv\Scripts\python testing_files\simulate_auction_cash.py --label 2023 --season 2023-24
+
+The truth is one season's actual stats (--season; default the benchmark season). Each autodrafter bids from its own
+expectation: those actuals plus its own noise (services/auction_autodraft.read_team_x_scores). Every finished team is
+scored twice: on the actuals ("actual"), and through its own expectation ("own view"), which is how good it believes
+its team is. A team buys the players its noise overrates, so its own view is almost always the higher of the two.
 
 Writes testing_files/auction_cash_runs/<label>_<timestamp>/:
-    summary.json      unspent cash per team (and max / median / total), each final team's H-score
-                      against the field and the field average, run settings, commit, timings
+    summary.json      per team: spent and unspent cash, the money paid extra for packing inefficiency, the
+                      actual and own-view H-scores against the field; their totals, the field average, run
+                      settings, commit, timings
     spend_curve.csv   cumulative dollars spent per team after every nomination
-    nominations.csv   one row per nomination: nominator, player, winner, price, the winner's and the
-                      runner-up's valuations, seconds taken
+    nominations.csv   one row per nomination: nominator, player, winner, price, the price the same bidding reaches
+                      without the cash share, the winner's and the runner-up's valuations, seconds taken
+
+Paid extra for packing inefficiency: "Your $" is scaled as if the league's cash were spent perfectly, which no team
+manages, so a team left holding more cash than its open slots can use gets a share of it added to its best options
+(auction_pricing). The extra is each sale's price above what the same bidding reaches with every team's share taken
+out of its valuation.
 """
 
 import argparse
@@ -48,10 +60,9 @@ _REPOSITORY_ROOT   = _TESTING_DIRECTORY.parent
 sys.path.insert(0, str(_REPOSITORY_ROOT))
 sys.path.insert(0, str(_TESTING_DIRECTORY))
 
-from benchmark_helpers import client, _build_session_request                          # noqa: E402
-from backend.state.session import get_session                                         # noqa: E402
-from backend.services.ranking import rank_candidates                                  # noqa: E402
-from backend.services.auction_autodraft import nominate_auction_player                # noqa: E402
+from experiment_harnesses.auction_simulation import (  # noqa: E402
+    build_auction_session, name_auction_teams, run_auction, score_auction,
+)
 
 _RUNS_DIRECTORY = _TESTING_DIRECTORY / 'auction_cash_runs'
 
@@ -65,6 +76,10 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument('--drafters', type=int, default=None, help='Number of teams (default: parameters.yaml).')
     parser.add_argument('--max-nominations', type=int, default=None,
                         help='Stop after this many nominations (a quick check that the script runs).')
+    parser.add_argument('--cash-rule', default='simple_scaling', choices=('simple_scaling', 'smooth'),
+                        help="Every team's cash-share rule (backend/services/auction_pricing.py; default simple_scaling).")
+    parser.add_argument('--season', default=None,
+                        help="The season whose actual stats are the truth, e.g. 2023-24 (default: the benchmark season).")
     return parser.parse_args()
 
 
@@ -73,157 +88,53 @@ def read_current_commit() -> str:
                           cwd=_REPOSITORY_ROOT).stdout.strip()
 
 
-def build_auction_session(
-    objective: str
-    , cash: int
-    , drafters: int | None
-):
-    request = _build_session_request(objective=objective, cash_per_team=cash, n_drafters=drafters)
-    response = client.post('/sessions', json=request)
-    if response.status_code != 201:
-        raise RuntimeError(f'Session build failed ({response.status_code}): {response.text}')
-    return get_session(response.json()['session_id'])
-
-
-def advance_nominator(
-    nominator_index: int
-    , player_assignments: dict[str, list[int]]
-    , teams: list[str]
-    , total_roster_picks: int
-) -> int:
-    """The next team in board order with an empty slot (advanceNominatorIndex)."""
-    for step in range(1, len(teams) + 1):
-        candidate = (nominator_index + step) % len(teams)
-        if len(player_assignments[teams[candidate]]) < total_roster_picks:
-            return candidate
-    return nominator_index
-
-
-def run_bidding(
-    nominator_index: int
-    , opening_bid: int
-    , valuations: dict[str, float]
-    , max_allowed_bids: dict[str, int]
-    , teams: list[str]
-) -> tuple[int, int]:
-    """The browser's round-robin bidding with every team an autodrafter (advanceAutobidders).
-    Returns (winner index, price)."""
-    team_count = len(teams)
-    active_bidders = {index for index, team in enumerate(teams) if max_allowed_bids[team] >= opening_bid}
-    active_bidders.add(nominator_index)
-    current_bid = opening_bid
-    high_bidder = nominator_index
-    turn = (nominator_index + 1) % team_count
-    while True:
-        if len(active_bidders) <= 1:
-            return high_bidder, current_bid
-        if turn not in active_bidders:
-            turn = (turn + 1) % team_count
-            continue
-        if turn == high_bidder:
-            return high_bidder, current_bid
-        team = teams[turn]
-        next_bid = current_bid + 1
-        if next_bid <= valuations[team] and next_bid <= max_allowed_bids[team]:
-            current_bid = next_bid
-            high_bidder = turn
-        else:
-            active_bidders.discard(turn)
-        turn = (turn + 1) % team_count
-
-
-def score_final_teams(
-    session
-    , player_assignments: dict[str, list[int]]
-    , remaining_cash: dict[str, float]
-    , teams: list[str]
-) -> dict[str, float]:
-    """Each finished team's H-score against the field (the full-roster evaluate's single row)."""
-    scores = {}
-    for team in teams:
-        result = rank_candidates(session=session, player_assignments=player_assignments, my_team_id=team,
-                                 exclusion_list=[], remaining_cash=remaining_cash)
-        if len(result.candidates) != 1:
-            raise RuntimeError(f'{team}: expected one full-roster row, got {len(result.candidates)}.')
-        scores[team] = result.candidates[0].h_score
-    return scores
-
-
 def main() -> None:
     arguments = parse_arguments()
     started = time.perf_counter()
-    session = build_auction_session(arguments.objective, arguments.cash, arguments.drafters)
+    session = build_auction_session(arguments.objective, arguments.cash, arguments.drafters, arguments.season, None)
     session_seconds = time.perf_counter() - started
 
-    team_count         = session.current_settings['n_drafters']
-    total_roster_picks = session.current_settings['n_picks']
-    teams              = [f'Team {index + 1}' for index in range(team_count)]
-    player_assignments = {team: [] for team in teams}
-    remaining_cash     = {team: float(arguments.cash) for team in teams}
-    total_nominations  = team_count * total_roster_picks
+    team_count = session.current_settings['n_drafters']
+    total_nominations = team_count * session.current_settings['n_picks']
     if arguments.max_nominations is not None:
         total_nominations = min(total_nominations, arguments.max_nominations)
-
-    print(f'Session built in {session_seconds:.1f}s: {team_count} teams, {total_roster_picks} picks, '
+    print(f'Session built in {session_seconds:.1f}s: {team_count} teams, {session.current_settings["n_picks"]} picks, '
           f'${arguments.cash}, {arguments.objective}. Running {total_nominations} nominations.', flush=True)
 
-    nomination_rows, spend_rows = [], []
-    nominator_index = 0
-    for nomination_number in range(1, total_nominations + 1):
-        nomination_started = time.perf_counter()
-        with session.lock:
-            nomination = nominate_auction_player(
-                session             = session,
-                player_assignments  = player_assignments,
-                remaining_cash      = remaining_cash,
-                nominator_id        = teams[nominator_index],
-                nominated_player_id = None,
-                opening_bid         = None,
-                valuation_team_ids  = teams,
-            )
-        winner_index, price = run_bidding(nominator_index, nomination.opening_bid, nomination.valuations,
-                                          nomination.max_allowed_bids, teams)
-        winner = teams[winner_index]
-        player_assignments[winner].append(nomination.nominated_player_id)
-        remaining_cash[winner] -= price
+    def print_sale(number, total, row):
+        print(f'{number:>4}/{total}  {row["player"]:<28} -> {row["winner"]:<8} ${row["price"]:<4} ({row["seconds"]:.1f}s)',
+              flush=True)
 
-        ranked_valuations = sorted(nomination.valuations.values(), reverse=True)
-        seconds = time.perf_counter() - nomination_started
-        nomination_rows.append({
-            'nomination':        nomination_number,
-            'nominator':         teams[nominator_index],
-            'player_id':         nomination.nominated_player_id,
-            'player':            nomination.nominated_player_name,
-            'winner':            winner,
-            'price':             price,
-            'winner_valuation':  nomination.valuations[winner],
-            'runner_up_valuation': ranked_valuations[1] if len(ranked_valuations) > 1 else 0.0,
-            'seconds':           round(seconds, 2),
-        })
-        spend_rows.append({'nomination': nomination_number,
-                           **{team: round(arguments.cash - remaining_cash[team], 2) for team in teams}})
-        print(f'{nomination_number:>4}/{total_nominations}  {nomination.nominated_player_name:<28} '
-              f'-> {winner:<8} ${price:<4} ({seconds:.1f}s)', flush=True)
-
-        nominator_index = advance_nominator(nominator_index, player_assignments, teams, total_roster_picks)
-
-    auction_complete = all(len(roster) == total_roster_picks for roster in player_assignments.values())
-    final_scores = score_final_teams(session, player_assignments, remaining_cash, teams) if auction_complete else {}
+    teams = name_auction_teams(session)
+    run = run_auction(session, arguments.cash, arguments.max_nominations, print_sale,
+                      {team: arguments.cash_rule for team in teams})
+    teams, remaining_cash = run.teams, run.remaining_cash
+    nomination_rows, spend_rows = run.nomination_rows, run.spend_rows
+    auction_complete = run.complete
+    actual_scores, own_view_scores = score_auction(session, run) if run.complete else ({}, {})
     unspent = [remaining_cash[team] for team in teams]
+    excess_by_team = {team: sum(row['paid_extra_for_packing'] for row in nomination_rows if row['winner'] == team)
+                      for team in teams}
+    last_round = nomination_rows[-team_count:]
 
     summary = {
         'label':            arguments.label,
         'commit':           read_current_commit(),
         'finished_at':      datetime.datetime.now().isoformat(timespec='seconds'),
         'settings':         {'objective': arguments.objective, 'cash': arguments.cash, 'teams': team_count,
-                             'picks': total_roster_picks, 'nominations_run': total_nominations},
+                             'picks': session.current_settings['n_picks'], 'nominations_run': total_nominations},
         'auction_complete': auction_complete,
         'unspent_cash':     {team: remaining_cash[team] for team in teams},
         'unspent_max':      max(unspent),
         'unspent_median':   statistics.median(unspent),
         'unspent_total':    sum(unspent),
-        'final_h_scores':   final_scores,
-        'final_h_score_average': statistics.mean(final_scores.values()) if final_scores else None,
+        'paid_extra_for_packing': excess_by_team,
+        'paid_extra_for_packing_total': sum(excess_by_team.values()),
+        'paid_extra_for_packing_last_round': sum(row['paid_extra_for_packing'] for row in last_round),
+        'season':           arguments.season or 'the benchmark season',
+        'actual_h_scores':  actual_scores,
+        'actual_h_score_average': statistics.mean(actual_scores.values()) if actual_scores else None,
+        'own_view_h_scores': own_view_scores,
         'seconds_session':  round(session_seconds, 1),
         'seconds_total':    round(time.perf_counter() - started, 1),
         'seconds_per_nomination_median': statistics.median(row['seconds'] for row in nomination_rows),
@@ -238,13 +149,19 @@ def main() -> None:
             writer.writeheader()
             writer.writerows(rows)
 
-    print(f'\nUnspent cash: max ${summary["unspent_max"]:g}, median ${summary["unspent_median"]:g}, '
-          f'total ${summary["unspent_total"]:g}')
+    print(f'\n{"Team":<8} {"actual H":>9} {"own view":>9} {"overrated":>10} {"spent":>7} {"unspent":>8} '
+          f'{"paid extra (packing)":>21}')
     for team in teams:
-        score = f'  H-score {final_scores[team]:.1f}' if final_scores else ''
-        print(f'  {team:<8} ${remaining_cash[team]:>6g} unspent{score}')
-    if final_scores:
-        print(f'Field average H-score: {summary["final_h_score_average"]:.2f} (expected 50)')
+        scores = (f'{actual_scores[team]:>9.1f} {own_view_scores[team]:>9.1f} '
+                  f'{own_view_scores[team] - actual_scores[team]:>+10.1f}') if actual_scores else f'{"":>30}'
+        print(f'{team:<8} {scores} ${arguments.cash - remaining_cash[team]:>6g} ${remaining_cash[team]:>7g} '
+              f'${excess_by_team[team]:>20}')
+    if actual_scores:
+        print(f'{"Average":<8} {summary["actual_h_score_average"]:>9.2f} {statistics.mean(own_view_scores.values()):>9.2f}')
+    print(f'\nUnspent cash: total ${summary["unspent_total"]:g} (max ${summary["unspent_max"]:g}). '
+          f'Paid extra for packing inefficiency (price above the same bidding without the cash share): '
+          f'${summary["paid_extra_for_packing_total"]:g}, ${summary["paid_extra_for_packing_last_round"]:g} of it in '
+          f'the last round.')
     print(f'Results: {run_directory}')
 
 

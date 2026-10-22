@@ -11,6 +11,7 @@ import pandas as pd
 
 from backend.math import exact_team_solves
 from backend.models import HypotheticalPick, HypotheticalTeamResponse, Roster, RosterAssignment
+from backend.services.auction_pricing import sum_spendable_league_cash
 from backend.services.build_agent import count_unscorable_players_as_replacement
 from backend.services.market_draft_values import (
     compute_availability_order, compute_blended_prices, load_market_draft_values, uses_market_draft_values,
@@ -67,9 +68,11 @@ def build_hypothetical_team(
         available_player_ids = h_agent.x_scores.index[
             ~h_agent.x_scores.index.isin(list(players_chosen) + exclusion_list)]
         _, generic_prices = compute_original_and_generic_dollars(
-            h_agent.default_h_scores, available_player_ids, h_agent.n_drafters * h_agent.n_picks,
-            h_agent.n_drafters * current_settings['cash_per_team'], sum(remaining_cash.values()),
-            current_settings['streaming_noise'],
+            h_agent.default_h_scores, available_player_ids, h_agent.n_drafters, h_agent.n_picks,
+            current_settings['n_picks'], current_settings['cash_per_team'],
+            sum_spendable_league_cash(player_assignments, remaining_cash, h_agent.n_picks),
+            current_settings['streaming_noise'], current_settings['replacement_threshold'],
+            current_settings['cash_share_softness'],
         )
         predicted_prices = compute_blended_prices(generic_prices, market_values)
         my_remaining_cash = remaining_cash[my_team_id]
