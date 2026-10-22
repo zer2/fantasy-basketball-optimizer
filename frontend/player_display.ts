@@ -194,6 +194,13 @@ export function buildUnmatchedPlayerDisplayHtml(platformName: string): string {
         + `${escapedName}<span class='unmatched-player-marker'>not matched</span></span>`
 }
 
+/** A roster slot that was empty on the platform, filled with the session's replacement player. */
+export function buildEmptySlotDisplayHtml(): string {
+    return `<span class='playername unmatched-player' `
+        + `title='An empty roster slot, counted as a replacement-level player'>`
+        + `Empty slot<span class='unmatched-player-marker'>replacement</span></span>`
+}
+
 /** Minimal display (headshot + last name) as an HTML string, for string-built contexts. */
 export function buildMinimalPlayerDisplayHtml(playerId: number): string {
     const entry = getRegistryEntry(playerId)

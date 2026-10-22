@@ -327,6 +327,9 @@ class DraftStateResponse(BaseModel):
     # team -> {position in that team's player_assignments: the platform's name}, for the players the session could not
     # match (carried there as the replacement player, -1). See PlatformSelections.
     unmatched_player_names: dict[str, dict[int, str]]
+    # Season Mode: team -> the positions in its player_assignments that were empty on the platform and are filled with
+    # the replacement player (-1) so the team is full (helpers.fill_empty_slots_with_replacement). Empty otherwise.
+    empty_slots: dict[str, list[int]]
     status: str
     remaining_cash: Optional[dict[str, float]] = None   # Auction Mode only
 

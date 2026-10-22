@@ -118,3 +118,20 @@ def build_platform_player_id_lookup(
         player_ids_by_name             = player_ids_by_name,
         player_ids_by_accent_free_name = player_ids_by_accent_free_name,
     )
+
+
+def fill_empty_slots_with_replacement(
+    player_assignments: dict[str, list[int]]
+    , roster_size: int
+) -> tuple[dict[str, list[int]], dict[str, list[int]]]:
+    """(each team's roster with its empty slots filled by the replacement player, team -> the filled positions). A
+    season roster short of the league's size has open slots the team will fill from waivers, so they count as
+    replacement-level players; a short roster also kept the team out of the Waiver and Trading tabs, which need full
+    teams (the user, 2026-10-21)."""
+    filled, empty_slots = {}, {}
+    for team, roster in player_assignments.items():
+        missing = max(roster_size - len(roster), 0)
+        filled[team] = list(roster) + [RP_PLAYER_ID] * missing
+        if missing:
+            empty_slots[team] = list(range(len(roster), roster_size))
+    return filled, empty_slots
