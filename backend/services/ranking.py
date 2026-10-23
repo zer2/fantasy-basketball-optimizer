@@ -15,6 +15,7 @@ from backend.state.session import Session
 from backend.models import (
     Candidate, GScoreRow, FlexAllocations, FlexRow,
     Roster, RosterAssignment, AuctionValues, EvaluateResponse,
+    PointsEvaluateResponse, PointsCandidate,
 )
 from backend.math.algorithm_helpers import auction_value_adjuster
 from backend.services.auction_pricing import (
@@ -181,6 +182,177 @@ def store_candidate_strategies(
         cache.popitem(last=False)
 
 
+def _rank_points_candidates(
+    session: Session,
+    player_assignments: dict[str, list[int]],
+    my_team_id: str,
+    exclusion_list: list[int],
+    remaining_cash: Optional[dict[str, float]],
+    candidate_offset: int = 0,
+    candidate_limit: Optional[int] = None,
+    drop_player_id: Optional[int] = None,
+) -> PointsEvaluateResponse:
+    from backend.points.roster_schedule import (
+        evaluate_waiver_candidates,
+        WaiverValuationResult,
+        compute_multi_day_lineup_fp,
+    )
+    from backend.points.schedule import ScheduleCalendar
+
+    my_roster = [int(p) for p in player_assignments.get(my_team_id, []) if p is not None]
+
+    rostered_players = {
+        int(p)
+        for team_players in player_assignments.values()
+        for p in team_players
+        if p is not None
+    }
+    excluded = rostered_players | {int(p) for p in (exclusion_list or []) if p is not None}
+
+    from backend.points.live import resolve_points_calendar
+    roster_ids = [int(p) for roster in player_assignments.values() for p in roster if p is not None]
+    schedule, dates = resolve_points_calendar(session, roster_ids)
+
+    # Resolve per-game FP and position eligibility
+    per_game_fp = getattr(session.agent, 'per_game_fp', {}) or {}
+    player_positions = getattr(session.agent, 'position_eligibility', {}) or {}
+    if not player_positions and session.player_registry:
+        player_positions = {pid: list(ident.positions) for pid, ident in session.player_registry.items()}
+
+    # Resolve slot configurations
+    active_slots = {}
+    bench_slots = 4
+    ir_slots = 3
+    if hasattr(session.agent, 'config') and session.agent.config:
+        active_slots = dict(session.agent.config.active_slots)
+        bench_slots = getattr(session.agent.config, 'bench_slots', 4)
+        ir_slots = getattr(session.agent.config, 'ir_slots', 3)
+    else:
+        active_slots = session.current_settings.get('slot_counts', {})
+        bench_slots = session.current_settings.get('bench_slots', 4)
+        ir_slots = session.current_settings.get('ir_slots', 3)
+
+    # Resolve dropped player(s) if explicitly passed in session settings
+    drop_param = (
+        session.current_settings.get('drop_player_id')
+        or session.current_settings.get('drop_candidates')
+        or session.current_settings.get('drop_candidate_ids')
+        or session.current_settings.get('drop_player_ids')
+    )
+    if drop_player_id is not None and drop_player_id not in my_roster:
+        raise ValueError('The selected drop player is not on your roster.')
+    drop_candidates = [drop_player_id] if drop_player_id is not None else None
+    if drop_param is not None and drop_player_id is None:
+        if isinstance(drop_param, (list, tuple, set)):
+            drop_candidates = [int(p) for p in drop_param if int(p) in my_roster]
+        else:
+            drop_candidates = [int(drop_param)] if int(drop_param) in my_roster else None
+
+    # Available player candidate pool
+    if per_game_fp:
+        all_pool_ids = list(per_game_fp.keys())
+    elif session.player_registry:
+        all_pool_ids = list(session.player_registry.keys())
+    elif session.v0_clean is not None:
+        all_pool_ids = list(session.v0_clean.index)
+    else:
+        all_pool_ids = []
+
+    unknown = [int(pid) for pid in all_pool_ids if int(pid) not in excluded and int(pid) != -1
+               and schedule.get_player_team(int(pid)) is None] if session.points_calendar_key else []
+    candidates = [int(pid) for pid in all_pool_ids if int(pid) not in excluded and int(pid) != -1
+                  and int(pid) not in unknown and np.isfinite(per_game_fp.get(pid, np.nan))]
+    # Rank candidates by per_game_fp descending
+    candidates.sort(key=lambda pid: per_game_fp.get(pid, 0.0) or 0.0, reverse=True)
+    total_candidates = len(candidates)
+
+    if candidate_limit is not None:
+        batch_candidates = candidates[candidate_offset : candidate_offset + candidate_limit]
+        has_more = (candidate_offset + candidate_limit) < total_candidates
+    else:
+        batch_candidates = candidates[candidate_offset:]
+        has_more = False
+
+    if my_roster:
+        waiver_results = evaluate_waiver_candidates(
+            current_roster_ids=my_roster,
+            candidate_ids=batch_candidates,
+            drop_candidates=drop_candidates,
+            schedule=schedule,
+            evaluation_window=dates,
+            player_positions=player_positions,
+            player_fp_per_game=per_game_fp,
+            active_slots=active_slots,
+            bench_slots=bench_slots,
+            ir_slots=ir_slots,
+        )
+    else:
+        waiver_results = []
+        start_date = dates[0] if dates else ""
+        end_date = dates[-1] if dates else ""
+        for cid in batch_candidates:
+            mod_fp, mod_daily = compute_multi_day_lineup_fp(
+                roster_player_ids=[cid],
+                schedule=schedule,
+                evaluation_window=dates,
+                player_positions=player_positions,
+                player_fp_per_game=per_game_fp,
+                active_slots=active_slots,
+                bench_slots=bench_slots,
+                ir_slots=ir_slots,
+            )
+            cand_games = schedule.get_player_game_count(cid, start_date, end_date) if dates else 0
+            waiver_results.append(
+                WaiverValuationResult(
+                    candidate_id=cid,
+                    drop_player_id=0,
+                    delta_fp=round(mod_fp, 4),
+                    baseline_fp=0.0,
+                    modified_fp=mod_fp,
+                    candidate_games=cand_games,
+                    dropped_games=0,
+                    daily_deltas={d: mod_daily[d].total_expected_fp for d in dates},
+                )
+            )
+        waiver_results.sort(key=lambda r: r.delta_fp, reverse=True)
+
+    candidates_dto: list[PointsCandidate] = []
+    for rank_idx, res in enumerate(waiver_results):
+        fpg = per_game_fp.get(res.candidate_id)
+        candidates_dto.append(
+            PointsCandidate(
+                player_id=res.candidate_id,
+                projected_fp_per_game=float(fpg) if fpg is not None and np.isfinite(fpg) else None,
+                projected_fp_total=float(fpg * res.candidate_games) if fpg is not None and np.isfinite(fpg) else None,
+                marginal_fp=res.delta_fp,
+                dynamic_value=res.delta_fp,
+                rank=rank_idx + 1 + candidate_offset,
+                is_exact_model=True,
+                approximation_note=None,
+                completion_ids=[],
+                drop_player_id=res.drop_player_id if res.drop_player_id > 0 else None,
+                delta_fp=res.delta_fp,
+                candidate_games=res.candidate_games,
+                dropped_games=res.dropped_games,
+                daily_deltas=res.daily_deltas,
+            )
+        )
+
+    horizon_str = f"{dates[0]} to {dates[-1]}" if dates else None
+    return PointsEvaluateResponse(
+        scoring_system='points',
+        objective='expected_points',
+        units='fantasy_points',
+        horizon=horizon_str,
+        candidates=candidates_dto,
+        has_more=has_more,
+        total_candidates=total_candidates,
+        roster_fp=compute_multi_day_lineup_fp(my_roster, schedule, dates, player_positions, per_game_fp, active_slots, bench_slots, ir_slots)[0],
+        warnings=([f'{len(unknown)} candidates excluded because their NBA team is unknown.'] if unknown else [])
+                 + ([f'{my_roster.count(-1)} roster spots without projections are excluded from points totals.'] if -1 in my_roster else []),
+    )
+
+
 # ── Public entry point ────────────────────────────────────────────────────────
 
 def rank_candidates(
@@ -191,27 +363,21 @@ def rank_candidates(
     remaining_cash: Optional[dict[str, float]],
     candidate_offset: int = 0,
     candidate_limit: Optional[int] = None,
+    drop_player_id: Optional[int] = None,
     forced_category_weights: Optional[dict[str, Optional[float]]] = None,
-) -> EvaluateResponse:
-    """Drive the HAgent gradient-descent loop and return ranked candidates.
+) -> EvaluateResponse | PointsEvaluateResponse:
+    if session.current_settings.get('scoring_system') == 'points':
+        return _rank_points_candidates(
+            session=session,
+            player_assignments=player_assignments,
+            my_team_id=my_team_id,
+            exclusion_list=exclusion_list,
+            remaining_cash=remaining_cash,
+            candidate_offset=candidate_offset,
+            candidate_limit=candidate_limit,
+            drop_player_id=drop_player_id,
+        )
 
-    Runs the agent's get_h_scores solve for the requested board and converts the
-    result into a serialisable EvaluateResponse. Warm-start state is managed by
-    the agent itself, primed from the neutral baseline built at session creation.
-
-    Args:
-        session:            The active session (fetched by the caller). n_iterations
-                            is read from its current_settings.
-        player_assignments: Maps each team name to the list of player ids already
-                            drafted/won by that team.
-        my_team_id:         The team name whose perspective the evaluation is from.
-        exclusion_list:     Player ids to exclude from the candidate rankings
-                            (e.g. already drafted by the user, injured).
-        remaining_cash:     Per-team auction budget remaining; None for draft mode.
-
-    Returns:
-        EvaluateResponse containing the iteration count and ranked Candidate list.
-    """
     board_key = make_candidate_strategy_key(
         player_assignments, my_team_id, exclusion_list, remaining_cash, forced_category_weights)
     # A rostered player the league's categories cannot score is replacement level, not an error.

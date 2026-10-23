@@ -135,6 +135,8 @@ export interface SessionRequest {
         most_categories_weight: number | null
         // The category that counts twice to settle a level matchup; null when none applies.
         tiebreaker_category: string | null
+        points_config?: import('./setting_collection/points_settings.js').PointsConfig
+        scoring_system?: 'categories' | 'points'
         categories: string[]
         cash_per_team?: number   // only consulted by the backend in Auction Mode
     }
@@ -177,4 +179,28 @@ export interface PlayerResult {
     flex_allocations?: FlexAllocations;  // absent when position data unavailable
     roster?: Roster;                     // absent when position data unavailable
     auction_values?: AuctionValues;      // present when mode === 'Auction Mode'
+    // Points mode candidate properties
+    points_per_game?: number;
+    total_projected_points?: number;
+    marginal_fp?: number;
+    delta_fp?: number;
+    candidate_games?: number;
+    dropped_games?: number;
+    daily_deltas?: Record<string, number>;
 }
+
+// ─── Points League Types ──────────────────────────────────────────────────────
+
+export interface LeagueTradeImpact {
+    pre_trade_points: Record<string, number>
+    post_trade_points: Record<string, number>
+    pre_trade_ranks: Record<string, number>
+    post_trade_ranks: Record<string, number>
+    rank_shifts: Record<string, number>
+    pre_trade_std: number
+    post_trade_std: number
+    pre_trade_spread: number
+    post_trade_spread: number
+    competitive_balance_delta: number
+}
+

@@ -212,7 +212,7 @@ class ESPNIntegration(PlatformIntegration):
         return result
 
     def _team_pairs(self, league: League) -> list[tuple[str, str]]:
-        return [(team.team_name, str(team.team_id)) for team in league.teams]
+        return [(team.team_name.strip() or f'Team {team.team_id}', str(team.team_id)) for team in league.teams]
 
     @staticmethod
     def _read_slot_counts(league_settings: dict, league_id: str) -> dict[str, int]:
@@ -235,6 +235,35 @@ class ESPNIntegration(PlatformIntegration):
             raise RuntimeError(f'ESPN league {league_id} reported no draftable roster slots.')
         return slots
 
+    @staticmethod
+    def _points_metadata(settings: dict) -> dict:
+        """Keep actual starters separate from bench/IR and import native Points rules."""
+        raw = settings['rosterSettings']['lineupSlotCounts']
+        active = {}
+        for slot, count in raw.items():
+            if int(slot) in (12, 13) or not count:
+                continue
+            name = _ESPN_SLOT_TO_APP_SLOT.get(int(slot))
+            if name is None:
+                raise ValueError(f'Unsupported ESPN active slot {slot}')
+            active[name] = active.get(name, 0) + int(count)
+        scoring = settings.get('scoringSettings', {})
+        native = scoring.get('scoringType') in ('H2H_POINTS', 'TOTAL_POINTS')
+        # ESPN basketball stat IDs; retain unsupported rules so validation names them.
+        names = {0:'PTS', 6:'REB', 3:'AST', 1:'BLK', 2:'STL', 11:'TO', 17:'3PM',
+                 13:'FGM', 14:'FGA', 15:'FTM', 16:'FTA'}
+        rules = {}
+        if native:
+            for item in scoring.get('scoringItems', []):
+                weight = item.get('points', 0)
+                if weight:
+                    stat = names.get(item['statId'], f"ESPN stat {item['statId']}")
+                    rules[stat] = rules.get(stat, 0) + weight
+        return {'scoring_system': 'points' if native else 'categories', 'scoring_rules': rules,
+                'active_slots': active, 'bench_slots': int(raw.get('12', 0)),
+                'ir_slots': int(raw.get('13', 0)),
+                'lineup_lock_mode': 'weekly' if settings['rosterSettings'].get('lineupLocktimeType') in ('MATCHUP', 'FIRST_GAME', 'MATCHUP_PERIOD') else 'pregame_daily'}
+
     def fetch_league_shape(
         self
         , league_id: str
@@ -255,6 +284,7 @@ class ESPNIntegration(PlatformIntegration):
             teams_dict       = teams_dict,
             is_auction_draft = draft_type == 'AUCTION',
             slot_counts      = slot_counts,
+            points_metadata  = self._points_metadata(league_settings),
         )
 
     # ── Roster state (Season only) ─────────────────────────────────────────────

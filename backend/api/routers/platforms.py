@@ -105,6 +105,7 @@ def connect_platform_route(platform: str, req: PlatformConfigRequest, user_key: 
         available_modes  = integration.available_modes,
         is_auction_draft = shape.is_auction_draft,
         slot_counts      = shape.slot_counts,
+        points_metadata  = shape.points_metadata,
     )
 
 

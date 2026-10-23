@@ -2,8 +2,9 @@
 // Draft and auction mode: session management, evaluate orchestration, and indicator state.
 // Owns the #eval-indicator element and all draft/auction-specific session state.
 
+import { getPointsConfig, isPointsSettingsValid } from '../setting_collection/points_settings.js'
 import { PlayerResult } from '../types.js'
-import { setBasePlayerResults, setCandidatePlayerResults, getCandidatePlayerResults, setGScores, getCurrentSeat, setLatestScoredBoard } from '../app_state.js'
+import { setBasePlayerResults, setCandidatePlayerResults, getCandidatePlayerResults, setGScores, getCurrentSeat, setLatestScoredBoard, isPointsMode } from '../app_state.js'
 import {
     getLeagueSettings, getPlatformConfig, getMode, DraftMode, isPlatformConnected, PLATFORM_SELECTION_CHANGED,
 } from '../setting_collection/league_settings.js'
@@ -150,7 +151,8 @@ export async function createOrPatchSession(
             const patchResp = await patchSession(getSessionId()!, { from_step: fromStep, ...patchBody }, signal)
             basePlayersBySession.delete(getSessionId()!)
             latestFullTeamResult = null
-            if (patchResp.steps_rerun.includes(4)) {
+            if (isPointsMode()) setGScores([])
+            if (patchResp.steps_rerun.includes(4) && !isPointsMode()) {
                 const freshGScores = await fetchGScores(getSessionId()!)
                 setGScores(freshGScores)
             }
@@ -191,6 +193,7 @@ export function isConnectionWaitingForSlots(): boolean {
 }
 
 document.addEventListener('platform-connected', () => {
+    if (isPointsMode() && !isPointsSettingsValid()) { showTableMessage('Choose Points scoring in Format & Categories to finish connecting.'); return }
     // A structure that does not fit the league's picks is never sent: it would be scored as a roster shape the league
     // does not have (an 11-pick league on the 13-slot default, 2026-10-12), and the backend now refuses it anyway. Say
     // so where the results go, and wait for the slots to be fixed.
@@ -212,7 +215,7 @@ document.addEventListener('platform-connected', () => {
     stopLivePolling()
     const { platform, n_drafters, n_picks, cash_per_team } = getLeagueSettings()
     const connectPatch = createOrPatchSession(4, {
-        league: { n_drafters, n_picks, cash_per_team },
+        league: { n_drafters, n_picks, cash_per_team, ...(isPointsMode() && isPointsSettingsValid() ? {scoring_system:'points', scoring_format:'Points League', points_config:getPointsConfig()} : {}) },
         slot_counts: getSlotCounts(),
         platform,
         platform_config: getPlatformConfig(),

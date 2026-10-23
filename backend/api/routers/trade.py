@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Union
 from fastapi import APIRouter, Depends, HTTPException
 
 from backend.api.helpers import fail, require_session
@@ -9,12 +10,17 @@ from backend.state.session import Session
 from backend.infra.rate_limit import enforce_rate_limit, COMPUTE_POLICY
 from backend.services.trading import run_trade_analyze, run_trade_suggest_across_teams
 from backend.api.schemas import TradeAnalyzeRequest, TradeSuggestRequest
-from backend.models import TradeAnalyzeResponse, TradeSuggestResponse
+from backend.models import (
+    TradeAnalyzeResponse, TradeSuggestResponse, TRADE_THRESHOLD_FLOOR,
+    PointsTradeAnalyzeResponse, PointsTradeSuggestResponse,
+)
+
+from backend.points.live import PointsDataUnavailable
 
 router = APIRouter()
 
 
-@router.post('/sessions/{session_id}/trade/analyze', response_model=TradeAnalyzeResponse,
+@router.post('/sessions/{session_id}/trade/analyze', response_model=Union[TradeAnalyzeResponse, PointsTradeAnalyzeResponse],
              dependencies=[Depends(enforce_rate_limit(COMPUTE_POLICY))])
 def analyze_trade_route(req: TradeAnalyzeRequest, session: Session = Depends(require_session)):
 
@@ -31,13 +37,20 @@ def analyze_trade_route(req: TradeAnalyzeRequest, session: Session = Depends(req
                 their_trade=req.their_trade,
                 position_check=req.position_check,
             )
+    except PointsDataUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     except Exception:
         raise fail(500, 'Trade analysis failed.')
 
 
-@router.post('/sessions/{session_id}/trade/suggest', response_model=TradeSuggestResponse,
+@router.post('/sessions/{session_id}/trade/suggest', response_model=Union[TradeSuggestResponse, PointsTradeSuggestResponse],
              dependencies=[Depends(enforce_rate_limit(COMPUTE_POLICY))])
 def suggest_trades_route(req: TradeSuggestRequest, session: Session = Depends(require_session)):
+    if session.current_settings.get('scoring_system') != 'points':
+        if min(req.your_differential_threshold, req.their_differential_threshold) < TRADE_THRESHOLD_FLOOR:
+            raise HTTPException(status_code=422, detail=f'Category trade thresholds must be at least {TRADE_THRESHOLD_FLOOR}.')
 
     try:
         with session.lock:
@@ -51,5 +64,9 @@ def suggest_trades_route(req: TradeSuggestRequest, session: Session = Depends(re
                 their_threshold=req.their_differential_threshold,
                 position_check=req.position_check,
             )
+    except PointsDataUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     except Exception:
         raise fail(500, 'Trade suggestion failed.')

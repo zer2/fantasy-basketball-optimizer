@@ -55,6 +55,15 @@ def build_agent(
         load_player_pool(session, csv_bytes=csv_bytes, uploaded_dfs=uploaded_dfs)
     if from_step <= 2:
         remove_injured_players(session)
+
+    scoring_system = session.current_settings.get('scoring_system', 'category')
+    if scoring_system == 'points' or session.current_settings.get('scoring_format') in ('Points', 'Points League'):
+        session.current_settings['scoring_system'] = 'points'
+        _run_points_pipeline(session, from_step)
+        return
+
+    session.points_config = None
+    session.points_projections = None
     if from_step <= 3:
         apply_upsilon_adjustment(session)
     if from_step <= 4:
@@ -104,7 +113,7 @@ def load_player_pool(
     if v0_with_names is None:
         if source_type == 'csv':
             v0_with_names = _fill_missing_positions(
-                _resolve_single_csv_player_ids(parse_projection_upload(csv_bytes, sport_params)), sport_params)
+                _resolve_single_csv_player_ids(parse_projection_upload(csv_bytes, sport_params, raw_stats_basis=(current_settings.get('points_config') or {}).get('projection_basis') if (current_settings.get('points_config') or {}).get('points_input_mode') == 'raw_stats' else None)), sport_params)
 
         elif source_type == 'historical':
 
@@ -184,7 +193,12 @@ def _build_v0_cache_key(current_settings: dict) -> tuple | None:
     if source_type == 'projections':
         custom_data_ids = current_settings.get('custom_data_ids') or []
         upload_keys = tuple(sorted(custom_data_ids))
-        return (sport, 'projections', describe_blend(current_settings['blend_weights']), upload_keys)
+        key = (sport, 'projections', describe_blend(current_settings['blend_weights']), upload_keys)
+        config = current_settings.get('points_config') or {}
+        if upload_keys:
+            totals = config.get('points_input_mode') == 'raw_stats' and config.get('projection_basis') in ('season_total', 'rest_of_season_total')
+            key += (totals,)
+        return key
     return None
 
 
@@ -262,7 +276,7 @@ def remove_injured_players(session: Session) -> None:
     change, which can take the player out of the pool before the frontend could know to unpick him, and a player who
     is not in the pool needs no excluding."""
 
-    injured_player_ids = session.current_settings['injured_players']
+    injured_player_ids = session.current_settings.get('injured_players') or []
     v1 = drop_injured_players(session.v0_clean, tuple(injured_player_ids))
     session.v1_clean = v1.copy()
 
@@ -534,6 +548,8 @@ def list_unscorable_player_ids(session: Session) -> list[int]:
     projects it for a player (ESPN projects no three-point attempts, so an ESPN-only rookie has no 3P%);
     such a player cannot be scored in a league that counts that category, and in one that does not, the
     gap does not matter. Derived from v2 and the categories, so a category change re-derives it."""
+    if session.v2 is None or session.current_settings.get('scoring_system') == 'points':
+        return []
     _, sport_params, _ = _resolve_sport_params(session)
     categories, _ = derive_effective_objective(session)
     ratio_statistics = sport_params['ratio-statistics']
@@ -561,6 +577,15 @@ def derive_effective_objective(session: Session) -> tuple[list[str], str | None]
     pipeline cache keys stay coherent with the request, and a category dropped for one
     data source comes back by itself when a later patch restores its columns.
     """
+    if (
+        session.v2 is None
+        or session.current_settings.get('scoring_system') == 'points'
+        or session.current_settings.get('scoring_format') in ('Points', 'Points League')
+    ):
+        cats = list(session.current_settings.get('categories', []))
+        tb = session.current_settings.get('tiebreaker_category')
+        return cats, tb
+
     _, sport_params, _ = _resolve_sport_params(session)
     available_columns = set(session.v2.columns)
     ratio_statistics  = sport_params['ratio-statistics']
@@ -597,3 +622,96 @@ class InsufficientPlayerPoolError(Exception):
     """The available player pool is too small to fill every roster in the league. This is a bad
     league configuration (too few players for the number of teams x roster spots), not a server
     fault, so the routes surface it as a 400."""
+
+
+# ── Points pipeline branch ────────────────────────────────────────────────────
+
+def _run_points_pipeline(session: Session, from_step: int) -> None:
+    """Build a DynamicPointsAgent for a points-mode session.
+
+    Replaces steps 3–5 for points sessions.  Skips upsilon adjustment (not
+    meaningful for points) and category-level process_player_data.  Instead:
+      - Validates the points_config block.
+      - Normalises the v1_clean projections into per-game FP.
+      - Builds position eligibility from the player registry.
+      - Constructs a DynamicPointsAgent and stores it as session.agent.
+    """
+    from backend.points.config import build_points_scoring_config, PointsConfigError
+    from backend.points.scoring import compute_player_fp_per_game, compute_player_fp_total
+    from backend.points.lineups import build_slot_configs_from_position_config
+    from backend.points.agents import DynamicPointsAgent
+    from backend.math.position_config import build_position_config
+
+    cp = session.current_params
+    points_config_dict = cp.get('points_config')
+    if not points_config_dict:
+        raise ValueError('Choose a Points scoring preset, custom weights, or direct fantasy-points input.')
+    metadata = session.platform_config.points_metadata if session.platform_config else None
+    active_slots = points_config_dict.get('active_slots')
+    if active_slots is None:
+        active_slots = (metadata or {}).get('active_slots', cp.get('slot_counts', {}))
+    if not active_slots or not any(active_slots.values()):
+        raise ValueError('Choose at least one active Points scoring slot.')
+    bench = points_config_dict.get('bench_slots', (metadata or {}).get('bench_slots', 0))
+    if sum(active_slots.values()) + bench > cp.get('n_picks', 13):
+        raise ValueError('Points starters plus bench exceed the roster size.')
+
+    try:
+        config = build_points_scoring_config(
+            points_input_mode  = points_config_dict.get('points_input_mode', 'projected_points')
+            , projection_basis = points_config_dict.get('projection_basis', 'per_game')
+            , scoring_rules    = points_config_dict.get('scoring_rules', {})
+            , competition_format = points_config_dict.get('competition_format', 'head_to_head')
+            , active_slots     = active_slots
+            , bench_slots      = bench
+            , ir_slots         = points_config_dict.get('ir_slots', (metadata or {}).get('ir_slots', 0))
+            , lineup_lock_mode = points_config_dict.get('lineup_lock_mode', 'pregame_daily')
+            , evaluation_window = points_config_dict.get('evaluation_window')
+            , projection_source = points_config_dict.get('projection_source')
+            , season           = points_config_dict.get('season')
+            , auction_budget   = cp.get('cash_per_team')
+            , minimum_bid      = points_config_dict.get('minimum_bid', 1)
+            , savor_enabled    = points_config_dict.get('savor_enabled', False)
+        )
+    except PointsConfigError as exc:
+        raise ValueError(f'Invalid points configuration: {exc}') from exc
+
+    from backend.points.projections import normalise_projection_file
+    from dataclasses import replace
+    # Every loaded pool's raw stats are canonical per-game rates; uploaded totals
+    # were converted by the parser, while built-in sources already contain rates.
+    normalized_config = replace(config, projection_basis='per_game') if config.points_input_mode == 'raw_stats' and cp.get('data_source_type') in ('csv', 'historical', 'projections') else config
+    projections = normalise_projection_file(session.v1_clean, normalized_config, direct_fp_col='FantasyPts')
+    per_game_fp = projections.per_game_fp.to_dict()
+
+    # Build position eligibility from the player registry.
+    position_eligibility: dict[int, list[str]] = {}
+    for player_id, identity in session.player_registry.items():
+        position_eligibility[player_id] = list(identity.positions)
+
+    # Build slot configs from the active scoring slots.
+    _, params, sport = _resolve_sport_params(session)
+    position_structure = params.get('position_structure') or params.get('position-structure') or {}
+    slot_configs = build_slot_configs_from_position_config(
+        active_slots       = dict(config.active_slots)
+        , position_structure = position_structure
+    )
+
+    n_picks = cp.get('n_picks', 13)
+
+    session.agent = DynamicPointsAgent(
+        config               = config
+        , per_game_fp        = per_game_fp
+        , position_eligibility = position_eligibility
+        , slot_configs       = slot_configs
+        , total_roster_spots = n_picks
+    )
+    # Store points config on the session for the ranking service to read.
+    session.points_config = config
+    session.points_projections = projections
+
+    # Calendar data is resolved lazily at analysis time, never replaced with synthetic games.
+    if session.points_calendar_key is not None:
+        session.schedule_calendar = None
+        session.points_calendar_key = None
+    session.agent.schedule = session.schedule_calendar

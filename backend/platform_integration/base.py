@@ -40,6 +40,7 @@ class LeagueShape:
     # The league's own position structure, in the app's slot names ({'PG': 1, ..., 'Util': 3}), when the platform
     # reports one; None when it does not, and the app falls back to its default for the roster size.
     slot_counts: Optional[dict[str, int]] = None
+    points_metadata: Optional[dict] = None
 
 
 @dataclass
@@ -55,6 +56,7 @@ class PlatformConfig:
     # Boards are seeded from this so a seat that nobody has taken yet is still a team with an
     # empty roster rather than missing from the league entirely.
     seat_names:         list[str]
+    points_metadata: Optional[dict] = None
 
 
 @dataclass

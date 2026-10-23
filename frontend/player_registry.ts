@@ -11,6 +11,7 @@ export interface PlayerRegistryEntry {
     last_name: string
     positions: string[]
     has_headshot: boolean
+    points_per_game?: number | null
 }
 
 /** The replacement-player sentinel's id (backend RP_PLAYER_ID): a stand-in the pipeline injects, not a player. */

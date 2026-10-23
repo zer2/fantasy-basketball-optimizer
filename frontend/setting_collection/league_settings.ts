@@ -7,6 +7,7 @@ import { makeLabel, makeNumberInput, makeSidebarToggle, readRequiredIntInput } f
 import { getSportConfig } from '../app_state.js'
 import { pref, savePref } from '../preferences.js'
 import { connectPlatform } from '../api/client.js'
+import type { PointsMetadata } from './points_settings.js'
 import { makeConnectors, connectorPlatforms } from '../platforms/registry.js'
 import { PlatformConnector, ConnectStatus, PLATFORM_LEAGUE_CHOSEN } from '../platforms/connector.js'
 import { isSignedIn, makeSignInPrompt } from '../api/auth.js'
@@ -39,6 +40,10 @@ interface ConnectedTo {
     mode:       string
 }
 let connectedTo: ConnectedTo | null = null
+let pointsMetadata: PointsMetadata | null = null
+export function getPointsMetadata(): PointsMetadata | null {
+    return isPlatformConnected() ? pointsMetadata : null
+}
 
 /** Fired (on document) when a connector's controls change, which may make them name a league other than the
  *  connected one. Listeners re-ask isPlatformConnected rather than assume the answer. */
@@ -381,6 +386,8 @@ export function renderLeagueSettings(container: HTMLElement): void {
                 // Enables the live-layout Refresh Analysis button, for as long as the controls
                 // still describe this league in this mode.
                 connectedTo = describeSelection()
+                pointsMetadata = resp.points_metadata ?? null
+                document.dispatchEvent(new Event('points-league-metadata'))
                 lockLeagueShapeWhileConnected()
                 // Patch the session with the platform's config (drives the draft-state poll +
                 // name lookup) and counts. Routed through an event so this module doesn't import

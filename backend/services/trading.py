@@ -18,12 +18,137 @@ from backend.state.session import Session
 from backend.models import (
     TeamHScore, TeamTradeResult, TradeAnalyzeResponse,
     TradeSuggestion, TradeSuggestResponse, ComboParam,
+    PointsTradeAnalyzeResponse, PointsTradeSuggestResponse,
+    PointsTradeSuggestionModel, LeagueTradeImpactModel,
 )
 from backend.math.position_optimization import check_team_eligibility
 from backend.services.build_agent import count_unscorable_players_as_replacement, list_unscorable_player_ids
 
 
 # ── Core trade analysis ──────────────────────────────────────────────────────
+
+def _run_points_trade_analyze(
+    session: Session
+    , player_assignments: dict[str, list[int]] | dict[str, list[str]]
+    , my_team: str
+    , their_team: str
+    , my_trade: list[int] | list[str]
+    , their_trade: list[int] | list[str]
+    , ignore_position_check: bool = False
+) -> PointsTradeAnalyzeResponse:
+    from backend.points.trade import analyze_points_trade
+    from backend.points.schedule import ScheduleCalendar
+
+    if len(my_trade) == 0 or len(their_trade) == 0:
+        return PointsTradeAnalyzeResponse(
+            scoring_system='points',
+            team_a_pre_fp=0.0,
+            team_a_post_fp=0.0,
+            team_a_delta_fp=0.0,
+            team_a_net_delta_fp=0.0,
+            team_a_streamer_boost=0.0,
+            team_b_pre_fp=0.0,
+            team_b_post_fp=0.0,
+            team_b_delta_fp=0.0,
+            team_b_net_delta_fp=0.0,
+            team_b_streamer_boost=0.0,
+            is_legal=False,
+            rejection_reason='A trade must include at least one player from each team.',
+            error='A trade must include at least one player from each team.',
+            team_a_opened_spots=0,
+            team_b_opened_spots=0,
+        )
+
+    team_a_sends = [int(p) for p in my_trade if p is not None]
+    team_b_sends = [int(p) for p in their_trade if p is not None]
+    team_a_roster = [int(p) for p in player_assignments.get(my_team, []) if p is not None]
+    team_b_roster = [int(p) for p in player_assignments.get(their_team, []) if p is not None]
+
+    # Include league rosters for league impact if provided
+    all_team_rosters = {
+        str(t): [int(p) for p in r if p is not None]
+        for t, r in player_assignments.items()
+    } if len(player_assignments) > 2 else None
+
+    from backend.points.live import resolve_points_calendar
+    roster_ids = [int(p) for roster in player_assignments.values() for p in roster if p is not None]
+    schedule, dates = resolve_points_calendar(session, roster_ids)
+
+    # Resolve per-game FP and position eligibility
+    per_game_fp = getattr(session.agent, 'per_game_fp', {}) or {}
+    player_positions = getattr(session.agent, 'position_eligibility', {}) or {}
+    if not player_positions and session.player_registry:
+        player_positions = {pid: list(ident.positions) for pid, ident in session.player_registry.items()}
+
+    # Resolve slot configurations
+    active_slots = {}
+    bench_slots = 4
+    ir_slots = 3
+    if hasattr(session.agent, 'config') and session.agent.config:
+        active_slots = dict(session.agent.config.active_slots)
+        bench_slots = getattr(session.agent.config, 'bench_slots', 4)
+        ir_slots = getattr(session.agent.config, 'ir_slots', 3)
+    else:
+        active_slots = session.current_settings.get('slot_counts', {})
+        bench_slots = session.current_settings.get('bench_slots', 4)
+        ir_slots = session.current_settings.get('ir_slots', 3)
+
+    roster_size_limit = getattr(session.agent, 'total_roster_spots', None) or session.current_settings.get('n_picks', 13)
+    waiver_baseline_fp = session.current_settings.get('waiver_baseline_fp_per_game', 20.0)
+    streamer_multiplier = session.current_settings.get('streamer_multiplier')
+    streamer_games_per_week = session.current_settings.get('streamer_games_per_week', 6.5)
+    position_caps = session.current_settings.get('position_caps')
+
+    result = analyze_points_trade(
+        team_a_roster=team_a_roster,
+        team_b_roster=team_b_roster,
+        team_a_sends=team_a_sends,
+        team_b_sends=team_b_sends,
+        schedule=schedule,
+        evaluation_window=dates,
+        player_positions=player_positions,
+        player_fp_per_game=per_game_fp,
+        active_slots=active_slots,
+        roster_size_limit=roster_size_limit,
+        waiver_baseline_fp_per_game=waiver_baseline_fp,
+        all_team_rosters=all_team_rosters,
+        bench_slots=bench_slots,
+        ir_slots=ir_slots,
+        position_caps=position_caps,
+        streamer_multiplier=streamer_multiplier,
+        streamer_games_per_week=streamer_games_per_week,
+        raise_on_illegal=False,
+        team_a_id=str(my_team),
+        team_b_id=str(their_team),
+        ignore_position_check=ignore_position_check,
+    )
+
+    league_impact_dto = None
+    if result.league_impact:
+        league_impact_dto = LeagueTradeImpactModel(**result.league_impact.to_dict())
+
+    return PointsTradeAnalyzeResponse(
+        scoring_system='points',
+        team_a_pre_fp=result.team_a_pre_fp,
+        team_a_post_fp=result.team_a_post_fp,
+        team_a_delta_fp=result.team_a_delta_fp,
+        team_a_net_delta_fp=result.team_a_net_delta_fp,
+        team_a_streamer_boost=result.team_a_streamer_boost,
+        team_b_pre_fp=result.team_b_pre_fp,
+        team_b_post_fp=result.team_b_post_fp,
+        team_b_delta_fp=result.team_b_delta_fp,
+        team_b_net_delta_fp=result.team_b_net_delta_fp,
+        team_b_streamer_boost=result.team_b_streamer_boost,
+        is_legal=result.is_legal,
+        rejection_reason=result.rejection_reason,
+        error=result.rejection_reason if not result.is_legal else None,
+        team_a_opened_spots=result.team_a_opened_spots,
+        team_b_opened_spots=result.team_b_opened_spots,
+        league_impact=league_impact_dto,
+        your_net_delta_fp=result.team_a_net_delta_fp,
+        their_net_delta_fp=result.team_b_net_delta_fp,
+    )
+
 
 def run_trade_analyze(
     session: Session
@@ -33,8 +158,19 @@ def run_trade_analyze(
     , my_trade: list[int]
     , their_trade: list[int]
     , position_check: bool = True
-) -> TradeAnalyzeResponse:
+) -> TradeAnalyzeResponse | PointsTradeAnalyzeResponse:
     """Public entry point for the trade/analyze endpoint."""
+    if session.current_settings.get('scoring_system') == 'points':
+        return _run_points_trade_analyze(
+            session=session,
+            player_assignments=player_assignments,
+            my_team=my_team,
+            their_team=their_team,
+            my_trade=my_trade,
+            their_trade=their_trade,
+            ignore_position_check=not position_check,
+        )
+
     if len(my_trade) == 0 or len(their_trade) == 0:
         return TradeAnalyzeResponse(error='A trade must include at least one player from each team.')
 
@@ -129,7 +265,136 @@ def analyze_trade(
     }
 
 
-# ── Suggestion orchestrator ──────────────────────────────────────────────────
+def _run_points_trade_suggest(
+    session: Session
+    , player_assignments: dict[str, list[int]] | dict[str, list[str]]
+    , my_team: str
+    , their_team: str
+    , combo_params: list[ComboParam]
+    , your_threshold: float
+    , their_threshold: float
+    , ignore_position_check: bool = False
+) -> PointsTradeSuggestResponse:
+    from backend.points.trade import search_win_win_points_trades
+    from backend.points.schedule import ScheduleCalendar
+
+    all_rosters = {
+        str(t): [int(p) for p in r if p is not None]
+        for t, r in player_assignments.items()
+    }
+    if their_team and their_team in player_assignments and their_team not in ("All Teams", "all", "", my_team):
+        all_rosters = {
+            str(my_team): all_rosters.get(str(my_team), []),
+            str(their_team): all_rosters.get(str(their_team), []),
+        }
+
+    trade_formats = []
+    if combo_params:
+        for cp in combo_params:
+            trade_formats.append(f"{cp.n_traded}v{cp.n_received}")
+    if not trade_formats:
+        trade_formats = ["1v1", "2v1", "2v2"]
+
+    from backend.points.live import resolve_points_calendar
+    roster_ids = [int(p) for roster in player_assignments.values() for p in roster if p is not None]
+    schedule, dates = resolve_points_calendar(session, roster_ids)
+
+    # Resolve per-game FP and position eligibility
+    per_game_fp = getattr(session.agent, 'per_game_fp', {}) or {}
+    player_positions = getattr(session.agent, 'position_eligibility', {}) or {}
+    if not player_positions and session.player_registry:
+        player_positions = {pid: list(ident.positions) for pid, ident in session.player_registry.items()}
+
+    # Resolve slot configurations
+    active_slots = {}
+    bench_slots = 4
+    ir_slots = 3
+    if hasattr(session.agent, 'config') and session.agent.config:
+        active_slots = dict(session.agent.config.active_slots)
+        bench_slots = getattr(session.agent.config, 'bench_slots', 4)
+        ir_slots = getattr(session.agent.config, 'ir_slots', 3)
+    else:
+        active_slots = session.current_settings.get('slot_counts', {})
+        bench_slots = session.current_settings.get('bench_slots', 4)
+        ir_slots = session.current_settings.get('ir_slots', 3)
+
+    roster_size_limit = getattr(session.agent, 'total_roster_spots', None) or session.current_settings.get('n_picks', 13)
+    waiver_baseline_fp = session.current_settings.get('waiver_baseline_fp_per_game', 20.0)
+    streamer_multiplier = session.current_settings.get('streamer_multiplier')
+    streamer_games_per_week = session.current_settings.get('streamer_games_per_week', 6.5)
+    position_caps = session.current_settings.get('position_caps')
+
+    suggestions = search_win_win_points_trades(
+        user_team_id=str(my_team),
+        all_team_rosters=all_rosters,
+        schedule=schedule,
+        evaluation_window=dates,
+        player_positions=player_positions,
+        player_fp_per_game=per_game_fp,
+        active_slots=active_slots,
+        roster_size_limit=roster_size_limit,
+        min_user_gain=float(your_threshold),
+        min_partner_gain=float(their_threshold),
+        trade_formats=trade_formats,
+        waiver_baseline_fp_per_game=waiver_baseline_fp,
+        bench_slots=bench_slots,
+        ir_slots=ir_slots,
+        position_caps=position_caps,
+        streamer_multiplier=streamer_multiplier,
+        streamer_games_per_week=streamer_games_per_week,
+        max_suggestions=50,
+        ignore_position_check=ignore_position_check,
+    )
+
+    suggestion_models = []
+    for s in suggestions:
+        an_dto = None
+        if s.analysis:
+            li_dto = LeagueTradeImpactModel(**s.analysis.league_impact.to_dict()) if s.analysis.league_impact else None
+            an_dto = PointsTradeAnalyzeResponse(
+                scoring_system='points',
+                team_a_pre_fp=s.analysis.team_a_pre_fp,
+                team_a_post_fp=s.analysis.team_a_post_fp,
+                team_a_delta_fp=s.analysis.team_a_delta_fp,
+                team_a_net_delta_fp=s.analysis.team_a_net_delta_fp,
+                team_a_streamer_boost=s.analysis.team_a_streamer_boost,
+                team_b_pre_fp=s.analysis.team_b_pre_fp,
+                team_b_post_fp=s.analysis.team_b_post_fp,
+                team_b_delta_fp=s.analysis.team_b_delta_fp,
+                team_b_net_delta_fp=s.analysis.team_b_net_delta_fp,
+                team_b_streamer_boost=s.analysis.team_b_streamer_boost,
+                is_legal=s.analysis.is_legal,
+                rejection_reason=s.analysis.rejection_reason,
+                error=s.analysis.rejection_reason if not s.analysis.is_legal else None,
+                team_a_opened_spots=s.analysis.team_a_opened_spots,
+                team_b_opened_spots=s.analysis.team_b_opened_spots,
+                league_impact=li_dto,
+                your_net_delta_fp=s.analysis.team_a_net_delta_fp,
+                their_net_delta_fp=s.analysis.team_b_net_delta_fp,
+            )
+        suggestion_models.append(
+            PointsTradeSuggestionModel(
+                partner_team_id=s.partner_team_id,
+                user_sends=s.user_sends,
+                partner_sends=s.partner_sends,
+                user_gain=s.user_gain,
+                partner_gain=s.partner_gain,
+                total_gain=s.total_gain,
+                trade_format=s.trade_format,
+                send=s.send,
+                receive=s.receive,
+                user_delta_fp=s.user_delta_fp,
+                partner_delta_fp=s.partner_delta_fp,
+                net_delta_fp=s.user_delta_fp if s.user_delta_fp is not None else s.user_gain,
+                analysis=an_dto,
+            )
+        )
+
+    return PointsTradeSuggestResponse(
+        scoring_system='points',
+        suggestions=suggestion_models,
+    )
+
 
 def run_trade_suggest(
     session: Session
@@ -140,8 +405,19 @@ def run_trade_suggest(
     , your_threshold: float
     , their_threshold: float
     , position_check: bool = True
-) -> TradeSuggestResponse:
+) -> TradeSuggestResponse | PointsTradeSuggestResponse:
     """Public entry point for the trade/suggest endpoint."""
+    if session.current_settings.get('scoring_system') == 'points':
+        return _run_points_trade_suggest(
+            session=session,
+            player_assignments=player_assignments,
+            my_team=my_team,
+            their_team=their_team,
+            combo_params=combo_params,
+            your_threshold=your_threshold,
+            their_threshold=their_threshold,
+            ignore_position_check=not position_check,
+        )
 
     # A rostered player the league's categories cannot score is replacement level, not a trade piece.
     player_assignments = count_unscorable_players_as_replacement(session, player_assignments)
@@ -251,6 +527,18 @@ def run_trade_suggest_across_teams(
     , position_check: bool
 ) -> TradeSuggestResponse:
     """run_trade_suggest for every team in their_teams, the suggestions ranked together by your score (highest first)."""
+    if session.current_settings.get('scoring_system') == 'points':
+        from backend.models import PointsTradeSuggestResponse
+        all_suggs = []
+        for their_team in their_teams:
+            resp = run_trade_suggest(
+                session, player_assignments, my_team, their_team, combo_params, your_threshold, their_threshold,
+                position_check)
+            if hasattr(resp, 'suggestions'):
+                all_suggs.extend(resp.suggestions)
+        all_suggs.sort(key=lambda s: -(s.net_delta_fp if getattr(s, 'net_delta_fp', None) is not None else (s.user_delta_fp or s.user_gain or 0.0)))
+        return PointsTradeSuggestResponse(suggestions=all_suggs)
+
     suggestions = [
         suggestion
         for their_team in their_teams

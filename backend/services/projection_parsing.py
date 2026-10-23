@@ -65,7 +65,7 @@ _MAX_PER_GAME = {'Points': 100.0, 'Rebounds': 60.0, 'Assists': 35.0, 'Steals': 1
 _ATTEMPTS_IN_RATIO_CELL_PATTERN = r'\(\s*-?[\d.]+\s*/\s*(-?[\d.]+)\s*\)'
 
 
-def parse_projection_upload(upload_bytes: bytes, sport_params: dict) -> pd.DataFrame:
+def parse_projection_upload(upload_bytes: bytes, sport_params: dict, raw_stats_basis: str | None = None) -> pd.DataFrame:
     """Parse an uploaded projection file (.csv, .xlsx or .xls) into the canonical column set.
 
     There is no format detection: each column is interpreted on its own through the alias
@@ -77,6 +77,9 @@ def parse_projection_upload(upload_bytes: bytes, sport_params: dict) -> pd.DataF
     df_raw = _read_projection_table(upload_bytes)
     column_mapping  = _map_columns_to_canonical(df_raw, sport_params)
     # Canonical names are aliases of themselves, so this covers a file already written in them.
+    for raw in df_raw.columns:
+        if _normalize_projection_header(raw) in ('fantasypts', 'fantasy points', 'fp', 'fantasy pts'):
+            column_mapping.setdefault(raw, 'FantasyPts')
     renamed_columns = set(column_mapping.values())
 
     # A player is named by one column or by first and last name split over two. Position is
@@ -86,8 +89,8 @@ def parse_projection_upload(upload_bytes: bytes, sport_params: dict) -> pd.DataF
     derivable_cores = {core for core, parts in _DERIVED_CORES.items() if parts <= renamed_columns}
     matched_cores    = [column for column in CORE_PROJECTION_COLUMNS
                         if column in renamed_columns or column in derivable_cores]
-    if has_player_name and len(matched_cores) >= _MIN_MATCHED_CORE_COLUMNS:
-        return _parse_with_renamer(df_raw, column_mapping, sport_params)
+    if has_player_name and (len(matched_cores) >= _MIN_MATCHED_CORE_COLUMNS or 'FantasyPts' in renamed_columns):
+        return _parse_with_renamer(df_raw, column_mapping, sport_params, raw_stats_basis)
 
     if not has_player_name:
         problem = 'no column for Player (nor First Name and Last Name)'
@@ -192,6 +195,7 @@ def _parse_with_renamer(
     df_raw: pd.DataFrame
     , column_mapping: dict
     , sport_params: dict
+    , raw_stats_basis: str | None = None
 ) -> pd.DataFrame:
     """Rename this file's columns to canonical names, drop junk, coerce stats."""
     # Keep only the columns the mapping claimed. Unmapped extras (ranks, dollar values,
@@ -236,7 +240,7 @@ def _parse_with_renamer(
     df = df.dropna(subset=stat_columns, how='all')
     df = _join_split_name(df)
     df = _derive_missing_columns(df)
-    df = _convert_season_totals_to_per_game(df, sport_params)
+    df = _convert_season_totals_to_per_game(df, sport_params, force=raw_stats_basis in ('season_total', 'rest_of_season_total'))
     df = convert_percent_columns_to_fractions(df)
 
     if 'Games Played %' not in df.columns:
@@ -292,7 +296,7 @@ def _derive_missing_columns(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def _convert_season_totals_to_per_game(df: pd.DataFrame, sport_params: dict) -> pd.DataFrame:
+def _convert_season_totals_to_per_game(df: pd.DataFrame, sport_params: dict, force: bool = False) -> pd.DataFrame:
     """Divide a season-totals file by games played (see _MAX_PER_GAME). Every count is divided --
     the counting stats, the attempts, the makes, the minutes; shares and games are not. A totals
     file without games cannot be put per game and is refused; a player projected for no games has
@@ -302,7 +306,7 @@ def _convert_season_totals_to_per_game(df: pd.DataFrame, sport_params: dict) -> 
     else:
         totals = any(df[column].max() > ceiling for column, ceiling in _MAX_PER_GAME.items()
                      if column in df.columns)
-    if not totals:
+    if not totals and not force:
         return df
     if 'Games Played' not in df.columns:
         raise ValueError('These numbers are season totals (no player could average them per game), '
