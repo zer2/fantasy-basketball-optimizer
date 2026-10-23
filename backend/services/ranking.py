@@ -190,6 +190,7 @@ def _rank_points_candidates(
     remaining_cash: Optional[dict[str, float]],
     candidate_offset: int = 0,
     candidate_limit: Optional[int] = None,
+    drop_player_id: Optional[int] = None,
 ) -> PointsEvaluateResponse:
     from backend.points.roster_schedule import (
         evaluate_waiver_candidates,
@@ -208,18 +209,9 @@ def _rank_points_candidates(
     }
     excluded = rostered_players | {int(p) for p in (exclusion_list or []) if p is not None}
 
-    # Resolve schedule
-    schedule = getattr(session, 'schedule_calendar', None) or getattr(session.agent, 'schedule', None)
-    if schedule is None:
-        schedule = ScheduleCalendar()
-
-    # Resolve evaluation window
-    window = (
-        session.current_settings.get('evaluation_window')
-        or session.current_settings.get('window')
-        or session.current_settings.get('evaluation_dates')
-    )
-    dates = schedule.normalize_window(window)
+    from backend.points.live import resolve_points_calendar
+    roster_ids = [int(p) for roster in player_assignments.values() for p in roster if p is not None]
+    schedule, dates = resolve_points_calendar(session, roster_ids)
 
     # Resolve per-game FP and position eligibility
     per_game_fp = getattr(session.agent, 'per_game_fp', {}) or {}
@@ -247,8 +239,10 @@ def _rank_points_candidates(
         or session.current_settings.get('drop_candidate_ids')
         or session.current_settings.get('drop_player_ids')
     )
-    drop_candidates = None
-    if drop_param is not None:
+    if drop_player_id is not None and drop_player_id not in my_roster:
+        raise ValueError('The selected drop player is not on your roster.')
+    drop_candidates = [drop_player_id] if drop_player_id is not None else None
+    if drop_param is not None and drop_player_id is None:
         if isinstance(drop_param, (list, tuple, set)):
             drop_candidates = [int(p) for p in drop_param if int(p) in my_roster]
         else:
@@ -264,7 +258,10 @@ def _rank_points_candidates(
     else:
         all_pool_ids = []
 
-    candidates = [int(pid) for pid in all_pool_ids if int(pid) not in excluded and int(pid) > 0]
+    unknown = [int(pid) for pid in all_pool_ids if int(pid) not in excluded and int(pid) != -1
+               and schedule.get_player_team(int(pid)) is None] if session.points_calendar_key else []
+    candidates = [int(pid) for pid in all_pool_ids if int(pid) not in excluded and int(pid) != -1
+                  and int(pid) not in unknown and np.isfinite(per_game_fp.get(pid, np.nan))]
     # Rank candidates by per_game_fp descending
     candidates.sort(key=lambda pid: per_game_fp.get(pid, 0.0) or 0.0, reverse=True)
     total_candidates = len(candidates)
@@ -326,7 +323,7 @@ def _rank_points_candidates(
             PointsCandidate(
                 player_id=res.candidate_id,
                 projected_fp_per_game=float(fpg) if fpg is not None and np.isfinite(fpg) else None,
-                projected_fp_total=res.modified_fp,
+                projected_fp_total=float(fpg * res.candidate_games) if fpg is not None and np.isfinite(fpg) else None,
                 marginal_fp=res.delta_fp,
                 dynamic_value=res.delta_fp,
                 rank=rank_idx + 1 + candidate_offset,
@@ -350,6 +347,9 @@ def _rank_points_candidates(
         candidates=candidates_dto,
         has_more=has_more,
         total_candidates=total_candidates,
+        roster_fp=compute_multi_day_lineup_fp(my_roster, schedule, dates, player_positions, per_game_fp, active_slots, bench_slots, ir_slots)[0],
+        warnings=([f'{len(unknown)} candidates excluded because their NBA team is unknown.'] if unknown else [])
+                 + ([f'{my_roster.count(-1)} roster spots without projections are excluded from points totals.'] if -1 in my_roster else []),
     )
 
 
@@ -363,6 +363,7 @@ def rank_candidates(
     remaining_cash: Optional[dict[str, float]],
     candidate_offset: int = 0,
     candidate_limit: Optional[int] = None,
+    drop_player_id: Optional[int] = None,
     forced_category_weights: Optional[dict[str, Optional[float]]] = None,
 ) -> EvaluateResponse | PointsEvaluateResponse:
     if session.current_settings.get('scoring_system') == 'points':
@@ -374,6 +375,7 @@ def rank_candidates(
             remaining_cash=remaining_cash,
             candidate_offset=candidate_offset,
             candidate_limit=candidate_limit,
+            drop_player_id=drop_player_id,
         )
 
     board_key = make_candidate_strategy_key(

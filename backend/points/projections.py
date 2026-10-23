@@ -50,7 +50,7 @@ _BM_STAT_COLS = (
 
 # ── Public normalisation entry point ──────────────────────────────────────────
 
-@dataclass_like = None  # see NormalisedProjections below
+
 
 
 class NormalisedProjections:
@@ -112,6 +112,8 @@ def normalise_projection_file(
         and information on unsupported rules / zero-GP rows.
     """
     df = raw_df.copy()
+    from backend.points.scoring import canonical_stat_name
+    df = df.rename(columns={c: canonical_stat_name(c) for c in df.columns})
 
     # ── Resolve projected games ────────────────────────────────────────────
     projected_games = _resolve_projected_games(df)
@@ -218,10 +220,17 @@ def _normalise_raw_stats(
     , provider_id_col: Optional[str]
 ) -> NormalisedProjections:
     """Derive expected points from raw stat projections and the configured weights."""
-    rules = config.scoring_rules
+    from backend.points.scoring import canonical_stat_name
+    rules = {canonical_stat_name(k): v for k, v in config.scoring_rules.items() if v != 0}
     basis = config.projection_basis
 
     per_game_stats = _derive_per_game_stats(df, projected_games, zero_gp_mask, basis)
+
+    # Makes are the source's own percentage times its attempts, not a guessed value.
+    for made, ratio, attempts in [('Field Goals Made', 'Field Goal %', 'Field Goal Attempts'),
+                                  ('Free Throws Made', 'Free Throw %', 'Free Throw Attempts')]:
+        if made not in per_game_stats and ratio in per_game_stats and attempts in per_game_stats:
+            per_game_stats[made] = (per_game_stats[ratio] * per_game_stats[attempts]).where(per_game_stats[attempts] != 0, 0)
 
     # Expand derived stats (missed shots) required by scoring rules
     per_game_stats = _expand_derived_stats(per_game_stats, rules)
@@ -242,21 +251,10 @@ def _normalise_raw_stats(
             f"corresponding rules from scoring_rules."
         )
 
-    per_game_fp = pd.concat(list(stat_contributions.values()), axis=1).sum(axis=1)
+    per_game_fp = pd.concat(list(stat_contributions.values()), axis=1).sum(axis=1, skipna=False)
     per_game_fp[zero_gp_mask] = np.nan
 
-    # Season total on the raw-stat basis
-    if basis in ('season_total', 'rest_of_season_total'):
-        # stats are already totals; fp total = direct application of rules to totals
-        total_contributions = {
-            stat: weight * df[stat].fillna(0)
-            for stat, weight in rules.items()
-            if stat in df.columns or (stat in per_game_stats.columns)
-        }
-        total_fp = pd.concat(list(total_contributions.values()), axis=1).sum(axis=1)
-        total_fp[zero_gp_mask] = np.nan
-    else:
-        total_fp = per_game_fp * projected_games
+    total_fp = per_game_fp * projected_games
 
     display_name = _extract_display_name(df)
     audit = _build_audit(
@@ -378,6 +376,9 @@ def _derive_per_game_stats(
         # Divide season totals by projected games; produce NaN for zero-GP rows
         safe_games = projected_games.replace(0, np.nan)
         result = numeric.div(safe_games, axis=0)
+        for column in numeric.columns:
+            if '%' in column or column == 'Assist to TO':
+                result[column] = numeric[column]
     else:
         raise ValueError(f"Unsupported projection_basis for raw-stats path: {basis!r}")
 
@@ -388,17 +389,17 @@ def _derive_per_game_stats(
 def _expand_derived_stats(per_game: pd.DataFrame, rules: dict[str, float]) -> pd.DataFrame:
     """Add derived stat columns (missed shots) required by the scoring rules."""
     if 'FGMiss' in rules and 'FGMiss' not in per_game.columns:
-        if 'FGA' in per_game.columns and 'FGM' in per_game.columns:
+        if 'Field Goal Attempts' in per_game.columns and 'Field Goals Made' in per_game.columns:
             per_game = per_game.copy()
-            per_game['FGMiss'] = (per_game['FGA'] - per_game['FGM']).clip(lower=0)
+            per_game['FGMiss'] = (per_game['Field Goal Attempts'] - per_game['Field Goals Made']).clip(lower=0)
         else:
             # Will be reported as unsupported in the caller
             pass
 
     if 'FTMiss' in rules and 'FTMiss' not in per_game.columns:
-        if 'FTA' in per_game.columns and 'FTM' in per_game.columns:
+        if 'Free Throw Attempts' in per_game.columns and 'Free Throws Made' in per_game.columns:
             per_game = per_game.copy()
-            per_game['FTMiss'] = (per_game['FTA'] - per_game['FTM']).clip(lower=0)
+            per_game['FTMiss'] = (per_game['Free Throw Attempts'] - per_game['Free Throws Made']).clip(lower=0)
 
     return per_game
 

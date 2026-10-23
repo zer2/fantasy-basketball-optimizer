@@ -4,6 +4,7 @@
 // On selection, calls evaluate with the dropped player removed from their team,
 // then highlights that player's row in the results.
 
+import { showFailureInTable } from '../../table/failure_message.js'
 import { makeCustomSelect } from '../../custom_select.js'
 import { readRequiredIntInput } from '../../helper_functions.js'
 import { readRosterAssignments, readEmptyRostersMessage, listMovablePlayers } from './season_helpers.js'
@@ -156,7 +157,7 @@ export function renderWaiverControls(container: HTMLElement): void {
         const modifiedAssignments = { ...assignments }
         modifiedAssignments[team] = assignments[team].filter(playerId => playerId !== dropPlayerId)
 
-        await runWaiverEvaluate(modifiedAssignments, team)
+        await runWaiverEvaluate(isPointsMode() ? assignments : modifiedAssignments, team, isPointsMode() ? dropPlayerId : undefined)
         highlightDropPlayer(dropPlayerId)
     }
 
@@ -168,13 +169,13 @@ export function renderWaiverControls(container: HTMLElement): void {
             ? (lowestPointsPlayer(roster) ?? roster[0])
             : (lowestGRankPlayer(roster) ?? roster[0])
         dropSel.setOptions(buildDropOptions(team), String(defaultDrop))
-        runWaiver().catch(err => console.error('Waiver evaluate failed:', err))
+        runWaiver().catch(err => showFailureInTable(err))
     })
 
     dropSel.element.addEventListener('change', () => {
-        runWaiver().catch(err => console.error('Waiver evaluate failed:', err))
+        runWaiver().catch(err => showFailureInTable(err))
     })
 
     // Run immediately on render
-    runWaiver().catch(err => console.error('Waiver evaluate failed:', err))
+    runWaiver().catch(err => showFailureInTable(err))
 }

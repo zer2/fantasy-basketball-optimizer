@@ -175,6 +175,8 @@ class PointsCandidate(BaseModel):
 
 
 class PointsEvaluateResponse(BaseModel):
+    warnings: list[str] = []
+    roster_fp: Optional[float] = None
     scoring_system:  str = 'points'
     objective:       str = 'expected_points'
     units:           str = 'fantasy_points'

@@ -187,22 +187,10 @@ def simulate_roster_lineup_fp(
     if not roster:
         return 0.0
 
-    norm_window = schedule.normalize_window(evaluation_window)
-    total_fp = 0.0
-    for date_str in norm_window:
-        playing_today = schedule.get_players_playing_on_date(roster, date_str)
-        assignment = assign_optimal_daily_lineup(
-            roster_player_ids=roster,
-            player_positions=player_positions,
-            player_fp=player_fp_per_game,
-            active_slots=active_slots,
-            playing_today=playing_today,
-            bench_slots=bench_slots,
-            ir_slots=ir_slots,
-        )
-        total_fp += assignment.total_expected_fp
-
-    return round(float(total_fp), 4)
+    from backend.points.roster_schedule import compute_multi_day_lineup_fp
+    total, _ = compute_multi_day_lineup_fp(roster, schedule, evaluation_window,
+        player_positions, player_fp_per_game, active_slots, bench_slots, ir_slots)
+    return total
 
 
 def validate_trade_legality(
@@ -243,9 +231,9 @@ def validate_trade_legality(
     post_a = [p for p in team_a_roster if p not in team_a_sends] + list(team_b_sends)
     post_b = [p for p in team_b_roster if p not in team_b_sends] + list(team_a_sends)
 
-    if len(post_a) != len(set(post_a)):
+    if len([p for p in post_a if p != -1]) != len({p for p in post_a if p != -1}):
         return False, "Duplicate player IDs produced in Team A post-trade roster"
-    if len(post_b) != len(set(post_b)):
+    if len([p for p in post_b if p != -1]) != len({p for p in post_b if p != -1}):
         return False, "Duplicate player IDs produced in Team B post-trade roster"
 
     # 5. Roster size limit

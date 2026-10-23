@@ -95,9 +95,32 @@ def compute_multi_day_lineup_fp(
     if not evaluation_window:
         return 0.0, {}
 
+    # Missing projections/empty platform slots may share the replacement sentinel.
+    from backend.player_identity import RP_PLAYER_ID
+    roster_player_ids = [p for p in roster_player_ids if p != RP_PLAYER_ID]
     normalized_dates = schedule.normalize_window(evaluation_window)
     daily_assignments: dict[str, DailyLineupAssignment] = {}
     total_starting_fp = 0.0
+    if getattr(schedule, 'lineup_lock_mode', 'pregame_daily') == 'weekly':
+        from datetime import date, timedelta
+        from backend.points.lineups import assign_optimal_weekly_lineup
+        weeks = {}
+        for day in normalized_dates:
+            d = date.fromisoformat(day)
+            weeks.setdefault(d - timedelta(days=d.weekday()), []).append(day)
+        for days in weeks.values():
+            counts = {pid: sum(pid in schedule.get_players_playing_on_date([pid], d) for d in days)
+                      for pid in roster_player_ids}
+            weekly = assign_optimal_weekly_lineup(roster_player_ids, player_positions,
+                player_fp_per_game, counts, active_slots, bench_slots=bench_slots,
+                ir_slots=ir_slots, injured_players=injured_players)
+            for day in days:
+                playing = set(schedule.get_players_playing_on_date(roster_player_ids, day))
+                active = {slot: pid if pid in playing else None for slot, pid in weekly.active_assignments.items()}
+                total = sum(player_fp_per_game[p] for p in active.values() if p is not None)
+                daily_assignments[day] = DailyLineupAssignment(active, weekly.bench_players, weekly.ir_players, total)
+                total_starting_fp += total
+        return round(total_starting_fp, 4), daily_assignments
 
     for date_str in normalized_dates:
         playing_today = schedule.get_players_playing_on_date(roster_player_ids, date_str)

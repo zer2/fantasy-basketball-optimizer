@@ -83,6 +83,10 @@ export async function refreshSeasonRostersFromPlatform(): Promise<void> {
  * Evaluates the full-team H-score for a specific team given roster assignments.
  * Returns h_score and per-category win rates, or null if the backend returns no candidates.
  */
+export async function evaluatePointsRoster(playerAssignments: Record<string, number[]>, teamId: string) {
+    return withSessionRetry(() => evaluate(getSessionId()!, {player_assignments:playerAssignments, my_team_id:teamId, candidate_limit:0}))
+}
+
 export async function evaluateTeamHScore(
     playerAssignments: Record<string, number[]>
   , teamId: string
@@ -170,11 +174,12 @@ export async function runTradeSuggest(
 export async function runWaiverEvaluate(
     playerAssignments: Record<string, number[]>
   , myTeamId: string
+  , dropPlayerId?: number
 ): Promise<void> {
     await withDisplayOwnership(
         { busy: 'evaluating', onSuccess: 'idle', onFailure: 'idle' }
         , stillOwner => withSessionRetry(async () => {
-            const resp = await evaluate(getSessionId()!, { player_assignments: playerAssignments, my_team_id: myTeamId })
+            const resp = await evaluate(getSessionId()!, { player_assignments: playerAssignments, my_team_id: myTeamId, drop_player_id: dropPlayerId })
             // No abort signal cancels this evaluate; by the time it resolves, a newer actor
             // — another waiver check, or a mode switch into a draft evaluate — may own the
             // display, and season candidates must not repaint that actor's board.
@@ -182,6 +187,12 @@ export async function runWaiverEvaluate(
                 const players = candidatesToPlayerResults(resp.candidates)
                 setCandidatePlayerResults(players)
                 buildTable(players)
+                document.getElementById('points-data-warning')?.remove()
+                if (resp.warnings?.length) {
+                    const note=document.createElement('p');note.className='sidebar-caption';note.setAttribute('role','status')
+                    note.textContent=resp.warnings.join(' ');document.getElementById('points-data-warning')?.remove()
+                    note.id='points-data-warning';document.getElementById('hscoretable')?.before(note)
+                }
             }
         })
     )

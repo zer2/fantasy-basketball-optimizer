@@ -282,12 +282,14 @@ export async function patchSession(
     , req: Record<string, unknown>
     , signal?: AbortSignal
 ): Promise<{ ok: boolean; steps_rerun: number[] }> {
-    return jsonRequest(`${BASE_URL}/sessions/${sessionId}`, 'Patch session', {
+    const response = await jsonRequest<any>(`${BASE_URL}/sessions/${sessionId}`, 'Patch session', {
         method:  'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify(req),
         signal,
     })
+    if (response.players) setPlayerRegistry(response.players)
+    return response
 }
 
 // ── GET /sessions/{id}/g-scores ───────────────────────────────────────────────
@@ -308,6 +310,7 @@ export async function evaluate(
         my_team_id: string
         exclusion_list?: number[]
         remaining_cash?: Record<string, number>
+        drop_player_id?: number
         candidate_offset?: number   // draft/waiver batching: slice start
         candidate_limit?: number    // draft/waiver batching: slice size (omit = whole pool)
         // Force-weighting: category -> a weight on the "100 = neutral" scale the table displays.
@@ -316,7 +319,7 @@ export async function evaluate(
         forced_category_weights?: Record<string, number>
     }
     , signal?: AbortSignal
-): Promise<{ iteration: number; candidates: any[]; has_more?: boolean; total_candidates?: number }> {
+): Promise<{ iteration: number; candidates: any[]; has_more?: boolean; total_candidates?: number; warnings?: string[]; roster_fp?: number }> {
     return jsonRequest(`${BASE_URL}/sessions/${sessionId}/evaluate`, 'Evaluate', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -515,7 +518,10 @@ export interface PlatformDivision {
     id: string
 }
 
+import type { PointsMetadata } from '../setting_collection/points_settings.js'
+
 export interface PlatformConnectResponse {
+    points_metadata?: PointsMetadata | null
     team_names: string[]
     n_drafters: number
     n_picks: number

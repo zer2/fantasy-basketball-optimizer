@@ -183,7 +183,7 @@ Shai Gilgeous-Alexander,PG,75,30.1,5.5,6.2,2.0,0.9,2.2,1.3
             "data_source_type": "csv",
             "scoring_format": "Head to Head: Each Category",
             "slot_counts": {"PG": 1, "SG": 1, "SF": 1, "PF": 1, "C": 1, "Util": 1},
-            "n_picks": 4,
+            "n_picks": 7,
             "n_drafters": 2,
             "n_iterations": 0,
             "omega": 1.0,
@@ -211,7 +211,7 @@ Shai Gilgeous-Alexander,PG,75,30.1,5.5,6.2,2.0,0.9,2.2,1.3
 
         assert isinstance(session.agent, DynamicPointsAgent)
         assert session.points_config is not None
-        assert session.schedule_calendar is not None
+        assert session.points_projections is not None
         assert session.agent.schedule is session.schedule_calendar
         assert len(session.agent.per_game_fp) == 4
         delete_session(session.id)
@@ -233,7 +233,7 @@ Shai Gilgeous-Alexander,PG,75,30.1,5.5,6.2,2.0,0.9,2.2,1.3
                 "competition_format": "head_to_head",
             },
         }
-        session.v1_clean = pd.DataFrame({"FantasyPts": [35.0, 40.0]}, index=[1, 2])
+        session.v1_clean = pd.DataFrame({"FantasyPts": [35.0, 40.0], "Games Played": [82, 82]}, index=[1, 2])
         session.player_registry = {
             1: make_player_identity(1, "Player 1", ["PG"]),
             2: make_player_identity(2, "Player 2", ["C"]),
@@ -602,8 +602,8 @@ class TestCategoryModeZeroRegression:
                 "my_team": "Team 1",
                 "their_team": "Team 2",
                 "combo_params": [{"n_traded": 1, "n_received": 1, "threshold": -5.0}],
-                "your_differential_threshold": -5.0,
-                "their_differential_threshold": -5.0,
+                "your_differential_threshold": -0.02,
+                "their_differential_threshold": -0.02,
                 "ignore_position_check": True,
             },
         )

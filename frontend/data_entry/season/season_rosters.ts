@@ -4,7 +4,7 @@
 
 import { makeCustomSelect, CustomSelect } from '../../custom_select.js'
 import { pref, savePref } from '../../preferences.js'
-import { getPlayerResults } from '../../app_state.js'
+import { getPlayerResults, isPointsMode } from '../../app_state.js'
 import { getRegistryEntry, findPlayerIdByName, REPLACEMENT_PLAYER_ID } from '../../player_registry.js'
 import {
     buildEmptySlotDisplayHtml, buildFullPlayerDisplayHtml, buildPlayerOptionLabel, buildUnmatchedPlayerDisplayHtml,
@@ -14,7 +14,7 @@ import { getTeamLabel, makeTeamLabelInput } from '../team_labels.js'
 import { getSelectedCategories } from '../../setting_collection/format_and_categories.js'
 import { getLeagueSettings, getTeamIdentitiesFromSidebar } from '../../setting_collection/league_settings.js'
 import {
-    evaluateTeamHScore, getLivePlatformEmptySlots, getLivePlatformRosters, getLivePlatformUnmatchedNames,
+    evaluateTeamHScore, evaluatePointsRoster, getLivePlatformEmptySlots, getLivePlatformRosters, getLivePlatformUnmatchedNames,
 } from '../../api/season_session.js'
 import { makeSpacerTh } from '../../table/table_helpers.js'
 import {
@@ -368,6 +368,27 @@ async function buildTeamGScoreTable(
     , container: HTMLElement
 ): Promise<void> {
     container.innerHTML = ''
+    if (isPointsMode()) {
+        const assignments: Record<string, number[]> = Object.fromEntries(teamNames.map((name,d) => [name,
+            selects.map(row => readSelectedPlayerId(row[d])).filter((p): p is number => p !== null)]))
+        const table=document.createElement('table');table.className='panel-table';table.dataset.testid='roster-inspection-points'
+        const header=table.createTHead().insertRow();for(const label of ['Player','FP/G']){const th=document.createElement('th');th.textContent=label;header.append(th)}
+        const body=table.createTBody()
+        for(const [index,pid] of assignments[teamNames[teamIdx]].entries()){
+            const row=body.insertRow();const identity=getRegistryEntry(pid)
+            row.insertCell().textContent=pid===REPLACEMENT_PLAYER_ID?(getLivePlatformUnmatchedNames()?.[teamNames[teamIdx]]?.[String(index)]??'Empty slot'):identity.name
+            row.insertCell().textContent=identity.points_per_game==null?'No projection':identity.points_per_game.toFixed(1)
+        }
+        container.append(table)
+        try {
+            const result=await evaluatePointsRoster(assignments,teamNames[teamIdx])
+            if(!container.isConnected||!isPointsMode())return
+            const total=document.createElement('p');total.textContent=`Projected starting FP: ${result.roster_fp?.toFixed(1)??'Unavailable'}`;container.append(total)
+        } catch(error) {
+            if(container.isConnected){const note=document.createElement('p');note.className='sidebar-error';note.textContent=(error as Error).message;container.append(note)}
+        }
+        return
+    }
     const categories = getSelectedCategories()
 
     // Collect G-scores for players on this team, and the label for each replacement-player row (by its table row): the

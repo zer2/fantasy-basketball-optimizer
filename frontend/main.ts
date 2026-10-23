@@ -14,7 +14,7 @@ import {
 import { runSeasonInit, refreshSeasonRostersFromPlatform, clearLivePlatformRosters } from './api/season_session.js'
 import { fetchConfig } from './api/client.js'
 import { fetchCurrentUser, setSignedInUser } from './api/auth.js'
-import { buildTableHeader } from './table/player_table.js'
+import { buildTableHeader, showTableMessage } from './table/player_table.js'
 import { showFailureInTable } from './table/failure_message.js'
 import { applyLayout, redrawActiveSeasonTab, getActiveSeasonTab } from './layout.js'
 import { resetDraftBoard } from './data_entry/draft_board.js'
@@ -25,9 +25,10 @@ import { renderSeatSelector, refreshSeatOptions, clearSeatOptions } from './seat
 import { renderAccountRow } from './account_row.js'
 
 import {
-    renderLeagueSettings, getLeagueSettings, isPlatformConnected,
+    renderLeagueSettings, getLeagueSettings, isPlatformConnected, getPlatformConfig,
     getModeSelectElement, getPlatformSelectElement,
 } from './setting_collection/league_settings.js'
+import { getPointsConfig, refreshPointsControls, isPointsSettingsValid } from './setting_collection/points_settings.js'
 import { TEAM_LABELS_CHANGED } from './data_entry/team_labels.js'
 import {
     renderFormatAndCategories, getScoringFormat, getMostCategoriesWeight, getTiebreakerCategory,
@@ -40,6 +41,10 @@ import { renderSlotCounts, getSlotCounts, isSlotCountsValid, revalidateSlotCount
 // Dispatches to runSeasonInit (Season Mode) or runEvaluate (Draft / Auction Mode)
 // depending on the current mode selector value.
 async function runModeEval(): Promise<void> {
+    if (isPointsMode() && !isPointsSettingsValid()) {
+        showTableMessage('Choose Points scoring in Format & Categories to start analysis.')
+        return
+    }
     const { platform, mode } = getLeagueSettings()
     if (mode === 'Season Mode') return runSeasonInit()
     // A live platform that isn't connected yet has no draft state to evaluate, and a normal
@@ -68,8 +73,9 @@ function makeApplyChain(label: string) {
         if (rebuildTableHeader) buildTableHeader()
         return createOrPatchSession(fromStep, patch, signal)
             .then(() => { if (!signal.aborted && evaluate) return runModeEval() })
-            .then(() => {
+            .then(async () => {
                 if (signal.aborted) return
+                if (patch.platform_config && getLeagueSettings().mode === 'Season Mode') await refreshSeasonRostersFromPlatform()
                 const seasonTabBeforeLayout = getActiveSeasonTab()
                 applyLayout()
                 // In Season Mode a settings change redraws the tab on screen: its results came from the old settings,
@@ -358,10 +364,11 @@ const formatDebouncer = makeDebouncer(() => {
     applyFormatChange(4, { league: {
         scoring_format:         getScoringFormat(),
         scoring_system:         isPointsMode() ? 'points' : 'categories',
+        points_config:          getPointsConfig(),
         most_categories_weight: getMostCategoriesWeight(),
         tiebreaker_category:    getTiebreakerCategory(),
         categories:             getSelectedCategories(),
-    } })
+    }, ...(isPointsMode() && getPlatformConfig() ? {platform:getLeagueSettings().platform, platform_config:getPlatformConfig()} : {}) })
 }, 800, 'fetching')
 formatSection.addEventListener('change', () => {
     refreshFormatParameterControls(getScoringFormat(), getMostCategoriesWeight())
@@ -392,6 +399,7 @@ document.addEventListener('forced-weights-changed', () => { applyForcedWeights()
 
 const slotSection = createSection(sidebarSections, 'Position Parameters')
 renderSlotCounts(slotSection)
+refreshPointsControls()
 // The perma-bench count completes the slot check (slots + bench = picks), so changing it can make valid a picks change
 // that was held back while the check failed: send the league settings then, as a picks change would have (16 picks set
 // before 3 bench slots otherwise left the session at the old pick count).

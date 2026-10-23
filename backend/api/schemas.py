@@ -39,6 +39,30 @@ class PointsConfigRequest(BaseModel):
     bid_increment:   int = 1
     savor_enabled:   bool = False
     savor_noise:     float = 0.0
+    active_slots: Optional[dict[str, int]] = None
+    bench_slots: Optional[int] = Field(default=None, ge=0)
+    ir_slots: Optional[int] = Field(default=None, ge=0)
+    lineup_lock_mode: str = 'pregame_daily'
+    evaluation_window: Optional[tuple[str, str]] = None
+    time_zone: str = 'America/New_York'
+
+    @model_validator(mode='after')
+    def validate_points_context(self):
+        from datetime import date
+        from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+        if self.lineup_lock_mode not in ('pregame_daily', 'weekly'):
+            raise ValueError('Unsupported lineup lock mode.')
+        if self.active_slots is not None and any(v < 0 for v in self.active_slots.values()):
+            raise ValueError('Active slot counts must be nonnegative.')
+        try:
+            ZoneInfo(self.time_zone)
+        except (ZoneInfoNotFoundError, ValueError) as exc:
+            raise ValueError('Unknown analysis timezone.') from exc
+        if self.evaluation_window:
+            start, end = map(date.fromisoformat, self.evaluation_window)
+            if end < start or (end - start).days > 365:
+                raise ValueError('Analysis date range must contain 1 to 366 days.')
+        return self
 
 
 class LeagueSettings(BaseModel):
@@ -156,6 +180,7 @@ class PlayerGScore(BaseModel):
 
 
 class PlayerRegistryEntry(BaseModel):
+    points_per_game: Optional[float] = None
     """One session player identity: everything the display layer needs to render a player.
     has_headshot is False for the RP sentinel and synthetic ids (no NBA CDN image exists)."""
     player_id: int
@@ -205,6 +230,7 @@ class PatchRequest(BaseModel):
 
 
 class PatchResponse(BaseModel):
+    players: Optional[list[PlayerRegistryEntry]] = None
     ok: bool
     steps_rerun: list[int]
 
@@ -219,6 +245,7 @@ class GScoresResponse(BaseModel):
 # ── /sessions/{id}/evaluate ───────────────────────────────────────────────────
 
 class EvaluateRequest(BaseModel):
+    drop_player_id: Optional[int] = None
     player_assignments: dict[str, list[int]]
     my_team_id: str
     remaining_cash: Optional[dict[str, float]] = None   # Auction Mode only
@@ -308,7 +335,7 @@ class TradeSuggestRequest(BaseModel):
     their_team: Optional[str] = None
     combo_params: list[ComboParam]
     your_differential_threshold: float = 0.0
-    their_differential_threshold: float = -0.20
+    their_differential_threshold: float = 0.0
     position_check: bool = True
     ignore_position_check: Optional[bool] = None
 
@@ -343,6 +370,7 @@ class ConnectResponse(BaseModel):
     is_auction_draft: Optional[bool] = None
     # The league's own position structure in the app's slot names, when the platform reports it.
     slot_counts: Optional[dict[str, int]] = None
+    points_metadata: Optional[dict] = None
 
 
 class EspnLeagueSeasonsResponse(BaseModel):

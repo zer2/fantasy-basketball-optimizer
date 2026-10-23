@@ -62,6 +62,8 @@ def build_agent(
         _run_points_pipeline(session, from_step)
         return
 
+    session.points_config = None
+    session.points_projections = None
     if from_step <= 3:
         apply_upsilon_adjustment(session)
     if from_step <= 4:
@@ -111,7 +113,7 @@ def load_player_pool(
     if v0_with_names is None:
         if source_type == 'csv':
             v0_with_names = _fill_missing_positions(
-                _resolve_single_csv_player_ids(parse_projection_upload(csv_bytes, sport_params)), sport_params)
+                _resolve_single_csv_player_ids(parse_projection_upload(csv_bytes, sport_params, raw_stats_basis=(current_settings.get('points_config') or {}).get('projection_basis') if (current_settings.get('points_config') or {}).get('points_input_mode') == 'raw_stats' else None)), sport_params)
 
         elif source_type == 'historical':
 
@@ -191,7 +193,12 @@ def _build_v0_cache_key(current_settings: dict) -> tuple | None:
     if source_type == 'projections':
         custom_data_ids = current_settings.get('custom_data_ids') or []
         upload_keys = tuple(sorted(custom_data_ids))
-        return (sport, 'projections', describe_blend(current_settings['blend_weights']), upload_keys)
+        key = (sport, 'projections', describe_blend(current_settings['blend_weights']), upload_keys)
+        config = current_settings.get('points_config') or {}
+        if upload_keys:
+            totals = config.get('points_input_mode') == 'raw_stats' and config.get('projection_basis') in ('season_total', 'rest_of_season_total')
+            key += (totals,)
+        return key
     return None
 
 
@@ -636,7 +643,18 @@ def _run_points_pipeline(session: Session, from_step: int) -> None:
     from backend.math.position_config import build_position_config
 
     cp = session.current_params
-    points_config_dict = cp.get('points_config') or {}
+    points_config_dict = cp.get('points_config')
+    if not points_config_dict:
+        raise ValueError('Choose a Points scoring preset, custom weights, or direct fantasy-points input.')
+    metadata = session.platform_config.points_metadata if session.platform_config else None
+    active_slots = points_config_dict.get('active_slots')
+    if active_slots is None:
+        active_slots = (metadata or {}).get('active_slots', cp.get('slot_counts', {}))
+    if not active_slots or not any(active_slots.values()):
+        raise ValueError('Choose at least one active Points scoring slot.')
+    bench = points_config_dict.get('bench_slots', (metadata or {}).get('bench_slots', 0))
+    if sum(active_slots.values()) + bench > cp.get('n_picks', 13):
+        raise ValueError('Points starters plus bench exceed the roster size.')
 
     try:
         config = build_points_scoring_config(
@@ -644,9 +662,11 @@ def _run_points_pipeline(session: Session, from_step: int) -> None:
             , projection_basis = points_config_dict.get('projection_basis', 'per_game')
             , scoring_rules    = points_config_dict.get('scoring_rules', {})
             , competition_format = points_config_dict.get('competition_format', 'head_to_head')
-            , active_slots     = cp.get('slot_counts', {}) or {}
-            , bench_slots      = points_config_dict.get('bench_slots', 4)
-            , ir_slots         = points_config_dict.get('ir_slots', 3)
+            , active_slots     = active_slots
+            , bench_slots      = bench
+            , ir_slots         = points_config_dict.get('ir_slots', (metadata or {}).get('ir_slots', 0))
+            , lineup_lock_mode = points_config_dict.get('lineup_lock_mode', 'pregame_daily')
+            , evaluation_window = points_config_dict.get('evaluation_window')
             , projection_source = points_config_dict.get('projection_source')
             , season           = points_config_dict.get('season')
             , auction_budget   = cp.get('cash_per_team')
@@ -656,53 +676,13 @@ def _run_points_pipeline(session: Session, from_step: int) -> None:
     except PointsConfigError as exc:
         raise ValueError(f'Invalid points configuration: {exc}') from exc
 
-    # Normalise v1_clean into per-game FP.
-    try:
-        from backend.points.projections import normalise_projection_file
-        projections = normalise_projection_file(
-            raw_df         = session.v1_clean
-            , config       = config
-            , direct_fp_col = 'FantasyPts'   # standard canonical name after alias mapping
-        )
-        # Compute per-game FP for raw-stats mode (projected_points path reads directly).
-        if config.points_input_mode == 'raw_stats' and projections.raw_stats_per_game is not None:
-            per_game_fp_series = compute_player_fp_per_game(
-                per_game_stats = projections.raw_stats_per_game
-                , scoring_rules = config.scoring_rules
-            )
-        else:
-            per_game_fp_series = projections.per_game_fp
-        per_game_fp = per_game_fp_series.to_dict()
-    except (SyntaxError, ImportError, Exception) as exc:
-        projections = None
-        if session.v1_clean is not None:
-            if 'FantasyPts' in session.v1_clean.columns:
-                per_game_fp = session.v1_clean['FantasyPts'].to_dict()
-            else:
-                stat_alias_map = {
-                    'pts': 'Points', 'points': 'Points',
-                    'reb': 'Rebounds', 'rebounds': 'Rebounds', 'trb': 'Rebounds',
-                    'ast': 'Assists', 'assists': 'Assists',
-                    'stl': 'Steals', 'steals': 'Steals',
-                    'blk': 'Blocks', 'blocks': 'Blocks',
-                    'to': 'Turnovers', 'tov': 'Turnovers', 'turnovers': 'Turnovers',
-                    'threes': 'Threes', '3pm': 'Threes', 'fg3m': 'Threes',
-                }
-                mapped_rules = {}
-                for k, w in config.scoring_rules.items():
-                    target_col = k if k in session.v1_clean.columns else stat_alias_map.get(k.lower(), k)
-                    if target_col in session.v1_clean.columns:
-                        mapped_rules[target_col] = w
-                if mapped_rules:
-                    per_game_fp_series = compute_player_fp_per_game(
-                        per_game_stats = session.v1_clean
-                        , scoring_rules = mapped_rules
-                    )
-                    per_game_fp = per_game_fp_series.to_dict()
-                else:
-                    per_game_fp = {}
-        else:
-            per_game_fp = {}
+    from backend.points.projections import normalise_projection_file
+    from dataclasses import replace
+    # Every loaded pool's raw stats are canonical per-game rates; uploaded totals
+    # were converted by the parser, while built-in sources already contain rates.
+    normalized_config = replace(config, projection_basis='per_game') if config.points_input_mode == 'raw_stats' and cp.get('data_source_type') in ('csv', 'historical', 'projections') else config
+    projections = normalise_projection_file(session.v1_clean, normalized_config, direct_fp_col='FantasyPts')
+    per_game_fp = projections.per_game_fp.to_dict()
 
     # Build position eligibility from the player registry.
     position_eligibility: dict[int, list[str]] = {}
@@ -730,14 +710,8 @@ def _run_points_pipeline(session: Session, from_step: int) -> None:
     session.points_config = config
     session.points_projections = projections
 
-    # Initialize schedule calendar if not already present on session
-    if getattr(session, 'schedule_calendar', None) is None:
-        from backend.points.schedule import ScheduleCalendar
-        player_teams = {}
-        if session.v0_clean is not None and 'Team' in session.v0_clean.columns:
-            for pid, t in zip(session.v0_clean.index, session.v0_clean['Team']):
-                if pd.notna(t):
-                    player_teams[int(pid)] = str(t)
-        session.schedule_calendar = ScheduleCalendar(player_teams=player_teams if player_teams else None)
+    # Calendar data is resolved lazily at analysis time, never replaced with synthetic games.
+    if session.points_calendar_key is not None:
+        session.schedule_calendar = None
+        session.points_calendar_key = None
     session.agent.schedule = session.schedule_calendar
-

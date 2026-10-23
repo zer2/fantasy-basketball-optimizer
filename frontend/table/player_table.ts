@@ -249,12 +249,12 @@ function buildRowPairHtml(player: PlayerResult, ctx: RenderContext): string {
         const dg = player.dropped_games ?? 0
         const dfp = player.delta_fp ?? marg
 
-        html += `<td class='categoricalhscore' style='font-weight:600;'>${fpg > 0 ? fpg.toFixed(1) : '—'}</td>`
-        html += `<td class='categoricalhscore'>${tot > 0 ? tot.toFixed(1) : '—'}</td>`
-        html += `<td class='categoricalhscore' style='font-weight:700; color: ${marg >= 0 ? '#48bb78' : '#f56565'};'>${marg >= 0 ? '+' : ''}${marg.toFixed(1)}</td>`
-        html += `<td class='categoricalhscore'>${cg}</td>`
-        html += `<td class='categoricalhscore'>${dg}</td>`
-        html += `<td class='categoricalhscore' style='color: ${dfp >= 0 ? '#48bb78' : '#f56565'};'>${dfp >= 0 ? '+' : ''}${dfp.toFixed(1)}</td>`
+        html += `<td class='points-value' style='font-weight:600;'>${player.points_per_game != null ? fpg.toFixed(1) : '—'}</td>`
+        html += `<td class='points-value'>${player.total_projected_points != null ? tot.toFixed(1) : '—'}</td>`
+        html += `<td class='points-value' style='font-weight:700; color: ${marg >= 0 ? 'light-dark(#167d32, #79d991)' : 'light-dark(#b91c1c, #ff9c9c)'};'>${marg >= 0 ? '+' : ''}${marg.toFixed(1)}</td>`
+        html += `<td class='points-value'>${cg}</td>`
+        html += `<td class='points-value'>${dg}</td>`
+        html += `<td class='points-value' style='color: ${dfp >= 0 ? 'light-dark(#167d32, #79d991)' : 'light-dark(#b91c1c, #ff9c9c)'};'>${dfp >= 0 ? '+' : ''}${dfp.toFixed(1)}</td>`
         html += `</tr>`
         html += `<tr class='expandedview' style='display:none'></tr>`
         return html

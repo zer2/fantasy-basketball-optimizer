@@ -19,6 +19,19 @@ import pandas as pd
 from backend.points.config import PointsScoringConfig
 
 
+ESPN_STANDARD_RULES = {'PTS': 1, 'REB': 1, 'AST': 2, 'STL': 4, 'BLK': 4,
+                       'TO': -2, '3PM': 1, 'FGM': 2, 'FGA': -1, 'FTM': 1, 'FTA': -1}
+_STAT_ALIASES = {'PTS': 'Points', 'REB': 'Rebounds', 'AST': 'Assists', 'STL': 'Steals',
+    'BLK': 'Blocks', 'TO': 'Turnovers', 'TOV': 'Turnovers', '3PM': 'Threes',
+    'FGM': 'Field Goals Made', 'FGA': 'Field Goal Attempts',
+    'FTM': 'Free Throws Made', 'FTA': 'Free Throw Attempts'}
+
+
+def canonical_stat_name(name):
+    """One alias vocabulary for imported rules and all projection sources."""
+    return _STAT_ALIASES.get(str(name).upper(), name)
+
+
 class UnsupportedScoringRuleError(ValueError):
     """A scoring rule cannot be computed from the available projection data."""
 
@@ -41,6 +54,8 @@ def compute_player_fp_per_game(
         UnsupportedScoringRuleError: if a rule's stat is absent from per_game_stats
             AND cannot be derived from available columns.
     """
+    scoring_rules = {canonical_stat_name(k): v for k, v in scoring_rules.items() if v != 0}
+    per_game_stats = per_game_stats.rename(columns={c: canonical_stat_name(c) for c in per_game_stats.columns})
     stats = _expand_derived_stats(per_game_stats, scoring_rules)
     missing = [stat for stat in scoring_rules if stat not in stats.columns]
     if missing:
@@ -135,12 +150,12 @@ def _expand_derived_stats(
     derived: dict[str, pd.Series] = {}
 
     if 'FGMiss' in scoring_rules and 'FGMiss' not in stats.columns:
-        if 'FGA' in stats.columns and 'FGM' in stats.columns:
-            derived['FGMiss'] = (stats['FGA'] - stats['FGM']).clip(lower=0)
+        if 'Field Goal Attempts' in stats.columns and 'Field Goals Made' in stats.columns:
+            derived['FGMiss'] = (stats['Field Goal Attempts'] - stats['Field Goals Made']).clip(lower=0)
 
     if 'FTMiss' in scoring_rules and 'FTMiss' not in stats.columns:
-        if 'FTA' in stats.columns and 'FTM' in stats.columns:
-            derived['FTMiss'] = (stats['FTA'] - stats['FTM']).clip(lower=0)
+        if 'Free Throw Attempts' in stats.columns and 'Free Throws Made' in stats.columns:
+            derived['FTMiss'] = (stats['Free Throw Attempts'] - stats['Free Throws Made']).clip(lower=0)
 
     if derived:
         return pd.concat([stats, pd.DataFrame(derived, index=stats.index)], axis=1)

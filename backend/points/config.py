@@ -104,6 +104,9 @@ def build_points_scoring_config(
     Raises ``PointsConfigError`` for any incompatible combination so that
     callers receive a clear message rather than a deep internal crash.
     """
+    import math
+    if any(not math.isfinite(v) for v in scoring_rules.values()):
+        raise PointsConfigError('Scoring weights must be finite numbers.')
     _validate_mode(points_input_mode, InputMode)
     _validate_mode(projection_basis, ProjectionBasis)
     _validate_mode(competition_format, CompetitionFmt)
@@ -132,13 +135,13 @@ def build_points_scoring_config(
             f"bid_increment must be at least 1; got {bid_increment}."
         )
 
-    if projection_basis in ('per_week', 'season_total', 'rest_of_season_total'):
-        if points_input_mode == 'raw_stats':
-            raise PointsConfigError(
-                f"projection_basis '{projection_basis}' with input_mode 'raw_stats' "
-                "requires season-total stat columns, not per-game stats. "
-                "Divide totals by projected games first, or use basis 'per_game'."
-            )
+    if projection_basis == 'per_week':
+        raise PointsConfigError('Per-week projections require an explicit conversion; use per-game or season totals.')
+    if active_slots and (any(v < 0 or int(v) != v for v in active_slots.values())
+                         or not any(active_slots.values())):
+        raise PointsConfigError('Active slots must contain nonnegative counts and at least one starter.')
+    if bench_slots < 0 or ir_slots < 0:
+        raise PointsConfigError('Bench and IR counts must be nonnegative.')
 
     return PointsScoringConfig(
         scoring_system     = 'points'

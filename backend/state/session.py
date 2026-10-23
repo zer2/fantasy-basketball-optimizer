@@ -73,6 +73,12 @@ class Session:
     # live platform is connected.
     platform_player_id_lookup: Optional[PlatformPlayerLookup] = None
 
+    points_config: Optional[object] = None
+    points_projections: Optional[object] = None
+    schedule_calendar: Optional[object] = None
+    points_calendar_key: Optional[tuple] = None
+    points_calendar_loaded_at: float = 0.0
+
     # Serialises work on this one session. An evaluate mutates shared agent state (warm-start
     # weights via get_h_scores), and a PATCH rebuilds the pipeline in place, so two overlapping
     # requests on the same session corrupt each other and 500. The frontend aborts its previous

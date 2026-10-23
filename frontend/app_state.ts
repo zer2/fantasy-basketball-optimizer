@@ -123,6 +123,7 @@ export function setPlayerResultsFromGScores(): void {
             const identities = getAllPlayerIdentities()
             const players = identities.map((entry, i) => ({
                 player_id: entry.player_id,
+                points_per_game: entry.points_per_game ?? undefined,
                 h_score: 0,
                 h_rank: 0,
                 g_rank: i + 1,

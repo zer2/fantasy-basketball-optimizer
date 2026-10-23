@@ -135,6 +135,7 @@ export interface SessionRequest {
         most_categories_weight: number | null
         // The category that counts twice to settle a level matchup; null when none applies.
         tiebreaker_category: string | null
+        points_config?: import('./setting_collection/points_settings.js').PointsConfig
         scoring_system?: 'categories' | 'points'
         categories: string[]
         cash_per_team?: number   // only consulted by the backend in Auction Mode

@@ -70,18 +70,9 @@ def _run_points_trade_analyze(
         for t, r in player_assignments.items()
     } if len(player_assignments) > 2 else None
 
-    # Resolve schedule
-    schedule = getattr(session, 'schedule_calendar', None) or getattr(session.agent, 'schedule', None)
-    if schedule is None:
-        schedule = ScheduleCalendar()
-
-    # Resolve evaluation window
-    window = (
-        session.current_settings.get('evaluation_window')
-        or session.current_settings.get('window')
-        or session.current_settings.get('evaluation_dates')
-    )
-    dates = schedule.normalize_window(window)
+    from backend.points.live import resolve_points_calendar
+    roster_ids = [int(p) for roster in player_assignments.values() for p in roster if p is not None]
+    schedule, dates = resolve_points_calendar(session, roster_ids)
 
     # Resolve per-game FP and position eligibility
     per_game_fp = getattr(session.agent, 'per_game_fp', {}) or {}
@@ -304,18 +295,9 @@ def _run_points_trade_suggest(
     if not trade_formats:
         trade_formats = ["1v1", "2v1", "2v2"]
 
-    # Resolve schedule
-    schedule = getattr(session, 'schedule_calendar', None) or getattr(session.agent, 'schedule', None)
-    if schedule is None:
-        schedule = ScheduleCalendar()
-
-    # Resolve evaluation window
-    window = (
-        session.current_settings.get('evaluation_window')
-        or session.current_settings.get('window')
-        or session.current_settings.get('evaluation_dates')
-    )
-    dates = schedule.normalize_window(window)
+    from backend.points.live import resolve_points_calendar
+    roster_ids = [int(p) for roster in player_assignments.values() for p in roster if p is not None]
+    schedule, dates = resolve_points_calendar(session, roster_ids)
 
     # Resolve per-game FP and position eligibility
     per_game_fp = getattr(session.agent, 'per_game_fp', {}) or {}
