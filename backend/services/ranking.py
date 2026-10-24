@@ -65,6 +65,22 @@ def check_rostered_players_in_pool(
         )
 
 
+def compute_original_savor_dollars(
+    baseline_scores: pd.Series
+    , n_drafters: int
+    , active_slots_per_team: int
+    , cash_per_team: float
+    , streaming_noise: float
+    , replacement_threshold: float
+) -> pd.Series:
+    """SAVOR on the baseline scores over the full cash and picks: the start-of-auction values before any team's
+    unusable-cash share."""
+    return auction_value_adjuster(
+        baseline_scores, n_drafters * active_slots_per_team, n_drafters * cash_per_team, streaming_noise,
+        replacement_threshold,
+    )
+
+
 def compute_original_dollars(
     baseline_scores: pd.Series
     , n_drafters: int
@@ -78,9 +94,8 @@ def compute_original_dollars(
     """What each player is worth at the start of the auction: SAVOR on the baseline scores over the full cash and
     picks, plus the app's share of the cash a team at the start could not otherwise use (compute_unusable_cash_shares:
     full cash, every slot open, every player rosterable), as "Your $" carries one -- so the two agree at the start."""
-    savor_dollars = auction_value_adjuster(
-        baseline_scores, n_drafters * active_slots_per_team, n_drafters * cash_per_team, streaming_noise,
-        replacement_threshold,
+    savor_dollars = compute_original_savor_dollars(
+        baseline_scores, n_drafters, active_slots_per_team, cash_per_team, streaming_noise, replacement_threshold,
     )
     start_cash_shares = compute_unusable_cash_shares(
         your_dollar_series   = savor_dollars,
@@ -94,27 +109,49 @@ def compute_original_dollars(
     return savor_dollars + start_cash_shares
 
 
-def compute_original_and_generic_dollars(
+def compute_league_generic_dollars(
     baseline_scores: pd.Series
     , available_player_ids: pd.Index
     , n_drafters: int
     , active_slots_per_team: int
-    , roster_slots_per_team: int
     , cash_per_team: float
     , total_cash_remaining: float
     , streaming_noise: float
     , replacement_threshold: float
-    , cash_share_softness: float
-) -> tuple[pd.Series, pd.Series]:
-    """(original dollars, generic dollars). original: compute_original_dollars on the neutral baseline H-scores.
-    generic: original dollars over the available players, rescaled so they sum to the remaining cash."""
-    original_dollar_series = compute_original_dollars(
-        baseline_scores, n_drafters, active_slots_per_team, roster_slots_per_team, cash_per_team, streaming_noise,
-        replacement_threshold, cash_share_softness,
+) -> pd.Series:
+    """What the available players are worth to the league as a whole now: the start-of-auction SAVOR values over the
+    available players, rescaled so they sum to the remaining cash. No team's unusable-cash share: that is one team's
+    own money, so it is added per team (the "Gnrc. $" column) and never to the league's prices. The share is left out
+    before rescaling, not scaled down with the rest: rescaling a start-of-auction share would spread a stale copy of it
+    over every player."""
+    savor_dollars = compute_original_savor_dollars(
+        baseline_scores, n_drafters, active_slots_per_team, cash_per_team, streaming_noise, replacement_threshold,
     )
-    original_available = original_dollar_series.reindex(available_player_ids).fillna(0.0)
-    generic_dollar_series = original_available * (total_cash_remaining / original_available.sum())
-    return original_dollar_series, generic_dollar_series
+    savor_available = savor_dollars.reindex(available_player_ids).fillna(0.0)
+    return savor_available * (total_cash_remaining / savor_available.sum())
+
+
+def add_team_cash_shares_to_league_dollars(
+    league_dollar_series: pd.Series
+    , player_fits_roster: pd.Series
+    , team_cash: float
+    , open_active_slots: int
+    , empty_roster_slots: int
+    , cash_share_softness: float
+) -> pd.Series:
+    """The "Gnrc. $" column: the league's values plus this team's share of the cash it could not otherwise use,
+    computed on those values exactly as "Your $" computes its share on the team's own -- so "Diff" compares
+    valuations alone, and at the start of the auction "Gnrc. $", "Orig. $" and "Your $" agree."""
+    fitting_players = player_fits_roster.index[player_fits_roster.to_numpy()]
+    return league_dollar_series + compute_unusable_cash_shares(
+        your_dollar_series   = league_dollar_series,
+        rosterable_players   = fitting_players.intersection(league_dollar_series.index),
+        team_cash            = team_cash,
+        open_active_slots    = open_active_slots,
+        empty_roster_slots   = empty_roster_slots,
+        rule                 = APP_CASH_SHARE_RULE,
+        smooth_rule_softness = cash_share_softness,
+    )
 
 
 # ── Candidate strategy cache ──────────────────────────────────────────────────
@@ -431,14 +468,16 @@ def _build_candidates(
     #   your_dollar — SAVOR on H-scores (team-specific, uses remaining cash), plus a proportional share of the cash
     #                 the team could not otherwise spend on its best options (add_unusable_cash_shares)
     #   original_dollar — SAVOR on generic H-scores (no players taken), original full cash/picks
-    #   generic_dollar — original_dollar restricted to the AVAILABLE players and rescaled so it sums to the
-    #                 current remaining cash. Not an independent SAVOR run: re-running SAVOR on the
-    #                 baseline mid-auction lets already-drafted players absorb part of the remaining
+    #   generic_dollar — original_dollar's SAVOR part restricted to the AVAILABLE players and rescaled so it sums
+    #                 to the current remaining cash, plus this team's unusable-cash share computed on those values
+    #                 (add_team_cash_shares_to_league_dollars). Not an independent SAVOR run: re-running SAVOR on
+    #                 the baseline mid-auction lets already-drafted players absorb part of the remaining
     #                 cash, so the available players' values no longer exhaust the budget (and Diff
     #                 drifts systematically positive). Every dollar column must sum to its budget:
     #                 your$/gnrc$ to the remaining cash over available players, orig$ to the original
-    #                 cash over the full pool. The one exception is your$'s unusable-cash share: it is this
-    #                 team's own spare money, so it moves your$ (and Diff) for the team's best options only.
+    #                 cash over the full pool. The one exception is the unusable-cash share: it is this
+    #                 team's own spare money, so your$ and gnrc$ both carry it, on their own values, and Diff
+    #                 compares valuations alone. At the start of the auction all three columns agree.
     #
     # n_remaining is the number of players still to be drafted across all teams.
     # The SAVOR function uses this to find the replacement-level player (the
@@ -494,18 +533,31 @@ def _build_candidates(
             your_dollar_series = your_dollar_series + unusable_cash_shares
             # Baseline scores for the generic/original dollars: the neutral-board run,
             # populated unconditionally at session build (build_session_agent).
-            original_dollar_series, generic_dollar_series = compute_original_and_generic_dollars(
-                generic_h_scores, h_scores_sorted.index, h_agent.n_drafters, h_agent.n_picks,
-                current_settings['n_picks'], cash_per_team, total_cash_remaining, streaming_noise,
-                replacement_threshold, cash_share_softness,
+            original_dollar_series = compute_original_dollars(
+                generic_h_scores, h_agent.n_drafters, h_agent.n_picks, current_settings['n_picks'], cash_per_team,
+                streaming_noise, replacement_threshold, cash_share_softness,
+            )
+            generic_dollar_series = add_team_cash_shares_to_league_dollars(
+                compute_league_generic_dollars(
+                    generic_h_scores, h_scores_sorted.index, h_agent.n_drafters, h_agent.n_picks, cash_per_team,
+                    total_cash_remaining, streaming_noise, replacement_threshold,
+                ),
+                player_fits_roster, remaining_cash[my_team_id], h_agent.n_picks - len(my_players),
+                current_settings['n_picks'] - team_roster_size, cash_share_softness,
             )
             # G-score variants, same construction from the G-score original values.
             original_dollar_g_score_series = compute_original_dollars(
                 player_g_scores['Total'], h_agent.n_drafters, h_agent.n_picks, current_settings['n_picks'],
                 cash_per_team, streaming_noise, replacement_threshold, cash_share_softness,
             )
-            orig_g_available     = original_dollar_g_score_series.reindex(g_scores_available.index).fillna(0.0)
-            generic_dollar_g_score_series = orig_g_available * (total_cash_remaining / orig_g_available.sum())
+            generic_dollar_g_score_series = add_team_cash_shares_to_league_dollars(
+                compute_league_generic_dollars(
+                    player_g_scores['Total'], g_scores_available.index, h_agent.n_drafters, h_agent.n_picks,
+                    cash_per_team, total_cash_remaining, streaming_noise, replacement_threshold,
+                ),
+                player_fits_roster, remaining_cash[my_team_id], h_agent.n_picks - len(my_players),
+                current_settings['n_picks'] - team_roster_size, cash_share_softness,
+            )
             player_auction_values = {
                 p: AuctionValues(
                     your_dollar   = round(float(your_dollar_series.get(p, 0.0)), 2),

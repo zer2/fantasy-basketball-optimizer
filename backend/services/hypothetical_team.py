@@ -17,7 +17,7 @@ from backend.services.market_draft_values import (
     compute_availability_order, compute_blended_prices, load_market_draft_values, uses_market_draft_values,
 )
 from backend.services.ranking import (
-    compute_original_and_generic_dollars, make_candidate_strategy_key, split_off_bench, make_slot_names,
+    compute_league_generic_dollars, make_candidate_strategy_key, split_off_bench, make_slot_names,
 )
 from backend.state.session import Session
 
@@ -67,12 +67,11 @@ def build_hypothetical_team(
         players_chosen = {p for roster in player_assignments.values() for p in roster}
         available_player_ids = h_agent.x_scores.index[
             ~h_agent.x_scores.index.isin(list(players_chosen) + exclusion_list)]
-        _, generic_prices = compute_original_and_generic_dollars(
+        generic_prices = compute_league_generic_dollars(
             h_agent.default_h_scores, available_player_ids, h_agent.n_drafters, h_agent.n_picks,
-            current_settings['n_picks'], current_settings['cash_per_team'],
+            current_settings['cash_per_team'],
             sum_spendable_league_cash(player_assignments, remaining_cash, h_agent.n_picks),
             current_settings['streaming_noise'], current_settings['replacement_threshold'],
-            current_settings['cash_share_softness'],
         )
         predicted_prices = compute_blended_prices(generic_prices, market_values)
         my_remaining_cash = remaining_cash[my_team_id]
