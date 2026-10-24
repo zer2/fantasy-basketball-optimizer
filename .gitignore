@@ -92,19 +92,14 @@ visualizations/render_cache/voiceovers/
 visualizations/render_cache/Tex/
 visualizations/render_cache/texts/
 
-# Rendered explainer videos and their poster frames. Regenerable from the scenes in
-# visualizations/scenes/, so they are build output
-# rather than source: ~85 MB of binaries that git stores afresh on every re-render, including
-# re-encodes that change no pixels. The docs reference them at ../videos/<name>.mp4, so the
-# publish step is responsible for rendering them and applying `ffmpeg -movflags +faststart`
-# (manim writes the moov atom last, which stops a browser seeking a streamed file).
-docs/videos/*.mp4
-docs/videos/*-poster.jpg
+# The rendered explainer videos and their posters in docs/videos/ ARE tracked: the docs are published by
+# .github/workflows/docs.yml from a fresh checkout, so a video that is not in git is not on the published site (they
+# were untracked from 2026-09-23, and every automated publish from 2026-10-15 went out without them). Publishing a
+# re-render: copy it into docs/videos/ with `ffmpeg -movflags +faststart` (manim writes the moov atom last, which stops
+# a browser seeking a streamed file) and commit it.
 
-# The built copy of the above. `mkdocs build` re-copies docs/videos into site/ every time, so
-# tracking it would commit ~106 MB of binaries whose source is already ignored two lines up.
-# It still reaches the published site: `mkdocs gh-deploy` commits the built directory itself
-# rather than staging it, so .gitignore does not apply to what lands on gh-pages.
+# The built copy of docs/videos. `mkdocs build` re-copies docs/videos into site/ every time, so tracking it would
+# commit the same binaries twice.
 site/videos/
 
 # Circular headshots built by visualizations/shared/prepare_season_data.py from the app's
