@@ -65,6 +65,8 @@ PAGE_CSS = """
   .multiples { display:grid; grid-template-columns:repeat(auto-fit, minmax(420px, 1fr)); gap:4px 24px; }
   .multiples h3 { font-size:.85rem; font-weight:600; color:var(--muted); margin:6px 0 0; }
   .other { background:var(--other); }
+  .seeding { background:repeating-linear-gradient(135deg, var(--other) 0 4px, transparent 4px 7px);
+             outline:1px solid var(--other); outline-offset:-1px; }
   .builds { display:flex; flex-wrap:wrap; gap:4px 5px; }
   .build { display:inline-flex; align-items:baseline; gap:4px; border:1px solid var(--line); border-left-width:5px;
            border-radius:6px; padding:1px 7px; background:var(--bg); font-size:.82rem; white-space:nowrap; }
@@ -92,6 +94,11 @@ PAGE_CSS = """
   td.wrap { white-space:normal; min-width:240px; }
   tr:last-child td { border-bottom:none; }
   tr.summary td { white-space:normal; font-weight:600; border-bottom:2px solid var(--line); }
+  table.seed-grid { width:auto; margin:4px 0 10px; }
+  table.seed-grid th { text-align:center; padding:4px 6px; border-bottom:none; font-size:.8rem; }
+  table.seed-grid td { text-align:center; min-width:58px; padding:5px 6px; border:1px solid var(--line);
+                       cursor:default; }
+  table.seed-grid td.empty { border:none; }
 """
 for _index in range(7):
     PAGE_CSS += f"  .series-{_index} {{ background:var(--series-{_index}); }}\n"
@@ -173,12 +180,15 @@ def render_chart(
     , background_series: tuple = ()
     , width: int = 1100
     , show_points: bool = True
+    , uses_log_scale: bool = False
 ) -> str:
     """A chart over categorical x positions: 'line' (lines with points), 'dots', 'bars' (grouped) or 'stacked' (one bar
     per position, the series stacked bottom first). Reference lines are dashed (red for a floor). A legend is drawn
     below when there is more than one series. width is the drawing's own width, so a chart set beside another (in
     .multiples) keeps legible text by being drawn narrow rather than scaled down; show_points False draws a line
-    chart's lines alone, for curves too dense for a marker at every point."""
+    chart's lines alone, for curves too dense for a marker at every point. uses_log_scale draws the y axis in powers of
+    ten (line or dots charts of positive values), for data spanning several orders of magnitude; y_floor and
+    y_ceiling then only widen it to the decades they fall in."""
     left, right, top, bottom = 58, (120 if width > 700 else 70), 14, 46
     plot_width, plot_height = width - left - right, height - top - bottom
     values = [value for one in list(series) + list(background_series)
@@ -195,13 +205,24 @@ def render_chart(
         low = min(low, y_floor)
     if y_ceiling is not None:
         high = max(high, y_ceiling)
-    padding = (high - low) * 0.08 or 1.0
-    low, high = (low - padding if kind not in ('bars', 'stacked') or low < 0 else low), high + padding
-    ticks = compute_nice_ticks(low, high)
-    low, high = min(low, ticks[0]), max(high, ticks[-1])
+    if uses_log_scale:
+        if kind not in ('line', 'dots') or low <= 0:
+            raise ValueError(f'A log-scale chart needs a line or dots chart of positive values (kind {kind!r}, '
+                             f'smallest value {low}).')
+        low_exponent, high_exponent = int(np.floor(np.log10(low))), int(np.ceil(np.log10(high)))
+        high_exponent = max(high_exponent, low_exponent + 1)
+        ticks = [10.0 ** exponent for exponent in range(low_exponent, high_exponent + 1)]
 
-    def y_of(value):
-        return top + plot_height * (1 - (value - low) / (high - low))
+        def y_of(value):
+            return top + plot_height * (1 - (np.log10(value) - low_exponent) / (high_exponent - low_exponent))
+    else:
+        padding = (high - low) * 0.08 or 1.0
+        low, high = (low - padding if kind not in ('bars', 'stacked') or low < 0 else low), high + padding
+        ticks = compute_nice_ticks(low, high)
+        low, high = min(low, ticks[0]), max(high, ticks[-1])
+
+        def y_of(value):
+            return top + plot_height * (1 - (value - low) / (high - low))
 
     n = len(x_labels)
     slot = plot_width / max(n, 1)
@@ -810,58 +831,189 @@ def card_warm_start(columns, rows):
     return render_takeaway('good' if ok else 'bad', 'passes' if ok else 'breach', text) + chart
 
 
-# Multi-start seeding
-def card_multi_start(columns, rows):
-    seasons = [row[0] for row in rows]
-    gains = [read_leading_number(row[3]) for row in rows]
-    improved = [read_leading_number(row[5]) for row in rows]
-    ok = all(value >= -0.1 for value in gains)
-    text = (f'Seeding from the punt scan instead of a single neutral seed raises the top-12 mean H-score by '
-            f'<b>{np.mean(gains):+.2f}%</b> on average ({min(gains):+.2f}% to {max(gains):+.2f}% by season), and '
-            f'improves {np.mean(improved):.0f} of the 12 players in a typical season (floor −0.1%).')
-    chart = render_chart([season[2:] for season in seasons], [Series('mean gain', gains)], 'Scan minus neutral',
-                         kind='bars', references=(ReferenceLine(-0.1, 'floor −0.1%', True),),
-                         value_suffix='%', value_places=2)
-    return render_takeaway('good' if ok else 'bad', 'passes' if ok else 'breach', text) + chart
+# How single-peaked are H-scores
+SEED_GRID_CATEGORIES = ('FG%', 'FT%', '3s', 'PTS', 'REB', 'AST', 'STL', 'BLK', 'TO')
+# The share of the app's menu's starts reaching the optimum above which the headline reads them as all on one hill.
+SEED_ONE_HILL_SHARE = 99.0
 
 
-# Punt starts reaching the optimum
-def card_punt_starts(columns, rows):
-    summary = find_summary(rows, 'ALL')
-    starts = [str(summary[columns.index(name)]) for name in ('Missed at 5%', 'Missed at 1%', 'Missed at 0%')]
-    shares = [100 * read_leading_number(text.split('/')[0]) / read_leading_number(text.split('/')[1]) for text in starts]
-    candidates = candidate_rows(rows)
-    with_miss = [row for row in candidates if any(read_leading_number(row[columns.index(name)].split('/')[0]) > 0
-                                                  for name in ('Missed at 5%', 'Missed at 1%', 'Missed at 0%'))]
-    rounds = sorted({int(row[1]) for row in candidates})
-    per_round = [sum(int(row[1]) == n_rounds for row in with_miss) / max(sum(int(row[1]) == n_rounds
-                                                                              for row in candidates), 1) * 100
-                 for n_rounds in rounds]
-    text = (f'<b>{np.mean(shares):.2f}%</b> of punt starts end on a lower peak; <b>{len(with_miss)} of '
-            f'{len(candidates)}</b> candidates have one. Most candidates are single-peaked, and multi-starting covers '
-            f'the rest.')
-    chart = render_chart([str(n_rounds) for n_rounds in rounds], [Series('candidates with a lower peak', per_round)],
-                         'Candidates with a miss', kind='bars', value_suffix='%', value_places=0)
-    status = ('good', 'mostly single-peaked') if np.mean(shares) < 5 else ('warn', 'many peaks')
-    return render_takeaway(*status, text) + '<div class="note">By draft round (players on the board).</div>' + chart
+SEED_MISS_COLUMNS = ['Season', 'Rd', 'Player', 'Seeds that miss', 'Shortfall(s)', "App's seed reaches"]
+# A shortfall this large (in percentage points) is a real second peak; below it, starts stop on a nearly flat ridge by
+# the optimum. The measured shortfalls sit far either side: 0.16 and up, or under 0.006.
+SECOND_PEAK_SHORTFALL = 0.1
 
 
-def filter_punt_starts(columns, rows):
-    names = ('Missed at 5%', 'Missed at 1%', 'Missed at 0%')
-    kept = [row for row in rows if is_summary_row(row)
-            or any(read_leading_number(row[columns.index(name)].split('/')[0]) > 0 for name in names)]
-    omitted = len(rows) - len(kept)
-    return kept, f'{omitted} candidates where every start reached the optimum are not listed.'
+def derive_seed_miss_table(columns, rows):
+    """The table under the heatmaps: one row per candidate with a start that misses the optimum, its missing seeds in
+    one cell (the app's seeds are the 'at 50%' ones and 'balanced'), largest shortfall first, under a count."""
+    by_candidate: dict = {}
+    for row in rows:
+        if row[0] != 'Miss':
+            continue
+        key = tuple(row[columns.index(name)] for name in ('Season', 'Rd', 'Player'))
+        candidate = by_candidate.setdefault(key, {'seeds': [], 'shortfalls': [],
+                                                  'app_reaches': row[columns.index("App's seed reaches")]})
+        candidate['seeds'].append(row[columns.index('Seed')])
+        candidate['shortfalls'].append(float(row[columns.index('Shortfall (pp)')]))
+    table = []
+    for (season, n_rounds, player), candidate in sorted(by_candidate.items(), key=lambda item: -max(item[1]['shortfalls'])):
+        low, high = min(candidate['shortfalls']), max(candidate['shortfalls'])
+        shortfall = f'{high:.4f}%' if f'{low:.4f}' == f'{high:.4f}' else f'{low:.4f}% to {high:.4f}%'
+        table.append([season, n_rounds, player, ', '.join(candidate['seeds']), shortfall, candidate['app_reaches']])
+    starts = read_leading_number(find_summary(rows, 'ALL (Full menu')[columns.index('Starts')])
+    n_misses = sum(len(candidate['seeds']) for candidate in by_candidate.values())
+    summary = [f'ALL: {n_misses} of {starts:,.0f} starts miss, in {len(by_candidate)} candidates'] + ['—'] * 5
+    return SEED_MISS_COLUMNS, [summary] + table
 
 
-def rule_missed(value, row, columns):
-    return GOOD if value == 0 else style_bad(0.6)
+def describe_seed_misses(columns, rows):
+    """The note above the miss table (derive_seed_miss_table's rows): how many candidates have a second peak, how many of
+    those peaks are significantly lower, and whether the app's chosen seed ever lands on one."""
+    candidates = [row for row in rows if not is_summary_row(row)]
+
+    def largest_shortfall(row):
+        return float(re.findall(r'[\d.]+', str(row[columns.index('Shortfall(s)')]))[-1])
+    significant = [row for row in candidates if largest_shortfall(row) >= SECOND_PEAK_SHORTFALL]
+    chosen_misses = [row for row in candidates if row[columns.index("App's seed reaches")] == 'no']
+    text = (f'Of the {len(candidates)} candidates where some starts end on another peak, the other peak is '
+            f'significantly lower (by {SECOND_PEAK_SHORTFALL}% or more) in only {len(significant)}.')
+    significant_chosen = [row for row in significant if row in chosen_misses]
+    if not significant_chosen:
+        text += (f' In all {len(significant)}, the seed the app\'s seeding chooses reaches the true optimum: the app '
+                 f'never lands on a significantly lower peak.')
+    else:
+        text += (f' In {len(significant_chosen)} of them, the seed the app\'s seeding chooses lands on the lower '
+                 f'peak.')
+    insignificant_chosen = [row for row in chosen_misses if row not in significant]
+    if insignificant_chosen:
+        names = ', '.join(f'{row[columns.index("Player")]} ({row[columns.index("Season")]}, round '
+                          f'{row[columns.index("Rd")]}), {largest_shortfall(row):.4f}% below'
+                          for row in insignificant_chosen)
+        occasion = 'time' if len(insignificant_chosen) == 1 else 'times'
+        text += (f' The only {occasion} the app\'s chosen seed ends on another peak, across all candidates, that peak '
+                 f'is barely lower: {names}.')
+    text += (" The app's seeds are the 'at 50%' ones and 'balanced'; the rest are the full menu's punts at 5%, 55 seeds "
+             "in all. App's seed reaches: whether the seed the app's seeding would choose reaches the optimum.")
+    return rows, text
 
 
-def rule_shortfall(value, row, columns):
-    if value == 0:
-        return GOOD
-    return style_bad(min(value / 0.5, 1.0))
+def read_seed_cells(columns, rows, menu):
+    """A menu's seed cells by label: their reach, choice and shortfall cells as stored."""
+    names = ('Reaches optimum', 'Chosen by seeding', 'Chosen by multi-start', 'Worst miss (pp)', 'Starts')
+    return {row[1]: dict(zip(names, (row[columns.index(name)] for name in names)))
+            for row in candidate_rows(rows) if row[0] == menu}
+
+
+def render_seed_cell(label, cell, shown_text):
+    """One heatmap cell: its reach rate, red the more of its starts miss (full red at 10% missing), and the choice
+    rates on hover."""
+    if cell is None:
+        return '<td class="empty"></td>'
+    reach = read_leading_number(cell['Reaches optimum'])
+    missing = min((100 - reach) / 10, 1.0)
+    background = f' style="background:rgba(var(--bad-rgb),{0.55 * missing:.2f})"' if missing > 0 else ''
+    hover = (f'{label}: {cell["Reaches optimum"]} of {cell["Starts"]} starts reach the optimum; chosen by seeding '
+             f'{cell["Chosen by seeding"]}, by multi-starting {cell["Chosen by multi-start"]}; worst miss '
+             f'{format_percent(cell["Worst miss (pp)"])}')
+    return f'<td{background} title="{escape(hover)}">{escape(shown_text)}</td>'
+
+
+def render_seed_strip(cells, labels, heads):
+    """One row of cells under their headings."""
+    head = ''.join(f'<th>{escape(text)}</th>' for text in heads)
+    body = ''.join(render_seed_cell(label, cells.get(label), str(cells[label]['Reaches optimum']) if label in cells
+                                    else '') for label in labels)
+    return f'<table class="seed-grid"><tr>{head}</tr><tr>{body}</tr></table>'
+
+
+def render_punt_grid(cells):
+    """The full menu's single and double punts at 5%: row i, column j is the double punt of i and j, the diagonal the
+    single punt; the lower triangle repeats the upper, so it is left blank."""
+    head = '<th></th>' + ''.join(f'<th>{name}</th>' for name in SEED_GRID_CATEGORIES)
+    body = []
+    for first_index, first in enumerate(SEED_GRID_CATEGORIES):
+        row_cells = []
+        for second_index, second in enumerate(SEED_GRID_CATEGORIES):
+            if second_index < first_index:
+                row_cells.append('<td class="empty"></td>')
+                continue
+            label = first if first == second else f'{first}/{second}'
+            row_cells.append(render_seed_cell(f'punt {label} at 5%', cells.get(label),
+                                              str(cells[label]['Reaches optimum']) if label in cells else ''))
+        body.append(f'<tr><th>{first}</th>{"".join(row_cells)}</tr>')
+    return f'<table class="seed-grid"><tr>{head}</tr>{"".join(body)}</table>'
+
+
+def card_seed_starts(columns, rows):
+    app_cells = read_seed_cells(columns, rows, 'App menu')
+    full_cells = read_seed_cells(columns, rows, 'Full menu')
+    app_all = read_leading_number(find_summary(rows, 'ALL (App menu')[columns.index('Reaches optimum')])
+    full_all = read_leading_number(find_summary(rows, 'ALL (Full menu')[columns.index('Reaches optimum')])
+    reached = (f'<b>{app_all:.2f}%</b> of starts from the app\'s menu and <b>{full_all:.2f}%</b> from the full menu '
+               f'climb to the certified optimum given the long budget.')
+    # Nearly every start on one hill: the seed menu cannot be choosing the hill, so seeding's gain is a closer start.
+    if app_all >= SEED_ONE_HILL_SHARE:
+        status = ('good', 'a closer start, not a different optimum')
+        conclusion = (' Choosing a good starting seed is rarely necessary to eventually find the true optimum. Its '
+                      'consistent benefit comes instead from starting closer to the peak, which gets the descent closer '
+                      'in fewer iterations.')
+    else:
+        status = ('warn', 'seeds on other hills')
+        conclusion = (' Some of the app\'s seeds climb a different hill, so for those candidates seeding also decides '
+                      'which optimum the app reaches.')
+    text = (reached + conclusion + ' Each cell is its seed\'s share; red marks starts that end on another hill. Hover '
+            'for how often the seed is the one chosen.')
+    app_labels = [f'{name} at 50%' for name in SEED_GRID_CATEGORIES] + ['balanced']
+    app_heads = list(SEED_GRID_CATEGORIES) + ['balanced']
+    return (render_takeaway(*status, text)
+            + '<h3>The app\'s menu</h3><div class="note">Gentle punts (that weight at 50% of neutral) and the balanced '
+              'build.</div>' + render_seed_strip(app_cells, app_labels, app_heads)
+            + '<h3>The full menu</h3><div class="note">The app\'s seeds above, plus single (diagonal) and double punts '
+              'at 5% of neutral. A seed reaches the optimum as often in either menu (its descent is the same); only '
+              'how often it is chosen differs, which the hover and the table give for every seed.</div>'
+            + render_punt_grid(full_cells))
+
+
+# Conditioning around the optimum
+# The window inside which every direction spirals in at sqrt(beta1) (optimum_loss_decomposition.UNDERDAMPED_WINDOW,
+# for Adam's beta1 = 0.9); repeated here so the page can be rebuilt without importing the harness.
+UNDERDAMPED_LOW = (1 - np.sqrt(0.9)) ** 2 / (1 - 0.9)
+UNDERDAMPED_HIGH = (1 + np.sqrt(0.9)) ** 2 / (1 - 0.9)
+
+
+def card_conditioning(columns, rows):
+    """One chart over the app's iterations: the minimum, average and maximum step x curvature over every direction of
+    every candidate's own descent, on a log axis with both edges of the window."""
+    iterations = [str(row[columns.index('Iteration')]) for row in rows]
+
+    def column(name):
+        return [float(row[columns.index(name)]) for row in rows]
+
+    outside = [int(row[columns.index('Candidates outside the window')]) for row in rows]
+    candidates = int(rows[0][columns.index('Candidates')])
+    inside_from = next((index + 1 for index in range(len(outside)) if not any(outside[index:])), None)
+    window = f'{UNDERDAMPED_LOW:.3g}-{UNDERDAMPED_HIGH:.3g}'
+    if inside_from is not None:
+        status = ('good', f'inside the window from iteration {inside_from}')
+        text = (f'For all {candidates} candidates, every direction\'s step x curvature is inside the {window} window '
+                f'from iteration <b>{inside_from}</b> of {len(iterations)} on: from there every direction closes in at '
+                f'sqrt(0.9) = 0.949 per iteration.')
+    else:
+        status = ('warn', 'outside the window at the end')
+        text = (f'{outside[-1]} of {candidates} candidates still have a direction outside the {window} window after '
+                f'{len(iterations)} iterations.')
+    if outside[0]:
+        text += (f' In the first iterations Adam\'s step sizes come from its first few gradients alone, and some '
+                 f'directions sit far above 38 (up to {column("Max")[0]:,.0f} at iteration 1).')
+    # A log axis: the first iterations run to the hundreds of thousands, and the window's edges are 0.026 and 38.
+    chart = render_chart(iterations, [Series(name, column(name)) for name in ('Max', 'Average', 'Min')],
+                         'Step x curvature (log)', kind='line',
+                         references=(ReferenceLine(UNDERDAMPED_HIGH, 'stability edge', True),
+                                     ReferenceLine(UNDERDAMPED_LOW, 'slow edge', True)),
+                         value_places=3, show_points=False, uses_log_scale=True)
+    return (render_takeaway(*status, text) + chart
+            + '<div class="note">Over every direction of every candidate\'s own descent: every direction lies between '
+              'the Max and Min lines.</div>')
 
 
 # Loop gain
@@ -885,34 +1037,6 @@ def rule_loop_gain(value, row, columns):
 def sort_by_loop_gain(columns, rows):
     index = columns.index('Largest loop gain')
     return sorted(rows, key=lambda row: -(read_leading_number(row[index]) or 0))
-
-
-# Quasiconcavity
-def card_quasiconcavity(columns, rows):
-    rounds = sorted({int(row[1]) for row in rows})
-    kinds = ['near the optimum', 'between punts', 'anywhere']
-    series = []
-    for kind in kinds:
-        values = []
-        for n_rounds in rounds:
-            matching = [read_leading_number(row[3]) for row in rows if row[2] == kind and int(row[1]) == n_rounds]
-            values.append(float(np.mean(matching)) if matching else None)
-        series.append(Series(kind, values))
-    overall = {kind: np.mean([read_leading_number(row[3]) for row in rows if row[2] == kind]) for kind in kinds}
-    text = (f'Straight segments that dip below both ends: <b>{overall["near the optimum"]:.2f}%</b> near the optimum, '
-            f'{overall["between punts"]:.1f}% between punts, {overall["anywhere"]:.1f}% anywhere. The surface is not '
-            f'quasiconcave far out, but near the peak it almost never dips.')
-    status = ('good', 'concave near the peak') if overall['near the optimum'] < 1 else ('warn', 'dips near the peak')
-    chart = render_chart([str(n_rounds) for n_rounds in rounds], series, 'Segments dipping', kind='line',
-                         value_suffix='%', value_places=2, y_floor=0.0)
-    return render_takeaway(*status, text) + '<div class="note">By draft round, mean over seasons.</div>' + chart
-
-
-def rule_dipping(value, row, columns):
-    """Only dips near the optimum would contradict anything; far-out dips are expected and stay uncoloured."""
-    if row[columns.index('Segments')] != 'near the optimum':
-        return ''
-    return GOOD if value == 0 else style_bad(min(value / 1.0, 1.0))
 
 
 # Planner vs H-scoring
@@ -1268,26 +1392,39 @@ def derive_dollar_shape_table(columns, rows):
 
 
 # Where the app loses to the optimum
-LOSS_COLUMNS = ['Seed choice', 'Seed menu', 'Iterations', 'Remaining gap', 'Total loss']
+LOSS_COLUMNS = ['Multi-starting', 'Full seed menu', 'Iterations', 'Remaining gap', 'Total loss']
+
+
+SEEDING_COLUMN = 'Seeding (in the app)'
 
 
 def card_loss(columns, rows):
+    """The headline, and one bar from a neutral start to the optimum: what the app's seeding already recovers (muted,
+    first), then the four losses the app still has, each a share of the whole."""
     summary = find_summary(rows, ('ALL', 'Mean of'))
     cost_row = find_summary(rows, 'Cost to fix')
     candidates = candidate_rows(rows)
     total = read_leading_number(summary[columns.index('Total loss')])
-    loss_sum = sum(read_leading_number(row[columns.index('Total loss')]) for row in candidates)
-    segments, legend = [], []
-    for position, cause in enumerate(LOSS_COLUMNS[:-1]):
-        cause_sum = sum(read_leading_number(row[columns.index(cause)]) for row in candidates)
-        share = round(100 * cause_sum / loss_sum) if loss_sum else 0
+    loss_sums = {cause: sum(read_leading_number(row[columns.index(cause)]) for row in candidates)
+                 for cause in LOSS_COLUMNS[:-1]}
+    seeding_sum = max(sum(read_leading_number(row[columns.index(SEEDING_COLUMN)]) for row in candidates), 0.0)
+    whole = seeding_sum + sum(loss_sums.values())
+    seeding_share = round(100 * seeding_sum / whole) if whole else 0
+    segments = [f'<div class="bar-segment seeding" style="flex-basis:{seeding_share:g}%" '
+                f'title="Seeding: {seeding_share:g}% of the gap from a neutral start, already recovered by the app">'
+                f'</div>']
+    legend = ['<span><span class="swatch seeding"></span>Seeding &middot; already in the app</span>']
+    for position, (cause, cause_sum) in enumerate(loss_sums.items()):
+        share = round(100 * cause_sum / whole) if whole else 0
         segments.append(f'<div class="bar-segment series-{position}" style="flex-basis:{share:g}%" '
-                        f'title="{escape(cause)}: {share:g}% of the loss"></div>')
+                        f'title="{escape(cause)}: {share:g}% of the gap from a neutral start"></div>')
         cost = f' &middot; fix: {escape(cost_row[columns.index(cause)])} the work' if cost_row else ''
         legend.append(f'<span><span class="swatch series-{position}"></span>{escape(cause)}{cost}</span>')
     average_app = np.mean([read_leading_number(row[columns.index('App')]) for row in candidates])
+    average_seeding = read_leading_number(summary[columns.index(SEEDING_COLUMN)])
     headline = (f'<div class="takeaway">Average total loss: <b>{total:.4f}%</b>, off an average H-score of '
-                f'{average_app:.2f}% &middot; {escape(summary[0])}</div>')
+                f'{average_app:.2f}% &middot; {escape(summary[0])}. Seeding, which the app already does, gains '
+                f'{average_seeding:.4f}% over a neutral start.</div>')
     return headline + f'<div class="bar-track">{"".join(segments)}</div><div class="legend">{"".join(legend)}</div>'
 
 
@@ -1296,12 +1433,16 @@ def styles_loss(columns, rows):
     bold in the top half of the scale, which tops out at the 95th percentile of the losses; a gain stays uncoloured."""
     indices = [columns.index(name) for name in LOSS_COLUMNS if name in columns]
     total_index = columns.index('Total loss')
+    seeding_index = columns.index(SEEDING_COLUMN) if SEEDING_COLUMN in columns else None
     losses = [read_leading_number(row[index]) for row in rows if not is_summary_row(row) for index in indices]
     losses = [loss for loss in losses if loss is not None and loss > 0]
     scale_top = float(np.percentile(losses, 95)) if losses else 1.0
     styles = []
     for row in rows:
         row_styles = [''] * len(row)
+        # Seeding is a gain the app already has: green when it gains, uncoloured otherwise.
+        if seeding_index is not None and (read_leading_number(row[seeding_index]) or 0) > 0:
+            row_styles[seeding_index] = GOOD
         for index in indices:
             loss = read_leading_number(row[index])
             if loss is None:
@@ -1370,33 +1511,24 @@ SECTION_VIEWS: dict[str, SectionView] = {
         formatters={'Warm mean H': format_percent, 'Cold mean H': format_percent,
                     'Warm - cold': lambda cell: format_percent(cell, signed=True)},
     ),
-    'Multi-start seeding': SectionView(
-        card=card_multi_start,
-        cell_styles=make_rule_styles({'Mean gain (pp)': rule_signed_gain(-0.1), 'Max gain (pp)': rule_signed_gain(-0.1),
-                                      'Neutral arm collapsed (NaN)': lambda value, row, columns: '' if value == 0 else WARN}),
-        formatters={'Scan mean H': format_percent, 'Neutral mean H': format_percent,
-                    'Mean gain (pp)': lambda cell: format_percent(cell, signed=True),
-                    'Max gain (pp)': lambda cell: format_percent(cell, signed=True)},
+    'How single-peaked are H-scores': SectionView(
+        card=card_seed_starts,
+        derive_table=derive_seed_miss_table,
+        # Dark for a real second peak, light for a start that stops on the flat ridge by the optimum (judged by the
+        # largest shortfall in the cell, a range's upper end).
+        cell_styles=make_rule_styles({'Shortfall(s)': lambda value, row, columns: style_bad(
+            1.0 if float(re.findall(r'[\d.]+', str(row[columns.index('Shortfall(s)')]))[-1]) >= SECOND_PEAK_SHORTFALL
+            else 0.2)}),
+        wrap_columns=('Seeds that miss',),
+        row_filter=describe_seed_misses,
     ),
-    'Punt starts reaching the optimum': SectionView(
-        card=card_punt_starts,
-        cell_styles=make_rule_styles({name: rule for depth in ('5%', '1%', '0%')
-                                      for name, rule in ((f'Missed at {depth}', rule_missed),
-                                                         (f'Worst miss (pp) at {depth}', rule_shortfall))}),
-        formatters={f'Worst miss (pp) at {depth}': format_percent for depth in ('5%', '1%', '0%')},
-        row_filter=filter_punt_starts,
-    ),
+    'Conditioning around the optimum': SectionView(card=card_conditioning),
     'Loop gain at the optimum': SectionView(
         card=card_loop_gain,
         cell_styles=make_rule_styles({'Largest loop gain': rule_loop_gain,
                                       'Largest Hessian eigenvalue':
                                           lambda value, row, columns: GOOD if value < 0 else BAD}),
         sort_rows=sort_by_loop_gain,
-    ),
-    'Quasiconcavity along weight segments': SectionView(
-        card=card_quasiconcavity,
-        cell_styles=make_rule_styles({'Dipping': rule_dipping}),
-        formatters={'Median dip (pp)': format_percent, 'Largest dip (pp)': format_percent},
     ),
     'Where the app loses to the optimum': SectionView(card=card_loss, cell_styles=styles_loss),
     'Planner vs H-scoring: individual drafts': SectionView(
@@ -1423,8 +1555,7 @@ SECTION_VIEWS: dict[str, SectionView] = {
 HEADER_RENAMES = {'Mean (pp)': 'Mean', 'SE (pp)': 'SE', 'Mean gain (pp)': 'Mean gain', 'Max gain (pp)': 'Max gain',
                   'Planner minus H (pp)': 'Planner minus H', 'Worst (pp)': 'Worst', 'Best (pp)': 'Best',
                   'Median dip (pp)': 'Median dip', 'Largest dip (pp)': 'Largest dip',
-                  'Worst miss (pp) at 5%': 'Worst miss at 5%', 'Worst miss (pp) at 1%': 'Worst miss at 1%',
-                  'Worst miss (pp) at 0%': 'Worst miss at 0%'}
+                  'Worst miss (pp)': 'Worst miss', 'Shortfall (pp)': 'Shortfall'}
 
 
 # ── The page ──────────────────────────────────────────────────────────────────
@@ -1515,10 +1646,9 @@ SECTION_GROUPS = {
     ],
     'Gradient descent optimality': [
         'Where the app loses to the optimum',
-        'Multi-start seeding',
-        'Punt starts reaching the optimum',
+        'How single-peaked are H-scores',
+        'Conditioning around the optimum',
         'Loop gain at the optimum',
-        'Quasiconcavity along weight segments',
     ],
     'Auctions': [
         'Smooth vs simple scaling',

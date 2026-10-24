@@ -19,11 +19,9 @@ Four measurements, each a function below:
     model's value function. Any dual weights give a valid upper bound (weak duality), so an inexact node solve never
     invalidates the search; the reachable point those weights select is a real team strategy, so its true objective is
     a lower bound. Branching splits the category whose envelope overstates its term most at the relaxation's solution.
-  - count_starts_reaching_optimum: every single and double punt start, run to convergence -- does each reach the peak?
   - measure_loop_gain: at the peak, weights match marginal values (w proportional to g), and the peak is a strict local
     maximum exactly when every eigenvalue of the loop-gain matrix G = Dg J / kappa is below 1 (J = d future_stats / dw,
     Dg = d marginal value / d future_stats, kappa = g / w). Cross-checked against a finite-difference Hessian.
-  - measure_quasiconcavity: along random segments of weight space, does the objective ever dip below the lower end?
 """
 
 from __future__ import annotations
@@ -44,7 +42,6 @@ ENVELOPE_GRID_POINTS = 401
 # Annealed soft-min temperatures for the node's dual: the exact dual has kinks wherever an envelope has a straight piece,
 # which is where L-BFGS stalls; each temperature warm-starts the next, and the bound reported is the exact dual.
 SMOOTHING_TEMPERATURES = (1e-3, 1e-4, 1e-5, 1e-6, 1e-7)
-PUNT_DEPTHS = (0.05, 0.01, 0.0)
 PEAK_TOLERANCE = 1e-5
 LOCAL_WEIGHT_FLOOR = 1e-9
 
@@ -239,25 +236,6 @@ def find_multistart_optimum(problem):
     return max((find_local_maximum(problem, start, floors) for start in starts), key=lambda pair: pair[0])
 
 
-def count_starts_reaching_optimum(problem, optimum):
-    """For each punt depth, how many single and double punt starts end within PEAK_TOLERANCE of the optimum, and how far
-    short the rest end. A start at exactly 0 may stay at 0: its punted categories' lower bound is 0 (every other
-    weight's is LOCAL_WEIGHT_FLOOR, as for the deeper-than-zero starts)."""
-    neutral = problem.agent.v.reshape(-1)
-    counts = {}
-    for depth in PUNT_DEPTHS:
-        finishes = []
-        for punted, weights in make_punt_starts(neutral, depth):
-            floors = np.full(problem.n_categories, LOCAL_WEIGHT_FLOOR)
-            if depth == 0:
-                floors[list(punted)] = 0.0
-            finishes.append(find_local_maximum(problem, weights, floors)[0])
-        shortfalls = [optimum - value for value in finishes if optimum - value > PEAK_TOLERANCE]
-        counts[depth] = {'starts': len(finishes), 'missed': len(shortfalls),
-                         'largest_shortfall': max(shortfalls, default=0.0)}
-    return counts
-
-
 # ── Branch and bound ──────────────────────────────────────────────────────────
 
 def compute_upper_concave_hull(xs, ys):
@@ -415,45 +393,6 @@ def measure_loop_gain(problem, weights):
     }
 
 
-def measure_quasiconcavity(problem, optimum_weights, rng, n_pairs=600, n_points=21):
-    """Share of random weight segments along which the objective dips below the lower of its two ends (a quasiconcave
-    function never does), and the dips' depth, for three ways of drawing the ends: anywhere on the simplex; single or
-    double punts at 5-100% of neutral; within +-30% of the optimum."""
-    neutral = problem.agent.v.reshape(-1)
-    n_categories = problem.n_categories
-
-    def draw_punts(count):
-        weights = np.tile(neutral, (count, 1))
-        for row in weights:
-            for category in rng.choice(n_categories, size=rng.integers(1, 3), replace=False):
-                row[category] *= rng.uniform(0.05, 1.0)
-        return weights
-
-    samplers = {
-        'anywhere': lambda: (rng.dirichlet(np.ones(n_categories), n_pairs), rng.dirichlet(np.ones(n_categories), n_pairs)),
-        'between punts': lambda: (draw_punts(n_pairs), draw_punts(n_pairs)),
-        'near the optimum': lambda: (optimum_weights * rng.uniform(0.7, 1.3, (n_pairs, n_categories)),
-                                     optimum_weights * rng.uniform(0.7, 1.3, (n_pairs, n_categories))),
-    }
-    fractions = np.linspace(0, 1, n_points)
-    results = {}
-    for name, draw in samplers.items():
-        starts, ends = draw()
-        starts = starts / starts.sum(axis=1, keepdims=True)
-        ends = ends / ends.sum(axis=1, keepdims=True)
-        points = fractions[None, :, None] * starts[:, None, :] + (1 - fractions)[None, :, None] * ends[:, None, :]
-        stats = problem.compute_future_stats(points.reshape(-1, n_categories))
-        z = ((problem.gap_intercepts[None] + problem.gap_slopes[None] * stats[:, :, None])
-             / np.sqrt(problem.gap_variances)[None])
-        values = ndtr(z).mean(axis=(1, 2)).reshape(n_pairs, n_points)
-        dips = np.minimum(values[:, 0], values[:, -1]) - values[:, 1:-1].min(axis=1)
-        violating = dips > 1e-9
-        results[name] = {'share_dipping': float(violating.mean()),
-                         'median_dip': float(np.median(dips[violating])) if violating.any() else 0.0,
-                         'largest_dip': float(dips.max()) if violating.any() else 0.0}
-    return results
-
-
 # ── Driving it ────────────────────────────────────────────────────────────────
 
 UNREGULARIZED_SETTINGS = {'lambda_c': 0, 'lambda_p': 0}
@@ -511,15 +450,12 @@ def measure_board(
         optimum_shares = optimum_weights / optimum_weights.sum()
         certification = certify_optimum(problem, optimum, tolerance, node_limit)
         gain = measure_loop_gain(problem, optimum_shares)
-        rng = np.random.default_rng([int(season[:4]), n_rounds, int(row)])
         measurements.append({
             'season': season, 'rounds': n_rounds, 'player': session.player_registry[problem.player_id].name,
             'app_iterations': app_iterations, 'app_score': problem.app_score,
             'long_app_score': float(long_scores[problem.player_id]), 'optimum': optimum,
             'certification': certification,
-            'punt_starts': count_starts_reaching_optimum(problem, optimum),
             'loop_gain': {key: value for key, value in gain.items() if np.isscalar(value)},
-            'quasiconcavity': measure_quasiconcavity(problem, optimum_shares, rng),
         })
     return measurements
 

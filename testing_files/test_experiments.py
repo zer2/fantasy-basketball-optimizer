@@ -123,21 +123,38 @@ _SECTION_EXPLANATIONS = {
         'seed scan, and this compares the mean H-score of the top 12.\n'
         "The point is display stability (the first pick's strategies match the rankings already shown), not "
         'better answers, so the expectation is parity. Floor: warm no more than 0.25% below cold.',
-    'Multi-start seeding':
-        "The app seeds every descent from a scan of gentle punts (one per category, keeping each player's "
-        "best) rather than from one neutral build. This solves the same players' builds both ways, against "
-        "the same field (Each Category, opponent model off), and compares each of the scan's top 12 with "
-        'themselves.\n'
-        'A positive gain means the scan found a better build for that player; a neutral-seeded descent tends '
-        'to stall near the neutral build. Improved = players gaining more than 0.05%. Floor: mean gain at '
-        'least −0.1%.',
-    'Punt starts reaching the optimum':
-        'Is the objective single-peaked? If it had several peaks, an ascent could stop on the wrong one. This '
-        'starts ascent from every single and double punt (45 starts per candidate), with the punted weights '
-        'at 5%, 1% and exactly 0% of neutral: far from the optimum, from every direction. A miss is a start '
-        'ending more than 0.001% below the best peak.\n'
-        "Zero misses means every start climbed to the same peak. The candidates are the loss section's, whose "
-        'branch and bound confirms that peak is the global one. No regularization (lambda_c = lambda_p = 0).',
+    'How single-peaked are H-scores':
+        'Does the seed menu find the right optimum, or does it only give the descent a starting point closer to it? '
+        "If the objective had several peaks, a start on the wrong hill would climb to a lesser one, and seeding's job "
+        'would be to pick the right hill. From every seed in two menus, the app\'s own descent (Adam, as the app runs '
+        "it) is continued to the loss section's long budget, keeping the best point it scores, and a seed reaches the "
+        'optimum when that point is within 0.001% of it. If every seed reaches it, there is only one hill to climb, '
+        "and all of seeding's gain in the loss section is a better starting point: the app's 30 iterations get "
+        'further from there.\n'
+        'Each cell is the share of candidates whose start there reaches the optimum. Hovering shows how often the '
+        "seed is the one chosen, by seeding (the best objective before any descent, as the app picks) and by "
+        "multi-starting (the best result after the app's iteration budget).\n"
+        "- The app's menu: one gentle punt per category (that weight at 50% of neutral) and the balanced build. The "
+        "app's menu also holds each candidate's own builds from the self-play history; they are left out here.\n"
+        "- The full menu: the app's, plus every single and double punt at 5% of neutral (the diagonal is the single "
+        'punt). Choices are made within each menu.\n'
+        "The candidates are the loss section's; the optimum is its certified one. No regularization (lambda_c = "
+        'lambda_p = 0).',
+    'Conditioning around the optimum':
+        "Why the app's descent gets close to the optimum in few iterations. Near the peak, the objective's curvature "
+        "decides how the app's update (Adam with momentum 0.9) behaves. Multiply each direction's curvature by Adam's "
+        'step size in that direction: while that product lies between 0.026 and 38, the direction spirals in, '
+        'shrinking by exactly sqrt(0.9) = 0.949 per iteration whatever its curvature (the distance halves every 13 '
+        'iterations, the H-score gap, which goes with the distance squared, every 7); above 38 it would bounce away '
+        '(the stability limit), and below 0.026 it would crawl.\n'
+        "The curvature is measured at the optimum (the Hessian along the simplex, by finite differences) and does not "
+        "change; what changes from one iteration to the next is Adam's step size in each direction. So after every "
+        "iteration of the app's own descent (from the seed its seeding chooses), each of the 8 directions' step x "
+        "curvature is computed with that iteration's step sizes. The chart shows, for each of the app's 30 "
+        'iterations, the minimum, average and maximum over every direction of every candidate: every direction lies '
+        'between the min and max lines.\n'
+        "The candidates are the loss section's; the optimum is its certified one. No regularization (lambda_c = "
+        'lambda_p = 0).',
     'Loop gain at the optimum':
         "H-scoring's build is self-referential: the weights decide which players the team expects to pick "
         'later, those decide where the team is strong or weak, and that decides how much each category is '
@@ -147,20 +164,15 @@ _SECTION_EXPLANATIONS = {
         '1 it comes back smaller, so the build returns to the peak: a strict local maximum. At 1 or above it '
         'would run away. The largest Hessian eigenvalue checks the same thing directly (negative at a peak).\n'
         'Same candidates as the loss section. No regularization (lambda_c = lambda_p = 0).',
-    'Quasiconcavity along weight segments':
-        'A stronger property than one peak: a quasiconcave objective never dips below the lower of its two '
-        'ends along any straight segment of weight space, so every ascent finds the peak by construction. '
-        'Random segments are drawn three ways: anywhere, between single or double punts (5-100% of neutral), '
-        'and within ±30% of the optimum. Dipping is the share of segments that dip.\n'
-        'A surface can be single-peaked without being quasiconcave, so dips far from the optimum do not '
-        'contradict the punt-start section; dips near the optimum would. Same candidates as the loss section. '
-        'No regularization (lambda_c = lambda_p = 0), and a convex regularizer could not create a dip anyway.',
     'Where the app loses to the optimum':
-        'The app takes the most promising of its 12 seeds and runs gradient descent on it for 30 iterations. It '
-        'could be improved by running gradient descent on all 12 seeds, using more seeds (58), using more '
-        'iterations (2,000), or using the exact branch-and-bound algorithm. This breaks down how much not doing '
-        'each of those costs: App + the four losses = Optimal. An H-score is an expected win rate, so all are in '
-        "%. Each board's players are in their App order; an arrow by Optimal shows how many places one would move "
+        'The app seeds: it takes the most promising of its 12 seeds and runs gradient descent on it for 30 '
+        'iterations. It could be improved by multi-starting (gradient descent on all 12 seeds, keeping the best), '
+        'using the full seed menu (58), using more iterations (2,000), or using the exact branch-and-bound '
+        'algorithm. This breaks down how much not doing each of those costs: App + the four losses = Optimal.\n'
+        "Seeding is the one fix the app already makes. Neutral start is the app's descent from the neutral build "
+        '(perturbed by 1%, since the neutral build itself is a stationary point) for the same 30 iterations; Seeding '
+        '(in the app) is what the app gains over it, so Neutral start + Seeding = App. It is not part of the loss.\n'
+        "An H-score is an expected win rate, so all are in %. Each board's players are in their App order; an arrow by Optimal shows how many places one would move "
         "if ranked by optimal values (▲ higher). The cost-to-fix row gives each improvement's cost as a multiple "
         "of the app's work (each includes the ones before it; branch and bound's is its measured time per "
         'candidate).\n'
@@ -896,52 +908,12 @@ def test_warm_start_no_convergence_cost():
     _fail_on_breaches(breaches)
 
 
-@sims
-def test_multi_start_seeding_helps():
-    """An OPTIMIZER comparison (no competing agents — see the section explanation): solve the same
-    players' builds twice, seeded by the punt scan vs a single neutral seed, and compare PAIRED
-    per-player objective values over the scan's top 12."""
-    breaches = []
-    for season in _SEASONS:
-        punt_scan = _build_session(_FORMATS['EC'], season=season, opponent_model_confidence=0)
-        neutral   = _build_session(_FORMATS['EC'], season=season, opponent_model_confidence=0)
-        neutral.agent.seed_mode = 'neutral'
-        neutral.agent.reset_draft_state()
-        neutral.agent.populate_default_h_scores(neutral.current_settings['n_iterations'])
-
-        scan_scores    = punt_scan.agent.default_h_scores
-        neutral_scores = neutral.agent.default_h_scores
-        top_players    = [p for p in scan_scores.index[:12] if p in neutral_scores.index]
-        # The neutral-seeded arm can COLLAPSE outright: a cold descent from neutral still carries the
-        # regulariser, which can snap weights exactly onto the singular w=v ray (0/0 -> NaN objective).
-        # The production punt scan never starts at neutral, so this cannot happen in the app -- when the
-        # diagnostic arm collapses, that IS the finding (the strongest form of "multi-start helps").
-        pairs      = [(p, 100 * float(scan_scores[p] - neutral_scores[p])) for p in top_players]
-        collapsed  = sum(1 for _, delta in pairs if np.isnan(delta))
-        deltas     = [delta for _, delta in pairs if not np.isnan(delta)]
-        improved   = sum(1 for delta in deltas if delta > 0.05)
-        valid_players = [p for p, delta in pairs if not np.isnan(delta)]
-        mean_gain  = f'{np.mean(deltas):+.2f}' if deltas else 'n/a'
-        max_gain   = f'{max(deltas):+.2f}' if deltas else 'n/a'
-        neutral_mean = (f'{100 * float(neutral_scores[valid_players].mean()):.1f}'
-                        if valid_players else 'NaN (collapsed)')
-        _record_row('Multi-start seeding',
-                    ['Season', 'Scan mean H', 'Neutral mean H', 'Mean gain (pp)', 'Max gain (pp)',
-                     'Improved (of 12)', 'Neutral arm collapsed (NaN)'],
-                    [season, f'{100 * float(scan_scores[top_players].mean()):.1f}', neutral_mean,
-                     mean_gain, max_gain, improved, collapsed])
-        if deltas:
-            _check_floor(breaches, float(np.mean(deltas)) >= -0.1,
-                         f'{season}: punt seed scan below a neutral seed (mean gain {np.mean(deltas):+.2f}pp)')
-    _fail_on_breaches(breaches)
-
-
 # ── Exact optimum (Each Category) ─────────────────────────────────────────────
-# One measurement serves four sections (the loss decomposition below, punt starts, loop gain, quasiconcavity): for each season, the boards after each of _EXACT_ROUNDS snake rounds (picks in
+# One measurement serves two sections (the loss decomposition below and loop gain): for each season, the boards after each of _EXACT_ROUNDS snake rounds (picks in
 # default-ranking order), my seat Drafter 1, the top EXPERIMENT_EXACT_CANDIDATES candidates of each board, at app
-# settings with no regularization anywhere (lambda_c = lambda_p = 0, the self-play field included): the four sections
+# settings with no regularization anywhere (lambda_c = lambda_p = 0, the self-play field included): the two sections
 # study the unregularized objective, and the app is scored on that same problem. experiment_harnesses/exact_optimum measures each board in its own process (EXPERIMENT_WORKERS of them); the
-# first of the four tests to run measures everything, and the rest read it. A board that fails is reported by every
+# first of the two tests to run measures everything, and the rest read it. A board that fails is reported by every
 # section (with its traceback) after the boards that worked are recorded; it is never measured twice.
 
 _EXACT_ROUNDS = [int(n_rounds) for n_rounds in
@@ -974,30 +946,6 @@ def _list_failed_exact_optimum_boards():
 
 
 @sims
-def test_punt_starts_reach_the_optimum():
-    """Does ascent from every single and double punt -- at 5%, 1% and exactly 0% of neutral -- climb to the peak?"""
-    from experiment_harnesses.exact_optimum import PUNT_DEPTHS
-    section = 'Punt starts reaching the optimum'
-    columns = (['Season', 'Rounds', 'Player']
-               + [f'{label} at {depth:.0%}' for depth in PUNT_DEPTHS for label in ('Missed', 'Worst miss (pp)')])
-    cases = _measure_exact_optimum_cases()
-    for case in cases:
-        cells = []
-        for depth in PUNT_DEPTHS:
-            counts = case['punt_starts'][depth]
-            cells += [f'{counts["missed"]}/{counts["starts"]}', f'{100 * counts["largest_shortfall"]:.4f}']
-        _record_row(section, columns, [case['season'], case['rounds'], case['player']] + cells)
-    totals = []
-    for depth in PUNT_DEPTHS:
-        missed = sum(case['punt_starts'][depth]['missed'] for case in cases)
-        starts = sum(case['punt_starts'][depth]['starts'] for case in cases)
-        worst = max(case['punt_starts'][depth]['largest_shortfall'] for case in cases)
-        totals += [f'{missed}/{starts}', f'{100 * worst:.4f}']
-    _record_row(section, columns, [f'ALL ({len(cases)} candidates)', '—', '—'] + totals)
-    _fail_on_breaches(_list_failed_exact_optimum_boards())
-
-
-@sims
 def test_loop_gain_at_the_optimum():
     """At the peak: weights match marginal values, and every loop-gain eigenvalue is below 1 (a strict peak)."""
     section = 'Loop gain at the optimum'
@@ -1020,31 +968,28 @@ def test_loop_gain_at_the_optimum():
                          for case in cases if case['loop_gain']['max_loop_gain'] >= 1])
 
 
-@sims
-def test_quasiconcavity_along_weight_segments():
-    """How often the objective dips along a straight segment of weight space, pooled over each board's candidates."""
-    section = 'Quasiconcavity along weight segments'
-    columns = ['Season', 'Rounds', 'Segments', 'Dipping', 'Median dip (pp)', 'Largest dip (pp)']
-    measurements_by_board: dict = {}
-    for case in _measure_exact_optimum_cases():
-        for segments, measured in case['quasiconcavity'].items():
-            measurements_by_board.setdefault((case['season'], case['rounds'], segments), []).append(measured)
-    for (season, n_rounds, segments), measurements in measurements_by_board.items():
-        _record_row(section, columns,
-                    [season, n_rounds, segments,
-                     f'{100 * np.mean([measured["share_dipping"] for measured in measurements]):.1f}%',
-                     f'{100 * np.median([measured["median_dip"] for measured in measurements]):.4f}',
-                     f'{100 * max(measured["largest_dip"] for measured in measurements):.4f}'])
-    _fail_on_breaches(_list_failed_exact_optimum_boards())
-
-
 # ── Where the app loses to the optimum ────────────────────────────────────────
 # The exact-optimum boards and candidates again, each solved five ways on the same frozen problem
-# (experiment_harnesses/optimum_loss_decomposition, whose header lists the assumptions).
+# (experiment_harnesses/optimum_loss_decomposition, whose header lists the assumptions). The same run records every
+# seed of both menus, which the seed-start section reads; the first of the two tests to run measures it.
+
+_loss_decomposition_run: dict = {}
+
+
+def _decompose_loss_cases():
+    """Every candidate's loss decomposition and seed measurements, measured once per run."""
+    from experiment_harnesses.optimum_loss_decomposition import decompose_boards_in_parallel
+    if not _loss_decomposition_run:
+        _loss_decomposition_run['cases'] = decompose_boards_in_parallel(_SEASONS, _EXACT_ROUNDS, _EXACT_CANDIDATES,
+                                                                        _EXPERIMENT_WORKERS)
+    return _loss_decomposition_run['cases']
 
 # Read left to right, a row adds up: App + the four losses = Optimal.
-_LOSS_CAUSE_LABELS = ('Seed choice', 'Seed menu', 'Iterations', 'Remaining gap')
-_LOSS_COLUMNS = ['Season', 'Rd', 'Player', 'App'] + list(_LOSS_CAUSE_LABELS) + ['Optimal', 'Total loss']
+_LOSS_CAUSE_LABELS = ('Multi-starting', 'Full seed menu', 'Iterations', 'Remaining gap')
+# Seeding comes before the app: it is what the app's seeding already buys over a neutral start, not a loss.
+_SEEDING_LABEL = 'Seeding (in the app)'
+_LOSS_COLUMNS = (['Season', 'Rd', 'Player', 'Neutral start', _SEEDING_LABEL, 'App'] + list(_LOSS_CAUSE_LABELS)
+                 + ['Optimal', 'Total loss'])
 _SIGNIFICANT_LOSS = 1e-5        # branch and bound's tolerance: a smaller loss is no loss
 
 
@@ -1082,7 +1027,8 @@ def format_loss(loss):
 
 
 def build_loss_rows(cases, branch_and_bound_seconds, uncertified_count):
-    """The loss section's rows: one per candidate (App, the four losses, Optimal, the total), each board's candidates
+    """The loss section's rows: one per candidate (the neutral start, what seeding gains over it, App, the four losses,
+    Optimal, the total), each board's candidates
     in their App order, then the mean of each, then what fixing each costs. Optimal carries how many places the
     candidate would move on his board if ranked by optimal values instead (an up arrow for higher)."""
     rows = []
@@ -1099,27 +1045,29 @@ def build_loss_rows(cases, branch_and_bound_seconds, uncertified_count):
             move = app_place - optimal_place[id(case)]
             n_moved += move != 0
             arrow = f' ▲{move}' if move > 0 else (f' ▼{-move}' if move < 0 else '')
-            rows.append([case['season'], case['rounds'], case['player'], f'{100 * steps[0]:.4f}%']
+            rows.append([case['season'], case['rounds'], case['player'], f'{100 * case["neutral_start"]:.4f}%',
+                         format_loss(steps[0] - case['neutral_start']), f'{100 * steps[0]:.4f}%']
                         + [format_loss(later - earlier) for earlier, later in zip(steps, steps[1:])]
                         + [f'{100 * steps[-1]:.4f}%{arrow}', format_loss(steps[-1] - steps[0])])
     losses = np.array([np.diff(case['steps']) for case in cases])                 # (cases, 4)
+    seeding_gains = [case['steps'][0] - case['neutral_start'] for case in cases]
     rows.append([f'Mean of {len(cases)}' + (f' ({uncertified_count} optimum not certified)' if uncertified_count else ''),
-                 '—', '—', '—'] + [format_loss(float(losses[:, index].mean())) for index in range(losses.shape[1])]
+                 '—', '—', '—', format_loss(float(np.mean(seeding_gains))), '—']
+                + [format_loss(float(losses[:, index].mean())) for index in range(losses.shape[1])]
                 + [f'{n_moved} of {len(cases)} move', format_loss(float(losses.sum(axis=1).mean()))])
-    rows.append(["Cost to fix (x the app's work)", '—', '—', '—']
+    rows.append(["Cost to fix (x the app's work)", '—', '—', '—', 'in the app', '—']
                 + [format_cost(cost) for cost in compute_improvement_costs(cases, branch_and_bound_seconds)] + ['—'] * 2)
     return rows
 
 
 @sims
 def test_where_the_app_loses_to_the_optimum():
-    """The app's shortfall from the certified optimum, split into seed choice, seed menu, iteration budget and the
+    """The app's shortfall from the certified optimum, split into multi-starting, the full seed menu, iteration budget and the
     rest. Branch and bound certifies each optimum (the shared exact-optimum measurement)."""
-    from experiment_harnesses.optimum_loss_decomposition import decompose_boards_in_parallel
     section = 'Where the app loses to the optimum'
     certifications = {(case['season'], case['rounds'], case['player']): case['certification']
                       for case in _measure_exact_optimum_cases()}
-    cases = decompose_boards_in_parallel(_SEASONS, _EXACT_ROUNDS, _EXACT_CANDIDATES, _EXPERIMENT_WORKERS)
+    cases = _decompose_loss_cases()
     uncertified = sum(certification['gap'] > _EXACT_TOLERANCE for certification in certifications.values())
     for row in build_loss_rows(cases, [certification['seconds'] for certification in certifications.values()],
                                uncertified):
@@ -1132,6 +1080,145 @@ def test_where_the_app_loses_to_the_optimum():
         + [f'{case["season"]} after {case["rounds"]} rounds, {case["player"]}: the long budget beat the certified '
            f'optimum by {100 * (case["steps"][3] - case["steps"][4]):.4f}pp'
            for case in cases if case['steps'][3] - case['steps'][4] > _SIGNIFICANT_LOSS])
+
+
+_SEED_MENUS = ('App menu', 'Full menu')
+# The heatmaps' per-seed totals use the first seven columns; each start that misses the optimum is a 'Miss' row using
+# the seed column and the last six.
+_SEED_COLUMNS = ['Menu', 'Seed', 'Reaches optimum', 'Chosen by seeding', 'Chosen by multi-start', 'Worst miss (pp)',
+                 'Starts', 'Season', 'Rd', 'Player', "In the app's menu", 'Shortfall (pp)', 'Seeds reaching',
+                 "App's seed reaches"]
+_SEED_TOTAL_PADDING = ['—'] * 7
+
+
+def label_seed(seed):
+    """A seed's cell: a gentle punt 'FG% at 50%', a full-menu punt 'FG%/FT%' (a single punt names one category), or
+    'balanced'."""
+    if seed['kind'] == 'gentle':
+        return f'{_SHORT_CATEGORY[seed["categories"][0]]} at 50%'
+    if seed['kind'] == 'punt':
+        return '/'.join(_SHORT_CATEGORY[category] for category in seed['categories'])
+    return {'balanced': 'balanced'}[seed['kind']]
+
+
+def select_menu_seeds(seeds, menu):
+    """The seeds in a menu. The full menu's neutral start is left out: it is the balanced build's weights again, and
+    a choice between the two identical starts would always fall on the first."""
+    if menu == 'App menu':
+        return [seed for seed in seeds if seed['app_menu']]
+    return [seed for seed in seeds if seed['kind'] != 'neutral']
+
+
+def summarize_seed_starts(cases, menu):
+    """One row per seed cell of a menu, pooled over the candidates, then an ALL row: the share of its starts whose
+    descent at the long budget reaches the optimum (within the exact optimum's PEAK_TOLERANCE), the share of candidates whose seeding and whose
+    multi-start choice fall on it, the largest shortfall, and the number of starts."""
+    from experiment_harnesses.exact_optimum import PEAK_TOLERANCE
+    reached, starts, worst = {}, {}, {}
+    chosen_by_seeding, chosen_by_multistart = {}, {}
+    for case in cases:
+        optimum = case['steps'][-1]
+        seeds = select_menu_seeds(case['seeds'], menu)
+        for seed in seeds:
+            label = label_seed(seed)
+            shortfall = optimum - seed['long_budget']
+            starts[label] = starts.get(label, 0) + 1
+            reached[label] = reached.get(label, 0) + (shortfall <= PEAK_TOLERANCE)
+            worst[label] = max(worst.get(label, 0.0), shortfall)
+        seeding_label = label_seed(max(seeds, key=lambda seed: seed['pre_descent']))
+        multistart_label = label_seed(max(seeds, key=lambda seed: seed['app_budget']))
+        chosen_by_seeding[seeding_label] = chosen_by_seeding.get(seeding_label, 0) + 1
+        chosen_by_multistart[multistart_label] = chosen_by_multistart.get(multistart_label, 0) + 1
+    rows = [[menu, label, f'{100 * reached[label] / starts[label]:.1f}%',
+             f'{100 * chosen_by_seeding.get(label, 0) / len(cases):.1f}%',
+             f'{100 * chosen_by_multistart.get(label, 0) / len(cases):.1f}%',
+             f'{100 * max(worst[label], 0.0):.4f}', starts[label]] + _SEED_TOTAL_PADDING for label in starts]
+    rows.append([f'ALL ({menu}, {len(cases)} candidates)', '—',
+                 f'{100 * sum(reached.values()) / sum(starts.values()):.1f}%', '—', '—',
+                 f'{100 * max(max(worst.values()), 0.0):.4f}', sum(starts.values())] + _SEED_TOTAL_PADDING)
+    return rows
+
+
+def summarize_seed_misses(cases):
+    """One 'Miss' row per start of the full menu (which holds the app's seeds) whose long descent ends more than
+    PEAK_TOLERANCE short of the optimum: the candidate, the seed, whether the app's menu has it, the shortfall, how many
+    of the candidate's seeds do reach the optimum, and whether the seed the app's seeding would choose does."""
+    from experiment_harnesses.exact_optimum import PEAK_TOLERANCE
+    rows = []
+    for case in cases:
+        optimum = case['steps'][-1]
+        seeds = select_menu_seeds(case['seeds'], 'Full menu')
+        app_choice = max(select_menu_seeds(case['seeds'], 'App menu'), key=lambda seed: seed['pre_descent'])
+        reaching = sum(optimum - seed['long_budget'] <= PEAK_TOLERANCE for seed in seeds)
+        for seed in seeds:
+            shortfall = optimum - seed['long_budget']
+            if shortfall <= PEAK_TOLERANCE:
+                continue
+            rows.append(['Miss', label_seed(seed), '—', '—', '—', '—', '—', case['season'], case['rounds'],
+                         case['player'], 'yes' if seed['app_menu'] else 'no', f'{100 * shortfall:.4f}',
+                         f'{reaching} of {len(seeds)}',
+                         'yes' if optimum - app_choice['long_budget'] <= PEAK_TOLERANCE else 'no'])
+    return rows
+
+
+@sims
+def test_seed_starts_reaching_the_optimum():
+    """Which seeds of the app's menu and of the full menu climb to the certified optimum, and which get chosen."""
+    section = 'How single-peaked are H-scores'
+    cases = _decompose_loss_cases()
+    for menu in _SEED_MENUS:
+        for row in summarize_seed_starts(cases, menu):
+            _record_row(section, _SEED_COLUMNS, row)
+    for row in summarize_seed_misses(cases):
+        _record_row(section, _SEED_COLUMNS, row)
+
+
+_CONDITIONING_SECTION = 'Conditioning around the optimum'
+_CONDITIONING_COLUMNS = ['Iteration', 'Min', 'Average', 'Max', 'Candidates outside the window', 'Candidates']
+_conditioning_run: dict = {}
+
+
+def collect_optimum_weights_by_board(cases):
+    """{(season, rounds): {player: {'categories': ..., 'optimum_weights': ...}}} from the loss decomposition's cases."""
+    by_board: dict = {}
+    for case in cases:
+        by_board.setdefault((case['season'], case['rounds']), {})[case['player']] = {
+            'categories': case['categories'], 'optimum_weights': case['optimum_weights']}
+    return by_board
+
+
+def _measure_conditioning_cases():
+    """Every candidate's step x curvature over the iterations, measured once per run, at the loss decomposition's
+    optima."""
+    from experiment_harnesses.optimum_loss_decomposition import measure_conditioning_boards_in_parallel
+    if not _conditioning_run:
+        _conditioning_run['cases'] = measure_conditioning_boards_in_parallel(
+            _SEASONS, _EXACT_ROUNDS, _EXACT_CANDIDATES, _EXPERIMENT_WORKERS,
+            collect_optimum_weights_by_board(_decompose_loss_cases()))
+    return _conditioning_run['cases']
+
+
+def summarize_conditioning(conditioning_cases):
+    """One row per iteration of the app's own descent (from the seed its seeding chooses): the minimum, average and
+    maximum step x curvature over every direction of every candidate, and how many candidates have a direction outside
+    UNDERDAMPED_WINDOW. Every seed's descent is in the saved measurement too; the section shows the app's."""
+    from experiment_harnesses.optimum_loss_decomposition import UNDERDAMPED_WINDOW
+    low, high = UNDERDAMPED_WINDOW
+    values = np.stack([case['app_step_scaled'] for case in conditioning_cases], axis=0)   # (candidates, iterations, directions)
+    rows = []
+    for iteration in range(values.shape[1]):
+        at_iteration = values[:, iteration, :]
+        outside = int(((at_iteration <= low) | (at_iteration >= high)).any(axis=1).sum())
+        rows.append([iteration + 1, f'{at_iteration.min():.4g}', f'{at_iteration.mean():.4g}',
+                     f'{at_iteration.max():.4g}', outside, values.shape[0]])
+    return rows
+
+
+@sims
+def test_conditioning_around_the_optimum():
+    """The step x curvature at the optimum over the app's own descent, every direction of every candidate."""
+    for row in summarize_conditioning(_measure_conditioning_cases()):
+        _record_row(_CONDITIONING_SECTION, _CONDITIONING_COLUMNS, row)
 
 
 # ── The example team's planner as a drafter ───────────────────────────────────
