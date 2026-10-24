@@ -25,7 +25,7 @@ Nothing here models anything. An earlier version of this script simulated a twel
 was thrown away: it converged in a single pass, which said more about the toy than about the
 algorithm.
 
-    python visualizations/scenes/6_self_play/prepare_self_play_data.py
+    python visualizations/scenes/self_play/prepare_self_play_data.py
 """
 
 from __future__ import annotations

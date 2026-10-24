@@ -3,7 +3,7 @@
 Run `python visualizations/shared/prepare_weight_surface_data.py` first: one bootstrap run
 measures the slices both this scene and its sibling read.
 
-    manim -ql visualizations/scenes/8_gradient_descent/gradient_descent.py GradientDescent
+    manim -ql visualizations/scenes/gradient_descent/gradient_descent.py GradientDescent
 """
 
 from __future__ import annotations

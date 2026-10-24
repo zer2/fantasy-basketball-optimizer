@@ -11,8 +11,8 @@ The numbers come from `prepare_assignment_data.py`, which runs the app's own
 `get_player_rows` / `get_future_player_rows` / `optimize_positions_all_players`. Run that once
 first; this scene reads its JSON and does no solving of its own.
 
-    manim -ql visualizations/scenes/3_roster_slots/roster_slots.py RosterSlotAssignment
-    manim -qh visualizations/scenes/3_roster_slots/roster_slots.py RosterSlotAssignment
+    manim -ql visualizations/scenes/roster_slots/roster_slots.py RosterSlotAssignment
+    manim -qh visualizations/scenes/roster_slots/roster_slots.py RosterSlotAssignment
 """
 
 from __future__ import annotations
@@ -73,7 +73,7 @@ def load_assignment_data(data_path: Path) -> dict:
     """The matrix and the two assignments written by prepare_assignment_data.py."""
     if not data_path.exists():
         raise FileNotFoundError(
-            f'{data_path} is missing. Run `python visualizations/scenes/3_roster_slots/prepare_roster_slots_data.py` '
+            f'{data_path} is missing. Run `python visualizations/scenes/roster_slots/prepare_roster_slots_data.py` '
             f'first -- the scene deliberately does no solving of its own.')
     prepared = json.loads(data_path.read_text(encoding='utf-8'))
     # JSON carries an ineligible cell as null; the scene wants the -inf it stands for, so that

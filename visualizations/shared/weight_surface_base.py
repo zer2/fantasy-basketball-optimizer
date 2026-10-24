@@ -14,14 +14,14 @@ decides which of the two it finds. The descent scene uses the simplest slice the
 find instead: one hill, with its top inside the picture.
 
 This module is the surface itself -- how it is loaded, drawn, labelled and climbed. The two
-scenes built on it live beside their own narration, in 8_gradient_descent and 7_seed_menu.
+scenes built on it live beside their own narration, in gradient_descent and seed_menu.
 
 Run `python visualizations/prepare_weight_surface_data.py` first. It builds a 2025-26 session,
 lets the self-play bootstrap settle the field, and records this surface and these climbs from the
 real objective, from inside the bootstrap itself.
 
-    manim -ql visualizations/scenes/8_gradient_descent/gradient_descent.py GradientDescent
-    manim -ql visualizations/scenes/7_seed_menu/seed_menu.py SeedMenu
+    manim -ql visualizations/scenes/gradient_descent/gradient_descent.py GradientDescent
+    manim -ql visualizations/scenes/seed_menu/seed_menu.py SeedMenu
 """
 
 from __future__ import annotations

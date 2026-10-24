@@ -2,7 +2,7 @@
 
 Run once (or whenever the season, the defaults or the chosen players change):
 
-    python visualizations/scenes/3_roster_slots/prepare_roster_slots_data.py
+    python visualizations/scenes/roster_slots/prepare_roster_slots_data.py
 
 Writes one file into this directory:
   data/assignment_<season>.json    the thirteen roster slots, five drafted players and their

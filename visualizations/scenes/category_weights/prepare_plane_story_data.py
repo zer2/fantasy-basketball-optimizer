@@ -15,7 +15,7 @@ setup rather than the answer, and the frame is worth more to the answer.
 The images are written here rather than drawn in the scene because a smooth field is an image,
 not ten thousand mobjects: Manim would spend the whole render on it and still band.
 
-    python visualizations/scenes/4_category_weights/prepare_plane_story_data.py
+    python visualizations/scenes/category_weights/prepare_plane_story_data.py
 """
 
 from __future__ import annotations

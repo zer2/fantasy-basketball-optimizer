@@ -27,7 +27,7 @@ from shared.narration_voice import NarrationVoice                        # noqa:
 
 _CACHE = _VISUALIZATIONS / 'media' / 'voiceovers'
 # Self-play divides these lines' total by the number of passes to get one steady rate.
-_PACED_SCENE = '6_self_play'
+_PACED_SCENE = 'self_play'
 _PACED_KEYS = ('early_passes', 're_estimation', 'late_passes')
 
 
@@ -64,7 +64,7 @@ def main() -> None:
     voice = NarrationVoice()
     before = previous_seconds()
     characters = 0
-    for folder in sorted(_VISUALIZATIONS.glob('scenes/[1-8]_*')):
+    for folder in sorted(path for path in _VISUALIZATIONS.glob('scenes/*') if (path / 'narration.py').exists()):
         print(f'\n{folder.name}')
         total_now = total_before = 0.0
         paced_now = paced_before = 0.0
