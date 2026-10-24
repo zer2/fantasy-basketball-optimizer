@@ -2910,6 +2910,7 @@ tr {
     align-items: stretch;
     gap: 4px;
     width: 100%;
+    container: auction-team-header / inline-size;
 }
 
 .auction-team-bid-status {
@@ -2985,6 +2986,29 @@ tr {
     }
     50% {
         box-shadow: 0 0 0 3px light-dark(#66aaff, #77aaff);
+    }
+}
+
+/* A narrow column stacks the team name above the autodraft toggle, as the mobile layout does. It keys on the column's
+   own width rather than the viewport's: a desktop window with many teams squeezes the columns just as much, and side
+   by side the toggle leaves the name room for one letter. Both widths are in rem because what has to fit is text: the
+   phone layout's 10px root font fits "Nominating" in a column that a 16px desktop root does not. After the badge
+   rules, so the badge size wins. */
+@container auction-team-header (max-width: 5rem) {
+    .team-header {
+        flex-direction: column;
+        gap: 2px;
+    }
+    .team-header .team-label-input {
+        width: 100%;
+    }
+}
+
+/* Narrower still, "Nominating", the longest status, overflows the badge at full size. */
+@container auction-team-header (max-width: 4rem) {
+    .auction-team-bid-status {
+        font-size: 0.52rem;
+        padding: 3px 1px;
     }
 }
 
