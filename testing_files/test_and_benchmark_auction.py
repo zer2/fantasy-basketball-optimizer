@@ -66,11 +66,13 @@ def test_evaluate_auction():
     # Regenerated 2026-10-21 for SAVOR's replacement threshold (S_R, default $2), which moves dollars toward the top
     # players in every column, and the smooth cash-share rule (s = 0.2), whose start-of-auction share now enters
     # orig$ and so gnrc$. H-scores are unchanged.
+    # Regenerated 2026-10-24: gnrc$ rescales orig$'s SAVOR part alone and then adds this team's cash share on its own
+    # values, instead of rescaling orig$ with the start-of-auction share baked in. Only gnrc$ (and Diff) move.
     expected_auction_values = [
-        ('Shai Gilgeous-Alexander',     -9.2,  95.2, 104.4, 102.2),
-        ('Tyrese Haliburton',           6.8,  62.8, 56.0, 54.8),
-        ('Dyson Daniels',               19.9,  64.2, 44.2, 43.3),
-        ('Jayson Tatum',                -1.3,  40.0, 41.4, 40.5),
+        ('Shai Gilgeous-Alexander',     -9.5,  95.2, 104.6, 102.2),
+        ('Tyrese Haliburton',           6.7,  62.8, 56.1, 54.8),
+        ('Dyson Daniels',               19.8,  64.2, 44.4, 43.3),
+        ('Jayson Tatum',                -1.4,  40.0, 41.5, 40.5),
     ]
     candidates_by_name = name_candidates(session, candidates)
     if os.environ.get('REGEN_GOLDENS'):
@@ -100,3 +102,37 @@ def test_evaluate_auction():
         assert abs(auction.original_dollar - expected_orig) <= _SCORE_TOL, (
             f'{match}: expected original_dollar {expected_orig}, got {auction.original_dollar:.1f}'
         )
+
+
+def test_dollar_columns_agree_at_the_start():
+    """Before anyone is drafted, "Your $", "Gnrc. $" and "Orig. $" are the same number for every candidate, H-score and
+    G-score alike: all three carry the same start-of-auction cash share, and nothing has yet moved one from another."""
+    session_request = build_golden_session_request(
+        objective = 'Each Category'
+        , cash_per_team = 200
+    )
+    response = client.post('/sessions', json=session_request)
+    assert response.status_code == 201, f'Session creation failed: {response.text}'
+    session = get_session(response.json()['session_id'])
+    team_names = [f'Drafter {i + 1}' for i in range(session.current_settings['n_drafters'])]
+
+    result = rank_candidates(
+        session            = session
+        , player_assignments = {name: [] for name in team_names}
+        , my_team_id         = 'Drafter 1'
+        , exclusion_list     = []
+        , remaining_cash     = {name: 200.0 for name in team_names}
+    )
+
+    # Each column is rounded to the cent separately, so two of them can differ by one cent.
+    cent = 0.011
+    for candidate in result.candidates:
+        auction = candidate.auction_values
+        assert abs(auction.your_dollar - auction.original_dollar) <= cent, (
+            f'{candidate.player_id}: your_dollar {auction.your_dollar} != original_dollar {auction.original_dollar}')
+        assert abs(auction.generic_dollar - auction.original_dollar) <= cent, (
+            f'{candidate.player_id}: generic_dollar {auction.generic_dollar} != original_dollar '
+            f'{auction.original_dollar}')
+        assert abs(auction.generic_dollar_g_score - auction.original_dollar_g_score) <= cent, (
+            f'{candidate.player_id}: generic_dollar_g_score {auction.generic_dollar_g_score} != '
+            f'original_dollar_g_score {auction.original_dollar_g_score}')

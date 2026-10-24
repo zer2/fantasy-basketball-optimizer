@@ -20,7 +20,7 @@ from benchmark_helpers import client, _build_session_request
 from backend.state.session import get_session
 from backend.math import exact_team_solves
 from backend.services.ranking import (
-    make_candidate_strategy_key, make_slot_names, compute_original_and_generic_dollars,
+    make_candidate_strategy_key, make_slot_names, compute_league_generic_dollars,
 )
 from backend.services.hypothetical_team import compute_expected_flex_position_counts
 
@@ -343,12 +343,11 @@ def test_auction_example_team_holds_at_most_two_players_per_nba_team():
     strategies = session.candidate_strategy_cache[
         make_candidate_strategy_key(board, 'Drafter 1', [], remaining_cash, None)][1]
     player_teams = pd.Series({int(p): f'team {int(p) % 10}' for p in agent.default_h_scores.index})
-    # Generic dollars for the whole available pool, as the service computes them.
-    _, prices = compute_original_and_generic_dollars(
-        agent.default_h_scores, agent.x_scores.index, agent.n_drafters, agent.n_picks,
-        session.current_settings['n_picks'], 200, sum(remaining_cash.values()),
-        session.current_settings['streaming_noise'], session.current_settings['replacement_threshold'],
-        session.current_settings['cash_share_softness'])
+    # The league's generic dollars for the whole available pool, as the example team prices other drafters' bids.
+    prices = compute_league_generic_dollars(
+        agent.default_h_scores, agent.x_scores.index, agent.n_drafters, agent.n_picks, 200,
+        sum(remaining_cash.values()), session.current_settings['streaming_noise'],
+        session.current_settings['replacement_threshold'])
     candidate = next(c for c in candidates if c['auction_values']['generic_dollar'] < 60)['player_id']
     problem, seating = solve_team_with_teams(agent, strategies[candidate], board, candidate, player_teams,
                                              remaining_cash=200.0, predicted_prices=prices)
