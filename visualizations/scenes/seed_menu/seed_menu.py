@@ -3,7 +3,7 @@
 Run `python visualizations/shared/prepare_weight_surface_data.py` first: one bootstrap run
 measures the slices both this scene and its sibling read.
 
-    manim -ql visualizations/scenes/7_seed_menu/seed_menu.py SeedMenu
+    manim -ql visualizations/scenes/seed_menu/seed_menu.py SeedMenu
 """
 
 from __future__ import annotations

@@ -15,10 +15,10 @@ The board opens full rather than empty: Level 0 has already solved everybody aga
 field before the first pass runs, and that is what the opening frame shows.
 
 Everything on screen is a recording of the shipped bootstrap, not a model of it -- the same loop
-that runs at session build. Run `python visualizations/scenes/6_self_play/prepare_self_play_data.py`
+that runs at session build. Run `python visualizations/scenes/self_play/prepare_self_play_data.py`
 first, which re-runs it with the recorders attached and writes what it saw.
 
-    manim -ql visualizations/scenes/6_self_play/self_play.py SelfPlayLoop
+    manim -ql visualizations/scenes/self_play/self_play.py SelfPlayLoop
 """
 
 from __future__ import annotations
@@ -72,7 +72,7 @@ def load_measurements() -> dict:
     if not _DATA_PATH.exists():
         raise FileNotFoundError(
             f'{_DATA_PATH} is missing. Run '
-            f'`python visualizations/scenes/6_self_play/prepare_self_play_data.py` first.')
+            f'`python visualizations/scenes/self_play/prepare_self_play_data.py` first.')
     return json.loads(_DATA_PATH.read_text(encoding='utf-8'))
 
 

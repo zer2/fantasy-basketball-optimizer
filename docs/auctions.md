@@ -86,9 +86,7 @@ SAVOR stands for Streaming-Adjusted Value Over Replacement. It adjusts for the f
     <source src="../videos/savor.mp4" type="video/mp4">
 </video>
 /// caption
-Why value concentrates at the top of an auction: a player's season is a distribution rather than
-a single number, and anyone below replacement level can be swapped out from the waiver wire, so
-the downside is capped and the upside is not.
+A visual explanation of the SAVOR adjustment
 ///
 
 SAVOR takes two input parameters, $S_{\sigma}$ (S-sigma) and $S_R$.
@@ -122,13 +120,20 @@ The default values of $10 and $2 are sourced by vibes- different values may be j
     (\mu - S_R)\,\Phi\left(\frac{\mu - S_R}{\sigma}\right) + S_R\,\Phi\left(-\frac{S_R}{\sigma}\right) + \frac{\sigma}{\sqrt{2\pi}}\left(e^{-\frac{(\mu - S_R)^2}{2\sigma^2}} - e^{-\frac{S_R^2}{2\sigma^2}}\right)
     $$
 
-### Cash increases for packing efficiency 
+### Overbidding for packing efficiency 
 
 The standard auction heuristic assigns dollar values to players such that their total value equals the amount of money in the pot. The implicit assumption in that formulation is that all teams will be able to spend all their money on players at those valuations. In reality, that is likely impossible: it would take luck to find thirteen players that add up to exactly $200. 
 
 This inefficiency is felt most acutely when the number of options for players dwindles. If managers wait too long to spend their money, there might not be enough high-value players left for them to spend all of their money on. E.g. if a manager has $40 with two slots left, and the top two players are worth $20 and $10 to them, they will leave some money on the table no matter what. 
 
-The fix for that is an inflation factor which increases the value of players as efficiency starts to get squeezed. It is calculated through a three-step process 
+<video controls preload="metadata" width="100%" poster="../videos/cash-packing-poster.jpg">
+    <source src="../videos/cash-packing.mp4" type="video/mp4">
+</video>
+/// caption
+Motivation for the packing efficiency inflation factor
+///
+
+The website's heuristic fix for that is an inflation factor which increases the value of players as efficiency starts to get squeezed. It is calculated through a three-step process 
 
 1. The base ratio $r_1$ is calculated. It is the team's spendable cash (its cash minus $1 per empty bench slot) over the base value of the top options (its top players, one per open slot).
 2. The ratio is adjusted through a formula: $r_2 = 1 + s\ln\left(1 + e^{(r_1-1)/s}\right)$, where $s$ is a parameter

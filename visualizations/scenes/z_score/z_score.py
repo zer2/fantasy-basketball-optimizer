@@ -16,8 +16,8 @@ that average is hiding.
 
 Render one act while tuning it, the whole thing when it is right:
 
-    manim -ql visualizations/scenes/1_z_score/z_score.py ActOneSingleDraw
-    manim -qh visualizations/scenes/1_z_score/z_score.py TeamDifferentialFull
+    manim -ql visualizations/scenes/z_score/z_score.py ActOneSingleDraw
+    manim -qh visualizations/scenes/z_score/z_score.py TeamDifferentialFull
 """
 
 from __future__ import annotations

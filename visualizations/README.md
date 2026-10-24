@@ -1,24 +1,25 @@
 # Visualizations
 
-Eleven animations for the docs, one folder each under `scenes/`. The first eight are numbered in the order they
-appear on the G-score and H-score pages; the three later ones are named for their subject.
+Twelve animations for the docs, one folder each under `scenes/`, named for their subject. In the order they appear
+in the docs:
 
 | folder | scene file, class | where it goes |
 |---|---|---|
-| `scenes/1_z_score/` | `z_score.py`, `TeamDifferentialFull` | top of the G-score page |
-| `scenes/2_z_versus_g_score/` | `g_score.py`, `GScoreFull` | directly after #1 |
-| `scenes/3_roster_slots/` | `roster_slots.py`, `RosterSlotAssignment` | H-score page, roster assignment |
-| `scenes/4_category_weights/` | `plane_story.py`, `PlaneStory` | H-score page, category weights |
-| `scenes/5_punting/` | `punting.py`, `PuntingSearch` | H-score page, punting |
-| `scenes/6_self_play/` | `self_play.py`, `SelfPlayLoop` | H-score page, "No model of other managers" |
-| `scenes/7_seed_menu/` | `seed_menu.py`, `SeedMenu` | H-score page, multi-starting |
-| `scenes/8_gradient_descent/` | `gradient_descent.py`, `GradientDescent` | H-score page, replacing the YouTube embed |
-| `scenes/most_categories/` | `most_categories.py`, `MostCategories` | H-score page, Most Categories |
-| `scenes/rotisserie/` | `rotisserie.py`, `Rotisserie` | H-score page, Rotisserie |
-| `scenes/savor/` | `savor.py`, `Savor` | auctions page, the SAVOR adjustment |
+| `scenes/gradient_descent/` | `gradient_descent.py`, `GradientDescent` | H-scoring page, replacing the YouTube embed |
+| `scenes/punting/` | `punting.py`, `PuntingSearch` | H-scoring page, punting |
+| `scenes/most_categories/` | `most_categories.py`, `MostCategories` | H-scoring page, Most Categories |
+| `scenes/rotisserie/` | `rotisserie.py`, `Rotisserie` | H-scoring page, Rotisserie |
+| `scenes/category_weights/` | `plane_story.py`, `PlaneStory` | H-scoring page, category weights |
+| `scenes/roster_slots/` | `roster_slots.py`, `RosterSlotAssignment` | H-scoring page, roster assignment |
+| `scenes/self_play/` | `self_play.py`, `SelfPlayLoop` | H-scoring page, "No model of other managers" |
+| `scenes/seed_menu/` | `seed_menu.py`, `SeedMenu` | H-scoring page, multi-starting |
+| `scenes/z_score/` | `z_score.py`, `TeamDifferentialFull` | top of the G-scores page |
+| `scenes/z_versus_g_score/` | `g_score.py`, `GScoreFull` | G-scores page, directly after z_score |
+| `scenes/savor/` | `savor.py`, `Savor` | Auction Mode page, the SAVOR adjustment |
+| `scenes/cash_packing/` | `cash_packing.py`, `CashPacking` | Auction Mode page, cash increases for packing efficiency |
 
-The eight numbered scenes are measured: everything on screen comes from a prep script run against the real
-algorithm. The three later ones started as wireframes -- first drafts asking *does this argument work as a
+The original eight -- z_score, z_versus_g_score, roster_slots, category_weights, punting, self_play, seed_menu and
+gradient_descent -- are measured: everything on screen comes from a prep script run against the real algorithm. most_categories, rotisserie and savor started as wireframes -- first drafts asking *does this argument work as a
 picture?* -- and their numbers are computed in the scene or chosen to illustrate, which each says in its
 docstring:
 
@@ -29,6 +30,10 @@ docstring:
 - `savor` -- a projection has a floor under it, at the replacement level S_R, because a player who ends up below
   it gets dropped for a streamer; the thing you are bidding against is a flyer with the same floor, and
   subtracting the two is the SAVOR formula.
+- `cash_packing` -- a budget cannot be spent exactly on the players left, least of all when the options run low; once
+  the cash exceeds what the remaining options are worth (r₁ above 1), the simple fix scales them up to it, and the
+  smooth version starts a little before; your dot's feedback loop keeps you off the far right; and the boost goes as
+  value squared.
 
 ## Sign-off
 
@@ -37,19 +42,20 @@ not get touched again without asking — including by a change that only means t
 
 | scene | signed off | length | notes |
 |---|---|---|---|
-| 1 z-score | **yes**\* | 137s | \*blessed conditional on the last three fixes — percentage-statistic label, one more second on the final frame, rewritten simulation line — all now in and verified |
-| 2 g-score | **yes** | 125s | worked examples cut from the two simulation lines |
-| 3 roster slots | **yes** | 102s | |
-| 4 plane story | **yes** | 47s | |
-| 5 punting | **yes** | 83s | |
-| 6 self-play | **yes** | 74s | |
-| 7 seed menu | **yes** | 27s | surface drawn with `HOLD_DRAWN_ASSIGNMENT`, which takes the notches out; the opening holds the axes for 0.9s and draws the surface under the line |
-| 8 gradient descent | **yes** | 44s | |
+| z-score | **yes**\* | 137s | \*blessed conditional on the last three fixes — percentage-statistic label, one more second on the final frame, rewritten simulation line — all now in and verified |
+| g-score | **yes** | 125s | worked examples cut from the two simulation lines |
+| roster slots | **yes** | 102s | |
+| plane story | **yes** | 47s | |
+| punting | **yes** | 83s | |
+| self-play | **yes** | 74s | |
+| seed menu | **yes** | 27s | surface drawn with `HOLD_DRAWN_ASSIGNMENT`, which takes the notches out; the opening holds the axes for 0.9s and draws the surface under the line |
+| gradient descent | **yes** | 44s | |
 | most categories | no | | awaiting review |
 | rotisserie | **yes** | | |
 | savor | **yes** | 126s | re-signed off 2026-10-21 after the line moved from $0 to S_R ('streaming slot ($2)', the app's default) and the narration was rewritten to match |
+| cash packing | **yes** | 220s | blessed 2026-10-23; published to docs/videos, embedded in auctions.md |
 
-The eight numbered scenes exist at both 480p15 (drafts) and 1080p60. Every render says what its `narration.py`
+The signed-off scenes exist at both 480p15 (drafts) and 1080p60. Every render says what its `narration.py`
 says — `shared/check_narration.py` reads each scene's subtitle track back and reports any line the render has
 fallen behind on.
 
@@ -70,7 +76,7 @@ Re-rendering a scene does not update the docs. Copy it across again.
 
 ## Render times
 
-The full 1080p60 pass of the eight takes about **two hours** on this machine, serially — roughly 11x the
+The full 1080p60 pass of the eight measured scenes takes about **two hours** on this machine, serially — roughly 11x the
 finished run time. Per scene, slowest first: gradient descent 27m, g-score 24m, seed menu 19m,
 z-score 17m, self-play 12m, punting 11m, roster slots 3m, plane story 1m. The two surface
 scenes cost the most per second of video: a 56x56 shaded mesh is expensive per pixel, and that
@@ -95,8 +101,8 @@ From the repository root, so that `manim.cfg` is picked up (it puts output in
 `visualizations/render_cache/`):
 
 ```
-manim -ql visualizations/scenes/6_self_play/self_play.py SelfPlayLoop      # draft, 480p15
-manim -qh visualizations/scenes/6_self_play/self_play.py SelfPlayLoop      # 1080p60
+manim -ql visualizations/scenes/self_play/self_play.py SelfPlayLoop      # draft, 480p15
+manim -qh visualizations/scenes/self_play/self_play.py SelfPlayLoop      # 1080p60
 manim -ql visualizations/scenes/savor/savor.py Savor
 ```
 
@@ -106,11 +112,13 @@ run. Renders do **not** notice that their data changed — after re-running a pr
 ## Data and shared code
 
 - `prepared_data/` — everything the prep scripts write. Several files are shared (`pool_2025_26.json`,
-  `matchup_2025_26.json`, `weekly_2025_26.json` feed #1 and #2).
-- `prepared_assets/` — headshots (#1, #2, #3, savor) and the baked density images (#4).
+  `matchup_2025_26.json`, `weekly_2025_26.json` feed z_score and z_versus_g_score).
+- `prepared_assets/` — headshots (z_score, z_versus_g_score, roster_slots, savor) and the baked density images
+  (category_weights).
 - `shared/` — code more than one animation needs: `prepare_season_data.py` (the season pull,
   also imported by the other preps for the app's default session), `differential_base.py`
-  (#1 and #2), `weight_surface_base.py` and `prepare_weight_surface_data.py` (#7 and #8: one
+  (z_score and z_versus_g_score), `weight_surface_base.py` and `prepare_weight_surface_data.py` (seed_menu and
+  gradient_descent: one
   bootstrap run measures both their surfaces, so they share a prep), and the narration tools.
 - `render_cache/` — Manim's output, including the purchased narration audio. See its own README.
 
@@ -120,14 +128,14 @@ Run from the repository root. Each one talks to Snowflake and builds a real sess
 take a few minutes.
 
 ```
-python visualizations/shared/prepare_season_data.py                       # 1, 2
-python visualizations/scenes/2_z_versus_g_score/prepare_wembanyama_blocks.py
-python visualizations/scenes/3_roster_slots/prepare_roster_slots_data.py
-python visualizations/scenes/4_category_weights/prepare_plane_story_data.py
-python visualizations/scenes/6_self_play/prepare_self_play_data.py
-python visualizations/shared/prepare_weight_surface_data.py               # 7 and 8 together
+python visualizations/shared/prepare_season_data.py                       # z_score, z_versus_g_score
+python visualizations/scenes/z_versus_g_score/prepare_wembanyama_blocks.py
+python visualizations/scenes/roster_slots/prepare_roster_slots_data.py
+python visualizations/scenes/category_weights/prepare_plane_story_data.py
+python visualizations/scenes/self_play/prepare_self_play_data.py
+python visualizations/shared/prepare_weight_surface_data.py               # seed_menu and gradient_descent
 python visualizations/scenes/most_categories/prepare_outcome_table.py
 ```
 
-`5_punting` has no prep: its curves are computed in the scene from the search it describes. Nor do
-`rotisserie` and `savor`, whose curves are closed form.
+`punting` has no prep: its curves are computed in the scene from the search it describes. Nor do
+`rotisserie` and `savor`, whose curves are closed form, or `cash_packing`, whose numbers illustrate.

@@ -21,7 +21,7 @@ Every spread on screen is read back out of the prepared simulations rather than 
 re-running the prep script with a different season or seed moves the scene with the data.
 
     python visualizations/shared/prepare_season_data.py      # writes all three datasets
-    manim -ql visualizations/scenes/2_z_versus_g_score/g_score.py GScoreFull
+    manim -ql visualizations/scenes/z_versus_g_score/g_score.py GScoreFull
 """
 
 from __future__ import annotations
