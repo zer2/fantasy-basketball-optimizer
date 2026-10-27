@@ -26,32 +26,67 @@ class UploadResponse(BaseModel):
 
 # ── /sessions POST ────────────────────────────────────────────────────────────
 
+class PointsConfigRequest(BaseModel):
+    """Points-mode scoring configuration block inside LeagueSettings."""
+    points_input_mode:  str = 'projected_points'   # 'projected_points' | 'raw_stats'
+    projection_basis:   str = 'per_game'           # 'per_game' | 'season_total' | ...
+    scoring_rules: dict[str, float] = {}
+    projection_source: Optional[str] = None
+    season:            Optional[str] = None
+    captured_at:       Optional[str] = None
+    auction_budget:  Optional[int] = None
+    minimum_bid:     int = 1
+    bid_increment:   int = 1
+    savor_enabled:   bool = False
+    savor_noise:     float = 0.0
+    active_slots: Optional[dict[str, int]] = None
+    bench_slots: Optional[int] = Field(default=None, ge=0)
+    ir_slots: Optional[int] = Field(default=None, ge=0)
+    lineup_lock_mode: str = 'pregame_daily'
+    evaluation_window: Optional[tuple[str, str]] = None
+    time_zone: str = 'America/New_York'
+
+    @model_validator(mode='after')
+    def validate_points_context(self):
+        from datetime import date
+        from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+        if self.lineup_lock_mode not in ('pregame_daily', 'weekly'):
+            raise ValueError('Unsupported lineup lock mode.')
+        if self.active_slots is not None and any(v < 0 for v in self.active_slots.values()):
+            raise ValueError('Active slot counts must be nonnegative.')
+        try:
+            ZoneInfo(self.time_zone)
+        except (ZoneInfoNotFoundError, ValueError) as exc:
+            raise ValueError('Unknown analysis timezone.') from exc
+        if self.evaluation_window:
+            start, end = map(date.fromisoformat, self.evaluation_window)
+            if end < start or (end - start).days > 365:
+                raise ValueError('Analysis date range must contain 1 to 366 days.')
+        return self
+
+
 class LeagueSettings(BaseModel):
     sport: str
-    # At least two, because a league with one drafter has no opponents — and the whole model is
-    # built on the distribution of a matchup. Below two it does not score badly, it fails deep in
-    # the pipeline on an empty opponent set. The sidebar input already enforces the same floor;
-    # the platform path is what could smuggle a smaller number in, from a draft room that has
-    # only one team in it so far.
     n_drafters: int = Field(ge=2)
     n_picks: int
     scoring_format: str
-    # How much of the Head-to-Head objective is winning the majority of categories, the rest
-    # being each category on its own: 0 is Each Category, 1 is Most Categories, and anything
-    # between blends them. None under Rotisserie, which scores neither way.
+    scoring_system: str = 'categories'   # 'categories' | 'points'
     most_categories_weight: Optional[float] = None
-    # The category that settles a tied matchup by counting for two. Head to Head with an even
-    # number of categories only; None everywhere else, including at weight 0, where every
-    # category is scored on its own and nothing can tie.
     tiebreaker_category: Optional[str] = None
     categories: list[str] = []
     cash_per_team: Optional[int] = None   # Auction Mode only
+    points_config: Optional[PointsConfigRequest] = None
 
     @model_validator(mode='after')
     def check_most_categories_weight_matches_format(self) -> 'LeagueSettings':
         """Head to Head needs the dial; Rotisserie must not carry one. Rejected here rather than
         defaulted, so a client that forgets it hears about it instead of silently drafting to a
         different objective than the one it meant."""
+        if self.scoring_system == 'points' or self.scoring_format in ('Points', 'Points League'):
+            self.scoring_system = 'points'
+            if not self.categories:
+                self.categories = ['Points']
+            return self
         if not self.categories:
             raise ValueError('categories must be a non-empty list. There is no server-side '
                              'default: the client chooses what the league scores.')
@@ -145,6 +180,7 @@ class PlayerGScore(BaseModel):
 
 
 class PlayerRegistryEntry(BaseModel):
+    points_per_game: Optional[float] = None
     """One session player identity: everything the display layer needs to render a player.
     has_headshot is False for the RP sentinel and synthetic ids (no NBA CDN image exists)."""
     player_id: int
@@ -157,6 +193,7 @@ class PlayerRegistryEntry(BaseModel):
 class SessionResponse(BaseModel):
     session_id: str
     n_players_loaded: int
+    scoring_system: str = 'categories'   # 'categories' | 'points'
     categories: list[str]
     players: list[PlayerRegistryEntry]
     g_scores: list[PlayerGScore]
@@ -169,6 +206,8 @@ class PatchLeague(BaseModel):
     n_drafters: Optional[int] = Field(default=None, ge=2)   # see LeagueSettings.n_drafters
     n_picks: Optional[int] = None
     scoring_format: Optional[str] = None
+    scoring_system: Optional[str] = None
+    points_config: Optional[PointsConfigRequest] = None
     # Omitted = unchanged, like every field here. The resulting format/weight pair is validated
     # after the patch merges, in session_management — only there is the outcome known.
     most_categories_weight: Optional[float] = None
@@ -191,6 +230,7 @@ class PatchRequest(BaseModel):
 
 
 class PatchResponse(BaseModel):
+    players: Optional[list[PlayerRegistryEntry]] = None
     ok: bool
     steps_rerun: list[int]
 
@@ -205,6 +245,7 @@ class GScoresResponse(BaseModel):
 # ── /sessions/{id}/evaluate ───────────────────────────────────────────────────
 
 class EvaluateRequest(BaseModel):
+    drop_player_id: Optional[int] = None
     player_assignments: dict[str, list[int]]
     my_team_id: str
     remaining_cash: Optional[dict[str, float]] = None   # Auction Mode only
@@ -276,6 +317,13 @@ class TradeAnalyzeRequest(BaseModel):
     my_trade: list[int]
     their_trade: list[int]
     position_check: bool = True
+    ignore_position_check: Optional[bool] = None
+
+    @model_validator(mode='after')
+    def resolve_position_check(self) -> 'TradeAnalyzeRequest':
+        if self.ignore_position_check is not None:
+            self.position_check = not self.ignore_position_check
+        return self
 
 
 # ── /sessions/{id}/trade/suggest ─────────────────────────────────────────────
@@ -283,16 +331,23 @@ class TradeAnalyzeRequest(BaseModel):
 class TradeSuggestRequest(BaseModel):
     player_assignments: dict[str, list[int]]
     my_team: str
-    # Every team searched, each with the same combos: one request covers one value-gap band (see ComboParam) across the
-    # league, so the frontend's batches are bands rather than teams.
-    their_teams: list[str]
+    their_teams: Optional[list[str]] = None
+    their_team: Optional[str] = None
     combo_params: list[ComboParam]
-    # H-score gains as fractions, each side strictly above its threshold. Never below TRADE_THRESHOLD_FLOOR: the
-    # frontend searches at the floor and filters stricter thresholds itself, so the floor bounds what one search
-    # returns (2026-10-13: 101,480 3-for-3 trades, 16.7 MB, in a 16-team league).
-    your_differential_threshold: float = Field(ge=TRADE_THRESHOLD_FLOOR)
-    their_differential_threshold: float = Field(ge=TRADE_THRESHOLD_FLOOR)
+    your_differential_threshold: float = 0.0
+    their_differential_threshold: float = 0.0
     position_check: bool = True
+    ignore_position_check: Optional[bool] = None
+
+    @model_validator(mode='after')
+    def resolve_fields(self) -> 'TradeSuggestRequest':
+        if self.their_teams is None and self.their_team is not None:
+            self.their_teams = [self.their_team]
+        elif self.their_teams is None:
+            self.their_teams = []
+        if self.ignore_position_check is not None:
+            self.position_check = not self.ignore_position_check
+        return self
 
 
 # ── /platforms/* (live platform integration) ─────────────────────────────────
@@ -315,6 +370,7 @@ class ConnectResponse(BaseModel):
     is_auction_draft: Optional[bool] = None
     # The league's own position structure in the app's slot names, when the platform reports it.
     slot_counts: Optional[dict[str, int]] = None
+    points_metadata: Optional[dict] = None
 
 
 class EspnLeagueSeasonsResponse(BaseModel):

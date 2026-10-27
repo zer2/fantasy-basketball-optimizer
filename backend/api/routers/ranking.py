@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 
+from typing import Union
 from fastapi import APIRouter, Depends, HTTPException, Response
 
 from backend.api.helpers import fail, require_session
@@ -18,12 +19,14 @@ from backend.api.schemas import (
     EvaluateRequest, HypotheticalTeamRequest, AuctionNominationRequest, AuctionNominationResponse,
     AuctionValuationRequest, AuctionValuationResponse,
 )
-from backend.models import EvaluateResponse, HypotheticalTeamResponse
+from backend.models import EvaluateResponse, PointsEvaluateResponse, HypotheticalTeamResponse
+
+from backend.points.live import PointsDataUnavailable
 
 router = APIRouter()
 
 
-@router.post('/sessions/{session_id}/evaluate', response_model=EvaluateResponse,
+@router.post('/sessions/{session_id}/evaluate', response_model=Union[EvaluateResponse, PointsEvaluateResponse],
              dependencies=[Depends(enforce_rate_limit(COMPUTE_POLICY))])
 def rank_candidates_route(req: EvaluateRequest, response: Response,
                           session: Session = Depends(require_session)):
@@ -62,9 +65,14 @@ def rank_candidates_route(req: EvaluateRequest, response: Response,
                 remaining_cash     = req.remaining_cash,
                 candidate_offset   = req.candidate_offset,
                 candidate_limit    = req.candidate_limit,
+                drop_player_id     = req.drop_player_id,
                 forced_category_weights = req.forced_category_weights,
             )
     except (UnknownRosterPlayersError, UnknownTeamError, ForcedWeightsInfeasibleError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except PointsDataUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception:
         raise fail(500, 'Evaluation failed.')
@@ -99,6 +107,10 @@ def build_hypothetical_team_route(req: HypotheticalTeamRequest, session: Session
     except ValueError as exc:
         # An infeasible team (e.g. the candidate's predicted price leaves too little cash) is the user's board, not
         # a server fault; the message says which.
+        raise HTTPException(status_code=400, detail=str(exc))
+    except PointsDataUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception:
         raise fail(500, 'Finding a hypothetical team failed.')

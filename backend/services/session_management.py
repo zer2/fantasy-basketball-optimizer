@@ -35,6 +35,10 @@ def build_session(
     HTTP-free: on pipeline failure it cleans up its own session and re-raises; the router maps
     that to a 500.
     """
+    if platform_config and platform_config.points_metadata and not current_settings.get('points_config'):
+        metadata = platform_config.points_metadata
+        if current_settings.get('scoring_system') == 'points' and metadata.get('scoring_system') == 'points':
+            current_settings['points_config'] = {**metadata, 'points_input_mode': 'raw_stats', 'projection_basis': 'per_game'}
     normalize_objective_settings(current_settings)
     validate_slot_structure(current_settings)
     session = create_session()
@@ -52,7 +56,18 @@ def build_session(
     return session
 
 
-def apply_patch(
+def apply_patch(session: Session, patch: dict, from_step: int, platform_config=None, csv_bytes=None, uploaded_dfs=None) -> None:
+    """Apply a rebuild atomically; rejected Points inputs must preserve the last good session."""
+    snapshot = dict(session.__dict__)
+    snapshot['pipeline_cache'] = session.pipeline_cache.copy()
+    try:
+        _apply_patch(session, patch, from_step, platform_config, csv_bytes, uploaded_dfs)
+    except Exception:
+        session.__dict__.update(snapshot)
+        raise
+
+
+def _apply_patch(
     session: Session
     , patch: dict
     , from_step: int
@@ -73,6 +88,7 @@ def apply_patch(
     platform_config feeds only the draft-state poll + name lookup, never the pipeline, so
     connecting a platform needs no pipeline rerun of its own.
     """
+    snapshot_scoring = session.current_settings.get('scoring_system')
     if session.agent is not None:
         outgoing_key = _build_pipeline_cache_key(session.current_settings, session.player_pool_hash)
         session.pipeline_cache[outgoing_key] = {
@@ -82,6 +98,8 @@ def apply_patch(
             'v1_clean':        session.v1_clean,
             'v2':              session.v2,
             'player_registry': session.player_registry,
+            'points_config': session.points_config,
+            'points_projections': session.points_projections,
         }
         session.pipeline_cache.move_to_end(outgoing_key)
         while len(session.pipeline_cache) > _PIPELINE_CACHE_ENTRIES:
@@ -110,7 +128,7 @@ def apply_patch(
         # that rebuilds the registry refreshes the lookup again once it has.
         refresh_platform_player_id_lookup(session)
 
-    rebuild_from_step = from_step
+    rebuild_from_step = min(from_step, 3) if snapshot_scoring != session.current_settings.get('scoring_system') else from_step
     if from_step <= 1:
         load_player_pool(session, csv_bytes=csv_bytes, uploaded_dfs=uploaded_dfs)
         rebuild_from_step = 2
@@ -124,9 +142,15 @@ def apply_patch(
         session.v1_clean        = cached_pipeline['v1_clean']
         session.v2              = cached_pipeline['v2']
         session.player_registry = cached_pipeline['player_registry']
+        session.points_config = cached_pipeline['points_config']
+        session.points_projections = cached_pipeline['points_projections']
         session.pipeline_cache.move_to_end(patched_pipeline_key)
     else:
         build_agent(session, from_step=rebuild_from_step, csv_bytes=csv_bytes, uploaded_dfs=uploaded_dfs)
+
+    if session.points_calendar_key is not None:
+        session.schedule_calendar = None
+        session.points_calendar_key = None
 
     # Rebuild the lookup when the player set changed (from_step <= 2); a new platform_config had
     # its lookup built above, from a registry this patch did not touch.
@@ -148,6 +172,8 @@ def _build_pipeline_cache_key(
             return tuple(freeze(v) for v in value)
         return value
     settings = {key: value for key, value in current_settings.items() if key not in POOL_SOURCE_SETTINGS}
+    if settings.get('scoring_system') != 'points':
+        settings.pop('points_config', None)
     return (player_pool_hash, freeze(settings))
 
 
@@ -192,15 +218,26 @@ def normalize_objective_settings(current_settings: dict) -> None:
     and experiments (HAgent.__init__, plus narrower checks in process_player_data and
     algorithm_helpers). Removing any one layer loses a distinct guarantee.
     """
-    if not current_settings['categories']:
+    if (
+        current_settings.get('scoring_system') == 'points'
+        or current_settings.get('scoring_format') in ('Points', 'Points League')
+    ):
+        current_settings['scoring_system'] = 'points'
+        current_settings['most_categories_weight'] = None
+        current_settings['tiebreaker_category']    = None
+        if not current_settings.get('categories'):
+            current_settings['categories'] = ['Points']
+        return
+
+    if not current_settings.get('categories'):
         raise ValueError('categories must be a non-empty list — a session cannot score nothing.')
 
-    if current_settings['scoring_format'] == 'Rotisserie':
+    if current_settings.get('scoring_format') == 'Rotisserie':
         current_settings['most_categories_weight'] = None
         current_settings['tiebreaker_category']    = None
         return
 
-    weight = current_settings['most_categories_weight']
+    weight = current_settings.get('most_categories_weight')
     if weight is None or not 0.0 <= weight <= 1.0:
         raise ValueError('most_categories_weight must be between 0 and 1 for Head to Head '
                          f'(0 = Each Category, 1 = Most Categories). Got {weight!r}.')

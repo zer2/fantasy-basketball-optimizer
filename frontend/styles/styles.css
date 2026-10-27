@@ -1297,7 +1297,7 @@ tr {
     content : '%';
 }
 
-.categoricalhscore {
+.categoricalhscore, .points-value {
     font-weight:500;
     text-align:right;
     padding:5px;
@@ -2169,6 +2169,7 @@ tr {
     .auction-dollar,
     .overallhscore,
     .categoricalhscore,
+    .points-value,
     .categoricalRotoHscore {
         padding: 5px 2px;
     }

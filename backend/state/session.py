@@ -73,6 +73,12 @@ class Session:
     # live platform is connected.
     platform_player_id_lookup: Optional[PlatformPlayerLookup] = None
 
+    points_config: Optional[object] = None
+    points_projections: Optional[object] = None
+    schedule_calendar: Optional[object] = None
+    points_calendar_key: Optional[tuple] = None
+    points_calendar_loaded_at: float = 0.0
+
     # Serialises work on this one session. An evaluate mutates shared agent state (warm-start
     # weights via get_h_scores), and a PATCH rebuilds the pipeline in place, so two overlapping
     # requests on the same session corrupt each other and 500. The frontend aborts its previous
@@ -90,7 +96,6 @@ class Session:
 
     # Each evaluated candidate's raw H-scoring category weights and win rates, by board
     # (services/ranking.store_candidate_strategies): {board key: (agent, {player id: (weights, rates)})}. The
-    # hypothetical team (services/hypothetical_team) reads the strategy the board showed instead of re-solving.
     candidate_strategy_cache: "OrderedDict[tuple, tuple]" = field(default_factory=OrderedDict)
 
     # Each auction autodrafter's raw H-scores between nominations (services/auction_autodraft.read_team_h_scores):
@@ -109,6 +114,14 @@ class Session:
     # Seeds every auction autodrafter's noisy view together with its team name (services/auction_autodraft.
     # read_team_x_scores). 0 is the app's draw; an experiment sets others to run independent auctions.
     auction_noise_seed: int = 0
+
+    @property
+    def current_params(self) -> dict:
+        return self.current_settings
+
+    @current_params.setter
+    def current_params(self, value: dict) -> None:
+        self.current_settings = value
 
 
 # ── Store ────────────────────────────────────────────────────────────────────

@@ -95,6 +95,7 @@ def resolve_platform_config(
         teams_dict         = shape.teams_dict,
         player_name_column = integration.player_name_column,
         seat_names         = shape.team_names,
+        points_metadata    = shape.points_metadata,
     )
 
 

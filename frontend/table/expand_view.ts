@@ -6,7 +6,7 @@ import {
     stat_styler_primary, stat_styler_tertiary, G_SCORE_MULTIPLIER, G_SCORE_AGGREGATE_MULTIPLIER,
 } from '../styles/styler_functions.js'
 import { PlayerResult, FlexAllocations, Roster, HypotheticalTeam, BoardRequest } from '../types.js'
-import { getPositionNames, getPositionStructure, getLatestScoredBoard } from '../app_state.js'
+import { getPositionNames, getPositionStructure, getLatestScoredBoard, isPointsMode } from '../app_state.js'
 import { classifyCashPressure, describeCashPressure, makeSpacerTh } from './table_helpers.js'
 import { buildPlayerGScoreCard } from './gscore_table.js'
 import { makeRosterPlayerDisplay, makeHypotheticalPlayerDisplay } from '../player_display.js'
@@ -48,6 +48,21 @@ export function buildExpandPanel(
     const cell = expandedRow.insertCell(-1)
     cell.colSpan = totalCols
     cell.className = 'panel-cell'
+    if (isPointsMode()) {
+        cell.colSpan = 7
+        const summary=document.createElement('p')
+        summary.textContent=`Projected FP/G: ${playerData.points_per_game?.toFixed(1) ?? 'Unavailable'}; starting-lineup gain: ${(playerData.delta_fp ?? 0).toFixed(1)} FP.`
+        cell.append(summary)
+        const table=document.createElement('table');table.className='panel-table';table.dataset.testid='points-candidate-details'
+        const header=table.createTHead().insertRow()
+        for(const label of ['Date','Starting-lineup gain']){const th=document.createElement('th');th.textContent=label;header.append(th)}
+        const body=table.createTBody()
+        for(const [date,gain] of Object.entries(playerData.daily_deltas ?? {})){
+            const row=body.insertRow();row.insertCell().textContent=date;row.insertCell().textContent=gain.toFixed(1)+' FP'
+        }
+        cell.append(table)
+        return
+    }
 
     cell.appendChild(makePanelLabel('G-score expectations (difference vs. other teams)', '60px'))
     cell.appendChild(makeGScoreTable(playerData, categories))
