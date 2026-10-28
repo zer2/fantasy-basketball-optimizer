@@ -65,10 +65,14 @@ export function renderWaiverControls(container: HTMLElement): void {
     candidateTable.style.display = fullTeams.length < 1 ? 'none' : ''
 
     if (fullTeams.length < 1) {
-        const msg = document.createElement('p')
-        msg.className   = 'coming-soon'
-        msg.textContent = readEmptyRostersMessage('one full team', 'Waiver Wire')
-        container.append(msg)
+        // Nothing while a connected league's rosters are pending: the indicator beside the tabs says so.
+        const message = readEmptyRostersMessage('one full team', 'Waiver Wire')
+        if (message !== null) {
+            const msg = document.createElement('p')
+            msg.className   = 'coming-soon'
+            msg.textContent = message
+            container.append(msg)
+        }
         return
     }
 

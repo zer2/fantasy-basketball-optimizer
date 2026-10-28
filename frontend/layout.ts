@@ -18,6 +18,7 @@ import {
 } from './api/draft_and_auction_session.js'
 import { setIndicatorState, claimDisplay, applyIndicatorState } from './api/session.js'
 import { BACKEND_WORK_CHANGED, countInFlightBackendWork } from './api/client.js'
+import { getLivePlatformRosterError, getLivePlatformRosters, SEASON_ROSTERS_CHANGED } from './api/season_session.js'
 
 // ─── Module state ─────────────────────────────────────────────────────────────
 
@@ -265,12 +266,19 @@ function buildSeasonNav(): void {
     reflectBackendWorkInSeasonIndicator()
 }
 
-/** Shows "Updating..." with a spinner while any session or platform request is in flight, "Updated" once none is. */
+/** Shows "Starting..." for as long as a connected league's rosters are pending (from connecting until they arrive or
+ *  fail -- the tabs have nothing to show meanwhile, and say nothing), otherwise "Updating..." with a spinner while any
+ *  session or platform request is in flight, and "Updated" once none is. */
 function reflectBackendWorkInSeasonIndicator(): void {
     if (document.getElementById('season-indicator') === null) return   // Season Mode not entered yet
-    applyIndicatorState('season-indicator', countInFlightBackendWork() > 0 ? 'evaluating' : 'idle')
+    const { mode, platform } = getLeagueSettings()
+    const areLeagueRostersPending = mode === 'Season Mode' && platform !== 'Enter your own data' && isPlatformConnected()
+        && getLivePlatformRosters() === null && getLivePlatformRosterError() === null
+    applyIndicatorState('season-indicator', areLeagueRostersPending ? 'fetching'
+        : countInFlightBackendWork() > 0 ? 'evaluating' : 'idle')
 }
 document.addEventListener(BACKEND_WORK_CHANGED, reflectBackendWorkInSeasonIndicator)
+document.addEventListener(SEASON_ROSTERS_CHANGED, reflectBackendWorkInSeasonIndicator)
 
 /** Switches the visible season mode content pane and highlights the active tab button. */
 function activateSeasonTab(tabId: string): void {
