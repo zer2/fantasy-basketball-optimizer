@@ -13,6 +13,7 @@
 
 import { HTTPError, readErrorDetail } from '../api/client.js'
 import { showTableMessage } from './player_table.js'
+import { showFailureBanner } from './failure_banner.js'
 
 /** Why the call failed, from the caller's point of view rather than the server's. */
 export type FailureKind =
@@ -77,5 +78,8 @@ export function showFailureInTable(error: unknown): boolean {
     if (error instanceof Error && error.name === 'AbortError') return false
     const failure = describeFailure(error)
     showTableMessage(failure.message, { isError: true })
+    // Some views hide the table (Season Mode's tabs, the team-statistics views); there the sentence above sits in a
+    // hidden cell, so it goes above the content too. The table is shown when it lays out at least one box.
+    if (document.getElementById('hscoretable')!.getClientRects().length === 0) showFailureBanner(failure.message)
     return true
 }
