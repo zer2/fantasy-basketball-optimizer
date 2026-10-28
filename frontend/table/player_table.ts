@@ -31,6 +31,7 @@ import { isMobileViewport, normalizeSearchText } from '../helper_functions.js'
 import { buildFullPlayerDisplayHtml } from '../player_display.js'
 import { buildForcedWeightsRow } from './force_weights.js'
 import { getRegistryEntry } from '../player_registry.js'
+import { clearFailureBanner } from './failure_banner.js'
 
 const table = document.getElementById('hscoretable') as HTMLTableElement
 
@@ -118,6 +119,7 @@ function resetVirtualState(): void {
 
 /** Clears the candidate table and shows a single centred message row. */
 export function showTableMessage(message: string, { isError = false } = {}): void {
+    clearFailureBanner()        // this message replaces whatever failed (a failure re-shows it if the table is hidden)
     table.innerHTML = ''
     resetVirtualState()
     renderCtx = null
@@ -133,6 +135,7 @@ export function showTableMessage(message: string, { isError = false } = {}): voi
 /** Clears the candidate table and rebuilds its width container, column structure,
  *  and header row. Categories, mode, and scoring format are read from the DOM. */
 export function buildTableHeader(): void {
+    clearFailureBanner()        // a fresh table (or a fresh attempt at one) replaces whatever failed
 
     const categories = getSelectedCategories()
     const isAuction  = getMode() === 'Auction Mode'

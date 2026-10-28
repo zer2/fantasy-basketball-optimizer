@@ -28,6 +28,10 @@ let livePlatformEmptySlots: Record<string, number[]> | null = null
 // reach only the console, and the tabs said "Loading your league's rosters…" for good (2026-10-21).
 let livePlatformRosterError: string | null = null
 
+/** Fired on document whenever the connected league's rosters arrive, fail or are cleared, so the Season indicator can
+ *  say "Starting..." for exactly as long as they are pending (layout.ts). */
+export const SEASON_ROSTERS_CHANGED = 'season-rosters-changed'
+
 /** Platform-provided season rosters ({team: [player ids]}), or null when not loaded
  *  (own data, or before the first platform refresh). */
 export function getLivePlatformRosters(): Record<string, number[]> | null {
@@ -56,12 +60,14 @@ export function clearLivePlatformRosters(): void {
     livePlatformUnmatchedNames = null
     livePlatformEmptySlots = null
     livePlatformRosterError = null
+    document.dispatchEvent(new Event(SEASON_ROSTERS_CHANGED))
 }
 
 /** Pull the connected platform's current rosters for Season Mode and cache them.
  *  The caller re-renders the season layout so renderSeasonRosters picks them up. */
 export async function refreshSeasonRostersFromPlatform(): Promise<void> {
     livePlatformRosterError = null
+    document.dispatchEvent(new Event(SEASON_ROSTERS_CHANGED))
     try {
         await withSessionRetry(async () => {
             const state = await fetchDraftState(getSessionId()!, 'Season Mode')
@@ -74,6 +80,8 @@ export async function refreshSeasonRostersFromPlatform(): Promise<void> {
         livePlatformRosterError = error instanceof HTTPError ? readErrorDetail(error.body)
             : error instanceof Error ? error.message : String(error)
         throw error
+    } finally {
+        document.dispatchEvent(new Event(SEASON_ROSTERS_CHANGED))
     }
 }
 

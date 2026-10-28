@@ -481,8 +481,9 @@ test("a Waiver tab drawn before the league's rosters arrive is redrawn when they
         const platformBoard = await stubLivePlatform(page, { availableModes: ['Season Mode'] })
         platformBoard.assignments = Object.fromEntries(LEAGUE_TEAMS.map((team, index) =>
             [team, players.slice(index * 13, index * 13 + 13)]))
-        // Hold the league's rosters: while they load, the tab says so instead of asking for rosters to be filled in,
-        // and the empty table stays hidden (2026-10-13).
+        // Hold the league's rosters: while they load, the indicator beside the tabs says "Starting...", the tab says
+        // nothing (no request to fill rosters in, 2026-10-13, and no loading line of its own, 2026-10-28), and the empty
+        // table stays hidden.
         let releaseRosters
         const rostersHeld = new Promise(resolve => { releaseRosters = resolve })
         await page.route(url => url.pathname.endsWith('/draft-state'), async route => {
@@ -492,8 +493,11 @@ test("a Waiver tab drawn before the league's rosters arrive is redrawn when they
         await setSelect(page, 'ls-platform', 'Retrieve from Yahoo')
         await typeYahooLeagueId(page, '12345')
         await page.locator('#ls-yahoo-league-id').press('Enter')
-        await page.waitForFunction(() => /Loading your league's rosters/.test(document.querySelector('#right-header')?.innerText ?? ''),
+        await page.waitForFunction(() => document.querySelector('#season-indicator')?.dataset.state === 'fetching',
                                    null, { timeout: 30000 })
+        assert.match(await page.locator('#season-indicator').innerText(), /Starting/)
+        const tabText = await page.locator('#right-header').innerText()
+        assert.doesNotMatch(tabText, /Fill out|Loading/, 'the tab says nothing while the rosters load')
         assert.equal(await page.locator('#hscoretable').isVisible(), false, 'no empty table while the rosters load')
         releaseRosters()
         await waitAppSettled(app, { timeout: 120000 })

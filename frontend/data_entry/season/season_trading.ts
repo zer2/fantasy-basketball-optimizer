@@ -418,10 +418,14 @@ export function renderSeasonTrading(container: HTMLElement): void {
     const fullTeams = teamNames.filter(t => (assignments[t]?.length ?? 0) >= nPicks)
 
     if (fullTeams.length < 2) {
-        const msg = document.createElement('p')
-        msg.className = 'coming-soon'
-        msg.textContent = readEmptyRostersMessage('two full teams', 'Trading')
-        container.append(msg)
+        // Nothing while a connected league's rosters are pending: the indicator beside the tabs says so.
+        const message = readEmptyRostersMessage('two full teams', 'Trading')
+        if (message !== null) {
+            const msg = document.createElement('p')
+            msg.className   = 'coming-soon'
+            msg.textContent = message
+            container.append(msg)
+        }
         return
     }
 

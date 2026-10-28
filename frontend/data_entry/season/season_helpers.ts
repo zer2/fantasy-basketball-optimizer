@@ -42,12 +42,15 @@ export function listMovablePlayers(roster: number[]): number[] {
     return roster.filter(playerId => playerId !== REPLACEMENT_PLAYER_ID)
 }
 
-/** What a Season Mode tab says before it has the full teams it needs. A connected league's rosters are on their way
- *  (the tab is drawn again when they arrive), so asking the user to fill them in read as broken (2026-10-13). */
+/** What a Season Mode tab says before it has the full teams it needs, or null while a connected league's rosters are
+ *  still on their way: the tab is drawn again when they arrive, and meanwhile the indicator beside the tabs says
+ *  "Starting..." (a "Loading your league's rosters…" line of its own sat in a different place on each tab and fell out
+ *  of step with the indicator, 2026-10-28). Asking the user to fill in a connected league's rosters read as broken
+ *  (2026-10-13). */
 export function readEmptyRostersMessage(
     teamsNeeded: string
     , toolName: string
-): string {
+): string | null {
     if (getLeagueSettings().platform === 'Enter your own data') {
         return `Fill out at least ${teamsNeeded} on the Rosters tab to use ${toolName}.`
     }
@@ -61,5 +64,7 @@ export function readEmptyRostersMessage(
             + (getLeagueSettings().platform === 'Retrieve from ESPN'
                 ? ' Choose another season under League Settings to see that one.' : '')
     }
-    return "Loading your league's rosters…"
+    if (platformRosters === null) return null
+    // The rosters arrived but too few teams are full (a league still filling, or one smaller than the tool needs).
+    return `Your league doesn't have ${teamsNeeded} yet, which ${toolName} needs.`
 }

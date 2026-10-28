@@ -1092,6 +1092,18 @@ tr {
     margin: 0 auto;
 }
 
+/* The same failure above the content, for views that hide the candidate table (table/failure_banner.ts). */
+.failure-banner {
+    color: #e06c6c;
+    background: light-dark(#f4f4f6, #3a3a4c);
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin: 0 0 12px;
+    text-align: center;
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+
 /* 1. Top-Left Corner */
 #hscoretable > thead > tr:first-child > :first-child {
   border-top-left-radius: 12px;
