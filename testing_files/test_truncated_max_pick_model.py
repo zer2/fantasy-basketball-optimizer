@@ -230,3 +230,26 @@ def test_neutral_neighbourhood_is_continuous():
         weights = (VALUE_DIRECTION.reshape(-1) + scale * deviation).reshape(1, -1)
         tilt = compute_expected_pick_tilts(weights, COVARIANCE, VALUE_DIRECTION, 25)
         assert np.max(np.abs(tilt)) < 0.5, f'scale {scale}'
+
+
+@pytest.mark.parametrize('pick_pool_size', [2, 5, 10, 25, 50, 100, 250, 600, 2000, 10000])
+def test_survival_quantile_matches_bisection(pick_pool_size):
+    """The quantile solve (safeguarded Newton) lands on the same root as a 50-step bisection of the bracket, over
+    the whole clamped rho range -- including near +/-1, where the survival function cancels to zero and below and
+    Newton has to fall back to bisecting."""
+    from backend.math import truncated_max_pick_model as model
+
+    rho_limit = np.sqrt(model._MAX_SQUARED_CORRELATION)
+    rho = np.linspace(-rho_limit, rho_limit, 4001)
+    shape = -rho / np.sqrt(1.0 - rho * rho)
+    lower = np.full_like(shape, model._QUANTILE_BRACKET[0])
+    upper = np.full_like(shape, model._QUANTILE_BRACKET[1])
+    for _ in range(50):
+        middle = 0.5 * (lower + upper)
+        above = model._skew_normal_survival(middle, shape) * pick_pool_size > 1.0
+        lower = np.where(above, middle, lower)
+        upper = np.where(above, upper, middle)
+    bisected = 0.5 * (lower + upper)
+    # The bisection itself is only resolved to 16 / 2^50 ~ 1.4e-14; large pools flatten the survival function at the
+    # root, so the same residual moves t further there.
+    assert np.abs(model._solve_survival_quantile(shape, pick_pool_size) - bisected).max() < 1e-12

@@ -37,8 +37,8 @@ order-statistic integral and against Monte Carlo is pinned in
 testing_files/test_truncated_max_pick_model.py.
 
 The Jacobian is the exact Hessian of sigma_s * e(rho): all it needs beyond the forward
-pass is e''(rho), and e, e', e'' are all closed-form — the quantile comes from one
-bisection of the monotone survival function, its derivatives from the implicit function
+pass is e''(rho), and e, e', e'' are all closed-form — the quantile comes from a
+safeguarded Newton solve of the monotone survival function, its derivatives from the implicit function
 theorem, where Owen's T supplies the elementary shape-partial
 dT/dalpha = exp(-t^2 (1 + alpha^2) / 2) / (2 pi (1 + alpha^2)). No numerical
 differentiation anywhere.
@@ -51,7 +51,7 @@ is evaluated through the same clamped machinery — preserves x(v) = 0 exactly.
 """
 
 import numpy as np
-from scipy.special import ndtr, owens_t
+from scipy.special import ndtr, ndtri, owens_t
 
 _EULER_GAMMA = np.euler_gamma        # the Gumbel distribution's mean
 _SQRT_TWO_PI = np.sqrt(2.0 * np.pi)
@@ -60,7 +60,14 @@ _SQRT_TWO_PI = np.sqrt(2.0 * np.pi)
 # it the tilt response is linearized; outside it the model is untouched.
 _MAX_SQUARED_CORRELATION = 1.0 - 1e-4
 
-_BISECTION_ITERATIONS = 50
+# The 1 - 1/M quantile of the survivor score is found by safeguarded Newton (_solve_survival_quantile) inside this
+# bracket, which holds it for every pool size the app allows. Newton converges in ~5 steps where a bisection of the
+# bracket needs ~50, each step an Owen's T evaluation -- the costliest part of every objective call. A step that would
+# leave the bracket bisects instead, so the worst case is the bisection's; a row stops once a step moves it less than
+# the tolerance (relative), below the old 50-step bisection's own resolution of 16 / 2^50 ~ 1.4e-14 absolute.
+_QUANTILE_BRACKET = (-4.0, 12.0)
+_QUANTILE_TOLERANCE = 1e-13
+_QUANTILE_MAXIMUM_STEPS = 64
 
 _DENSITY_FLOOR = 1e-300
 
@@ -257,15 +264,7 @@ def _evaluate_expected_max_score(
     d_shape = -s2 ** -1.5
     dd_shape = -3.0 * rho * s2 ** -2.5
 
-    # The 1 - 1/M quantile, by bisection on the monotone survival function.
-    lower = np.full_like(rho, -4.0)
-    upper = np.full_like(rho, 12.0)
-    for _ in range(_BISECTION_ITERATIONS):
-        middle = 0.5 * (lower + upper)
-        above = _skew_normal_survival(middle, shape) * pick_pool_size > 1.0
-        lower = np.where(above, middle, lower)
-        upper = np.where(above, upper, middle)
-    t = 0.5 * (lower + upper)
+    t = _solve_survival_quantile(shape, pick_pool_size)
 
     pdf_t = _standard_normal_pdf(t)
     pdf_shaped = _standard_normal_pdf(shape * t)
@@ -310,6 +309,38 @@ def _evaluate_expected_max_score(
         - 2.0 * d_density * d_density / (density * density * density)
     )
     return e, d_e, dd_e
+
+
+def _solve_survival_quantile(shape, pick_pool_size):
+    """The 1 - 1/M quantile of the standardized skew-normal survivor score: t with M * SF(t; shape) = 1, per row.
+
+    Newton on f(t) = log(M * SF(t)), whose derivative is -density / SF: the log keeps the far tail, where SF is
+    tiny, close to linear. Every step's residual tightens a bracket around the root (f is decreasing), and a step
+    that would leave the bracket bisects it instead -- so a row cannot do worse than bisection. SF = 1 - Phi + 2T
+    cancels near rho = +/-1 and can come out a hair below zero; it is clamped there, so its log is -inf, which reads
+    as above the root: the same verdict the bisection's M * SF > 1 test gives it. A row is done once a step moves
+    it less than the tolerance, and only a finite residual can say so."""
+    lower = np.full_like(shape, _QUANTILE_BRACKET[0])
+    upper = np.full_like(shape, _QUANTILE_BRACKET[1])
+    t = np.full_like(shape, float(ndtri(1.0 - 1.0 / pick_pool_size)))   # the normal quantile: the shape-0 root
+    converged = np.zeros(shape.shape, dtype=bool)
+    for _ in range(_QUANTILE_MAXIMUM_STEPS):
+        survival = np.maximum(_skew_normal_survival(t, shape), 0.0)
+        density = 2.0 * _standard_normal_pdf(t) * ndtr(shape * t)
+        with np.errstate(divide='ignore', invalid='ignore'):
+            residual = np.log(survival * pick_pool_size)
+            proposal = t + residual * survival / density
+        lower = np.where(residual > 0.0, t, lower)
+        upper = np.where(residual < 0.0, t, upper)
+        outside = (proposal < lower) | (proposal > upper) | ~np.isfinite(proposal)
+        proposal = np.where(outside, 0.5 * (lower + upper), proposal)
+        settled = np.isfinite(residual) & (np.abs(proposal - t) <= _QUANTILE_TOLERANCE * np.maximum(1.0, np.abs(t)))
+        t = np.where(converged, t, proposal)
+        converged |= settled
+        if converged.all():
+            return t
+    raise ArithmeticError(f'The survival quantile did not converge for {int((~converged).sum())} of '
+                          f'{converged.size} rows in {_QUANTILE_MAXIMUM_STEPS} steps.')
 
 
 def _skew_normal_survival(t, shape):

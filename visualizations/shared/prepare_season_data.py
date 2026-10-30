@@ -121,6 +121,8 @@ def build_default_session_request(season: str, sport: str) -> SessionRequest:
             opponent_model_confidence = default_of('opponent_model_confidence'),
             n_iterations              = default_of('n_iterations'),
             streaming_noise           = default_of('S'),
+            replacement_threshold     = default_of('S_R'),
+            cash_share_softness       = default_of('cash_share_softness'),
         ),
         data_source = DataSource(type='historical', season=season),
     )

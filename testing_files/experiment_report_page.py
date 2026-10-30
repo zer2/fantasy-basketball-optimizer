@@ -1,8 +1,8 @@
 """The experiment report page: one tab per stored section, each with its explanation, a takeaway card (a headline and a
 chart drawn from the section's own rows) and its table, colour-coded.
 
-Colour code, the same in every tab: green = passes (or no loss), red = breaches a floor (or a loss, stronger for more),
-amber = a warning short of a breach. Values that are expected win rates or differences of them carry '%'.
+Colour code, the same in every tab: green = good, red = bad (a loss is deeper red the larger it is), amber = worth a
+look. The cards report numbers, not verdicts. Values that are expected win rates or differences of them carry '%'.
 
 Each section's view (SECTION_VIEWS) is read from its stored rows alone, so the page can be rebuilt without rerunning
 anything. A section with no view is drawn as a plain table.
@@ -73,6 +73,9 @@ PAGE_CSS = """
   .build b { color:var(--fg); }
   .build .soft { color:var(--muted); }
   .build .count { color:var(--muted); font-size:.75rem; margin-left:2px; }
+  h2.part { margin-top:36px; }
+  .details { color:var(--muted); font-size:.85rem; margin:0 0 12px; }
+  .details p.explain, .details ul.explain { font-size:.85rem; color:var(--muted); margin:2px 0; }
   .bar-track { display:flex; gap:2px; height:22px; border-radius:6px; overflow:hidden; }
   .bar-segment { flex-grow:0; flex-shrink:0; min-width:3px; }
   .note { color:var(--muted); font-size:.85rem; margin:0 0 8px; }
@@ -170,6 +173,8 @@ def render_chart(
     x_labels: list[str]
     , series: list[Series]
     , y_title: str
+    , *
+    , x_title: str
     , kind: str = 'line'
     , references: tuple = ()
     , y_floor: Optional[float] = None
@@ -189,7 +194,7 @@ def render_chart(
     chart's lines alone, for curves too dense for a marker at every point. uses_log_scale draws the y axis in powers of
     ten (line or dots charts of positive values), for data spanning several orders of magnitude; y_floor and
     y_ceiling then only widen it to the decades they fall in."""
-    left, right, top, bottom = 58, (120 if width > 700 else 70), 14, 46
+    left, right, top, bottom = 58, (120 if width > 700 else 70), 14, 58
     plot_width, plot_height = width - left - right, height - top - bottom
     values = [value for one in list(series) + list(background_series)
               for value, error in zip(one.values, one.errors or [0] * len(one.values))
@@ -244,6 +249,8 @@ def render_chart(
         if index % label_step == 0:
             parts.append(f'<text x="{x_of(index):.1f}" y="{top + plot_height + 16}" text-anchor="middle">'
                          f'{escape(str(label))}</text>')
+    parts.append(f'<text x="{left + plot_width / 2:.1f}" y="{top + plot_height + 38}" text-anchor="middle">'
+                 f'{escape(x_title)}</text>')
     for reference in references:
         y = y_of(reference.value)
         css = 'reference bad' if reference.is_floor else 'reference'
@@ -324,9 +331,9 @@ def render_stat_tiles(tiles: list[tuple[str, str, str]]) -> str:
         f'<div class="tile-label">{escape(label)}</div></div>' for value, label, status in tiles) + '</div>'
 
 
-def render_takeaway(status: str, status_text: str, text: str) -> str:
-    """The card's headline: a status pill (good / warn / bad) and one sentence."""
-    return f'<div class="takeaway"><span class="status {status}">{escape(status_text)}</span>{text}</div>'
+def render_takeaway(text: str) -> str:
+    """The card's headline: the numbers that answer the experiment's question, without a verdict."""
+    return f'<div class="takeaway">{text}</div>'
 
 
 # ── Section views ─────────────────────────────────────────────────────────────
@@ -373,41 +380,77 @@ def find_summary(rows, label_start, column_index=0):
 
 
 # H-scoring vs a G-score field
+# Break-even H-score per format: head to head, a 50% expected category win rate; Rotisserie, the league-win
+# probability of one team in 12.
+H_VERSUS_G_BREAK_EVEN = {'EC': 50.0, 'MC': 50.0, 'Roto': 100 / 12}
+
+
 def card_h_versus_g(columns, rows):
-    pooled = {row[0]: read_leading_number(row[2]) for row in rows if str(row[1]).startswith('ALL')}
-    seasons = sorted({row[1] for row in candidate_rows(rows)})
-    by_format = {format_key: {row[1]: read_leading_number(row[2]) for row in candidate_rows(rows) if row[0] == format_key}
-                 for format_key in ('EC', 'MC')}
-    below = sum(value <= 50.5 for values in by_format.values() for value in values.values())
-    status = ('good', 'passes') if below == 0 and all(value > 52 for value in pooled.values()) else ('bad', 'breach')
-    text = (f'H-scoring wins <b>{pooled.get("EC", float("nan")):.1f}%</b> of category matchups in Each Category and '
-            f'<b>{pooled.get("MC", float("nan")):.1f}%</b> in Most Categories against a G-score field (50% = break-even). '
-            f'{below} of {len(seasons) * 2} season-formats fall at or below the 50.5% floor.')
+    """Per format, the H seat's pooled H-score against its break-even, then by draft position: one chart for the
+    head-to-head formats (expected category win rate) and one for Rotisserie (league-win probability)."""
+    format_index, value_index = columns.index('Format'), columns.index('Mean H-score')
+    pooled = {row[format_index]: read_leading_number(row[value_index]) for row in rows
+              if str(row[columns.index('Season')]).startswith('ALL')}
+    seasons = sorted({row[columns.index('Season')] for row in candidate_rows(rows)})
+    names = {'EC': 'Each Category', 'MC': 'Most Categories', 'Roto': 'Rotisserie'}
+    has_real = 'Mean real win rate' in columns
+    pooled_real = {row[format_index]: read_leading_number(row[columns.index('Mean real win rate')]) for row in rows
+                   if has_real and str(row[columns.index('Season')]).startswith('ALL')}
+
+    def describe_format(format_key, value):
+        real = pooled_real.get(format_key)
+        real_text = f', <b>{real:.1f}%</b> in real weeks' if real is not None else ''
+        return (f'{names[format_key]}: <b>{value:.1f}%</b> H-score{real_text} (break-even '
+                f'{H_VERSUS_G_BREAK_EVEN[format_key]:.1f}%)')
+
+    sentences = [describe_format(format_key, value) for format_key, value in pooled.items()]
+    text = 'Against a G-score field, the H-scoring seat scores ' + '; '.join(sentences) + '.'
     seat_columns = [name for name in columns if re.fullmatch(r'S\d+', name)]
-    series = []
-    for format_key in ('EC', 'MC'):
-        by_seat = np.array([[read_leading_number(row[columns.index(name)]) for name in seat_columns]
-                            for row in candidate_rows(rows) if row[0] == format_key])
+
+    def summarize_by_seat(by_seat, label):
         standard_errors = by_seat.std(axis=0, ddof=1) / np.sqrt(len(by_seat))
-        series.append(Series(format_key, list(by_seat.mean(axis=0)), list(2 * standard_errors)))
-    chart = render_chart([name[1:] for name in seat_columns], series, 'Win rate',
-                         references=(ReferenceLine(50.0, 'parity 50%'),), value_suffix='%', value_places=1)
-    note = (f'<div class="note">By draft position, averaged over the {len(seasons)} seasons; bars are ±2 standard '
-            f'errors across seasons.</div>')
-    return render_takeaway(*status, text) + note + chart
+        return Series(label, list(by_seat.mean(axis=0)), list(2 * standard_errors))
+
+    def chart_formats(format_keys, y_title, reference_label):
+        series = []
+        for format_key in format_keys:
+            format_rows = [row for row in candidate_rows(rows) if row[format_index] == format_key]
+            by_seat = np.array([[read_leading_number(row[columns.index(name)]) for name in seat_columns]
+                                for row in format_rows])
+            if format_key in pooled_real:
+                series.append(summarize_by_seat(by_seat, f'{format_key} H-score'))
+                real_by_seat = np.array([[float(value) for value in row[columns.index('Every real win rate')].split()]
+                                         for row in format_rows])
+                series.append(summarize_by_seat(real_by_seat, f'{format_key} real weeks'))
+            else:
+                series.append(summarize_by_seat(by_seat, format_key))
+        return render_chart([name[1:] for name in seat_columns], series, y_title, x_title='Seat (draft position)',
+                            references=(ReferenceLine(H_VERSUS_G_BREAK_EVEN[format_keys[0]], reference_label),),
+                            value_suffix='%', value_places=1)
+
+    head_to_head = [format_key for format_key in ('EC', 'MC') if format_key in pooled]
+    charts = ''
+    if head_to_head:
+        charts += ('<div class="note">Head to head by draft position: Each Category\'s category win rate, Most '
+                   'Categories\' matchup win rate, as the H-score expects it and in real weeks.</div>'
+                   + chart_formats(head_to_head, 'Win rate', 'break-even 50%'))
+    if 'Roto' in pooled:
+        charts += ('<div class="note">Rotisserie: probability of winning the league by draft position.</div>'
+                   + chart_formats(['Roto'], 'League-win probability', 'break-even 8.3%'))
+    note = (f'<div class="note">Averaged over the {len(seasons)} seasons; bars are ±2 standard errors across '
+            f'seasons.</div>')
+    return render_takeaway(text) + note + charts
 
 
 def rule_season_win_rate(value, row, columns):
-    if is_summary_row(row):
-        return GOOD if value > 52 else BAD
-    return GOOD if value > 50.5 else BAD
+    """Green above the format's break-even, red at or below it."""
+    return GOOD if value > H_VERSUS_G_BREAK_EVEN[row[columns.index('Format')]] else BAD
 
 
 def rule_seat_win_rate(value, row, columns):
-    return style_bad(1.0) if value < 50 else ''
+    return style_bad(1.0) if value < H_VERSUS_G_BREAK_EVEN[row[columns.index('Format')]] else ''
 
 
-# Awareness
 def card_awareness(columns, rows):
     pooled = {row[0]: (read_leading_number(row[2]), read_leading_number(row[3]))
               for row in rows if str(row[1]).startswith('ALL')}
@@ -419,17 +462,15 @@ def card_awareness(columns, rows):
                   for row in candidate_rows(rows) if row[0] == comparison}
         series.append(Series(comparison, [values[s][0] if s in values else None for s in seasons] + [pooled[comparison][0]],
                              [2 * values[s][1] if s in values else 0 for s in seasons] + [2 * pooled[comparison][1]]))
-    harmful = any(mean < -2 * error for mean, error in pooled.values())
     unaware = pooled.get('vs unaware H field', (float('nan'), float('nan')))
     g_field = pooled.get('vs G field', (float('nan'), float('nan')))
     text = (f'The opponent model adds <b>{unaware[0]:+.2f}% ± {unaware[1]:.2f}</b> against H-drafters without it, and '
             f'<b>{g_field[0]:+.2f}% ± {g_field[1]:.2f}</b> against G-score drafters, where its predictions are wrong. '
             f'± is one standard error; the bars are ±2.')
-    chart = render_chart([season[2:] for season in seasons] + ['ALL'], series, 'On minus off',
+    chart = render_chart([season[2:] for season in seasons] + ['ALL'], series, 'On minus off', x_title='Season',
                          kind='dots', references=(ReferenceLine(0.0, 'no effect'),),
                          value_suffix='%', value_places=2)
-    status = ('bad', 'hurts') if harmful else ('good', 'no harm')
-    return render_takeaway(*status, text) + chart
+    return render_takeaway(text) + chart
 
 
 def rule_pooled_significance(value, row, columns):
@@ -609,7 +650,7 @@ def card_punt_diversity(columns, rows):
     note = ("<div class=\"note\">Each bar is a season's 12 builds, coloured by exactly what they hard punt (under 15%); "
             'soft punts are ignored here but listed in the table. Light shades are two hard punts, paired with the '
             'single punt of the same hue. Hover a segment for its exact combinations.</div>')
-    return (render_takeaway('good' if fewest >= 3 else 'bad', 'passes' if fewest >= 3 else 'breach', text) + note
+    return (render_takeaway(text) + note
             + legend + f'<div class="multiples">{"".join(panels)}</div>')
 
 
@@ -618,9 +659,9 @@ def card_rotisserie(columns, rows):
     most = max(read_leading_number(row[2]) for row in rows)
     weakest = min(rows, key=lambda row: read_leading_number(row[5]))
     text = (f'At most <b>{most:.0f}</b> hard punt{"s" if most != 1 else ""} among the top-12 Rotisserie builds in any '
-            f'season (ceiling 2). The weakest category anywhere: {escape(weakest[4])} at {escape(weakest[5])} '
+            f'season. The weakest category anywhere: {escape(weakest[4])} at {escape(weakest[5])} '
             f'({escape(weakest[6])}, {escape(weakest[0])} {escape(weakest[1])}).')
-    return render_takeaway('good' if most <= 2 else 'bad', 'passes' if most <= 2 else 'breach', text)
+    return render_takeaway(text)
 
 
 def rule_hard_punts(value, row, columns):
@@ -650,12 +691,14 @@ def render_strip_chart(
     x_labels: list[str]
     , series: list[tuple[str, list[list[float]]]]
     , y_title: str
+    , *
+    , x_title: str
     , value_suffix: str = ''
     , height: int = 240
 ) -> str:
     """Every value as its own dot: per x position, one column of dots per series (side by side), each dot's tooltip its
     value. series: [(name, values per x position)]."""
-    width, left, right, top, bottom = 1100, 58, 120, 14, 30
+    width, left, right, top, bottom = 1100, 58, 120, 14, 50
     plot_width, plot_height = width - left - right, height - top - bottom
     values = [value for _, columns in series for column in columns for value in column] + [0.0]
     low, high = min(values), max(values)
@@ -685,6 +728,8 @@ def render_strip_chart(
                 parts.append(f'<circle cx="{x:.1f}" cy="{y_of(value):.1f}" r="3.5" style="fill:var(--series-{series_index});'
                              f'fill-opacity:.7;stroke:var(--card);stroke-width:1"><title>{escape(name)} · {escape(label)}: '
                              f'{value:+.2f}{escape(value_suffix)}</title></circle>')
+    parts.append(f'<text x="{left + plot_width / 2:.1f}" y="{top + plot_height + 40}" text-anchor="middle">'
+                 f'{escape(x_title)}</text>')
     parts.append('</svg>')
     legend = '<div class="legend">' + ''.join(
         f'<span><span class="swatch series-{index}"></span>{escape(name)}</span>'
@@ -692,123 +737,175 @@ def render_strip_chart(
     return ''.join(parts) + legend
 
 
-def find_column(columns, prefix):
-    """The one column whose name starts with prefix (stored tables from before a rename carry the older name)."""
-    matches = [index for index, name in enumerate(columns) if name.startswith(prefix)]
-    if len(matches) != 1:
-        raise ValueError(f'{len(matches)} columns start with {prefix!r}: {columns}')
-    return matches[0]
+def collect_player_values(columns, rows, column, group_of):
+    """{group: every per-player value in `column` (space-separated in each row)} over the rows, grouped by
+    group_of(row)."""
+    collected = {}
+    for row in rows:
+        collected.setdefault(group_of(row), []).extend(float(value) for value in row[columns.index(column)].split())
+    return collected
 
 
-def card_stability(columns, rows):
-    seasons = sorted({row[0] for row in rows})
-    move_index = find_column(columns, 'Max relative move')
-    flips_index, worst_flip_index = columns.index('Punt flips'), columns.index('Worst punt flip')
-    largest = max(read_leading_number(row[move_index]) for row in rows)
-    flips = sum(read_leading_number(row[flips_index]) for row in rows)
-    text = (f'After an opponent takes the player the model predicted, no candidate\'s H-score moves more than '
-            f'<b>{largest:.2f}%</b> against the field (an H-score is an expected win rate, so that is in percentage '
-            f'points), and <b>{flips:.0f}</b> build{"s" if flips != 1 else ""} change their punts (want 0).'
-            + ('' if flips == 0 else ' Flips: ' + '; '.join(escape(f'{row[0]} {row[1]}: {row[worst_flip_index]}')
-                                                           for row in rows if read_leading_number(row[flips_index]))
-               + '.'))
-    status = render_takeaway('good' if flips == 0 else 'bad', 'passes' if flips == 0 else 'punt flips', text)
-    if 'Every relative move (H-score)' not in columns:
-        return status
-    every_index = columns.index('Every relative move (H-score)')
-    series = []
-    for mode in ('draft', 'auction'):
-        by_season = {row[0]: [float(value) for value in row[every_index].split()] for row in rows if row[1] == mode}
-        if by_season:
-            series.append((mode, [by_season.get(season, []) for season in seasons]))
-    note = ("<div class=\"note\">Every compared candidate's H-score move against the field (its change minus the "
-            'shared shift), one dot each.</div>')
-    return status + note + render_strip_chart([season[2:] for season in seasons], series, 'H-score move', '%')
+def render_stability_charts(columns, rows, group_of, what, include_rank_moves):
+    """The stability charts: how many places each player moves (when include_rank_moves), and how far its category
+    win rates move on average (percentage points), each a histogram grouped by group_of(row). `what` names the
+    comparison. Results saved before the per-player columns existed say so instead of drawing."""
+    if 'Every rank move' not in columns:
+        return ('<div class="takeaway">These results predate the per-player rank and win-rate columns; rerun the '
+                'experiment to draw the charts.</div>')
+    moves = collect_player_values(columns, rows, 'Every rank move', group_of)
+    changes = collect_player_values(columns, rows, 'Every category change', group_of)
+    largest_move = int(max(max(values) for values in moves.values()))
+    move_chart = render_chart([str(move) for move in range(largest_move + 1)],
+                              [Series(group, [sum(int(value) == move for value in values)
+                                              for move in range(largest_move + 1)])
+                               for group, values in moves.items()],
+                              'Players', x_title=f'Places moved ({what})', kind='bars', value_places=0)
+    edges = (0.0, 1.0, 2.0, 5.0, 10.0)
+    labels = [f'{low:g}–{high:g}' for low, high in zip(edges, edges[1:])] + [f'{edges[-1]:g}+']
+    change_chart = render_chart(labels,
+                                [Series(group, [sum(low <= value < high for value in values)
+                                                for low, high in zip(edges, edges[1:])]
+                                        + [sum(value >= edges[-1] for value in values)])
+                                 for group, values in changes.items()],
+                                'Players', x_title=f'Average category win-rate change, points ({what})',
+                                kind='bars', value_places=0)
+    def describe_group(group):
+        places = (f'{sum(value == 0 for value in moves[group])} of {len(moves[group])} players keep their place, and '
+                  if include_rank_moves else '')
+        return (f'{escape(group)}: {places}the average category win rate moves <b>{np.median(changes[group]):.1f}</b> '
+                f'points for the median player (largest {max(changes[group]):.1f}).')
+
+    sentences = [describe_group(group) for group in changes]
+    note_moves = ("Ranking: how many places each player's position moves. 0 is the same place; 1 is two neighbours "
+                  'swapping.')
+    note_changes = ("Builds: the mean over the categories of how far each player's expected category win rate moves, "
+                    'in percentage points. A refinement moves it a point or two; a different punt moves it by ten or '
+                    'more.')
+    ranking = f'<div class="note">{note_moves}</div>' + move_chart if include_rank_moves else ''
+    return (f'<div class="takeaway">{" ".join(sentences)}</div>' + ranking
+            + f'<div class="note">{note_changes}</div>' + change_chart)
 
 
-def derive_stability_table(columns, rows):
-    """The table without the per-candidate moves (they are the chart)."""
-    if 'Every relative move (H-score)' not in columns:
-        return columns, rows
-    every_index = columns.index('Every relative move (H-score)')
-    return ([name for index, name in enumerate(columns) if index != every_index],
-            [[cell for index, cell in enumerate(row) if index != every_index] for row in rows])
+def card_draft_pick_stability(columns, rows):
+    """Per format, how the board moves when an opponent drafts exactly the player the model predicted for them."""
+    return render_stability_charts(columns, rows, lambda row: row[columns.index('Format')],
+                                   'before vs after the predicted pick', include_rank_moves=True)
+
+
+def card_auction_pick_stability(columns, rows):
+    """Per format, how the builds move when an opponent buys exactly the player the model predicted for them. No
+    ranking chart: in an auction a player's place on the board does not matter."""
+    return render_stability_charts(columns, rows, lambda row: row[columns.index('Format')],
+                                   'before vs after the predicted purchase', include_rank_moves=False)
+
+
+def derive_table_without_lists(columns, rows):
+    """The table without the per-player lists (they are the charts)."""
+    kept = [index for index, name in enumerate(columns) if not name.startswith('Every ')]
+    return [columns[index] for index in kept], [[row[index] for index in kept] for row in rows]
 
 
 # Self-play convergence
-def group_self_play_cycles(columns, rows, run):
-    """For one run (rows tagged with that Run; a table without a Run column is one run): per season, the neutral pass,
-    then one row per cycle (two consecutive passes, which between them re-solve every tracked player exactly once, so
-    cycle counts are comparable), then the serve. Returns (rows, cycle changes by season), the changes being how many
-    punts differ from the previous cycle, summed over categories."""
-    pass_index = columns.index('Pass')
-    run_rows = [row for row in rows if 'Run' not in columns or row[columns.index('Run')] == run]
-    grouped, changes = [], {}
-    for season in sorted({row[0] for row in run_rows}):
-        season_rows = [row for row in run_rows if row[0] == season]
-        passes = [row for row in season_rows if row[pass_index] not in ('0', 'serve')]
-        if len(passes) % 2:
-            raise ValueError(f'{season} {run}: {len(passes)} self-play passes, not whole cycles of two')
-        grouped += [row for row in season_rows if row[pass_index] == '0']
-        cycles = []
-        for first, second in zip(passes[0::2], passes[1::2]):
-            counts = np.array([read_leading_number(a) + read_leading_number(b)
-                               for a, b in zip(first[pass_index + 1:], second[pass_index + 1:])])
-            cycles.append(counts)
-            grouped.append(first[:pass_index] + [f'cycle {len(cycles)} (passes {first[pass_index]}-{second[pass_index]})']
-                           + [f'{count:.0f}' for count in counts])
-        grouped += [row for row in season_rows if row[pass_index] == 'serve']
-        changes[season] = [float(np.abs(later - earlier).sum()) for earlier, later in zip(cycles, cycles[1:])]
-    return grouped, changes
-
-
 def list_self_play_runs(columns, rows):
-    """The runs in the table, the app's first; a table without a Run column is the app's run alone."""
-    if 'Run' not in columns:
-        return ['app']
+    """The runs in the table, the app's first."""
     return list(dict.fromkeys(row[columns.index('Run')] for row in rows))
 
 
+def list_punt_columns(columns):
+    """The per-category punt-count columns: every column after 'Max drift'."""
+    return columns[columns.index('Max drift') + 1:]
+
+
+def track_convergence(columns, rows, run, measure):
+    """For one run: per (format, season), one value per block, in order -- 'Mean change' or 'Mean drift' (None
+    where a block has none), or 'Punt changes': how many punt counts changed since the previous block's end, summed
+    over the categories (None for the first block). Returns ({(format, season): [value]}, [block labels])."""
+    format_index, run_index = columns.index('Format'), columns.index('Run')
+    punt_indices = [columns.index(name) for name in list_punt_columns(columns)]
+    values, labels, previous_counts = {}, [], {}
+    for row in rows:
+        if row[run_index] != run:
+            continue
+        key = (row[format_index], row[0])
+        if measure == 'Punt changes':
+            counts = np.array([read_leading_number(row[index]) for index in punt_indices])
+            value = None if key not in previous_counts else float(np.abs(counts - previous_counts[key]).sum())
+            previous_counts[key] = counts
+        else:
+            value = read_leading_number(row[columns.index(measure)])
+        values.setdefault(key, []).append(value)
+        labels.append(row[columns.index('Iterations')])
+    return values, list(dict.fromkeys(labels))
+
+
+def average_blocks_by_format(values_by_key):
+    """{(format, season): [value or None]} -> {format: [mean over seasons, or None]}."""
+    averaged = {}
+    for format_key in dict.fromkeys(key[0] for key in values_by_key):
+        lists = [values for key, values in values_by_key.items() if key[0] == format_key]
+        longest = max(len(values) for values in lists)
+        averaged[format_key] = []
+        for position in range(longest):
+            present = [values[position] for values in lists if position < len(values) and values[position] is not None]
+            averaged[format_key].append(float(np.mean(present)) if present else None)
+    return averaged
+
+
 def card_self_play(columns, rows):
+    """One chart per format, from the longest run (its first blocks are the app's run): the per-iteration movement,
+    the block-to-block drift and the punt counts changed, each averaged over the seasons. Numbers only, no verdict."""
     runs = list_self_play_runs(columns, rows)
-    _, changes = group_self_play_cycles(columns, rows, runs[0])
-    extended = group_self_play_cycles(columns, rows, runs[1])[1] if len(runs) > 1 else {}
-    longest = max(len(values) for values in list(changes.values()) + list(extended.values()))
-    early = np.mean([np.mean(values[:3]) for values in changes.values()])
-    late = np.mean([np.mean(values[-5:]) for values in changes.values()])
-    text = (f'From one cycle to the next, <b>{early:.0f}</b> punts change on average in the first three cycles '
-            f'(summed over the top 12 players and every category) and <b>{late:.0f}</b> in the app\'s last five: the '
-            f'field settles, with small residual motion, as a damped mixed equilibrium should.')
-    if extended:
-        extended_late = np.mean([np.mean(values[-5:]) for values in extended.values()])
-        text += (f' Run for twice as many passes, the last five cycles change <b>{extended_late:.0f}</b> punts on '
-                 f'average.')
-    status = ('good', 'settles') if late < early / 2 else ('warn', 'not settling')
-    series = [Series(season, values + [None] * (longest - len(values)))
-              for season, values in sorted(changes.items())]
-    chart = render_chart([str(index + 2) for index in range(longest)], series, 'Punts changed', kind='line',
-                         value_places=0, y_floor=0.0,
-                         background_series=[Series(f'{season} doubled', values + [None] * (longest - len(values)))
-                                            for season, values in sorted(extended.items())])
-    note = 'Punts changed from the previous cycle, by cycle and season.'
-    if extended:
-        note += ' Grey: the same seasons with the pass count doubled (its first cycles repeat the app\'s).'
-    return render_takeaway(*status, text) + f'<div class="note">{note}</div>' + chart
+    longest_run = runs[-1]
+    app_blocks = len(track_convergence(columns, rows, runs[0], 'Mean change')[1])
+    changes, labels = track_convergence(columns, rows, longest_run, 'Mean change')
+    drifts, _ = track_convergence(columns, rows, longest_run, 'Mean drift')
+    punt_changes, _ = track_convergence(columns, rows, longest_run, 'Punt changes')
+    changes, drifts = average_blocks_by_format(changes), average_blocks_by_format(drifts)
+    punt_changes = average_blocks_by_format(punt_changes)
+    sentences, charts = [], []
+    for format_key in changes:
+        sentence = (f"{escape(format_key)}: a top player's weights move <b>{changes[format_key][0]:.1f}</b> per "
+                    f"iteration in the first 10 iterations and <b>{changes[format_key][app_blocks - 1]:.1f}</b> in the "
+                    f"app's last 10; the block average drifts <b>{drifts[format_key][1]:.1f}</b> between the first two "
+                    f"blocks and <b>{drifts[format_key][app_blocks - 1]:.1f}</b> into the app's last")
+        if len(runs) > 1:
+            sentence += f', <b>{drifts[format_key][-1]:.1f}</b> at the end of the longer run'
+        sentences.append(sentence + '.')
+        measures = (('per-iteration movement', changes[format_key]), ('drift', drifts[format_key]),
+                    ('punt counts changed', punt_changes[format_key]))
+        # In colour up to where the app stops; the longer run's continuation in grey, joined at the app's last block.
+        within_app = [Series(name, values[:app_blocks] + [None] * (len(values) - app_blocks))
+                      for name, values in measures]
+        beyond_app = [Series(f'{name}, beyond the app', [None] * (app_blocks - 1) + values[app_blocks - 1:])
+                      for name, values in measures] if len(runs) > 1 else []
+        charts.append(f'<div class="note"><b>{escape(format_key)}</b></div>' + render_chart(
+            labels, within_app, 'Change', x_title='Iterations', kind='line', value_places=1, y_floor=0.0, height=220,
+            background_series=beyond_app))
+    note = ("Per-iteration movement: the average over each block of 10 iterations of a top-12 player's change in "
+            'category weights from the previous iteration (Euclidean norm, display units); switching back and forth '
+            "counts in full. Drift: each player's weights averaged over a block against the previous block's average; "
+            'back-and-forth cancels and only movement of the average shows. Punt counts changed: how many of the '
+            "table's punt counts (top 12 players under 40% in a category) changed since the previous block's end. All "
+            'averaged over the seasons.' + (f" The charts run to {longest_run.split('(')[-1].rstrip(')')}; the app "
+                                             f'stops after {app_blocks} blocks, and the rest is grey.'
+                                             if len(runs) > 1 else ''))
+    return f'<div class="takeaway">{" ".join(sentences)}</div><div class="note">{note}</div>' + ''.join(charts)
 
 
 def filter_self_play(columns, rows):
     runs = list_self_play_runs(columns, rows)
-    grouped, _ = group_self_play_cycles(columns, rows, runs[0])
-    return grouped, ('Each pass re-solves a random half of the players, so passes are paired into cycles that '
-                     're-solve all 12 once; a cell counts the top 12 players punting that category. The table shows '
-                     "the app's run.")
+    return ([row for row in rows if row[columns.index('Run')] == runs[0]],
+            "One row per block of 10 iterations. The category columns count the top 12 players whose current start "
+            "punts that category at the block's end. The table shows the app's run.")
 
 
 def styles_self_play(columns, rows):
     styles = []
+    first_punt_column = columns.index('Max drift') + 1
     for row in rows:
         row_styles = [''] * len(row)
-        for index in range(columns.index('Pass') + 1, len(row)):
+        for index in range(first_punt_column, len(row)):
             value = read_leading_number(row[index])
             if value:
                 row_styles[index] = style_heat(value / 12)
@@ -816,19 +913,83 @@ def styles_self_play(columns, rows):
     return styles
 
 
-# Warm start
-def card_warm_start(columns, rows):
-    seasons = [row[0] for row in rows]
-    differences = [read_leading_number(row[3]) for row in rows]
-    ok = all(value >= -0.25 for value in differences)
-    text = (f'Continuing the first pick from the self-play builds instead of the seed scan changes the top-12 mean '
-            f'H-score by between <b>{min(differences):+.3f}%</b> and <b>{max(differences):+.3f}%</b> (floor −0.25%): '
-            f'parity, as intended.')
-    chart = render_chart([season[2:] for season in seasons], [Series('warm minus cold', differences)],
-                         'Warm minus cold', kind='dots',
-                         references=(ReferenceLine(0.0, 'parity'), ReferenceLine(-0.25, 'floor −0.25%', True)),
-                         value_suffix='%', value_places=3)
-    return render_takeaway('good' if ok else 'bad', 'passes' if ok else 'breach', text) + chart
+# Self-play best responses
+def card_best_responses(columns, rows):
+    """The numbers only: how far the top served builds fall below the best a long descent reaches, no verdict."""
+    shortfalls = [read_leading_number(row[columns.index('Shortfall')]) for row in rows]
+    worst = max(rows, key=lambda row: read_leading_number(row[columns.index('Shortfall')]))
+    text = (f'Of {len(rows)} top served builds, the mean shortfall from the best a long descent reaches against the '
+            f'same field is <b>{np.mean(shortfalls):.3f}</b> H-score points, and <b>{sum(s > 0.1 for s in shortfalls)}</b> '
+            f'fall more than 0.1 below it. The largest: {escape(worst[columns.index("Player")])} ({escape(worst[0])}, '
+            f'{escape(worst[1])}) at {escape(worst[columns.index("Shortfall")])}.')
+    edges = (0.0, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0)
+    labels = [f'{low:g}–{high:g}' for low, high in zip(edges, edges[1:])] + [f'{edges[-1]:g}+']
+    series = []
+    for format_key in dict.fromkeys(row[columns.index('Format')] for row in rows):
+        values = np.array([read_leading_number(row[columns.index('Shortfall')]) for row in rows
+                           if row[columns.index('Format')] == format_key])
+        counts = [int(((values >= low) & (values < high)).sum()) for low, high in zip(edges, edges[1:])]
+        series.append(Series(format_key, counts + [int((values >= edges[-1]).sum())]))
+    chart = render_chart(labels, series, 'Top served builds', x_title='Shortfall from the best response (H-score points)',
+                         kind='bars', value_places=0)
+    note = ('How many of the top served builds fall short of the best a long descent reaches by each amount '
+            '(H-score points), by format.')
+    ranked = rank_by_served_and_best(columns, rows)
+    moves = {}
+    for (format_key, _), places in ranked.items():
+        moves.setdefault(format_key, []).extend(abs(served - best) for served, best in places.values())
+    largest_move = max(max(values) for values in moves.values())
+    move_labels = [str(move) for move in range(largest_move + 1)]
+    move_series = [Series(format_key, [sum(value == move for value in values) for move in range(largest_move + 1)])
+                   for format_key, values in moves.items()]
+    move_chart = render_chart(move_labels, move_series, 'Top-12 players', x_title='Places moved if served optimally',
+                              kind='bars', value_places=0)
+    moved = '; '.join(f'{escape(format_key)} {sum(value > 0 for value in values)} of {len(values)}'
+                      for format_key, values in moves.items())
+    move_note = ("If every top-12 player were served its best response instead, how many places would it move within "
+                 f"its season's top 12? Players who would move: {moved}. Players outside the top 12 have no best "
+                 'response measured, so a move into the top 12 cannot show.')
+    return (f'<div class="takeaway">{text}</div><div class="note">{note}</div>' + chart
+            + f'<div class="note">{move_note}</div>' + move_chart)
+
+
+def rank_by_served_and_best(columns, rows):
+    """Per (format, season): each player's place in the top 12 by served H-score and by best-response H-score (1 =
+    first). Returns {(format, season): {player: (served place, best place)}}."""
+    places = {}
+    for key in dict.fromkeys((row[columns.index('Format')], row[0]) for row in rows):
+        group = [row for row in rows if (row[columns.index('Format')], row[0]) == key]
+        by_served = sorted(group, key=lambda row: -read_leading_number(row[columns.index('Served H')]))
+        by_best = sorted(group, key=lambda row: -read_leading_number(row[columns.index('Best H')]))
+        best_place = {row[columns.index('Player')]: place for place, row in enumerate(by_best, start=1)}
+        places[key] = {row[columns.index('Player')]: (place, best_place[row[columns.index('Player')]])
+                       for place, row in enumerate(by_served, start=1)}
+    return places
+
+
+def derive_optimality_table(columns, rows):
+    """The rows with each player's place in its season's top 12, served and if optimal, after its name."""
+    places = rank_by_served_and_best(columns, rows)
+    player_index = columns.index('Player')
+    derived = []
+    for row in rows:
+        served, best = places[(row[columns.index('Format')], row[0])][row[player_index]]
+        derived.append(row[:player_index + 1] + [str(served), str(best)] + row[player_index + 1:])
+    return columns[:player_index + 1] + ['Served rank', 'Rank if optimal'] + columns[player_index + 1:], derived
+
+
+# Serve stability
+def is_app_confidence(row, columns):
+    """Rows at the app's own confidence: head to head below C = 1, Rotisserie (always at 1)."""
+    return row[columns.index('Format')] == 'Roto' or read_leading_number(row[columns.index('C')]) < 1
+
+
+def card_serve_stability(columns, rows):
+    """Serve stability, numbers only: per format at the app's own confidence, how the field's players move between
+    self-play's builds and the served ones."""
+    app_rows = [row for row in rows if is_app_confidence(row, columns)]
+    return render_stability_charts(columns, app_rows, lambda row: row[columns.index('Format')],
+                                   'self-play vs served', include_rank_moves=True)
 
 
 # How single-peaked are H-scores
@@ -953,19 +1114,17 @@ def card_seed_starts(columns, rows):
                f'climb to the certified optimum given the long budget.')
     # Nearly every start on one hill: the seed menu cannot be choosing the hill, so seeding's gain is a closer start.
     if app_all >= SEED_ONE_HILL_SHARE:
-        status = ('good', 'a closer start, not a different optimum')
         conclusion = (' Choosing a good starting seed is rarely necessary to eventually find the true optimum. Its '
                       'consistent benefit comes instead from starting closer to the peak, which gets the descent closer '
                       'in fewer iterations.')
     else:
-        status = ('warn', 'seeds on other hills')
         conclusion = (' Some of the app\'s seeds climb a different hill, so for those candidates seeding also decides '
                       'which optimum the app reaches.')
     text = (reached + conclusion + ' Each cell is its seed\'s share; red marks starts that end on another hill. Hover '
             'for how often the seed is the one chosen.')
     app_labels = [f'{name} at 50%' for name in SEED_GRID_CATEGORIES] + ['balanced']
     app_heads = list(SEED_GRID_CATEGORIES) + ['balanced']
-    return (render_takeaway(*status, text)
+    return (render_takeaway(text)
             + '<h3>The app\'s menu</h3><div class="note">Gentle punts (that weight at 50% of neutral) and the balanced '
               'build.</div>' + render_seed_strip(app_cells, app_labels, app_heads)
             + '<h3>The full menu</h3><div class="note">The app\'s seeds above, plus single (diagonal) and double punts '
@@ -994,12 +1153,10 @@ def card_conditioning(columns, rows):
     inside_from = next((index + 1 for index in range(len(outside)) if not any(outside[index:])), None)
     window = f'{UNDERDAMPED_LOW:.3g}-{UNDERDAMPED_HIGH:.3g}'
     if inside_from is not None:
-        status = ('good', f'inside the window from iteration {inside_from}')
         text = (f'For all {candidates} candidates, every direction\'s step x curvature is inside the {window} window '
                 f'from iteration <b>{inside_from}</b> of {len(iterations)} on: from there every direction closes in at '
                 f'sqrt(0.9) = 0.949 per iteration.')
     else:
-        status = ('warn', 'outside the window at the end')
         text = (f'{outside[-1]} of {candidates} candidates still have a direction outside the {window} window after '
                 f'{len(iterations)} iterations.')
     if outside[0]:
@@ -1007,11 +1164,11 @@ def card_conditioning(columns, rows):
                  f'directions sit far above 38 (up to {column("Max")[0]:,.0f} at iteration 1).')
     # A log axis: the first iterations run to the hundreds of thousands, and the window's edges are 0.026 and 38.
     chart = render_chart(iterations, [Series(name, column(name)) for name in ('Max', 'Average', 'Min')],
-                         'Step x curvature (log)', kind='line',
+                         'Step x curvature (log)', x_title='Iteration', kind='line',
                          references=(ReferenceLine(UNDERDAMPED_HIGH, 'stability edge', True),
                                      ReferenceLine(UNDERDAMPED_LOW, 'slow edge', True)),
                          value_places=3, show_points=False, uses_log_scale=True)
-    return (render_takeaway(*status, text) + chart
+    return (render_takeaway(text) + chart
             + '<div class="note">Over every direction of every candidate\'s own descent: every direction lies between '
               'the Max and Min lines.</div>')
 
@@ -1021,12 +1178,11 @@ def card_loop_gain(columns, rows):
     gains = [value for value in column_values(columns, candidate_rows(rows), 'Largest loop gain') if value is not None]
     edges = np.arange(0.0, 1.2, 0.1)
     counts, _ = np.histogram(gains, bins=edges)
-    ok = max(gains) < 1
     text = (f'The largest loop gain at any of the {len(gains)} optima is <b>{max(gains):.3f}</b>: every one is below 1, '
             f'so a nudge to the weights shrinks on its way round and each optimum is a true peak.')
     chart = render_chart([f'{low:.1f}–{low + 0.1:.1f}' for low in edges[:-1]], [Series('optima', list(counts))],
-                         'Optima', kind='bars', value_places=0)
-    return (render_takeaway('good' if ok else 'bad', 'passes' if ok else 'breach', text)
+                         'Optima', x_title='Largest loop gain', kind='bars', value_places=0)
+    return (render_takeaway(text)
             + '<div class="note">How many optima have each largest loop gain (1 is the limit).</div>' + chart)
 
 
@@ -1040,25 +1196,6 @@ def sort_by_loop_gain(columns, rows):
 
 
 # Planner vs H-scoring
-def card_planner(columns, rows):
-    names = [row[0] for row in rows]
-    means = [read_leading_number(row[3]) for row in rows]
-    errors = [2 * read_leading_number(row[4]) for row in rows]
-    wins = [str(row[5]) for row in rows]
-    text = ('Planning concrete teams loses to H-scoring\'s smooth model in every pair: '
-            + '; '.join(f'{escape(name)} <b>{mean:+.2f}%</b> (wins {escape(win)})'
-                        for name, mean, win in zip(names, means, wins)) + '. Bars are ±2 standard errors.')
-    chart = render_chart(names, [Series('planner minus H-scoring', means, errors)], 'Planner minus H', kind='dots',
-                         references=(ReferenceLine(0.0, 'even'),), value_suffix='%', value_places=2, height=200)
-    return render_takeaway('good', 'H-scoring wins', text) + chart
-
-
-def rule_planner(value, row, columns):
-    """No floor here: a negative number is H-scoring winning, the expected result. Only a planner win is marked."""
-    return WARN if value > 0 else ''
-
-
-# Planner vs H-scoring: individual drafts
 def compute_seat_differences(columns, rows):
     """Per planner variant, per seat: the seat's planner score minus its H-scoring score within each pair (each seat
     drafts once with each method in a pair). Returns {variant: (S, pairs) array}."""
@@ -1083,23 +1220,49 @@ def compute_seat_differences(columns, rows):
     return differences
 
 
+def summarize_planner_pairs(columns, rows):
+    """Per planner variant, from the individual drafts: each pair's planner-minus-H-scoring (the mean of its two
+    drafts), and the drafts. Returns {variant: {'pairs': array of pair differences, 'drafts': array of draft
+    differences}}."""
+    difference_index = columns.index('Planner minus H (pp)')
+    summary = {}
+    for variant in dict.fromkeys(row[0] for row in rows):
+        pairs = {}
+        for row in rows:
+            if row[0] == variant:
+                pairs.setdefault(row[1], []).append(read_leading_number(row[difference_index]))
+        summary[variant] = {'pairs': np.array([np.mean(drafts) for drafts in pairs.values()]),
+                            'drafts': np.array([value for drafts in pairs.values() for value in drafts])}
+    return summary
+
+
 def card_planner_drafts(columns, rows):
+    """The whole experiment on one card: per variant the mean pair difference with its standard error and how many
+    pairs and drafts the planner won; then each seat against itself, by draft position. Numbers only."""
+    summary = summarize_planner_pairs(columns, rows)
     differences = compute_seat_differences(columns, rows)
     seat_count = next(iter(differences.values())).shape[0]
+    sentences = []
+    for variant, values in summary.items():
+        pairs, drafts = values['pairs'], values['drafts']
+        seat_means = differences[variant].mean(axis=1)
+        sentences.append(
+            f'{escape(variant)}: <b>{pairs.mean():+.2f}%</b> per pair (standard error {pairs.std(ddof=1) / np.sqrt(len(pairs)):.2f}, '
+            f'pairs from {pairs.min():+.2f} to {pairs.max():+.2f}); the planner wins <b>{int((pairs > 0).sum())} of '
+            f'{len(pairs)}</b> pairs and {int((drafts > 0).sum())} of {len(drafts)} single drafts; by seat, from '
+            f'{seat_means.min():+.2f}% (seat {int(np.argmin(seat_means)) + 1}) to {seat_means.max():+.2f}% (seat '
+            f'{int(np.argmax(seat_means)) + 1}).')
     series = [Series(variant, list(values.mean(axis=1)),
                      list(2 * values.std(axis=1, ddof=1) / np.sqrt(values.shape[1])))
               for variant, values in differences.items()]
-    worst = {variant: int(np.argmin(values.mean(axis=1))) + 1 for variant, values in differences.items()}
-    best = {variant: int(np.argmax(values.mean(axis=1))) + 1 for variant, values in differences.items()}
-    text = ('Each seat against itself, planner minus H-scoring: '
-            + '; '.join(f'{escape(variant)} from <b>{values.mean(axis=1).min():+.2f}%</b> (seat {worst[variant]}) to '
-                        f'<b>{values.mean(axis=1).max():+.2f}%</b> (seat {best[variant]})'
-                        for variant, values in differences.items()) + '. Bars are ±2 standard errors over the pairs.')
-    winning = any((values.mean(axis=1) > 0).any() for values in differences.values())
-    status = ('warn', 'planner wins somewhere') if winning else ('good', 'H-scoring wins every seat')
-    chart = render_chart([str(seat + 1) for seat in range(seat_count)], series, 'Planner minus H', kind='dots',
+    chart = render_chart([str(seat + 1) for seat in range(seat_count)], series, 'Planner minus H',
+                         x_title='Seat (draft position)', kind='dots',
                          references=(ReferenceLine(0.0, 'even'),), value_suffix='%', value_places=2)
-    return render_takeaway(*status, text) + '<div class="note">By draft position.</div>' + chart
+    note = ("A pair is two drafts in which the planner and H-scoring seats swap; its number is the planner seats' mean "
+            "complete-team H-score minus the H-scoring seats', averaged over the two drafts. The chart: each dot is one "
+            "draft position (seat 1 picks first), averaged over the pairs: that seat drafting with the planner minus "
+            'the same seat drafting with H-scoring; bars are ±2 standard errors. One colour per planner variant.')
+    return f'<div class="takeaway">{" ".join(sentences)}</div><div class="note">{note}</div>' + chart
 
 
 def derive_planner_pair_table(columns, rows):
@@ -1120,15 +1283,15 @@ def derive_planner_pair_table(columns, rows):
 
 
 def styles_planner_pairs(columns, rows):
-    """A diverging tint per difference: blue where H-scoring won, orange where the planner won, deeper for more
-    (full depth at 3 points)."""
+    """A diverging tint per difference: purple where H-scoring won, green where the planner won, deeper for more
+    (full depth at 3 points). Its own pair of hues, so it cannot be read as the chart's planner-variant colours."""
     styles = []
     for row in rows:
         row_styles = [''] * len(row)
         for index in range(columns.index('Planner minus H (pp)'), len(row)):
             value = read_leading_number(row[index])
             depth = 0.08 + 0.42 * min(abs(value) / 3.0, 1.0)
-            color = 'var(--heat-rgb)' if value < 0 else '230,159,0'
+            color = '117,112,179' if value < 0 else '27,158,119'
             row_styles[index] = f' style="background:rgba({color},{depth:.2f})"'
         styles.append(row_styles)
     return styles
@@ -1172,14 +1335,9 @@ def card_rules_head_to_head(columns, rows):
         (f'{seasons_ahead} of {len(seasons)}', f'seasons in which s = {best} comes out ahead', ''),
         (f'${read(best, "Unspent (smooth)"):.2f} vs ${read(best, "Unspent (simple scaling)"):.2f}',
          f'left unspent per team at the end: smooth (s = {best}) vs simple scaling', ''),
-        (f'{worst_gap:+.2f}', f'at s = {worst}: it spends too much too early', judge(worst_gap, worst_error)),
+        (f'{worst_gap:+.2f}', f'own-view H-score points per team at s = {worst} (±{2 * worst_error:.2f})',
+         judge(worst_gap, worst_error)),
     ])
-    clear = best_gap - 2 * best_error > 0
-    status = ('good', 'smooth ahead') if clear else ('warn', 'no clear winner')
-    text = (f'Spending surplus cash smoothly, from a little before it is surplus, beats waiting for the surplus: at '
-            f'<b>s = {escape(best)}</b> the smooth drafters finish ahead of the simple-scaling drafters in their own '
-            f'view in {seasons_ahead} of {len(seasons)} seasons and leave a fraction of the money on the table. Softer '
-            f'is not better without limit: at s = {escape(worst)} they overpay early and lose.')
 
     groups = seasons + ['All']
 
@@ -1192,7 +1350,7 @@ def card_rules_head_to_head(columns, rows):
         [Series(f's = {softness}', [read_season(softness, season, 'Own view gap') for season in groups],
                 [2 * read_season(softness, season, 'Own view SE') for season in groups])
          for softness in softnesses],
-        'Own-view H-score points, smooth - simple', kind='bars', references=(ReferenceLine(0.0, 'no difference'),),
+        'Own-view H-score points, smooth - simple', x_title='Season', kind='bars', references=(ReferenceLine(0.0, 'no difference'),),
         value_places=2, height=250)
 
     def spending_gap(softness, round_number):
@@ -1204,13 +1362,13 @@ def card_rules_head_to_head(columns, rows):
         [str(round_number) for round_number in rounds],
         [Series(f's = {softness}', [spending_gap(softness, round_number) for round_number in rounds])
          for softness in softnesses],
-        '$ spent so far, smooth - simple', references=(ReferenceLine(0.0, 'even'),), value_places=1, height=280,
+        '$ spent so far, smooth - simple', x_title='Auction round', references=(ReferenceLine(0.0, 'even'),), value_places=1, height=280,
         width=540)
     unspent_chart = render_chart(
         [f's = {softness}' for softness in softnesses],
         [Series(label, [read(softness, f'Unspent ({label})') for softness in softnesses]) for label in RULE_LABELS],
-        '$ left per team', kind='bars', value_places=2, height=280, width=540)
-    return (render_takeaway(*status, text) + tiles
+        '$ left per team', x_title='Cash-share softness', kind='bars', value_places=2, height=280, width=540)
+    return (tiles
             + '<h3>Does it win every season?</h3><div class="note">Own view, each season and pooled; whiskers are ±2 '
               'standard errors across 40 pairs of auctions per season.</div>' + gap_chart
             + '<div class="multiples"><div><h3>Where the money goes</h3><div class="note">How much more the smooth '
@@ -1267,18 +1425,15 @@ def card_rule_builds(columns, rows):
          f'misfits per team at s = {softness}, smooth vs simple scaling',
          'good' if softness in no_cost else 'warn')
         for softness in softnesses])
-    text = ('Bidding up the stars does not cost the smooth drafters their builds: they put the same share of their '
-            'value into the categories they punt as the simple-scaling drafters, and carry about as many misfits'
-            + (f' (no more at s = {", ".join(no_cost)}).' if no_cost else '.'))
     misfit_chart = render_chart(
         [f's = {softness}' for softness in softnesses],
         [Series(rule, [read(softness, rule, 'Misfits per team') for softness in softnesses]) for rule in RULE_LABELS],
-        'Misfits per team', kind='bars', value_places=2, height=260, width=540)
+        'Misfits per team', x_title='Cash-share softness', kind='bars', value_places=2, height=260, width=540)
     punted_chart = render_chart(
         [f's = {softness}' for softness in softnesses],
         [Series(rule, [read(softness, rule, 'Value in punted') for softness in softnesses]) for rule in RULE_LABELS],
-        'Value in punted categories', kind='bars', value_suffix='%', value_places=0, height=260, width=540)
-    return (render_takeaway('good' if no_cost else 'warn', 'builds hold' if no_cost else 'builds slip', text) + tiles
+        'Value in punted categories', x_title='Cash-share softness', kind='bars', value_suffix='%', value_places=0, height=260, width=540)
+    return (tiles
             + '<div class="multiples"><div><h3>Misfits</h3><div class="note">Players with at least half their value '
               'in categories the team punts.</div>' + misfit_chart + '</div>'
             + '<div><h3>Value in punted categories</h3><div class="note">Share of the team\'s positive value; a '
@@ -1338,9 +1493,9 @@ def card_dollar_shape(columns, rows):
              (app_replacement, 'high', f'S = {read(app_replacement, "high", "SAVOR noise"):g}, S_R = ${threshold:g}')]
     shape_chart = render_chart(
         ranks, [Series(label, percent_change(replacement, savor)) for replacement, savor, label in cells],
-        '% change in dollars', references=(ReferenceLine(0.0, 'neither'),), value_suffix='%', value_places=0,
+        '% change in dollars', x_title='Rank of the drafted player (by value)', references=(ReferenceLine(0.0, 'neither'),), value_suffix='%', value_places=0,
         height=280, show_points=False)
-    return (render_takeaway('good', 'shape', text) + tiles
+    return (render_takeaway(text) + tiles
             + '<h3>Who gains and who pays</h3><div class="note">Each drafted rank\'s dollars at the start of an '
               'auction, in percent against neither adjustment, mean over the six seasons. The top ranks gain what the '
               'bottom ones lose.</div>' + shape_chart)
@@ -1428,6 +1583,112 @@ def card_loss(columns, rows):
     return headline + f'<div class="bar-track">{"".join(segments)}</div><div class="legend">{"".join(legend)}</div>'
 
 
+APP_LOSS_COLUMNS = ['Multi-starting', 'Full seed menu', 'Iterations']
+
+
+def card_app_loss(columns, rows):
+    """Per format, one bar: the format's total loss split among the three fixes that recover it,
+    each a share of the whole (the exact-solution page's bar; App loss has no neutral start, so no seeding segment).
+    Every bar is its own format's gap from a neutral start to the best found (the formats' H-scores are on different
+    scales: Rotisserie's is a league-win probability): first what the app's seeding already recovers, then the three
+    losses; its label gives the total loss. Rotisserie has no seeding, so its bar is its loss alone."""
+    format_index = columns.index('Format')
+    names = {'EC': 'Each Category', 'MC': 'Most Categories', 'Roto': 'Rotisserie'}
+    bars = []
+    for format_key in [key for key in names if any(row[format_index] == key for row in rows)]:
+        format_rows = [row for row in rows if row[format_index] == format_key]
+        summary = find_summary(format_rows, 'Mean of', column_index=1)
+        cost_row = find_summary(format_rows, 'Cost to fix', column_index=1)
+        candidates = candidate_rows(format_rows)
+        total = read_leading_number(summary[columns.index('Total loss')])
+        average_app = read_leading_number(summary[columns.index('App')])
+        loss_sums = {cause: sum(read_leading_number(row[columns.index(cause)]) for row in candidates)
+                     for cause in APP_LOSS_COLUMNS}
+        # Rotisserie has no seeding (its one low-variance seed): no seeding segment, and its bar is its loss alone.
+        average_seeding = read_leading_number(summary[columns.index(SEEDING_COLUMN)])
+        if average_seeding is None:
+            whole = sum(loss_sums.values())
+            segments, legend = [], []
+            span = 'the bar is the whole loss; Rotisserie has no seeding'
+        else:
+            seeding_sum = max(sum(read_leading_number(row[columns.index(SEEDING_COLUMN)]) for row in candidates), 0.0)
+            whole = seeding_sum + sum(loss_sums.values())
+            seeding_share = round(100 * seeding_sum / whole) if whole else 0
+            segments = [f'<div class="bar-segment seeding" style="flex-basis:{seeding_share:g}%" '
+                        f'title="Seeding: {seeding_share:g}% of the gap from a neutral start, already recovered by the '
+                        f'app"></div>']
+            legend = [f'<span><span class="swatch seeding"></span>Seeding {seeding_share:g}% &middot; already in the '
+                      f'app (+{average_seeding:.3f} over a neutral start)</span>']
+            span = 'the bar is the gap from a neutral start to the best found'
+        for position, (cause, cause_sum) in enumerate(loss_sums.items()):
+            share = round(100 * cause_sum / whole) if whole else 0
+            segments.append(f'<div class="bar-segment series-{position}" style="flex-basis:{share:g}%" '
+                            f'title="{escape(cause)}: {share:g}% of the bar"></div>')
+            legend.append(f'<span><span class="swatch series-{position}"></span>{escape(cause)} {share:g}% '
+                          f'&middot; fix: {escape(cost_row[columns.index(cause)])} the work</span>')
+        bars.append((names[format_key], total, average_app, span, segments, legend))
+    return ''.join(
+        f'<h3>{name}: total loss <b>{total:.3f}%</b> <span class="note">(of an average H-score of '
+        f'{average_app:.2f}%; {span})</span></h3>'
+        f'<div class="bar-track">{"".join(segments)}</div>'
+        f'<div class="legend">{"".join(legend)}</div>' for name, total, average_app, span, segments, legend in bars)
+
+
+# How far below the best the app's seed's peak ends, in H-score points: the bins of the Peakedness chart for the seeds
+# that miss the best (whether a seed reaches it is the stored yes/no, judged before rounding).
+PEAK_SHORTFALL_EDGES = (0.05, 0.1, 0.5)
+# Candidates with this many peaks or more share the last bar of the peaks chart.
+PEAK_COUNT_CAP = 10
+
+
+def card_peakedness(columns, rows):
+    """Per format: how many candidates have more than one peak and how often the app's seed ends below the best, then
+    two histograms -- the number of peaks per candidate, and how far below the best the app's seed's peak is."""
+    format_index = columns.index('Format')
+    names = {'EC': 'Each Category', 'MC': 'Most Categories', 'Roto': 'Rotisserie'}
+    formats = [key for key in names if any(row[format_index] == key for row in rows)]
+    by_format = {key: candidate_rows([row for row in rows if row[format_index] == key]) for key in formats}
+    peaks = {key: [int(row[columns.index('Peaks')]) for row in by_format[key]] for key in formats}
+    misses = {key: [read_leading_number(row[columns.index("App's seed's peak (below best)")])
+                    for row in by_format[key] if row[columns.index("App's seed reaches best")] == 'no']
+              for key in formats}
+
+    def describe_format(key):
+        count = len(peaks[key])
+        if misses[key]:
+            miss_text = (f"the app's seed ends below the best for {len(misses[key])} (median "
+                         f'{np.median(misses[key]):.2f}, largest {max(misses[key]):.2f} points)')
+        else:
+            miss_text = "the app's seed reaches the best for every candidate"
+        return (f'{names[key]}: {sum(value > 1 for value in peaks[key])} of {count} candidates have more than one '
+                f'peak; {miss_text}.')
+
+    peak_labels = [str(count) for count in range(1, PEAK_COUNT_CAP)] + [f'{PEAK_COUNT_CAP}+']
+    peak_chart = render_chart(peak_labels,
+                              [Series(key, [sum(value == count for value in peaks[key])
+                                            for count in range(1, PEAK_COUNT_CAP)]
+                                      + [sum(value >= PEAK_COUNT_CAP for value in peaks[key])]) for key in formats],
+                              'Candidates', x_title="Peaks (distinct end points of the full menu's starts)",
+                              kind='bars', value_places=0)
+    edges = PEAK_SHORTFALL_EDGES
+    labels = (['reaches best', f'under {edges[0]:g}'] + [f'{low:g}–{high:g}' for low, high in zip(edges, edges[1:])]
+              + [f'{edges[-1]:g}+'])
+
+    def bin_shortfalls(key):
+        values = misses[key]
+        return ([len(peaks[key]) - len(values), sum(value < edges[0] for value in values)]
+                + [sum(low <= value < high for value in values) for low, high in zip(edges, edges[1:])]
+                + [sum(value >= edges[-1] for value in values)])
+
+    shortfall_chart = render_chart(labels, [Series(key, bin_shortfalls(key)) for key in formats],
+                                   'Candidates', x_title="How far below the best the app's seed ends after 2,000 "
+                                                         'iterations, H-score points', kind='bars', value_places=0)
+    return (render_takeaway(' '.join(describe_format(key) for key in formats))
+            + '<div class="note">How many peaks each candidate has.</div>' + peak_chart
+            + "<div class=\"note\">Where the app's own seed ends: on the best peak, or how far below it.</div>"
+            + shortfall_chart)
+
+
 def styles_loss(columns, rows):
     """Green for no loss at all; red strengthening with the loss (in the summary row, with its share of the total),
     bold in the top half of the scale, which tops out at the 95th percentile of the losses; a gain stays uncoloured."""
@@ -1449,7 +1710,8 @@ def styles_loss(columns, rows):
                 continue
             if is_summary_row(row):
                 total = read_leading_number(row[total_index])
-                if not total or index == total_index or row[0].startswith('Cost to fix'):
+                if not total or index == total_index or any(str(cell).startswith('Cost to fix')
+                                                            for cell in row[:2]):
                     continue
                 row_styles[index] = style_bad(loss / total)
             elif loss == 0:
@@ -1469,9 +1731,11 @@ SECTION_VIEWS: dict[str, SectionView] = {
                                                              cell_styles=styles_dollar_shape_table),
     'H-scoring vs a G-score field': SectionView(
         card=card_h_versus_g,
-        cell_styles=make_rule_styles({'Mean win rate': rule_season_win_rate,
+        cell_styles=make_rule_styles({'Mean H-score': rule_season_win_rate,
                                       **{f'S{seat}': rule_seat_win_rate for seat in range(1, 13)}}),
-        formatters={'Mean win rate': format_percent, **{f'S{seat}': format_percent for seat in range(1, 13)}},
+        formatters={'Mean H-score': format_percent, 'Mean real win rate': format_percent,
+                    **{f'S{seat}': format_percent for seat in range(1, 13)}},
+        derive_table=derive_table_without_lists,
     ),
     'Awareness (opponent model on vs off)': SectionView(
         card=card_awareness,
@@ -1491,8 +1755,8 @@ SECTION_VIEWS: dict[str, SectionView] = {
         cell_styles=make_rule_styles({'Hard': rule_hard_punts, 'Soft': rule_soft_punts,
                                       'Weakest rate': rule_weakest_rate}),
     ),
-    'Predicted-pick stability (EC; opponent takes its predicted player)': SectionView(
-        card=card_stability,
+    'Draft pick stability': SectionView(
+        card=card_draft_pick_stability,
         cell_styles=make_rule_styles({
             'Max dweight': lambda value, row, columns: GOOD if value <= 5 else BAD,
             'Punt flips': lambda value, row, columns: GOOD if value == 0 else BAD,
@@ -1501,16 +1765,27 @@ SECTION_VIEWS: dict[str, SectionView] = {
         }),
         formatters={'Shared shift (H-score)': lambda cell: format_percent(cell, signed=True),
                     'Max relative move (H-score)': format_percent},
-        derive_table=derive_stability_table,
+        derive_table=derive_table_without_lists,
     ),
-    'Self-play convergence (MC bootstrap)': SectionView(card=card_self_play, cell_styles=styles_self_play,
-                                                        row_filter=filter_self_play),
-    'Warm start (purpose: display stability, not better answers)': SectionView(
-        card=card_warm_start,
-        cell_styles=make_rule_styles({'Warm - cold': lambda value, row, columns: GOOD if value >= -0.25 else BAD}),
-        formatters={'Warm mean H': format_percent, 'Cold mean H': format_percent,
-                    'Warm - cold': lambda cell: format_percent(cell, signed=True)},
+    'Auction pick stability': SectionView(
+        card=card_auction_pick_stability,
+        cell_styles=make_rule_styles({
+            'Max dweight': lambda value, row, columns: GOOD if value <= 5 else BAD,
+            'Punt flips': lambda value, row, columns: GOOD if value == 0 else BAD,
+            'Shared shift (H-score)': lambda value, row, columns: '' if abs(value) <= 5 else BAD,
+            'Shared shift (whole board)': lambda value, row, columns: '' if abs(value) <= 5 else BAD,
+        }),
+        formatters={'Shared shift (H-score)': lambda cell: format_percent(cell, signed=True),
+                    'Max relative move (H-score)': format_percent},
+        derive_table=derive_table_without_lists,
     ),
+    'Self-play convergence': SectionView(card=card_self_play, cell_styles=styles_self_play, row_filter=filter_self_play),
+    'Self-play optimality': SectionView(
+        card=card_best_responses,
+        derive_table=derive_optimality_table,
+    ),
+    'Serve stability': SectionView(card=card_serve_stability, derive_table=derive_table_without_lists,
+                                   wrap_columns=('Top 12 unseated',)),
     'How single-peaked are H-scores': SectionView(
         card=card_seed_starts,
         derive_table=derive_seed_miss_table,
@@ -1531,23 +1806,17 @@ SECTION_VIEWS: dict[str, SectionView] = {
         sort_rows=sort_by_loop_gain,
     ),
     'Where the app loses to the optimum': SectionView(card=card_loss, cell_styles=styles_loss),
-    'Planner vs H-scoring: individual drafts': SectionView(
+    'App loss': SectionView(card=card_app_loss, cell_styles=styles_loss),
+    'Peakedness': SectionView(card=card_peakedness),
+    'Planner vs H-scoring': SectionView(
         card=card_planner_drafts,
         cell_styles=styles_planner_pairs,
         derive_table=derive_planner_pair_table,
         formatters={'Planner minus H (pp)': lambda cell: format_percent(cell, signed=True),
                     **{f'S{seat}': (lambda cell: format_percent(cell, signed=True)) for seat in range(1, 13)}},
         row_filter=lambda columns, rows: (rows, 'Each cell is that seat drafting with the planner minus the same seat '
-                                                'drafting by H-scoring, in the same pair. Blue: H-scoring better; '
-                                                'orange: the planner better.'),
-    ),
-    'Planner vs H-scoring (paired 6v6 drafts)': SectionView(
-        card=card_planner,
-        cell_styles=make_rule_styles({'Planner minus H (pp)': rule_planner, 'Worst (pp)': rule_planner,
-                                      'Best (pp)': rule_planner}),
-        formatters={'Planner minus H (pp)': lambda cell: format_percent(cell, signed=True), 'SE (pp)': format_percent,
-                    'Worst (pp)': lambda cell: format_percent(cell, signed=True),
-                    'Best (pp)': lambda cell: format_percent(cell, signed=True)},
+                                                'drafting by H-scoring, in the same pair. Purple: H-scoring better; '
+                                                'green: the planner better.'),
     ),
 }
 
@@ -1618,33 +1887,70 @@ def render_section_body(data: dict) -> str:
     if view is not None and view.row_filter is not None:
         rows, note_text = view.row_filter(columns, rows)
         note = f'<div class="note">{escape(note_text)}</div>'
-    return card + note + render_table(columns, rows, view)
+    details = (f'<div class="details"><b>Details</b>{render_explanation_html(data["details"])}</div>'
+               if data.get('details') else '')
+    return card + details + note + render_table(columns, rows, view)
 
 
-def render_section_panel(data: dict, position: int) -> str:
-    """One tab's panel: title, generation time, explanation, takeaway card, table."""
+def describe_generation(data: dict) -> str:
+    """When the page's results were generated: one time, or one per format when its formats were run separately."""
+    by_format = data.get('generated_by_format')
+    if not by_format or len(set(by_format.values())) == 1:
+        return f'generated {escape(data["generated"])}'
+    return 'generated ' + ', '.join(f'{escape(format_key)} {escape(when)}' for format_key, when in by_format.items())
+
+
+def render_section_panel(data: dict, position: int, parts: list[dict]) -> str:
+    """One tab's panel: title, generation time, explanation, takeaway card, table; then each part (another stored
+    section of the same experiment) under its own heading, with its explanation, card and table."""
     active = ' class="active"' if position == 0 else ''
+    rendered_parts = ''.join(f'\n<h2 class="part">{escape(PART_HEADINGS[part["title"]])}</h2>\n'
+                             f'{render_explanation_html(part["explanation"])}\n{render_section_body(part)}'
+                             for part in parts)
     return (f'<section id="tab-{position}"{active}>\n<h2>{escape(data["title"])}</h2>\n'
-            f'<div class="generated">generated {escape(data["generated"])}</div>\n'
-            f'{render_explanation_html(data["explanation"])}\n{render_section_body(data)}\n</section>')
+            f'<div class="generated">{describe_generation(data)}</div>\n'
+            f'{render_explanation_html(data["explanation"])}\n{render_section_body(data)}{rendered_parts}\n</section>')
+
+
+# Stored sections that are parts of another section's page, not tabs of their own: {page: [part, ...]}. An experiment
+# that records two tables still has one page.
+SECTION_PARTS = {
+    'Smooth vs simple scaling': ['Cash-share rules: builds (own view)'],
+}
+PART_HEADINGS = {'Cash-share rules: builds (own view)': 'Builds'}
 
 
 # The tab groups, in page order; a stored section in none of them is listed last under 'Other'.
 SECTION_GROUPS = {
-    'Draft performance simulations': [
+    # Does H-scoring win drafts?
+    'Draft performance': [
         'H-scoring vs a G-score field',
         'Awareness (opponent model on vs off)',
-        'Planner vs H-scoring (paired 6v6 drafts)',
-        'Planner vs H-scoring: individual drafts',
+        'Planner vs H-scoring',
     ],
-    'Algorithm behavior': [
-        'Self-play convergence (MC bootstrap)',
+    # Does self-play find an equilibrium?
+    'Self-play': [
+        'Self-play convergence',
+        'Self-play optimality',
+    ],
+    # Does the board move when nothing has really changed?
+    'Stability': [
+        'Serve stability',
+        'Draft pick stability',
+        'Auction pick stability',
+    ],
+    # Are the builds the app predicts and serves sensible?
+    'Served builds': [
         'Punt diversity (top-12 anchors)',
         'Rotisserie punting (hard <15% / soft 15-40% expected win rate)',
-        'Predicted-pick stability (EC; opponent takes its predicted player)',
-        'Warm start (purpose: display stability, not better answers)',
     ],
+    # How far is the app's answer from the best build, on the app's actual objective?
     'Gradient descent optimality': [
+        'App loss',
+        'Peakedness',
+    ],
+    # The same questions on a simplified objective, against a certified optimum.
+    'Simplified form with exact solution': [
         'Where the app loses to the optimum',
         'How single-peaked are H-scores',
         'Conditioning around the optimum',
@@ -1652,7 +1958,6 @@ SECTION_GROUPS = {
     ],
     'Auctions': [
         'Smooth vs simple scaling',
-        'Cash-share rules: builds (own view)',
         'Dollar shape: replacement level and SAVOR',
     ],
 }
@@ -1661,6 +1966,9 @@ SECTION_GROUPS = {
 def group_sections(sections: list[dict]) -> list[tuple[str, list[dict]]]:
     """The stored sections under their group names, in SECTION_GROUPS order."""
     by_title = {data['title']: data for data in sections}
+    for part_titles in SECTION_PARTS.values():
+        for title in part_titles:
+            by_title.pop(title, None)
     groups = [(name, [by_title.pop(title) for title in titles if title in by_title])
               for name, titles in SECTION_GROUPS.items()]
     groups.append(('Other', list(by_title.values())))
@@ -1698,6 +2006,7 @@ document.querySelectorAll('.group-tabs button').forEach(function (button) {
 def render_report_page(sections: list[dict], subtitle: str) -> str:
     """The whole page: a row of group tabs, under it the chosen group's section tabs, one panel per section."""
     group_buttons, section_rows, panels, position = [], [], [], 0
+    by_title = {data['title']: data for data in sections}
     for group_index, (group_name, members) in enumerate(group_sections(sections)):
         group_active = ' class="active"' if group_index == 0 else ''
         group_buttons.append(f'<button data-group="{group_index}"{group_active}>{escape(group_name)}</button>')
@@ -1705,7 +2014,8 @@ def render_report_page(sections: list[dict], subtitle: str) -> str:
         for data in members:
             active = ' class="active"' if position == 0 else ''
             buttons.append(f'<button data-tab="{position}"{active}>{escape(data["title"].split(" (")[0])}</button>')
-            panels.append(render_section_panel(data, position))
+            parts = [by_title[title] for title in SECTION_PARTS.get(data['title'], []) if title in by_title]
+            panels.append(render_section_panel(data, position, parts))
             position += 1
         row_class = 'tab-buttons active' if group_index == 0 else 'tab-buttons'
         section_rows.append(f'<div class="{row_class}" data-group="{group_index}">{"".join(buttons)}</div>')

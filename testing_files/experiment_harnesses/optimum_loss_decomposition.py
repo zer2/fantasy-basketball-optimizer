@@ -308,7 +308,7 @@ def capture_final_descent(client, session_id, agent, request) -> dict:
         del agent.get_objective_and_gradient, agent.perform_iterations
     final_descent = descents[-1]
     if not final_descent['seeds'] or final_descent['final'] is None:
-        raise RuntimeError('The final descent scored no seed menu (a warm-started evaluate is not a cold start).')
+        raise RuntimeError('The final descent scored no seed menu (the evaluate did not run its seed scan).')
     return final_descent
 
 

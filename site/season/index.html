@@ -686,7 +686,7 @@
 <figure>
 <p><img alt="Waiver G-score breakdown" src="../img/hwaiverexp.png" /></p>
 <figcaption>
-<p>A breakdown of how Sam Hauser contributes to a team in terms of G-score.</p>
+<p>A breakdown of how Paul George would contribute to a team in terms of G-score, 2025-26.</p>
 </figcaption>
 </figure>
 <h2 id="trading-tab">Trading tab</h2>
@@ -702,13 +702,13 @@
 <p>Only trades with the same number of players sent and received can be analyzed. </p>
 <p>In theory asymmetric trades could be analyzed. The team getting bigger could be scored by checking every possible set of players that could be dropped and finding the option that maximizes H-score. The team getting smaller could be scored with the normal H-scoring algorithm, which chooses one candidate from the pool of available players and generates a future draft strategy if needed. However, this process is very sensitive to the conditions of the available player pool. If an injured player has been dropped by another team, they could still be considered as a potential addition. The trade would then look artificially good because H-scoring would jump on that player's optimistic projection. Practically, this makes it difficult to analyze asymmetric trades robustly. For the sake of simplicity the option has been removed. </p>
 <h3 id="trade-suggestions">Trade suggestions</h3>
-<p>Below the trade analysis module, trade suggestions are shown. </p>
+<p>Below the trade analysis module, trade suggestions are shown. Clicking on a potential trade automatically brings the details up to the analysis module.  </p>
 <p><img alt="Trade suggestions list" src="../img/tradesuggestions.png" /></p>
 <p>Which trades end up being shown as suggestions depends on the user-configurable trade parameters. </p>
 <p><img alt="Trade parameters" src="../img/tp3.png" /></p>
-<p>Candidate trades are found by iterating through all combinations of possible trades. Those trades are first filtered by a general value difference threshold, which limits candidate trades to those between collections of players whose total general values are similar to each other. Specifically, if the difference in total H-score (calculated for the first pick of a draft, with no players selected) between the two groups of players that are to be traded is above 2%, the trade will not be considered for analysis. E.g. a trade between two 48% players and two 50% players has an H-score difference of 4%, which is above the threshold, so the trade will not be analyzed further. This is to prevent unnecessary computation checking trades that are unlikely to be viable. </p>
-<p>After trades are analyzed for H-score implications, one more filter is applied. Only those which meet the H-score differential thresholds as supplied by the user are shown. </p>
-<p>Even with all this filtering, there can be many possible trades to look through, especially when looking for trades with large numbers of players and when the parameters for acceptable trades are loose. For the purpose of limiting computation time, only 1x1 trades are searched for by default. 2x2 and 3x3 are also available. </p>
+<p>Candidate trades are found by iterating through all combinations of possible trades. They are checked to see how they would change H-scores for each team, and those which surpass the user-supplied differential thresholds are shown as suggestions. The thresholds cannot be lowered below -2%; loose filters allow an extreme number of candidate trades to be displayed. </p>
+<p>Searching prospective trades can be computationally expensive. For the purpose of limiting computation time, only 1x1 trades are searched for by default. 2x2 and 3x3 are also available. </p>
+<p>Also, candidate trades are processed in batches, starting with pairs of player sets that are within 1% of each other in the sum of total H-scores (calculated for the first pick of a draft, with no players selected). Then the criterion is relaxed to 2%, 3% etc., until all of the 10%+ trades are evaluated at once. This is so that the most promising trades are evaluated first, and can be inspected before all possibilities are processed. </p>
 <h2 id="rosters-tab">Rosters tab</h2>
 <h3 id="roster-table">Roster table</h3>
 <p>Rosters can be manually input or edited on this tab. It is unnecessary if rosters are loaded through a platform integration.</p>

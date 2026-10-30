@@ -193,7 +193,7 @@ def store_candidate_strategies(
     , n_my_players: int
 ) -> None:
     """Keep each scored candidate's CandidateStrategy for this board, merged across batches, so the hypothetical team
-    reads exactly the strategy on screen without re-solving (a re-solve would move the agent's warm-start state).
+    reads exactly the strategy on screen without re-solving.
     Entries remember the agent they came from; a rebuild invalidates them."""
     if h_score_result['Weights'] is None:
         return
@@ -233,8 +233,7 @@ def rank_candidates(
     """Drive the HAgent gradient-descent loop and return ranked candidates.
 
     Runs the agent's get_h_scores solve for the requested board and converts the
-    result into a serialisable EvaluateResponse. Warm-start state is managed by
-    the agent itself, primed from the neutral baseline built at session creation.
+    result into a serialisable EvaluateResponse.
 
     Args:
         session:            The active session (fetched by the caller). n_iterations

@@ -14,7 +14,6 @@ When the selected mode from the left sidebar is 'Auction Mode', the website will
 
 Player selection information can be entered into the table through the selectors above it. Teams can also be toggled to autodraft using the 'A' button next to each team name in the column headers. Autodrafters rotate nominations, opening the bidding at $1. Drafters then take turns in set circular order bidding $1 higher whenever the price remains within their budget and calculated valuation; otherwise, they must pass and can no longer bid on that player. Bidding among the autodrafters is settled at once, so manual drafters are first asked at the price the autodrafters reach on their own (the second-highest autodrafter's limit, or $1 above it); no lower manual bid could win. From there, non-autobidders have one turn per cycle to either pass, increase the bid by $1, or optionally increase the bid by more. Bidding continues until everyone else passes and one player wins.
 
-
 ### Live connection 
 
 Yahoo auctions can be integrated with the website, like drafts. 

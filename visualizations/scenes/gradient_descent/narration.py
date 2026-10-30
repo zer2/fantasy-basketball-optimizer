@@ -22,4 +22,8 @@ NARRATION = {
     'the_top':
         'We stop when we cannot move up much more. After thirty steps, we usually are quite close to the top. This works '
         'well in general, even across many dimensions.',
+    'example':
+        'Here\'s an example of gradient descent working on a real candidate player. The algorithm is '
+        'trying to climb up the multi-dimensional hill. Sometimes it steps too far but in general it '
+        'moves up, and the weights at the end score better than the weights that it started with. '
 }
