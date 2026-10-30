@@ -73,8 +73,8 @@ class Session:
     # live platform is connected.
     platform_player_id_lookup: Optional[PlatformPlayerLookup] = None
 
-    # Serialises work on this one session. An evaluate mutates shared agent state (warm-start
-    # weights via get_h_scores), and a PATCH rebuilds the pipeline in place, so two overlapping
+    # Serialises work on this one session. An evaluate mutates shared agent state (the per-draft
+    # opponent store via get_h_scores), and a PATCH rebuilds the pipeline in place, so two overlapping
     # requests on the same session corrupt each other and 500. The frontend aborts its previous
     # request before firing the next, but an aborted fetch does not stop the server-side handler,
     # so the two still overlap here. Every request that reads or mutates agent/pipeline state holds

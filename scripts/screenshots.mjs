@@ -320,6 +320,9 @@ const STATES = {
         await page.waitForTimeout(500)
     },
     async 'league-settings'(page)   { await ensure(page, 'draft-EC'); await expandSection(page, /League Settings/i) },
+    // 2020-21 shot: the first pick of Each Category in 2020-21, where self-play's field crowds into punting Free
+    // Throw % (the docs' example of crowding at C = 0.5). Runs at the END -- leaks the old season.
+    async 'draft-EC-2020-21'(page)  { await ensure(page, 'draft-EC'); await selectHistoricalSeason(page, '2020-21') },
 
     // hexp / hstrat feature Giannis — the docs' punt-strategy exemplar (he's a top-5 EC pick in 2024-25).
     // The detailed drop-down shots (hexp/hstrat/hflex/hroster) illustrate a team that took Giannis
@@ -710,6 +713,7 @@ const SHOTS = [
     // Order matters: `historical` (base 2025-26) and `1984-85` before `projections` flips the type.
     { name: 'projections', state: 'player-stats-proj', selector: '#ps-proj-section' },
     { name: '1984-85',     state: 'season-1984-85',    selector: '#hscoretable', rows: 12 },
+    { name: 'crowding2021', state: 'draft-EC-2020-21', selector: '#hscoretable', rows: 12 },
 
     // Autodraft — runs late because toggling the "A" squares triggers autopilot, which mutates the
     // draft/candidate board for anything after it. Draft-mode state, so it precedes the platform shots.

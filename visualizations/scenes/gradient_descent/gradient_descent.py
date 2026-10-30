@@ -1,24 +1,28 @@
-"""What gradient descent is: one start, walking uphill until it cannot.
+"""What gradient descent is: one start, walking uphill until it cannot; then a real candidate's descent.
 
 Run `python visualizations/shared/prepare_weight_surface_data.py` first: one bootstrap run
-measures the slices both this scene and its sibling read.
+measures the slices both this scene and its sibling read. The example is a recorded descent
+(prepare_descent_trace_data.py; EXAMPLE_TRACE names it), drawn by the descent-trace scene's code
+without its seed menu.
 
     manim -ql visualizations/scenes/gradient_descent/gradient_descent.py GradientDescent
 """
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
-from manim import FadeIn, PURPLE_A
+from manim import DEGREES, ORIGIN, FadeIn, FadeOut, Indicate, PURPLE_A, YELLOW
 from manim_voiceover import VoiceoverScene
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from shared.weight_surface_base import (                              # noqa: E402
     WeightSurfaceScene, CAMERA_DRIFT, CLIMB_ZOOM, DESCENT_RUN_TIME, READOUT_PURPLE,
 )
-from shared.narration_timing import wait_until_phrase                # noqa: E402
+from shared.narration_timing import seconds_until_phrase, wait_until_phrase   # noqa: E402
+from scenes.descent_trace.descent_trace import DescentTraceDrawing   # noqa: E402
 
 # How many of the thirty iterations are left off the end of the drawn climb. See
 # stop_where_it_stops_climbing for what they do, and why not drawing them costs nothing.
@@ -26,8 +30,15 @@ SETTLED_TAIL = 14
 from shared.narration_voice import NarrationVoice   # noqa: E402
 from narration import NARRATION                                       # noqa: E402
 
+# The example: Nikola Jokic's first-pick descent in 2025-26, where the balanced seed is the one chosen.
+EXAMPLE_TRACE = 'descent_trace_2025_26_round0_nikola_jokic.json'
+# The first step, the overshoot the narration names, is played slower than the rest so it can be seen.
+OVERSHOOT_RUN_TIME = 1.2
+# The other steps share the time until the narration reaches the end, but never go faster than this.
+FASTEST_STEP_RUN_TIME = 0.12
 
-class GradientDescent(VoiceoverScene, WeightSurfaceScene):
+
+class GradientDescent(VoiceoverScene, WeightSurfaceScene, DescentTraceDrawing):
     """One start, from the middle, walking uphill until it cannot: what descent IS.
 
     Measured on the simplest slice the search could find -- a single hill with its top inside the
@@ -108,5 +119,33 @@ class GradientDescent(VoiceoverScene, WeightSurfaceScene):
                 , run_time=0.8)
             self.wait(2.4)
         self.stop_ambient_camera_rotation()
+        self.play_example()
+
+    def play_example(self) -> None:
+        """A real candidate's descent, drawn flat: the surface goes, the camera turns to face straight down (where a
+        ThreeDScene draws flat mobjects as a Scene does), and the recorded descent plays from its start card -- no
+        seed menu. Its first step overshoots, played slower as the narration names it; the rest share the time until
+        the narration reaches the end, when the start's score and the end's are pointed out together."""
+        self.play(*[FadeOut(mobject) for mobject in self.mobjects], run_time=0.8)
+        self.set_camera_orientation(phi=0, theta=-90 * DEGREES, gamma=0, zoom=1, frame_center=ORIGIN)
+        trace_path = Path(__file__).resolve().parent.parent.parent / 'prepared_data' / EXAMPLE_TRACE
+        self.use_trace(json.loads(trace_path.read_text(encoding='utf-8')))
+        n_iterations = len(self.trace['iterations'])
+        with self.voiceover(text=NARRATION['example']) as tracker:
+            self.play_title()
+            self.play_start_card()
+            self.play_starting_state()
+            wait_until_phrase(self, tracker, 'Sometimes it steps too far')
+            self.play_steps([1], OVERSHOOT_RUN_TIME)
+            wait_until_phrase(self, tracker, 'but in general it moves up')
+            remaining_steps = range(2, n_iterations)
+            seconds_left = (seconds_until_phrase(tracker, 'and the weights at the end')
+                            - (self.renderer.time - tracker.start_t))
+            self.play_steps(remaining_steps, max(seconds_left / len(remaining_steps), FASTEST_STEP_RUN_TIME))
+            wait_until_phrase(self, tracker, 'and the weights at the end')
+            # The H-score readout (the state's numbers: the counter, then the H-score) against the start card's.
+            end_score = self.state[2][1]
+            self.play(Indicate(end_score, color=YELLOW), Indicate(self.chosen_card, color=YELLOW), run_time=1.4)
+        self.wait(2.0)
 
 

@@ -501,6 +501,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#overbidding-for-packing-efficiency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overbidding for packing efficiency
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -651,6 +662,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#overbidding-for-packing-efficiency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overbidding for packing efficiency
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -680,7 +702,7 @@
 <p>When the selected mode from the left sidebar is 'Auction Mode', the website will provide analysis for either synthetic or live auctions. </p>
 <h3 id="manual-entry">Manual entry</h3>
 <p><img alt="Manual auction entry table" src="../img/mauction.png" /></p>
-<p>Player selection information can be entered into the table through the selectors above it. There is no autodrafting option because the website does not simulate actual auctions, it only provides reference material for a given auction state. </p>
+<p>Player selection information can be entered into the table through the selectors above it. Teams can also be toggled to autodraft using the 'A' button next to each team name in the column headers. Autodrafters rotate nominations, opening the bidding at $1. Drafters then take turns in set circular order bidding $1 higher whenever the price remains within their budget and calculated valuation; otherwise, they must pass and can no longer bid on that player. Bidding among the autodrafters is settled at once, so manual drafters are first asked at the price the autodrafters reach on their own (the second-highest autodrafter's limit, or $1 above it); no lower manual bid could win. From there, non-autobidders have one turn per cycle to either pass, increase the bid by $1, or optionally increase the bid by more. Bidding continues until everyone else passes and one player wins.</p>
 <h3 id="live-connection">Live connection</h3>
 <p>Yahoo auctions can be integrated with the website, like drafts. </p>
 <p>For some reason, Yahoo's API does not return anything for auctions until a few minutes after the auction has started. Because of that, the displayed values may be the default values for the first few picks. Besides that, the integration works much the same way as for drafting mode. </p>
@@ -733,12 +755,15 @@
     <source src="../videos/savor.mp4" type="video/mp4">
 </video>
 <figcaption>
-<p>Why value concentrates at the top of an auction: a player's season is a distribution rather than
-a single number, and anyone below replacement level can be swapped out from the waiver wire, so
-the downside is capped and the upside is not.</p>
+<p>A visual explanation of the SAVOR adjustment</p>
 </figcaption>
 </figure>
-<p>SAVOR takes an input parameter, <span class="arithmatex">\(S_{\sigma}\)</span> (S-sigma). It controls the degree to which players are expected to move up and down in dollar value across the season according to the SAVOR model. Its default value of 10 is sourced by vibes- different values may be just as or more reasonable. </p>
+<p>SAVOR takes two input parameters, <span class="arithmatex">\(S_{\sigma}\)</span> (S-sigma) and <span class="arithmatex">\(S_R\)</span>.</p>
+<ul>
+<li><span class="arithmatex">\(S_{\sigma}\)</span> controls the degree to which players are expected to move up and down in dollar value across the season according to the SAVOR model.</li>
+<li><span class="arithmatex">\(S_R\)</span> is the value of a streaming slot. SAVOR assumes that players actualize their value if they end up above <span class="arithmatex">\(S_R\)</span> after perturbation.</li>
+</ul>
+<p>The default values of $10 and $2 are sourced by vibes- different values may be just as or more reasonable. </p>
 <details class="note">
 <summary>What is the theoretical framework behind the SAVOR calculation?</summary>
 <p>Details of the SAVOR adjustment are included in the appendix of <a href="https://arxiv.org/abs/2307.02188v4">an old version of the first paper</a>. It was removed from the most recent version because it was not topical to the main point of the paper. </p>
@@ -750,7 +775,31 @@ the downside is capped and the upside is not.</p>
 \]</div>
 <p>This does not lend itself to intuition, but the simple explanation is that as the scale parameter is turned up, players projected to be valuable become even more valuable than their projection. The reason is that the small bump in mean expectation from a low value player versus a tail-end-of-the-auction player doesn't mean as much as a bump in mean expectation for a high-value player, because a significant fraction of the time, the real value of a low-value player will dip below the replacement threshold. That is highly unlikely to happen for high-value players.</p>
 <p><img alt="Pre- and post-SAVOR value table" src="../img/savor.png" /></p>
+<p>The original version of the SAVOR calculation had no <span class="arithmatex">\(S_R\)</span>, it just assumed the cut-off for value was 0. When the calculation is traced through with <span class="arithmatex">\(S_R\)</span> as the cutoff, it becomes </p>
+<div class="arithmatex">\[
+(\mu - S_R)\,\Phi\left(\frac{\mu - S_R}{\sigma}\right) + S_R\,\Phi\left(-\frac{S_R}{\sigma}\right) + \frac{\sigma}{\sqrt{2\pi}}\left(e^{-\frac{(\mu - S_R)^2}{2\sigma^2}} - e^{-\frac{S_R^2}{2\sigma^2}}\right)
+\]</div>
 </details>
+<h3 id="overbidding-for-packing-efficiency">Overbidding for packing efficiency</h3>
+<p>The standard auction heuristic assigns dollar values to players such that their total value equals the amount of money in the pot. The implicit assumption in that formulation is that all teams will be able to spend all their money on players at those valuations. In reality, that is likely impossible: it would take luck to find thirteen players that add up to exactly $200. </p>
+<p>This inefficiency is felt most acutely when the number of options for players dwindles. If managers wait too long to spend their money, there might not be enough high-value players left for them to spend all of their money on. E.g. if a manager has $40 with two slots left, and the top two players are worth $20 and $10 to them, they will leave some money on the table no matter what. </p>
+<figure>
+<video controls preload="metadata" width="100%" poster="../videos/cash-packing-poster.jpg">
+    <source src="../videos/cash-packing.mp4" type="video/mp4">
+</video>
+<figcaption>
+<p>Motivation for the packing efficiency inflation factor</p>
+</figcaption>
+</figure>
+<p>The website's heuristic fix for that is an inflation factor which increases the value of players as efficiency starts to get squeezed. It is calculated through a three-step process </p>
+<ol>
+<li>The base ratio <span class="arithmatex">\(r_1\)</span> is calculated. It is the team's spendable cash (its cash minus $1 per empty bench slot) over the base value of the top options (its top players, one per open slot).</li>
+<li>The ratio is adjusted through a formula: <span class="arithmatex">\(r_2 = 1 + s\ln\left(1 + e^{(r_1-1)/s}\right)\)</span>, where <span class="arithmatex">\(s\)</span> is a parameter</li>
+<li>A player worth <span class="arithmatex">\(v\)</span> is given an extra <span class="arithmatex">\((r_2 - 1)\frac{v^2}{\bar{v}}\)</span> worth of value, where <span class="arithmatex">\(\bar{v}\)</span> is the value-weighted average value of the top options</li>
+</ol>
+<p>The base ratio <span class="arithmatex">\(r_1\)</span> is a measure of how much the auction drafter needs to worry about spending their money. When it gets above <span class="arithmatex">\(1\)</span>, they cannot spend their money perfectly efficiently anymore, even if they win all their bids. The site automatically will change the color of value numbers as <span class="arithmatex">\(r_1\)</span> gets close to <span class="arithmatex">\(1\)</span>. </p>
+<p>The transformation is a smoothed version of max(1,<span class="arithmatex">\(r_1\)</span>). At the limit when <span class="arithmatex">\(r_1\)</span> is small, the formula simplifies to approximately one. When <span class="arithmatex">\(r_1\)</span> is large, the limit simplifies to approximately <span class="arithmatex">\(r_1\)</span>. The idea is having the multiplier go from about parity when <span class="arithmatex">\(r_1\)</span> is small, to exactly <span class="arithmatex">\(r_1\)</span> when it is needed to scale values up such that there will be no entirely wasted money. <span class="arithmatex">\(s = 0.2\)</span> was found to work well in testing. </p>
+<p>The third step is a modification that makes the additional value proportional to value squared, instead of just value. In the example where two players are worth $20 and $10, the $20 player gets 4x the excess value from the adjustment, making the final values $28 and $12. The idea is that the highest-value players are the most unique and therefore the most important to prioritize. There might be a nine dollar player available, for example, which makes it less important to get the ten dollar player. </p>
 
 
 

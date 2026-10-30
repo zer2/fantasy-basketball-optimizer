@@ -742,3 +742,50 @@ def _check_gradient_aggregate(x_diff, func, del_func, tolerance=1e-7):
     all_results_normalized  = all_results_array  / all_results_array.sum()
 
     assert (abs(all_del_real_normalized - all_results_normalized) < tolerance).all()
+
+
+# ─── Self-play field ──────────────────────────────────────────────────────────
+
+@pytest.mark.parametrize('scoring_format', ['Head to Head', 'Rotisserie'])
+@pytest.mark.parametrize('auction', [False, True])
+def test_self_play_field_matches_the_app_field(auction, scoring_format):
+    """The joint self-play descent rebuilds its field from arrays (_SelfPlayField) instead of calling
+    get_diff_distributions every iteration. On the empty board the two must agree exactly -- the opponent
+    differentials, self-exclusion included, the opponents' volumes, and Rotisserie's league-spread term -- for any
+    committed tilts, in the draft and the auction branches alike."""
+    from backend.math.algorithm_agents import _SelfPlayField
+    from backend.player_identity import RP_PLAYER_ID
+
+    request = _build_default_session_request()
+    request['league']['scoring_format'] = scoring_format
+    if scoring_format == 'Rotisserie':
+        request['league']['most_categories_weight'] = None
+    response = client.post('/sessions', json=request)
+    assert response.status_code == 201, response.text
+    session_id = response.json()['session_id']
+    agent = get_session(session_id).agent
+    teams = get_session(session_id).current_settings['team_names']
+    empty = {team: [] for team in teams}
+    drafter = teams[0]
+    cash = {team: 200.0 for team in teams} if auction else None
+    available = agent.x_scores[agent.x_scores.index.isin(agent.positions.index)
+                               & (agent.x_scores.index != RP_PLAYER_ID)]
+    batch = list(agent._anchor_player_order)
+    batch_index = available.index[available.index.isin(batch)]
+
+    random_tilts = np.random.default_rng(0).normal(scale=0.05, size=(len(batch_index), agent.n_categories))
+    committed = agent._player_committed_future_diffs.copy()
+    committed.loc[batch_index] = random_tilts
+    agent._player_committed_future_diffs = committed
+
+    app_means, app_vars, app_spread, _, app_volume = agent.get_diff_distributions(
+        empty, drafter, available, cash, candidate_batch=list(batch_index))
+    # One start per player: the field is the app's for exactly these tilts (any scores pick the only start).
+    field = _SelfPlayField(agent, empty, drafter, batch_index, cash, app_volume, starts_per_player=1)
+    rebuilt_means, rebuilt_units = field.rebuild_field(random_tilts, np.zeros(len(batch_index)))
+
+    assert rebuilt_means.shape == np.broadcast_shapes(app_means.shape, rebuilt_means.shape)
+    assert np.array_equal(np.broadcast_to(app_means, rebuilt_means.shape), rebuilt_means)
+    assert np.array_equal(np.broadcast_to(app_volume['opponent_units'], rebuilt_units.shape), rebuilt_units)
+    if scoring_format == 'Rotisserie':
+        assert np.array_equal(app_spread, agent.get_rotisserie_sigma_2_m(rebuilt_means, app_vars))

@@ -26,7 +26,7 @@ For all of the formats, the website supports any combination of categories, acro
 Top H-scores for the first pick, 2024-25 season, with default settings including Each Category scoring.
 ///
 
-The overall H-score on the left side of the display is both the metric that H-scoring is trying to optimize with its future draft pick strategy, and the one used to rank players. It is the output of the full H-scoring function, which has three components: category strength expectations, category-level victory probabilities, and the outer-level objective function. The decisions made by the algorithm impact the category strength expectations, which in turn impact category-level victory probabilities, which in turn impact the outer-level objective function. 
+The overall H-score on the left side of the display is both the metric that H-scoring is trying to optimize with its future draft pick strategy, and the one used to rank players. It is the output of the full H-scoring function, which has three components: category strength expectations, category-level victory probabilities, and the outer-level objective function. The decisions made by the algorithm impact the category strength expectations, which in turn impact category-level victory probabilities, which in turn impact the outer-level objective function. With Each Category scoring, the outer-level objective function is the average win rate across categories and opponents. 
 
 While the spinner is up, the algorithm is iterating, attempting to repeatedly improve its solution. Mathematically, the underlying iteration process is based on a procedure called gradient descent (or ascent). 
 
@@ -81,7 +81,7 @@ The exact degree to which punting is beneficial depends on many factors- the sco
 
 ### Head to Head: Most Categories
 
-An alternative to Each Category scoring is Most Categories scoring. In Most Categories, teams get wins for every opponent they get a majority of category wins against. To reflect that, with Most Categories scoring, the definition of the overall H-score is the probability of winning a majority of categories (assuming they are independent for the sake of making the calculation less intensive). Most Categories can be added to the blend with Each Category by moving the slider on the sidebar above its default level of 0. 
+An alternative to Each Category scoring is Most Categories scoring. In Most Categories, teams get wins for every opponent they get a majority of category wins against. To reflect that, with Most Categories scoring, the definition of the overall H-score is the probability of winning a majority of categories (assuming they are independent for the sake of making the calculation less intensive) against a random opponent. Most Categories can be added to the blend with Each Category by moving the slider on the sidebar above its default level of 0. 
 
 ![Most Categories H-score table](img/hmc.png)
 /// caption
@@ -443,25 +443,6 @@ Both λs are scaled by a diminishing factor as the draft goes on. This ensures t
 
     The flex position regularizer has the same scheduler, just scaled up because the flex position numbers tend to vary more. 
 
-### Adjusting for other managers' strategies 
-
-The internal logic of the paper's version of H-scoring does not understand that other drafters may also be trying to punt categories. This will lead to inaccurate projections of other teams and inaccurate projections of which players will be available in later rounds.
-
-The website's version of the algorithm has a few ways of dealing with this. Predicting the choices of other fantasy managers is difficult because each one has their own habits. Some will punt aggressively, some will prioritize balance, some will chose players from their favorite teams, etc. So the algorithm doesn't try to get in every manager's head; it uses a few heuristic strategies instead. 
-
-The first is a way of predicting what other teams will look like. Before running H-scoring on all candidates, the algorithm is run once to establish a set of top players. Then the process repeats using the identified top players and their corresponding builds as a context in which H-scoring runs. In order to dampen oscillations from one extreme to another, only half of the players are adjusted in each step, and they run against averaged versions of their opponents across previous iterations. This process slowly drifts strategy profiles towards a stationary point. By the end, the algorithm has a rough picture of what an equilibrium might look like in terms of opposing team strategies. Then, during a draft, the algorithm continues to update its expectations by running H-scoring for opponents, and keeping track of what the algorithm expects from future picks for each opponent. 
-
-The strength of the applied prediction is controlled by the $C$ (confidence) parameter in the sidebar. For Head to Head formats it defaults to 0.5, which halves the adjustment to expected team statistics; the purpose of that softening is to prevent overconfidence about exact punting builds. Rotisserie always uses full confidence, so the control is hidden there — there is no equivalent uncertainty about punting in Rotisserie, where the main strategy other drafters are expected to adopt is shoring up reliable categories, which is consistent and stable. 
-
-Testing confirms that the prediction adjustment improves the performance of H-scoring against other H-scoring drafters, while degrading performance slightly against pure G-score drafters. Setting C to zero turns the prediction off entirely: every other drafter is treated as a neutral picker with no strategic tendencies.
-
-<video controls preload="metadata" width="100%" poster="../videos/self-play-poster.jpg">
-  <source src="../videos/self-play.mp4" type="video/mp4">
-</video>
-/// caption
-A demonstration of the self-play process that runs before a draft.
-///
-
 ### Checking multiple potential builds 
 
 A fundamental limitation of gradient descent is that it only looks for nearby peaks, potentially missing peaks that are further away. In fantasy basketball terms, it can optimize a build but not evaluate the idea of totally switching to a new build. This means that basic H-scoring can get stuck in one strategy and miss others that would be more promising if it explored them. 
@@ -490,7 +471,43 @@ Punting is less common in Rotisserie, so gradient descent does not start at a pu
     2. Within the parameters for 9cat, it turns out that generally, the entire decision space usually has only one peak. Gradient descent can get to it from almost any point in the decision space. This might be because across nine dimensions, there are many directions in which a local peak might be surpassed. Gradient descent does not get stuck on suboptimal punts because as it moves in other categories, it can gain some strength in the punted category, eventually bringing it out of the punt. 
     3. The seed menu usually finds a promising starting place for gradient ascent, which is not far from the peak
 
-    The second and third properties happen to be true with the 9cat setup, and are not natural properties of the problem. It is entirely possible with different parameters, like more categories, the approach does not work as well. 
+    The second and third properties happen to be true with the simplified 9cat setup, and are not guaranteed properties of the problem in general. With gradient descents starting in many places, it is possible to find multiple peaks on the real version of the problem, confirming that a gradient ascent could get stuck on a sub-optimal peak. Still, in my testing these alternate peaks were never much better than what the app found by gradient descent. 
+
+### Adjusting for other managers' strategies 
+
+The internal logic of the paper's version of H-scoring does not understand that other drafters may also be trying to punt categories. This will lead to inaccurate projections of other teams and inaccurate projections of which players will be available in later rounds.
+
+The website's version of the algorithm has a few ways of handling this. 
+
+The first is a self-play process that estimates what an equilibrium state could look like in terms of punting. To start, H-scoring is run for all candidates against a neutral field to establish a set of top players. Then H-scoring is run again with the field updating dynamically; the expected statistics of opponents are continuously changed based on the top players and their expected strategies. The opponent field is based on the top twelve players, with the twelfth player ignored for players outside of the top twelve so there are always eleven opponents. 
+
+For Head-to-Head, each top player has gradient descent run simultaneously from each multi-start seed. The optimal strategies for each seed and their H-scores are tracked through the whole self-play process. Only one version counts as potentially part of the opponent field for any particular step in the process, generally the version that is scoring the best. The one restriction is that on any given iteration, only the six players that would benefit the most from switching paths are allowed to switch. This is to avoid large oscillations.
+
+For Rotisserie, all players start near neutral, and descend from there without switching. Punting is not nearly as common in Rotisserie as other formats, so there is no need to account for varying punt builds. 
+ 
+This process slowly drifts strategy profiles towards a stationary point. By the end, the algorithm has a rough picture of what an equilibrium might look like in terms of opposing team strategies. 
+
+<video controls preload="metadata" width="100%" poster="../videos/self-play-poster.jpg">
+  <source src="../videos/self-play.mp4" type="video/mp4">
+</video>
+/// caption
+A demonstration of the self-play process that runs before a draft.
+///
+
+Then, during a draft, the algorithm continues to update its expectations by running H-scoring for opponents, and keeping track of what the algorithm expects from future picks for each opponent.
+
+These processes will not necessarily be accurate in their expectations for how other managers behave. In reality every manager has their own habits; some will punt aggressively, some will prioritize balance, some will choose players from their favorite teams, etc. To mitigate overconfidence in the expected projections, its strength can be controlled by the $C$ (confidence) parameter in the sidebar. It shrinks the size of the expected adjustments from opponents towards neutral. For Head to Head formats it defaults to 0.5, which halves the adjustment to expected team statistics; the purpose of that softening is to prevent overconfidence about exact punting builds. 
+
+One should note that sometimes with this default of $C = 0.5$, the equilibrium found by self-play will still be heavily tilted towards one build. If the field naturally rewards a certain build enough, opponents expected to lean into that build only at half-tilt may not be enough to dissuade other teams from joining the punt. 
+
+![Free Throw % crowding at the first pick, 2020-21](img/crowding2021.png)
+/// caption
+An example of the whole field crowding into one punt. 2020-21 Each Category  
+///
+
+Rotisserie drafters almost always go for balanced builds. Accordingly, the Rotisserie algorithm uses no multi-starting and has little uncertainty about punting. There is no need for the $C$ control in that context; instead of being configurable by the user it is always set to one. 
+
+Testing confirms that the prediction adjustment improves the performance of H-scoring against other H-scoring drafters, while degrading performance slightly against pure G-score drafters. Setting C to zero turns the prediction off entirely: every other drafter is treated as a neutral picker with no strategic tendencies.
 
 ### Adjusting percentage categories for volume
 
@@ -508,7 +525,7 @@ Some limitations remain intrinsic to the model, at least so far.
 
 ### Constant categorical variance
 
-H-scoring does not model category variance based on players. Instead, it assumes that week-to-week variance is the same for all matchups. This is not always accurate, especially when a team is punting a category
+H-scoring does not model category variance based on players. Instead, it assumes that week-to-week variance is the same for all matchups. This is not always accurate, especially when a team is punting a category. 
 
 ![Expected versus actual category win rates](img/cwinrates.png)
 /// caption
@@ -519,7 +536,7 @@ The paper shows that when hard-punting free throws, teams still win the category
 
 These statistics come from simulations of real seasons using actual player data. Reality is less predictable- players outperform or underperform projections, players get traded or substituted, etc. This increased variance provides a counterbalance to the underprediction for threes. For free throw percent, it compounds, meaning that the algorithm likely underestimates the probability of winning the category despite punting by quite a bit. 
 
-Mathematically, the central reason for the algorithm not taking player-level variance into account is that assuming constant variance makes the math significantly easier. It is what allows the algorithm to think only in the space of differentials- true magnitudes do not matter. 
+Mathematically, the central reason for the algorithm not taking player-level variance into account is that assuming constant variance makes the math significantly easier. It is what allows the algorithm to think only in the space of differentials- true magnitudes do not matter. This is especially helpful for the percentage categories, which would require a complicated formulation for team-specific variance. 
 
 Another reason is that predicting variance is hard, even ignoring the complicated reality of real fantasy basketball. Most likely, accounting for variance would require individual player-and-category-level forecasts of variance, which would require a massive overhaul of existing forecasting procedures. It might be possible to predict category variance as a function of expected value instead, but that would not necessarily be accurate. 
 
