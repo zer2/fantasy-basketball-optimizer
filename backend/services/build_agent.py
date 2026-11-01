@@ -314,7 +314,8 @@ def build_scoring_info(session: Session) -> None:
     info = process_player_data(
         player_stats_v2   = scorable_pool,
         weekly_df         = None,
-        mean_of_variances = _load_mean_of_variances(),
+        mean_of_variances = _load_mean_of_variances(
+            current_settings['season'] if current_settings['data_source_type'] == 'historical' else None),
         psi               = current_settings['psi'],
         chi               = current_settings['chi'],
         scoring_format    = scoring_format,
@@ -582,13 +583,19 @@ def _resolve_sport_params(session: Session) -> tuple[dict, dict, str]:
     return all_params, all_params[sport], sport
 
 
-def _load_mean_of_variances() -> pd.Series:
-    """Load empirical mean-of-variances for the most recent season from the
-    coefficient exploration output CSV.  The CSV has stats as rows and seasons
-    as columns (newest first); the first data column is the most recent season.
-    """
+def _load_mean_of_variances(season: str | None) -> pd.Series:
+    """The empirical weekly variances (mean of variances) from the coefficient exploration output CSV, which has stats
+    as rows and seasons as columns, newest first: a historical season's own column, or for a season-less pool
+    (projections, an uploaded file) the most recent season's. Week-to-week noise differs a lot between eras (2000-01's
+    threes vary 0.38x as much as 2024-25's), so a past season is never priced with another season's. A season with no
+    column raises: add it with backend/math/coefficient_exploration.py."""
     df = pd.read_csv(_MEAN_OF_VARIANCES_PATH, index_col=0)
-    return df.iloc[:, 0]
+    if season is None:
+        return df.iloc[:, 0]
+    if season not in df.columns:
+        raise ValueError(f'No stored weekly variances for season {season!r} in {_MEAN_OF_VARIANCES_PATH.name}; '
+                         f'compute its column with backend/math/coefficient_exploration.py.')
+    return df[season]
 
 
 # ── errors ────────────────────────────────────────────────────────────────────
