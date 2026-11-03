@@ -43,8 +43,23 @@ from backend.services.ranking import rank_candidates
 _RUN_SIMS  = bool(os.environ.get('RUN_EXPERIMENTS'))
 # 0 = every seat in the league (a full season's worth of draft positions).
 _SIM_SEATS = int(os.environ.get('EXPERIMENT_SEATS', '0'))
-_ALL_SEASONS = '2020-21,2021-22,2022-23,2023-24,2024-25,2025-26'
-_SEASONS = (os.environ.get('EXPERIMENT_SEASONS') or (_ALL_SEASONS if _RUN_SIMS else '2024-25')).split(',')
+# Shortened seasons are left out of every experiment: a player's games played is a share of 82 games (data_retrieval),
+# so in these seasons nobody reaches 100% and every player's expected weekly totals are understated (the user,
+# 2026-11-01: exclude them rather than model them for now). A season list given in the environment is filtered too.
+_SHORTENED_SEASONS = ('1998-99', '2011-12', '2019-20', '2020-21')
+
+
+def exclude_shortened_seasons(seasons):
+    """The seasons, without the shortened ones (_SHORTENED_SEASONS), saying which were left out."""
+    excluded = [season for season in seasons if season in _SHORTENED_SEASONS]
+    if excluded:
+        print(f'(shortened seasons left out: {", ".join(excluded)})')
+    return [season for season in seasons if season not in _SHORTENED_SEASONS]
+
+
+_ALL_SEASONS = '2021-22,2022-23,2023-24,2024-25,2025-26'
+_SEASONS = exclude_shortened_seasons(
+    (os.environ.get('EXPERIMENT_SEASONS') or (_ALL_SEASONS if _RUN_SIMS else '2024-25')).split(','))
 
 _FORMATS = {
     'EC':   'Each Category',
@@ -140,9 +155,52 @@ _SECTION_EXPLANATIONS = {
         'How much H-score does the app give up against the true optimum? On a simplified objective that branch '
         'and bound solves exactly, the gap is split by the fix that recovers it: multi-starting, the full seed '
         'menu (55), more iterations (2,000), and the exact algorithm. App + the four losses = Optimal.',
+    'Draft order: snake vs third-round reversal':
+        'How much does draft position matter when every drafter uses H-scoring, and does third-round reversal even '
+        'it out? Twelve H-scoring drafters draft each season twice, once as a snake and once with third-round '
+        'reversal; every seat\'s H-score and, head to head, its win rate in real weeks.',
+    'Z-scores vs G-scores':
+        'Do G-scores draft better teams than Z-scores? Z-scores are G-scores without the week-to-week variance. Every '
+        'split of a 12-team league is drafted statically, from 1 seat ranking by Z-score and 11 by G-score to 11 and '
+        '1; every team is scored by H-score and in real weeks.',
     'Planner vs H-scoring':
         "Would planning a concrete team beat H-scoring's smooth model of future picks? In pairs of 12-team snake "
         'drafts, six seats draft with the planner and six by H-scoring, then the seats swap.',
+    'H-scoring vs a G-score field (auction)':
+        'Does H-scoring beat G-scores in an auction too? Complete 12-team auctions: one seat is the app\'s H-scoring '
+        'autodrafter, the other 11 bid by G-score dollar values. Each Category and Most Categories show the H seat\'s '
+        'win rate as its H-score expects it and in real weeks; Rotisserie its probability of winning the league.',
+    'Draft timing':
+        'Where does a draft\'s time go? Cold session builds and a whole 12-team draft through the app\'s own routes, '
+        'every request broken down by the functions it spends its time in, averaged per request.',
+    'Draft timing by round':
+        'How long each pick takes, by round: the first 100 candidates (what an autodrafter waits for, and the wait '
+        'before a person\'s board appears) and the whole board (every batch).',
+    'Auction timing':
+        'Where does an auction\'s time go? Cold session builds and a whole autodraft auction through the app\'s own '
+        'routes, every request broken down by the functions it spends its time in, averaged per request.',
+    'Auction timing by round':
+        'How long each nomination and each auction-table evaluate takes, by round of sales.',
+    'Pool-size calibration':
+        'How big a pool do the future-pick model\'s picks behave like? The model prices each future pick as the best, '
+        'by the team\'s weights, of a window of M surviving players (the app uses M = 25). For every pick and each of '
+        'that team\'s later picks, the realised tilt is the best player still available by the pick\'s weights minus '
+        'the best by generic value; the effective M is the M whose predicted tilt is closest to it. Two fields: twelve '
+        'H-scoring seats (the draft-order drafts, both orders), and twelve G-score seats, each seat\'s H-scoring '
+        'session recording the weights it would pick with.',
+    'Category weights by round':
+        'How do the category weights move from the first pick to the last? The weights behind every pick of the '
+        'draft-order drafts (twelve H-scoring seats, both orders, every season), by round.',
+    'Category weight correlations':
+        'Which categories do the weights move together? The correlation between each pair of categories\' weights '
+        'over every recorded pick, per format, beside the correlation between players\' category scores.',
+    'Best player-seasons':
+        'The best player-seasons since 2000, by first-pick H-score in Each Category, with each one\'s rank by Half and '
+        'Half, Most Categories and Rotisserie H-score and by G-score.',
+    'Best player-seasons, pre-2000':
+        'The best player-seasons from 1984-85 to 1999-00, by first-pick H-score in Each Category, with each one\'s rank '
+        'by Half and Half, Most Categories and Rotisserie H-score and by G-score. Ranked apart from 2000 on: these '
+        'seasons have no reliable positions.',
     'Smooth vs simple scaling':
         'Comparing the simple scaling rule for scaling up dollar values when there isn\'t enough value left on the '
         'board, to the smooth version. See "Overbidding for packing efficiency" in the Auction Mode docs for details.\n'
@@ -153,6 +211,19 @@ _SECTION_EXPLANATIONS = {
         'punts (expected win rate under 40%; ! under 15%). Value in punted is the share of its players\' positive '
         'X-score value in those categories; categories punted is that share for players bought regardless of the build. '
         'A misfit is a player with at least half his value in categories the team punts.',
+    'Dollar shape: Gini by SAVOR settings':
+        'How unequal are the starting board\'s dollar values under each SAVOR setting? The Gini coefficient of the '
+        'dollars of the players who would be drafted, for each replacement threshold and noise.',
+    'Dollar inequality by season':
+        'Has the spread of auction values changed over the years? For each season, the Gini coefficient of the '
+        'dollars of the players who would be drafted at the start of an auction, with SAVOR off and at the app\'s '
+        'defaults.',
+    'Most valuable player-seasons':
+        'The most valuable players of every season, by their dollars at the start of an auction at the app\'s '
+        'defaults, ranked across all seasons.',
+    'Dollar curves by league size':
+        'How does the shape of auction values change with the size of the league? Every drafted player\'s dollars at '
+        'the start of an auction, by draft rank, for different numbers of teams and roster sizes.',
     'Dollar shape: replacement level and SAVOR':
         "How do SAVOR's noise and its replacement threshold reshape dollar values? On the board at the start of "
         "an auction, each combination of threshold ($0, the app's $2, $4) and noise (0, the app's 10, 20) is "
@@ -248,23 +319,40 @@ def _load_stored_sections(reports_dir):
     return ordered + list(stored.values())
 
 
-def merge_other_formats(payload, stored_path, stamp):
-    """A run that measured only some formats of a page replaces only those formats' rows: the stored rows of every
-    other format are kept, after this run's, with the time each format was last generated (generated_by_format). A
-    stored page with different columns is replaced whole -- its rows cannot sit in this table."""
+# The columns a page's partial runs are merged by (merge_other_formats); every other page with a Format column merges by
+# format.
+_MERGE_KEYS = {'Planner vs H-scoring': ('Season',),
+               'Best player-seasons': ('Season',),
+               'Best player-seasons, pre-2000': ('Season',),
+               'Draft timing': ('Format',),
+               'Dollar inequality by season': ('Season',),
+               'Dollar curves by league size': ('Season',),
+               'Most valuable player-seasons': ('Season',),
+               'Draft order: snake vs third-round reversal': ('Format', 'Season'),
+               'Z-scores vs G-scores': ('Format', 'Season')}
+
+
+def merge_other_formats(payload, stored_path, stamp, merge_columns):
+    """A run that measured only some values of merge_columns (some formats; for some pages, some formats and seasons)
+    replaces only those rows: the stored rows of every other value are kept, after this run's, with the time each was
+    last generated (generated_by_format, keyed by the values joined with a space). A stored page with different
+    columns is replaced whole -- its rows cannot sit in this table."""
     import json
     with open(stored_path, encoding='utf-8') as stored_file:
         stored = json.load(stored_file)
-    format_index = payload['columns'].index('Format')
-    measured = {row[format_index] for row in payload['rows']}
-    generated = {format_key: stamp for format_key in measured}
+    indices = [payload['columns'].index(name) for name in merge_columns]
+
+    def key_of(row):
+        return ' '.join(str(row[index]) for index in indices)
+
+    measured = {key_of(row) for row in payload['rows']}
+    generated = {key: stamp for key in measured}
     if stored.get('columns') == payload['columns']:
-        kept = [row for row in stored['rows'] if row[format_index] not in measured]
+        kept = [row for row in stored['rows'] if key_of(row) not in measured]
         payload['rows'] = payload['rows'] + kept
-        stored_generated = stored.get('generated_by_format') or {row[format_index]: stored['generated']
+        stored_generated = stored.get('generated_by_format') or {key_of(row): stored['generated']
                                                                   for row in stored['rows']}
-        generated.update({format_key: when for format_key, when in stored_generated.items()
-                          if format_key not in measured})
+        generated.update({key: when for key, when in stored_generated.items() if key not in measured})
     payload['generated_by_format'] = generated
 
 
@@ -286,6 +374,30 @@ _SECTION_DETAILS = {
         'The number is on minus off, in H-score points. Every seat drafts with its own agent. The ALL rows pool '
         'every season and seat, with a standard error; a pooled mean is coloured only when it is more than 2 '
         'standard errors from 0.',
+    'Draft order: snake vs third-round reversal':
+        '- Snake: forward in the first round, then alternating. Third-round reversal: rounds one and two as a snake, '
+        'round three in round two\'s direction again (the last seat of round one picks first in rounds two and '
+        'three), then alternating. H-scoring\'s future-pick model does not depend on the order.\n'
+        '- Every seat drafts by H-scoring at the app\'s opponent-model confidence (0.5 head to head; Rotisserie pins '
+        'it at 1), each with its own agent. Identical drafters make each draft deterministic: one draft per season '
+        'and order gives every seat.\n'
+        '- H-score: each team\'s complete-team H-score against the actual field (Each Category the expected category '
+        'win rate, Most Categories the expected matchup win rate, Rotisserie the probability of winning the league). '
+        'Real weeks: the same rate from 1,000 matchups against each opponent in which every player brings one random '
+        'week of the season (a week without games is a zero week).\n'
+        '- beth = 0 and psi = 0, as in H-scoring vs a G-score field. The charts average each seat over the seasons; '
+        'bars are \u00b12 standard errors across seasons.',
+    'Z-scores vs G-scores':
+        '- Z-scores: the G-score pipeline with the weekly variance term at 0 (each score\'s denominator is the '
+        'spread of players\' means alone), on exactly the inputs the session\'s own pipeline received; everything '
+        'else -- the percentage-volume correction, the games-played re-centring, the representative players -- is '
+        'computed the same way.\n'
+        '- Static drafting: every seat takes the best player left on its own ranking whom its roster can still place.\n'
+        '- Each split is drafted 24 times per season, the Z seats chosen at random each time, so draft position '
+        'averages out. A draft records each group\'s mean.\n'
+        '- H-score: each team\'s complete-team H-score against the actual field. Real weeks: as in H-scoring vs a '
+        'G-score field. beth = 0 and psi = 0. Each Category and Most Categories only: G-scores are defined differently '
+        'for Rotisserie.',
     'Planner vs H-scoring':
         "- A planner seat plans the rest of its team around each of H-scoring's top 40 candidates (an exact naive"
         ' team, then Frank-Wolfe, then swaps) and takes the one whose planned team scores highest.\n'
@@ -364,7 +476,7 @@ _SECTION_DETAILS = {
         'not enough to be worth their computational cost when the app is already this close to the best build '
         'found.\n'
         '- Boards: the first pick (round 0, against the predicted field) and after rounds 1-10 (default-ranking '
-        'picks), seat Drafter 1, top 8 candidates, 2020-21 to 2025-26. The cost rows give each fix as a multiple '
+        'picks), seat Drafter 1, top 8 candidates, 2021-22 to 2025-26. The cost rows give each fix as a multiple '
         "of the app's work.",
     'Peakedness':
         'Peaks: how many distinct end points the candidate has. Second peak: how far below the best the next one '
@@ -381,7 +493,7 @@ _SECTION_DETAILS = {
         'many places one would move if ranked by optimal values. The cost row gives each fix as a multiple of the'
         " app's work (each includes the ones before; branch and bound's is its measured time per candidate).\n"
         '- Boards after rounds 1-10 (default-ranking picks), seat Drafter 1, top 8 candidates, Each Category, '
-        '2020-21 to 2025-26.\n'
+        '2021-22 to 2025-26.\n'
         "- Differences from the real app: the volume scale and the position term are held at the app's solution "
         '(the app re-optimises both as it descends); no regularization (lambda_c = lambda_p = 0); the descent is '
         "a re-implementation of the app's (Adam, same learning rate and update) on this fixed problem. Full "
@@ -410,12 +522,91 @@ _SECTION_DETAILS = {
         'At the peak the loop closes (weight vs value share gap ~0). At 1 or above a nudge would run away. The '
         'largest Hessian eigenvalue checks the same thing directly (negative at a peak). Same candidates as the '
         'loss section. No regularization (lambda_c = lambda_p = 0).',
+    'H-scoring vs a G-score field (auction)':
+        '- The H seat is the app\'s autodrafter: it nominates its best available player that fits its roster and '
+        'values players by its "Your $". A G-score bidder values a player at the auction table\'s G-score "Gnrc. $" '
+        '(the league\'s G-score dollars for the players still available, plus its own share of the cash it could not '
+        'otherwise use) and nominates its best G-score player that fits its roster. Both open at $1, and the bidding is '
+        'the browser\'s.\n'
+        '- S1-S12: the H seat\'s board position (nomination order). $200 a team.\n'
+        '- Everyone bids on the season\'s actual statistics: the autodrafter\'s own-view noise is off, SAVOR is off, '
+        'beth = 0 and psi = 0, and the H seat\'s opponent model is off head to head (Rotisserie pins it on), as in '
+        'the draft experiment. Real weeks as there.',
+    'Draft timing':
+        '- Session build: a cold build (the agent and player-pool caches cleared; the season\'s data already in '
+        'memory, so Snowflake\'s network time is not counted), three times.\n'
+        '- Pick: every pick evaluates the picking team\'s first batch of 100 candidates, as the browser does; each '
+        'pick takes the top candidate. Whole board: every batch of the first team\'s evaluate, at its picks.\n'
+        '- 2024-25 historical stats, 12 teams x 13, the app\'s default settings. The chart nests each function under '
+        'its caller; a bar\'s width is its average time per request, the same function the same colour everywhere. '
+        'Time a function spends outside the traced functions is the gap under it.',
+    'Auction timing':
+        '- Session build: as in Draft timing. Nomination: the nominator\'s choice and every team\'s valuation (every '
+        'team an autodrafter). Auction table: the first team\'s full evaluate after each round of sales.\n'
+        '- 2024-25 historical stats, 12 teams x 13, $200 a team, the app\'s default settings.',
+    'Pool-size calibration':
+        '- Tilt: a category vector in X-scores (the units of the model\'s covariance). Realised: among the players '
+        'not yet drafted at the later pick of the recorded draft, the best by the decision\'s weights minus the best by '
+        'generic value v (no positions, as in the model). The decision\'s weights are held fixed, as the model holds '
+        'them.\n'
+        '- Effective M: the grid M with the smallest mean squared error over categories and pairs, pooled as shown. '
+        'Grid: 2 to 400.\n'
+        '- Explained: 1 - (mean squared error) / (mean square of the realised tilt), the share of the realised tilt\'s '
+        'square the prediction removes; 0 is no better than predicting no tilt.\n'
+        '- Effective M for all remaining draft picks: by the round of the current pick (the one the weights were made '
+        'for), fitting one M to all of that team\'s remaining picks, as the app applies one M to them all. Effective M '
+        'for a single future pick: by the round of the future pick the weights are tested at (from current picks in '
+        'any earlier round).\n'
+        '- H-scoring field: twelve H-scoring seats, opponent-model confidence 0.5 (Rotisserie 1), beth = 0, psi = 0.\n'
+        '- G-score field: twelve seats each taking the best G-score player its roster can place (the H vs G '
+        'experiment\'s G drafters). The weights are those each seat\'s own H-scoring session puts behind its top '
+        'candidate at that pick, at the H vs G conventions (opponent model off, beth = 0, psi = 0); it does not pick.',
+    'Category weights by round':
+        '- Weights in display units: 100 = neutral (the weight of generic value), lower = de-emphasised.\n'
+        '- A team\'s last pick has no weights (no picks follow it), so the rounds run 1 to 12.\n'
+        '- Every pick of every seat, both orders, every season of the draft-order drafts.',
+    'Category weight correlations':
+        '- Weights: every pick with weights (rounds 1 to 12, every seat, both orders, every season), pooled.\n'
+        '- Players: the correlation of the covariance the future-pick model uses (L: X-scores of the draftable pool, '
+        'each position weighted by its share of the roster slots), averaged over the seasons.\n'
+        '- Both in the categories\' scoring direction (a higher turnover score is fewer turnovers).',
+    'Best player-seasons':
+        '- H-score: each player\'s first-pick H-score on the neutral board of his season (12 teams x 13, the app\'s '
+        'default settings but beth = 0, as the season\'s statistics are the truth). Rotisserie\'s is a league-win '
+        'probability.\n'
+        '- Half and Half (50/50): head to head, the objective half Each Category and half Most Categories.\n'
+        '- G-score: the nine-category G-score total (the head-to-head objectives share it).\n'
+        '- Ranks are all-time, among every season\'s player-seasons.\n'
+        '- Every season from 2000-01 (earlier seasons have no reliable positions), the shortened seasons left out.',
+    'Best player-seasons, pre-2000':
+        '- H-score: each player\'s first-pick H-score on the neutral board of his season (12 teams x 13, the app\'s '
+        'default settings but beth = 0, as the season\'s statistics are the truth). Rotisserie\'s is a league-win '
+        'probability.\n'
+        '- Half and Half (50/50): head to head, the objective half Each Category and half Most Categories.\n'
+        '- G-score: the nine-category G-score total (the head-to-head objectives share it).\n'
+        '- Ranks are all-time within these seasons.\n'
+        '- Every season from 1984-85 to 1999-00, the shortened 1998-99 left out.\n'
+        '- Known data fault: the source merges some same-name players into one (e.g. Eddie Johnson, 1984-85 and '
+        '1985-86; Charles Jones; Charles Smith), adding their games together (up to 153), which inflates their values.',
     'Smooth vs simple scaling':
         "Setup: complete auctions of 12 teams, $200 each, 13 players a team, Each Category, on each season's "
         'actual statistics. Each pair of auctions puts alternate seats on each rule, then swaps them. Every '
         'drafter values players through its own noisy view of them; SAVOR off and beth = 0. Own view: each '
         "drafter's H-score through its own expectation, which is what it maximises; actual: on the true "
         "statistics. Paid extra: a sale's price above what the same bidding reaches without any cash share.",
+    'Dollar shape: Gini by SAVOR settings':
+        '- The Gini coefficient of the drafted players\' dollars (the top 156 of the starting board, 12 teams x $200, '
+        'Each Category): 0 when every player costs the same, towards 1 as the dollars concentrate in a few players.\n'
+        '- Each cell is averaged over the seasons. The outlined cell is the app\'s default (S_R $2, S_sigma 10).',
+    'Dollar inequality by season':
+        '- The Gini coefficient of the top 156 players\' dollars on the starting board (12 teams x $200, Each '
+        'Category, the app\'s default settings): 0 when every player costs the same, towards 1 as the dollars '
+        'concentrate in a few players.\n'
+        '- Each season is priced on its own statistics and weekly variances. Shortened seasons are left out.',
+    'Dollar curves by league size':
+        '- Each Category, $200 a team, the app\'s default settings (SAVOR S_R $2, S_sigma 10). Team counts at the '
+        'default roster of 13; roster sizes 13-16 (the sizes the app has slot layouts for) at the default 12 teams.\n'
+        '- Each curve averages the seasons. Shortened seasons are left out.',
     'Dollar shape: replacement level and SAVOR':
         "- Vanilla SAVOR treats a player's outcome as normal around his dollar value, with standard deviation S "
         '(the SAVOR noise), and counts every outcome above $0. A player who ends up worth a dollar might be used '
@@ -476,8 +667,9 @@ def write_experiment_report_files(base_directory):
             'generated':   stamp,
         }
         stored_path = _os.path.join(reports_dir, f'{_section_slug(section)}.json')
-        if 'Format' in table['columns'] and _os.path.exists(stored_path):
-            merge_other_formats(payload, stored_path, stamp)
+        merge_columns = _MERGE_KEYS.get(section, ('Format',))
+        if all(name in table['columns'] for name in merge_columns) and _os.path.exists(stored_path):
+            merge_other_formats(payload, stored_path, stamp, merge_columns)
         with open(_os.path.join(archive_dir, f'{_section_slug(section)}.json'), 'w',
                   encoding='utf-8') as archive_file:
             json.dump(payload, archive_file, indent=2)
@@ -962,6 +1154,37 @@ def _draft_h_seat_rosters(h_session, seat, candidate_limit=40):
     return assignments
 
 
+AUCTION_H_VERSUS_G_SECTION = 'H-scoring vs a G-score field (auction)'
+
+
+@sims
+@pytest.mark.parametrize('format_key', ['EC', 'MC', 'Roto'])
+def test_h_scoring_beats_g_field_in_auctions(format_key):
+    """The auction counterpart of test_h_scoring_beats_g_field: per season, one auction with the H-scoring autodrafter
+    at each board position against eleven G-score bidders; its H-score and (head to head) real-week win rate.
+    Measurements only, apart from every auction completing."""
+    from experiment_harnesses.auction_h_versus_g import run_h_versus_g_auctions_in_parallel
+    n_seats = _SIM_SEATS or 12
+    results, failures = run_h_versus_g_auctions_in_parallel(format_key, _SEASONS, n_seats, _EXPERIMENT_WORKERS)
+    columns = ['Format', 'Season', 'Mean H-score', 'Mean real win rate'] + _seat_columns(n_seats) + ['Every real win rate']
+    pooled, pooled_real = [], []
+    for season in _SEASONS:
+        by_seat = sorted((result for result in results if result['season'] == season), key=lambda result: result['h_seat'])
+        if len(by_seat) != n_seats:
+            continue
+        scores = [result['h_score'] for result in by_seat]
+        real_rates = [result['real_rate'] for result in by_seat if result['real_rate'] is not None]
+        pooled.extend(scores)
+        pooled_real.extend(real_rates)
+        _record_row(AUCTION_H_VERSUS_G_SECTION, columns,
+                    [format_key, season, f'{np.mean(scores):.1f}', f'{np.mean(real_rates):.1f}' if real_rates else '—']
+                    + [f'{score:.1f}' for score in scores] + [' '.join(f'{rate:.1f}' for rate in real_rates)])
+    _record_row(AUCTION_H_VERSUS_G_SECTION, columns,
+                [format_key, f'ALL ({len(pooled)} auctions)', f'{np.mean(pooled):.1f}',
+                 f'{np.mean(pooled_real):.1f}' if pooled_real else '—'] + ['—'] * n_seats + [''])
+    _fail_on_breaches([f'{failure["job"]} failed:\n{failure["traceback"]}' for failure in failures])
+
+
 # Random real weeks per opponent in the H vs G real-matchup simulation.
 _REAL_MATCHUP_SIMULATIONS = 1000
 
@@ -975,7 +1198,7 @@ def _seat_columns(n_seats):
 def test_h_scoring_beats_g_field(format_key):
     """The most basic utility claim: an H-scoring drafter in a league of G-score drafters should win
     more than it loses, in every season."""
-    from experiment_harnesses.real_matchups import simulate_real_win_rates
+    from experiment_harnesses.real_matchups import load_season_weeks, simulate_real_win_rates
     pooled, pooled_real = [], []
     n_seats = None
     # Head to head, the real counterpart of the H-score: Each Category's expected category win rate, Most Categories'
@@ -993,6 +1216,7 @@ def test_h_scoring_beats_g_field(format_key):
                                  opponent_model_confidence=0, psi=0)
         n_seats = _SIM_SEATS or session.current_settings['n_drafters']
         assert len(_seat_columns(n_seats)) == len(columns) - 5, 'the league size changed between seasons'
+        season_weeks = load_season_weeks(season) if real_measure is not None else None
         scores, real_rates = [], []
         for seat in range(n_seats):
             assignments = _draft_h_seat_rosters(session, seat)
@@ -1001,7 +1225,7 @@ def test_h_scoring_beats_g_field(format_key):
                                                   session.current_settings['n_iterations'])['Scores']
             scores.append(100 * float(h_scores[h_scores.idxmax()]))
             if real_measure is not None:
-                rates = simulate_real_win_rates(season, assignments, team, session.current_settings['categories'],
+                rates = simulate_real_win_rates(season_weeks, assignments, team, session.current_settings['categories'],
                                                 _REAL_MATCHUP_SIMULATIONS, seed=seat)
                 real_rates.append(100 * rates[real_measure])
         pooled.extend(scores)
@@ -1020,7 +1244,7 @@ def measure_awareness_vs_unaware_h_field(format_key):
     field agent cross-contaminates its seats (an inference from seat A's perspective can overwrite seat
     B's own team entry, so B would be modelled from A's view of B); every seat drafts with its own
     session."""
-    from self_play import draft_population
+    from self_play import draft_population, list_snake_order
 
     section = 'Awareness (opponent model on vs off)'
     all_gains = []
@@ -1040,7 +1264,7 @@ def measure_awareness_vs_unaware_h_field(format_key):
                                         opponent_model_confidence=0.5, beth=0)
 
         def deviator_score(session_by_seat, seat):
-            assignments = draft_population(session_by_seat, n_drafters, n_picks, 40)
+            assignments = draft_population(session_by_seat, n_drafters, list_snake_order(n_drafters, n_picks), 40)
             # One fixed scorer for both arms: a complete roster's H is parameter-clean, so any agent
             # works, but using the same one removes even rounding asymmetry.
             scores = reference.agent.get_h_scores(assignments, f'Drafter {seat + 1}',
@@ -1563,27 +1787,336 @@ def test_how_many_peaks(format_key):
 # ── The example team's planner as a drafter ───────────────────────────────────
 
 _PLANNER_PAIRS = int(os.environ.get('EXPERIMENT_PLANNER_PAIRS', '24'))
+# The planner's seasons: its own list, since a pair of planner drafts costs far more than the other experiments' drafts.
+_PLANNER_SEASONS = exclude_shortened_seasons((os.environ.get('EXPERIMENT_PLANNER_SEASONS') or '2024-25').split(','))
 
 
 @sims
 def test_planner_versus_h_scoring_drafts():
     """Paired 6v6 drafts: the example team's planner choosing picks against H-scoring, anchored and unanchored."""
     from experiment_harnesses.frank_wolfe_drafts import VARIANTS, run_paired_drafts_in_parallel
-    records_by_variant = {variant: run_paired_drafts_in_parallel(variant, _PLANNER_PAIRS, _EXPERIMENT_WORKERS, 1)
-                          for variant in VARIANTS}
-    # Every draft: each seat's complete-team H-score, marked P (planner) or H (H-scoring). The report summarises the
-    # pairs from these same rows.
-    n_seats = len(records_by_variant[VARIANTS[0]][0]['drafts'][0]['seat_scores'])
-    draft_columns = ['Planner', 'Pair', 'Draft', 'Planner minus H (pp)'] + _seat_columns(n_seats)
-    for variant, records in records_by_variant.items():
-        for pair_number, record in enumerate(records, start=1):
-            for draft_number, draft in enumerate(record['drafts'], start=1):
-                planner_seats = set(draft['planner_seats'])
-                _record_row('Planner vs H-scoring', draft_columns,
-                            [variant, pair_number, draft_number,
-                             f'{draft["planner_mean"] - draft["h_scoring_mean"]:+.2f}']
-                            + [f'{"P" if seat in planner_seats else "H"} {score:.2f}'
-                               for seat, score in enumerate(draft['seat_scores'])])
+    for season in _PLANNER_SEASONS:
+        records_by_variant = {variant: run_paired_drafts_in_parallel(variant, season, _PLANNER_PAIRS,
+                                                                     _EXPERIMENT_WORKERS, 1)
+                              for variant in VARIANTS}
+        # Every draft: each seat's complete-team H-score, marked P (planner) or H (H-scoring). The report summarises
+        # the pairs from these same rows.
+        n_seats = len(records_by_variant[VARIANTS[0]][0]['drafts'][0]['seat_scores'])
+        draft_columns = ['Planner', 'Season', 'Pair', 'Draft', 'Planner minus H (pp)'] + _seat_columns(n_seats)
+        for variant, records in records_by_variant.items():
+            for pair_number, record in enumerate(records, start=1):
+                for draft_number, draft in enumerate(record['drafts'], start=1):
+                    planner_seats = set(draft['planner_seats'])
+                    _record_row('Planner vs H-scoring', draft_columns,
+                                [variant, season, pair_number, draft_number,
+                                 f'{draft["planner_mean"] - draft["h_scoring_mean"]:+.2f}']
+                                + [f'{"P" if seat in planner_seats else "H"} {score:.2f}'
+                                   for seat, score in enumerate(draft['seat_scores'])])
+        # A season of planner drafts is about half an hour: each is saved as it finishes (the page merges by Season),
+        # so a stopped run keeps the seasons it completed.
+        if _RUN_SIMS:
+            write_experiment_report_files(os.path.dirname(__file__))
+
+
+# ── Draft order: snake vs third-round reversal ────────────────────────────────
+
+# Each job holds twelve sessions (one per drafter), so fewer workers than the other experiments.
+_DRAFT_ORDER_WORKERS = int(os.environ.get('EXPERIMENT_DRAFT_ORDER_WORKERS', '6'))
+
+
+Z_VERSUS_G_SECTION = 'Z-scores vs G-scores'
+
+
+@sims
+@pytest.mark.parametrize('format_key', ['EC', 'MC', 'Roto'])
+def test_draft_order_bias(format_key):
+    """Every season drafted twice by twelve H-scoring seats, as a snake and with third-round reversal: each seat's
+    H-score and (head to head) real-week win rate. Measurements only, apart from every draft completing."""
+    from experiment_harnesses.draft_order import ORDERS, measure_draft_orders_in_parallel
+    results, failures = measure_draft_orders_in_parallel(format_key, _SEASONS, _DRAFT_ORDER_WORKERS)
+    for result in sorted(results, key=lambda result: (result['season'], ORDERS.index(result['order']))):
+        scores = result['h_scores']
+        _record_row('Draft order: snake vs third-round reversal',
+                    ['Format', 'Season', 'Order', 'Mean H-score'] + _seat_columns(len(scores))
+                    + ['Every real win rate'],
+                    [format_key, result['season'], result['order'], f'{np.mean(scores):.2f}']
+                    + [f'{score:.2f}' for score in scores]
+                    + [' '.join(f'{rate:.2f}' for rate in result['real_rates'] or [])])
+    save_draft_picks(results, DRAFT_PICKS_PATH)
+    _fail_on_breaches([f'{failure["job"]} failed:\n{failure["traceback"]}' for failure in failures])
+
+
+# Every pick of the draft-order drafts: the raw data of the pool-size calibration and weight-evolution analyses.
+DRAFT_PICKS_PATH = Path(__file__).resolve().parent / 'experiment_results' / 'draft_order_picks.jsonl'
+
+
+def save_draft_picks(results
+                     , path: Path):
+    """The drafts' picks, one line per draft (format, season, order, categories, value direction, picks), merged into
+    the file at path: a draft measured again replaces its line, every other line is kept."""
+    import json
+    lines = {}
+    if path.exists():
+        for line in path.read_text(encoding='utf-8').splitlines():
+            draft = json.loads(line)
+            lines[(draft['format'], draft['season'], draft['order'])] = draft
+    for result in results:
+        lines[(result['format'], result['season'], result['order'])] = {
+            key: result[key] for key in ('format', 'season', 'order', 'categories', 'value_direction', 'picks')}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text('\n'.join(json.dumps(draft) for draft in lines.values()) + '\n', encoding='utf-8')
+
+
+# ── Z-scores vs G-scores ──────────────────────────────────────────────────────
+
+# Drafts per split of the seats (Z drafters 1 to 11), per season and format, each on a random seating.
+_Z_VERSUS_G_DRAFTS_PER_SPLIT = int(os.environ.get('EXPERIMENT_Z_VERSUS_G_DRAFTS_PER_SPLIT', '24'))
+
+
+# Head to head only: G-scores are defined differently for Rotisserie (chi scales their weekly variance), which makes a
+# Rotisserie comparison with Z-scores confusing (the user, 2026-11-02).
+@sims
+@pytest.mark.parametrize('format_key', ['EC', 'MC'])
+def test_z_versus_g_scores(format_key):
+    """Per season, every split of the seats between Z-score and G-score rankings (1 Z v 11 G to 11 v 1), drafted
+    statically on random seatings: each group's mean H-score and real-week win rate per draft. Measurements only, apart
+    from every season completing."""
+    from experiment_harnesses.z_versus_g import measure_drafter_counts_in_parallel
+    records, failures = measure_drafter_counts_in_parallel(format_key, _SEASONS, _Z_VERSUS_G_DRAFTS_PER_SPLIT,
+                                                           _EXPERIMENT_WORKERS)
+    draft_numbers: dict = {}
+    for record in records:
+        key = (record['season'], record['n_z_drafters'])
+        draft_numbers[key] = draft_numbers.get(key, 0) + 1
+        _record_row(Z_VERSUS_G_SECTION,
+                    ['Format', 'Season', 'Z drafters', 'Draft', 'Z seats', 'G H-score', 'Z H-score', 'G real',
+                     'Z real'],
+                    [format_key, record['season'], record['n_z_drafters'], draft_numbers[key],
+                     ' '.join(str(seat + 1) for seat in record['z_seats']), f'{record["G_h"]:.2f}',
+                     f'{record["Z_h"]:.2f}', f'{record["G_real"]:.2f}', f'{record["Z_real"]:.2f}'])
+    _fail_on_breaches([f'{failure["job"]} failed:\n{failure["traceback"]}' for failure in failures])
+
+
+# ── The future-pick model's pool size, and the weights by round ──────────────
+# Both read the picks test_draft_order_bias recorded (DRAFT_PICKS_PATH), every format and season there.
+
+CALIBRATION_SECTION = 'Pool-size calibration'
+WEIGHTS_SECTION = 'Category weights by round'
+WEIGHT_CORRELATIONS_SECTION = 'Category weight correlations'
+# Weight histogram bins (display units, 100 = neutral): 0-10, 10-20, ..., the last open above.
+WEIGHT_BIN_WIDTH = 10
+WEIGHT_BIN_COUNT = 28
+
+
+# Every pick of the G-score-field drafts, with the weights each seat's H-scoring session would have picked with.
+G_FIELD_PICKS_PATH = Path(__file__).resolve().parent / 'experiment_results' / 'g_field_picks.jsonl'
+# The fields the calibration measures against, each with the file its drafts are in.
+_CALIBRATION_FIELDS = {'H-scoring': DRAFT_PICKS_PATH, 'G-score': G_FIELD_PICKS_PATH}
+
+
+@sims
+@pytest.mark.parametrize('format_key', ['EC', 'MC', 'Roto'])
+def test_g_field_drafts(format_key):
+    """Per season, one draft of twelve G-score seats, recording the weights each seat's H-scoring session would pick
+    with at every pick: the G-score field of the pool-size calibration. Saved to G_FIELD_PICKS_PATH; measurements
+    only, apart from every draft completing."""
+    from experiment_harnesses.pick_model_calibration import draft_g_fields_in_parallel
+    drafts, failures = draft_g_fields_in_parallel(format_key, _SEASONS, _DRAFT_ORDER_WORKERS)
+    save_draft_picks(drafts, G_FIELD_PICKS_PATH)
+    _fail_on_breaches([f'{failure["job"]} failed:\n{failure["traceback"]}' for failure in failures])
+
+
+@sims
+def test_pool_size_calibration():
+    """Per field, format, season and point in the draft (the round of the pick the weights were made for, and the
+    round of the later pick they are tested at): how close the future-pick model's predicted tilt comes to what the
+    same weights would have taken from the recorded draft, at every grid pool size. Measurements only."""
+    from experiment_harnesses.pick_model_calibration import (POOL_SIZE_GRID, measure_season, read_draft_picks,
+                                                             summarize_errors)
+    columns = (['Field', 'Format', 'Season', 'Grouping', 'Round', 'Pairs', 'No-tilt MS']
+               + [f'MSE M={pool_size}' for pool_size in POOL_SIZE_GRID])
+    for field, path in _CALIBRATION_FIELDS.items():
+        drafts = read_draft_picks(path)
+        for format_key, season in sorted({(draft['format'], draft['season']) for draft in drafts}):
+            records = measure_season(format_key, season, [draft for draft in drafts
+                                                          if (draft['format'], draft['season']) == (format_key, season)])
+            for grouping, key in (('Decision round', 'decision_round'), ('Later round', 'later_round')):
+                for round_number in sorted({record[key] for record in records}):
+                    summary = summarize_errors([record for record in records if record[key] == round_number])
+                    _record_row(CALIBRATION_SECTION, columns,
+                                [field, format_key, season, grouping, round_number, summary['n'],
+                                 f'{summary["realised_mean_square"]:.6f}']
+                                + [f'{error:.6f}' for error in summary['mean_squared_errors']])
+
+
+@sims
+def test_category_weights_by_round():
+    """Per format, round and category: the distribution of the weights behind every recorded pick (a team's last pick
+    has none). Measurements only."""
+    from experiment_harnesses.pick_model_calibration import read_draft_picks
+    drafts = read_draft_picks(DRAFT_PICKS_PATH)
+    weights: dict = {}
+    for draft in drafts:
+        for pick in draft['picks']:
+            if pick['weights'] is None:
+                continue
+            for category, weight in zip(draft['categories'], pick['weights']):
+                weights.setdefault((draft['format'], pick['round'], category), []).append(weight)
+    columns = ['Format', 'Round', 'Category', 'Weights', 'P10', 'P25', 'Median', 'P75', 'P90', 'Bin counts']
+    for (format_key, round_number, category), values in sorted(
+            weights.items(), key=lambda item: (list(_FORMATS).index(item[0][0]), item[0][1])):
+        values = np.asarray(values)
+        bins = np.minimum((values // WEIGHT_BIN_WIDTH).astype(int), WEIGHT_BIN_COUNT - 1)
+        counts = np.bincount(bins, minlength=WEIGHT_BIN_COUNT)
+        _record_row(WEIGHTS_SECTION, columns,
+                    [format_key, round_number, category, len(values)]
+                    + [f'{np.percentile(values, percentile):.1f}' for percentile in (10, 25, 50, 75, 90)]
+                    + [' '.join(str(count) for count in counts)])
+    record_weight_correlations(drafts)
+
+
+def record_weight_correlations(drafts):
+    """Per format: the correlation matrix of the weights over every recorded pick (every round and season pooled), and
+    the players' -- the correlation of the covariance L the future-pick model uses (X-scores of the draftable pool),
+    averaged over the seasons drafted."""
+    from experiment_harnesses.draft_order import DRAFTER_SETTINGS, OBJECTIVES
+    from experiment_harnesses.league_sessions import build_league_session
+    for format_key in [key for key in _FORMATS if any(draft['format'] == key for draft in drafts)]:
+        format_drafts = [draft for draft in drafts if draft['format'] == format_key]
+        categories = format_drafts[0]['categories']
+        if any(draft['categories'] != categories for draft in format_drafts):
+            raise ValueError(f'{format_key}: the drafts do not all have the same categories.')
+        weights = np.array([pick['weights'] for draft in format_drafts for pick in draft['picks']
+                            if pick['weights'] is not None])
+        player_correlations = []
+        for season in sorted({draft['season'] for draft in format_drafts}):
+            agent = build_league_session(OBJECTIVES[format_key], season, DRAFTER_SETTINGS)[2].agent
+            if list(agent.x_scores.columns) != categories:
+                raise ValueError(f'{format_key} {season}: the X-scores\' categories are not the drafts\'.')
+            covariance = np.asarray(agent.L[0])
+            deviations = np.sqrt(np.diag(covariance))
+            player_correlations.append(covariance / np.outer(deviations, deviations))
+        for matrix_name, matrix in (('Weights', np.corrcoef(weights, rowvar=False)),
+                                    ('Players', np.mean(player_correlations, axis=0))):
+            for category, correlations in zip(categories, matrix):
+                _record_row(WEIGHT_CORRELATIONS_SECTION, ['Format', 'Matrix', 'Category'] + categories,
+                            [format_key, matrix_name, category] + [f'{value:.3f}' for value in correlations])
+
+
+# ── Best player-seasons ───────────────────────────────────────────────────────
+
+BEST_SEASONS_SECTION = 'Best player-seasons'
+BEST_SEASONS_PRE_2000_SECTION = 'Best player-seasons, pre-2000'
+# Each season records the union of its best players under every ranking, with every ranking's value: enough that the
+# all-time ranks of the player-seasons the page shows are exact.
+_BEST_PER_SEASON = 100
+# The two eras, ranked separately: seasons before 2000-01 have no reliable position data, and positions shape every
+# H-score, so a pre-2000 season is comparable only with another. {section: (first season, last season)}.
+_BEST_SEASONS_ERAS = {BEST_SEASONS_SECTION: ('2000-01', '9999-99'),
+                      BEST_SEASONS_PRE_2000_SECTION: ('1984-85', '1999-00')}
+# The objectives ranked by H-score: the three formats, and head to head half Each Category, half Most Categories.
+_BEST_SEASONS_OBJECTIVES = ('Each Category', 'Half and Half', 'Most Categories', 'Rotisserie')
+
+
+@sims
+@pytest.mark.parametrize('section', list(_BEST_SEASONS_ERAS))
+def test_best_player_seasons(section):
+    """Per season of this era: the players among the season's best by first-pick H-score on the neutral board (Each
+    Category, Half and Half, Most Categories, Rotisserie) or by G-score (the nine-category G-scores the head-to-head
+    objectives share), each with every ranking's value. beth = 0: the season's statistics are the truth. Measurements
+    only."""
+    from backend.services.build_agent import load_all_params
+    n_games = load_all_params()['NBA']['n_games']
+    columns = (['Season', 'Player id', 'Player', 'Games']
+               + [f'H-score, {objective}' for objective in _BEST_SEASONS_OBJECTIVES] + ['G-score'])
+    first, last = _BEST_SEASONS_ERAS[section]
+    for season in [season for season in _SEASONS if first <= season <= last]:
+        values: dict = {}
+        names, games = {}, None
+        for objective in _BEST_SEASONS_OBJECTIVES:
+            session = _build_session(objective, season=season, beth=0)
+            registered = [player for player in session.agent.default_h_scores.index
+                          if player in session.player_registry]
+            if games is None:
+                games = (session.v1_clean['Games Played %'] * n_games).round().astype(int)
+            values[f'H-score, {objective}'] = 100 * session.agent.default_h_scores[registered]
+            if objective == 'Each Category':
+                values['G-score'] = session.agent.info['G-scores']['Total'][registered]
+            names.update({player: session.player_registry[player].name for player in registered})
+        recorded = set()
+        for ranking in values.values():
+            recorded |= set(ranking.sort_values(ascending=False).index[:_BEST_PER_SEASON])
+        for player in sorted(recorded, key=lambda player: -values['H-score, Each Category'][player]):
+            _record_row(section, columns,
+                        [season, player, names[player], int(games[player])]
+                        + [f'{values[ranking][player]:.2f}' for ranking in columns[4:]])
+
+
+# ── Timing ────────────────────────────────────────────────────────────────────
+
+DRAFT_TIMING_SECTION = 'Draft timing'
+DRAFT_TIMING_BY_ROUND_SECTION = 'Draft timing by round'
+AUCTION_TIMING_SECTION = 'Auction timing'
+AUCTION_TIMING_BY_ROUND_SECTION = 'Auction timing by round'
+# The season the timings are taken on (the backend tests' league).
+_TIMING_SEASON = '2024-25'
+
+
+def average_durations(samples):
+    """{path: (mean seconds, mean calls)} per sample over the samples (each {path: [seconds, calls]})."""
+    totals: dict = {}
+    for sample in samples:
+        for path, (seconds, calls) in sample.items():
+            entry = totals.setdefault(path, [0.0, 0])
+            entry[0] += seconds
+            entry[1] += calls
+    return {path: (seconds / len(samples), calls / len(samples)) for path, (seconds, calls) in totals.items()}
+
+
+def record_timing_breakdown(section, format_key, operation, samples):
+    for path, (seconds, calls) in sorted(average_durations(samples).items()):
+        _record_row(section, ['Format', 'Operation', 'Part', 'Calls per operation', 'Mean ms', 'Samples'],
+                    [format_key, operation, ' > '.join(path), f'{calls:.2f}', f'{1000 * seconds:.1f}', len(samples)])
+
+
+def total_milliseconds(sample):
+    """A sample's request time: its one root path."""
+    roots = [seconds for path, (seconds, _) in sample.items() if len(path) == 1]
+    if len(roots) != 1:
+        raise ValueError(f'A timing sample has {len(roots)} root paths, expected one.')
+    return 1000 * roots[0]
+
+
+@sims
+@pytest.mark.parametrize('format_key', ['EC', 'MC', 'Roto'])
+def test_timing_breakdown(format_key):
+    """Where the app's time goes, per format: cold session builds, a whole draft (every pick's first 100 candidates,
+    the first team's whole board) and a whole autodraft auction (every nomination, the first team's table after each
+    round), each request broken down by the functions it spends its time in. Run on an otherwise idle machine.
+    Measurements only."""
+    from experiment_harnesses.timing_trace import time_auction, time_draft
+    draft = time_draft(format_key, _TIMING_SEASON)
+    record_timing_breakdown(DRAFT_TIMING_SECTION, format_key, 'Session build', draft['build'])
+    record_timing_breakdown(DRAFT_TIMING_SECTION, format_key, 'Pick: first 100 candidates',
+                            [sample for _, sample in draft['pick']])
+    record_timing_breakdown(DRAFT_TIMING_SECTION, format_key, "Whole board (the first team's picks)",
+                            [sample for _, sample in draft['board']])
+    for round_number in sorted({round_number for round_number, _ in draft['pick']}):
+        picks = [total_milliseconds(sample) for number, sample in draft['pick'] if number == round_number]
+        boards = [total_milliseconds(sample) for number, sample in draft['board'] if number == round_number]
+        _record_row(DRAFT_TIMING_BY_ROUND_SECTION, ['Format', 'Round', 'First 100 ms', 'Whole board ms'],
+                    [format_key, round_number, f'{np.mean(picks):.0f}', f'{np.mean(boards):.0f}' if boards else '—'])
+    auction = time_auction(format_key, _TIMING_SEASON)
+    record_timing_breakdown(AUCTION_TIMING_SECTION, format_key, 'Session build', auction['build'])
+    record_timing_breakdown(AUCTION_TIMING_SECTION, format_key, 'Nomination (every team\'s valuation)',
+                            [sample for _, sample in auction['nomination']])
+    record_timing_breakdown(AUCTION_TIMING_SECTION, format_key, "Auction table (the first team's evaluate)",
+                            [sample for _, sample in auction['table']])
+    for round_number in sorted({round_number for round_number, _ in auction['nomination']}):
+        nominations = [total_milliseconds(sample) for number, sample in auction['nomination'] if number == round_number]
+        tables = [total_milliseconds(sample) for number, sample in auction['table'] if number == round_number]
+        _record_row(AUCTION_TIMING_BY_ROUND_SECTION, ['Format', 'Round', 'Nomination ms', 'Table ms'],
+                    [format_key, round_number, f'{np.mean(nominations):.0f}', f'{np.mean(tables):.0f}' if tables else '—'])
 
 
 # ── Auction cash-share rules ──────────────────────────────────────────────────
@@ -1685,6 +2218,22 @@ DOLLAR_SHAPE_SECTION = 'Dollar shape: replacement level and SAVOR'
 # savor_calculation; 2 is the app's default), and its streaming noise S (0 is off; 10 is the app's default).
 _REPLACEMENT_LEVELS = (('off', 0.0), ('medium', 2.0), ('high', 4.0))
 _SAVOR_NOISES = (('off', 0.0), ('medium', 10.0), ('high', 20.0))
+DOLLAR_GINI_SECTION = 'Dollar shape: Gini by SAVOR settings'
+# The Gini heatmap's finer grid around the app's defaults (S_R $2, S_sigma 10; the app allows S_R $0-50 and S_sigma
+# 0-200).
+_GINI_REPLACEMENT_THRESHOLDS = (0.0, 0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0, 6.0)
+_GINI_SAVOR_NOISES = (0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 40.0, 50.0)
+
+
+def compute_gini_coefficient(values):
+    """The Gini coefficient of non-negative values: the mean absolute difference between every two of them over twice
+    their mean (0 every value equal, towards 1 all in one)."""
+    values = np.sort(np.asarray(values, dtype=float))
+    if (values < 0).any():
+        raise ValueError(f'A Gini coefficient needs non-negative values; the smallest is {values[0]}.')
+    n = len(values)
+    ranks = np.arange(1, n + 1)
+    return float(np.sum((2 * ranks - n - 1) * values) / (n * values.sum()))
 # The drafted players' tiers, best first: (name, share of the drafted players).
 _DOLLAR_TIERS = (('Top 10%', 0.10), ('Middle 80%', 0.80), ('Bottom 10%', 0.10))
 
@@ -1696,6 +2245,77 @@ def _split_into_dollar_tiers(dollars, total_picks):
     drafted = dollars.iloc[:total_picks].to_numpy()
     return [float(drafted[:top_count].mean()), float(drafted[top_count:total_picks - bottom_count].mean()),
             float(drafted[total_picks - bottom_count:].mean())]
+
+
+DOLLAR_GINI_BY_SEASON_SECTION = 'Dollar inequality by season'
+# The SAVOR settings the season trend is measured at: (label, replacement threshold S_R, noise S_sigma).
+_GINI_TREND_SETTINGS = (('SAVOR off', 0.0, 0.0), ('the app (S_R $2, S_sigma 10)', 2.0, 10.0))
+TOP_VALUES_SECTION = 'Most valuable player-seasons'
+# Each season's most valuable players recorded for the all-time ranking (the page ranks across seasons).
+_TOP_VALUES_PER_SEASON = 10
+
+
+@sims
+def test_dollar_gini_by_season(sessions):
+    """Per season, the Gini coefficient of the drafted players' dollars on the starting board (12 teams x $200, Each
+    Category), with SAVOR off and at the app's defaults. Measurements only."""
+    from backend.math.algorithm_helpers import auction_value_adjuster
+    for season in _SEASONS:
+        session = sessions('EC', auction=True, season=season)
+        agent = session.agent
+        total_picks = agent.n_drafters * agent.n_picks
+        total_cash = agent.n_drafters * session.current_settings['cash_per_team']
+        ginis = []
+        for _, replacement_threshold, savor_noise in _GINI_TREND_SETTINGS:
+            dollars = auction_value_adjuster(agent.default_h_scores, total_picks, total_cash, savor_noise,
+                                             replacement_threshold).sort_values(ascending=False)
+            ginis.append(compute_gini_coefficient(dollars.iloc[:total_picks]))
+        _record_row(DOLLAR_GINI_BY_SEASON_SECTION, ['Season'] + [f'Gini, {label}' for label, _, _ in _GINI_TREND_SETTINGS],
+                    [season] + [f'{gini:.4f}' for gini in ginis])
+        # The last setting is the app's: its dollars rank the season's most valuable players.
+        for rank, (player_id, value) in enumerate(dollars.iloc[:_TOP_VALUES_PER_SEASON].items(), start=1):
+            _record_row(TOP_VALUES_SECTION, ['Season', 'Rank in season', 'Player', 'Dollars'],
+                        [season, rank, session.player_registry[player_id].name, f'{value:.1f}'])
+
+
+DOLLAR_CURVES_SECTION = 'Dollar curves by league size'
+# The league sizes the dollar curves compare: (teams, roster size). The team counts at the default roster of 13, and
+# the roster sizes parameters.yaml has slot layouts for (13-16) at the default 12 teams.
+_DOLLAR_CURVE_LEAGUES = ((8, 13), (10, 13), (12, 13), (14, 13), (16, 13), (12, 14), (12, 15), (12, 16))
+
+
+def build_league_size_session(n_drafters, n_picks, season):
+    """An Each Category auction session ($200 a team, the app's defaults) with this many teams and roster spots, the
+    slots parameters.yaml lays out for that roster size."""
+    import yaml
+    from benchmark_helpers import _PARAMS_PATH
+    request = _build_session_request(objective='Each Category', n_drafters=n_drafters, cash_per_team=200)
+    with open(_PARAMS_PATH) as params_file:
+        positions = yaml.safe_load(params_file)['NBA']['options']['positions'][n_picks]
+    request['league']['n_picks'] = n_picks
+    request['slot_counts'] = {**positions['base'], **positions['flex']}
+    request['data_source']['season'] = season
+    response = client.post('/sessions', json=request)
+    assert response.status_code == 201, f'session build failed: {response.text}'
+    return get_session(response.json()['session_id'])
+
+
+@sims
+def test_dollar_curves_by_league_size():
+    """Per season and league size, every drafted player's dollars at the start of an auction, by draft rank, at the
+    app's SAVOR settings. Measurements only."""
+    from backend.math.algorithm_helpers import auction_value_adjuster
+    for season in _SEASONS:
+        for n_drafters, n_picks in _DOLLAR_CURVE_LEAGUES:
+            session = build_league_size_session(n_drafters, n_picks, season)
+            settings = session.current_settings
+            total_picks = n_drafters * n_picks
+            dollars = auction_value_adjuster(session.agent.default_h_scores, total_picks,
+                                             n_drafters * settings['cash_per_team'], settings['streaming_noise'],
+                                             settings['replacement_threshold']).sort_values(ascending=False)
+            _record_row(DOLLAR_CURVES_SECTION, ['Season', 'Teams', 'Roster size', 'Top player $', 'Every dollar value'],
+                        [season, n_drafters, n_picks, f'{dollars.iloc[0]:.1f}',
+                         ' '.join(f'{value:.2f}' for value in dollars.iloc[:total_picks])])
 
 
 def test_dollar_shape_by_replacement_level_and_savor(sessions):
@@ -1729,6 +2349,14 @@ def test_dollar_shape_by_replacement_level_and_savor(sessions):
                             + [f'{100 * (value / base - 1):+.1f}%' for value, base in zip(tiers, baseline)]
                             + [int((dollars.iloc[:total_picks] > 1).sum())]
                             + [f'{value:.2f}' for value in dollars.iloc[:total_picks]])
+        # The Gini heatmap: the drafted players' dollars (the top total_picks) on the finer grid.
+        for replacement_threshold in _GINI_REPLACEMENT_THRESHOLDS:
+            for savor_noise in _GINI_SAVOR_NOISES:
+                dollars = auction_value_adjuster(agent.default_h_scores, total_picks, total_cash, savor_noise,
+                                                 replacement_threshold).sort_values(ascending=False)
+                _record_row(DOLLAR_GINI_SECTION, ['Season', 'Replacement threshold', 'SAVOR noise', 'Gini'],
+                            [season, replacement_threshold, savor_noise,
+                             f'{compute_gini_coefficient(dollars.iloc[:total_picks]):.4f}'])
     curve_start = columns.index('Rank 1 $')
     baseline = np.mean(tiers_by_cell[('off', 'off')], axis=0)
     for replacement_label, replacement_threshold in _REPLACEMENT_LEVELS:

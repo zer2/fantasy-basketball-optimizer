@@ -19,11 +19,11 @@ import numpy as np
 
 PAGE_CSS = """
   :root { --bg:#ffffff; --fg:#26282e; --muted:#6a6f7a; --line:#e4e6ea; --card:#f7f8fa; --accent:#33556e;
-          --good:#1e8a3a; --bad-rgb:200,30,30; --warn:#a85d00; --heat-rgb:0,114,178;
+          --good:#1e8a3a; --bad-rgb:200,30,30; --warn:#a85d00; --heat-rgb:0,114,178; --diverge-negative-rgb:213,94,0;
           --series-0:#0072b2; --series-1:#e69f00; --series-2:#56b4e9; --series-3:#cc79a7; --series-4:#009e73; --series-5:#d55e00; --series-6:#f0e442; --other:#80858e; --no-hard-punt:#d5d8dd; }
   @media (prefers-color-scheme: dark) {
     :root { --bg:#14161c; --fg:#e6e8ec; --muted:#9aa0ab; --line:#2c303a; --card:#1b1e26; --accent:#8fb4d1;
-            --good:#5ccb7a; --bad-rgb:255,105,105; --warn:#f0b43c; --heat-rgb:86,180,233;
+            --good:#5ccb7a; --bad-rgb:255,105,105; --warn:#f0b43c; --heat-rgb:86,180,233; --diverge-negative-rgb:240,123,63;
             --series-0:#3d9be0; --series-1:#f0b43c; --series-2:#7cc8f2; --series-3:#de9cc4; --series-4:#3cc79a; --series-5:#f07b3f; --series-6:#e8dc5a; --other:#7a808a; --no-hard-punt:#3a3f48; }
   }
   * { box-sizing: border-box; }
@@ -36,7 +36,16 @@ PAGE_CSS = """
   .group-tabs button { background:none; border:none; border-bottom:2px solid transparent; color:var(--muted);
                        padding:6px 2px; font-size:.9rem; font-weight:600; cursor:pointer; margin-bottom:-1px; }
   .group-tabs button.active { color:var(--accent); border-bottom-color:var(--accent); }
-  .tab-buttons { display:none; flex-wrap:wrap; gap:6px; }
+  .tab-buttons { display:none; flex-wrap:wrap; gap:12px; align-items:stretch; }
+  .tab-cluster { display:flex; flex-direction:column; gap:6px; background:var(--card); border:1px solid var(--line);
+                 border-radius:10px; padding:8px 10px 10px; }
+  .tab-cluster .tab-cluster-buttons button { background:var(--bg); }
+  .tab-cluster-label { text-align:center; font-size:.72rem; font-weight:600; letter-spacing:.04em; text-transform:uppercase;
+                       color:var(--muted); }
+  .tab-cluster-buttons { display:grid; gap:6px; }
+  .player-cell { display:flex; align-items:center; gap:10px; }
+  .headshot { width:40px; height:40px; border-radius:50%; object-fit:cover; object-position:top;
+              background:var(--line); flex:none; display:inline-block; }
   .tab-buttons.active { display:flex; }
   .tab-buttons button { background:var(--card); color:var(--fg); border:1px solid var(--line); border-radius:8px;
                         padding:5px 10px; font-size:.82rem; cursor:pointer; }
@@ -63,6 +72,22 @@ PAGE_CSS = """
   .legend { display:flex; flex-wrap:wrap; gap:6px 18px; margin-top:6px; font-size:.85rem; color:var(--muted); }
   .swatch { display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:6px; }
   .multiples { display:grid; grid-template-columns:repeat(auto-fit, minmax(420px, 1fr)); gap:4px 24px; }
+  table.heatmap td { text-align:center; font-variant-numeric:tabular-nums; padding:6px 10px; }
+  table.heatmap th { text-align:center; }
+  .icicle { margin:6px 0 18px; font-size:.72rem; }
+  .ice-node { display:flex; flex-direction:column; min-width:0; }
+  .ice-bar { color:#fff; padding:3px 4px; margin:1px; border-radius:3px; white-space:nowrap; overflow:hidden;
+             text-overflow:ellipsis; min-height:1.1rem; }
+  .ice-children { display:flex; }
+  .ice-slot { flex-grow:0; flex-shrink:0; min-width:0; }
+  .three-columns { display:grid; grid-template-columns:1fr 1fr 1fr; gap:4px 20px; }
+  .three-columns.narrow-first { grid-template-columns:0.65fr 1.3fr 1fr; }
+  @media (max-width: 760px) { .three-columns, .three-columns.narrow-first { grid-template-columns:1fr; } }
+  .two-columns { display:grid; grid-template-columns:1fr 1fr; gap:4px 24px; }
+  .chart-square { display:grid; grid-template-columns:max-content 1fr 1fr; gap:4px 24px; align-items:center; }
+  .chart-square .grid-head { text-align:center; font-size:.9rem; font-weight:600; color:var(--muted); }
+  .chart-square .grid-side { writing-mode:vertical-rl; transform:rotate(180deg); font-size:.9rem; font-weight:600;
+                             color:var(--muted); }
   .multiples h3 { font-size:.85rem; font-weight:600; color:var(--muted); margin:6px 0 0; }
   .other { background:var(--other); }
   .seeding { background:repeating-linear-gradient(135deg, var(--other) 0 4px, transparent 4px 7px);
@@ -77,6 +102,9 @@ PAGE_CSS = """
   .details { color:var(--muted); font-size:.85rem; margin:0 0 12px; }
   .details p.explain, .details ul.explain { font-size:.85rem; color:var(--muted); margin:2px 0; }
   .bar-track { display:flex; gap:2px; height:22px; border-radius:6px; overflow:hidden; }
+  .bar-track.with-parity { position:relative; }
+  .parity-line { position:absolute; left:50%; top:-3px; bottom:-3px; border-left:2px dashed var(--fg);
+                 transform:translateX(-1px); pointer-events:none; }
   .bar-segment { flex-grow:0; flex-shrink:0; min-width:3px; }
   .note { color:var(--muted); font-size:.85rem; margin:0 0 8px; }
   .tiles { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:8px; margin:8px 0 12px; }
@@ -451,31 +479,47 @@ def rule_seat_win_rate(value, row, columns):
     return style_bad(1.0) if value < H_VERSUS_G_BREAK_EVEN[row[columns.index('Format')]] else ''
 
 
+# The awareness card's bar labels, per comparison.
+AWARENESS_FIELD_LABELS = {'vs unaware H field': 'vs H-scoring field (unaware)', 'vs G field': 'vs G-score field'}
+
+
 def card_awareness(columns, rows):
-    pooled = {row[0]: (read_leading_number(row[2]), read_leading_number(row[3]))
-              for row in rows if str(row[1]).startswith('ALL')}
-    seasons = sorted({row[1] for row in candidate_rows(rows)})
-    comparisons = [comparison for comparison in ('vs unaware H field', 'vs G field') if comparison in pooled]
-    series = []
-    for comparison in comparisons:
-        values = {row[1]: (read_leading_number(row[2]), read_leading_number(row[3]))
-                  for row in candidate_rows(rows) if row[0] == comparison}
-        series.append(Series(comparison, [values[s][0] if s in values else None for s in seasons] + [pooled[comparison][0]],
-                             [2 * values[s][1] if s in values else 0 for s in seasons] + [2 * pooled[comparison][1]]))
-    unaware = pooled.get('vs unaware H field', (float('nan'), float('nan')))
-    g_field = pooled.get('vs G field', (float('nan'), float('nan')))
-    text = (f'The opponent model adds <b>{unaware[0]:+.2f}% ± {unaware[1]:.2f}</b> against H-drafters without it, and '
-            f'<b>{g_field[0]:+.2f}% ± {g_field[1]:.2f}</b> against G-score drafters, where its predictions are wrong. '
-            f'± is one standard error; the bars are ±2.')
-    chart = render_chart([season[2:] for season in seasons] + ['ALL'], series, 'On minus off', x_title='Season',
-                         kind='dots', references=(ReferenceLine(0.0, 'no effect'),),
-                         value_suffix='%', value_places=2)
-    return render_takeaway(text) + chart
+    """Per format: the pooled effect of the opponent model against each field, in a sentence and a two-bar chart (bars
+    the pooled means, whiskers two standard errors). Pooled rows are the ones whose Season starts 'ALL'."""
+    comparison_index, format_index, season_index = (columns.index(name) for name in ('Comparison', 'Format', 'Season'))
+    mean_index, error_index = columns.index('Mean (pp)'), columns.index('SE (pp)')
+    names = {'EC': 'Each Category', 'MC': 'Most Categories'}
+    fields = {'vs unaware H field': 'against H-drafters without it', 'vs G field': 'against G-score drafters'}
+
+    def read_effect(row):
+        return read_leading_number(row[mean_index]), read_leading_number(row[error_index])
+
+    sentences, charts = [], []
+    for format_key in [key for key in names if any(row[format_index] == key for row in rows)]:
+        format_rows = [row for row in rows if row[format_index] == format_key]
+        pooled = {row[comparison_index]: read_effect(row) for row in format_rows
+                  if str(row[season_index]).startswith('ALL')}
+        by_season_rows = [row for row in format_rows if not str(row[season_index]).startswith('ALL')]
+        seasons = sorted({row[season_index] for row in by_season_rows})
+        comparisons = [comparison for comparison in fields if comparison in pooled]
+        sentences.append(f'{names[format_key]}: ' + ', and '.join(
+            f'<b>{pooled[comparison][0]:+.2f}% ± {pooled[comparison][1]:.2f}</b> {fields[comparison]}'
+            for comparison in comparisons) + '.')
+        bars = Series('On minus off', [pooled[comparison][0] for comparison in comparisons],
+                      [2 * pooled[comparison][1] for comparison in comparisons])
+        charts.append(f'<div><h3>{names[format_key]}</h3>' + render_chart(
+            [AWARENESS_FIELD_LABELS[comparison] for comparison in comparisons], [bars], 'On minus off',
+            x_title='Field', kind='bars', references=(ReferenceLine(0.0, 'no effect'),), value_suffix='%',
+            value_places=2, height=320, width=540) + '</div>')
+    text = ('The opponent model adds, on minus off: ' + ' '.join(sentences)
+            + ' ± is one standard error; the whiskers are ±2.')
+    return render_takeaway(text) + f'<div class="two-columns">{"".join(charts)}</div>'
 
 
 def rule_pooled_significance(value, row, columns):
-    """Only the pooled means, and only when more than 2 standard errors from 0: green above, red below."""
-    if not is_summary_row(row):
+    """Only the pooled means (Season 'ALL ...'), and only when more than 2 standard errors from 0: green above, red
+    below."""
+    if not str(row[columns.index('Season')]).startswith('ALL'):
         return ''
     error = read_leading_number(row[columns.index('SE (pp)')])
     if value > 2 * error:
@@ -614,11 +658,16 @@ def render_build_chips(breakdown: str) -> str:
 def card_punt_diversity(columns, rows):
     seasons = sorted({row[0] for row in rows})
     breakdown_index = columns.index('Breakdown (! = hard)')
-    panels = []
-    for format_key in ('MC', 'EC'):
-        for mode in ('draft', 'auction'):
+    formats = {'EC': 'Each Category', 'MC': 'Most Categories'}
+    modes = ('draft', 'auction')
+    # The square: a corner, the mode headings across, then per format its heading and one chart per mode.
+    cells = ['<div></div>'] + [f'<div class="grid-head">{mode.capitalize()}</div>' for mode in modes]
+    for format_key, format_name in formats.items():
+        cells.append(f'<div class="grid-side">{format_name}</div>')
+        for mode in modes:
             by_season = {row[0]: row for row in rows if row[1] == format_key and row[2] == mode}
             if not by_season:
+                cells.append('<div></div>')
                 continue
             stacks = []
             for season in seasons:
@@ -632,9 +681,8 @@ def card_punt_diversity(columns, rows):
                                 f'{season} · {name_build_kind(kind)}: '
                                 + ', '.join(f'{combination} x{count}' for combination, count in members))
                                for kind, members in sorted(by_kind.items())])
-            name = {'MC': 'Most Categories', 'EC': 'Each Category'}[format_key]
-            panels.append(f'<div><h3>{name}, {mode}</h3>'
-                          + render_stacked_bars([season[2:] for season in seasons], stacks, 'Builds', 12.0) + '</div>')
+            cells.append('<div>' + render_stacked_bars([season[2:] for season in seasons], stacks, 'Builds', 12.0)
+                         + '</div>')
     present = {classify_build(combination) for row in rows for combination, _ in read_breakdown(row[breakdown_index])}
     shown = [kind for kind in range(len(BUILD_KINDS)) if kind in present] + [NO_HARD_PUNT] + (
         [OTHER_BUILD] if OTHER_BUILD in present else [])
@@ -645,13 +693,12 @@ def card_punt_diversity(columns, rows):
     hard_counts = [count_distinct_builds(row[breakdown_index], True) for row in rows]
     fewest = min(all_counts)
     text = (f'In a season, the top-12 builds use <b>{fewest:.0f}-{max(all_counts):.0f}</b> distinct punt combinations '
-            f'counting soft punts, and <b>{min(hard_counts)}-{max(hard_counts)}</b> counting hard punts alone (floor 3 '
-            f'on the first: fewer would mean the field has collapsed onto one build).')
+            f'counting soft punts, and <b>{min(hard_counts)}-{max(hard_counts)}</b> counting hard punts alone.')
     note = ("<div class=\"note\">Each bar is a season's 12 builds, coloured by exactly what they hard punt (under 15%); "
             'soft punts are ignored here but listed in the table. Light shades are two hard punts, paired with the '
             'single punt of the same hue. Hover a segment for its exact combinations.</div>')
     return (render_takeaway(text) + note
-            + legend + f'<div class="multiples">{"".join(panels)}</div>')
+            + legend + f'<div class="chart-square">{"".join(cells)}</div>')
 
 
 # Rotisserie punting
@@ -1196,6 +1243,11 @@ def sort_by_loop_gain(columns, rows):
 
 
 # Planner vs H-scoring
+def identify_pair(columns, row):
+    """A pair is its season and its number within the season."""
+    return row[columns.index('Season')], row[columns.index('Pair')]
+
+
 def compute_seat_differences(columns, rows):
     """Per planner variant, per seat: the seat's planner score minus its H-scoring score within each pair (each seat
     drafts once with each method in a pair). Returns {variant: (S, pairs) array}."""
@@ -1205,7 +1257,7 @@ def compute_seat_differences(columns, rows):
         pairs = {}
         for row in rows:
             if row[0] == variant:
-                pairs.setdefault(row[1], []).append(row)
+                pairs.setdefault(identify_pair(columns, row), []).append(row)
         per_pair = []
         for drafts in pairs.values():
             if len(drafts) != 2:
@@ -1230,38 +1282,37 @@ def summarize_planner_pairs(columns, rows):
         pairs = {}
         for row in rows:
             if row[0] == variant:
-                pairs.setdefault(row[1], []).append(read_leading_number(row[difference_index]))
+                pairs.setdefault(identify_pair(columns, row), []).append(read_leading_number(row[difference_index]))
         summary[variant] = {'pairs': np.array([np.mean(drafts) for drafts in pairs.values()]),
-                            'drafts': np.array([value for drafts in pairs.values() for value in drafts])}
+                            'drafts': np.array([value for drafts in pairs.values() for value in drafts]),
+                            'seasons': [season for season, _ in pairs]}
     return summary
 
 
 def card_planner_drafts(columns, rows):
-    """The whole experiment on one card: per variant the mean pair difference with its standard error and how many
-    pairs and drafts the planner won; then each seat against itself, by draft position. Numbers only."""
+    """Per planner variant: the mean pair difference with its standard error and how many pairs and drafts the planner
+    won, in a sentence and a bar chart (one bar per variant, whiskers two standard errors). Each Category only."""
     summary = summarize_planner_pairs(columns, rows)
-    differences = compute_seat_differences(columns, rows)
-    seat_count = next(iter(differences.values())).shape[0]
     sentences = []
     for variant, values in summary.items():
         pairs, drafts = values['pairs'], values['drafts']
-        seat_means = differences[variant].mean(axis=1)
         sentences.append(
-            f'{escape(variant)}: <b>{pairs.mean():+.2f}%</b> per pair (standard error {pairs.std(ddof=1) / np.sqrt(len(pairs)):.2f}, '
-            f'pairs from {pairs.min():+.2f} to {pairs.max():+.2f}); the planner wins <b>{int((pairs > 0).sum())} of '
-            f'{len(pairs)}</b> pairs and {int((drafts > 0).sum())} of {len(drafts)} single drafts; by seat, from '
-            f'{seat_means.min():+.2f}% (seat {int(np.argmin(seat_means)) + 1}) to {seat_means.max():+.2f}% (seat '
-            f'{int(np.argmax(seat_means)) + 1}).')
-    series = [Series(variant, list(values.mean(axis=1)),
-                     list(2 * values.std(axis=1, ddof=1) / np.sqrt(values.shape[1])))
-              for variant, values in differences.items()]
-    chart = render_chart([str(seat + 1) for seat in range(seat_count)], series, 'Planner minus H',
-                         x_title='Seat (draft position)', kind='dots',
-                         references=(ReferenceLine(0.0, 'even'),), value_suffix='%', value_places=2)
+            f'{escape(variant)}: <b>{pairs.mean():+.2f}%</b> per pair (standard error '
+            f'{pairs.std(ddof=1) / np.sqrt(len(pairs)):.2f}, pairs from {pairs.min():+.2f} to {pairs.max():+.2f}); the '
+            f'planner wins <b>{int((pairs > 0).sum())} of {len(pairs)}</b> pairs and {int((drafts > 0).sum())} of '
+            f'{len(drafts)} single drafts.')
+    variants = list(summary)
+    bars = Series('Planner minus H-scoring', [float(summary[variant]['pairs'].mean()) for variant in variants],
+                  [2 * float(summary[variant]['pairs'].std(ddof=1) / np.sqrt(len(summary[variant]['pairs'])))
+                   for variant in variants])
+    seasons = sorted({season for values in summary.values() for season in values['seasons']})
+    chart = (f'<div class="two-columns"><div><h3>Each Category</h3>' + render_chart(
+        variants, [bars], 'Planner minus H', x_title='Planner', kind='bars',
+        references=(ReferenceLine(0.0, 'even'),), value_suffix='%', value_places=2, height=320, width=540)
+        + '</div></div>')
     note = ("A pair is two drafts in which the planner and H-scoring seats swap; its number is the planner seats' mean "
-            "complete-team H-score minus the H-scoring seats', averaged over the two drafts. The chart: each dot is one "
-            "draft position (seat 1 picks first), averaged over the pairs: that seat drafting with the planner minus "
-            'the same seat drafting with H-scoring; bars are ±2 standard errors. One colour per planner variant.')
+            "complete-team H-score minus the H-scoring seats', averaged over the two drafts. The whiskers are \u00b12 "
+            f"standard errors across pairs. Seasons: {', '.join(seasons)}.")
     return f'<div class="takeaway">{" ".join(sentences)}</div><div class="note">{note}</div>' + chart
 
 
@@ -1273,13 +1324,13 @@ def derive_planner_pair_table(columns, rows):
     difference_index = columns.index('Planner minus H (pp)')
     pair_rows = []
     for variant in dict.fromkeys(row[0] for row in rows):
-        pairs = list(dict.fromkeys(row[1] for row in rows if row[0] == variant))
+        pairs = list(dict.fromkeys(identify_pair(columns, row) for row in rows if row[0] == variant))
         for position, pair in enumerate(pairs):
-            drafts = [row for row in rows if row[0] == variant and row[1] == pair]
+            drafts = [row for row in rows if row[0] == variant and identify_pair(columns, row) == pair]
             pair_mean = float(np.mean([read_leading_number(draft[difference_index]) for draft in drafts]))
-            pair_rows.append([variant, pair, f'{pair_mean:+.2f}']
+            pair_rows.append([variant, pair[0], pair[1], f'{pair_mean:+.2f}']
                              + [f'{differences[variant][seat, position]:+.2f}' for seat in range(len(seat_columns))])
-    return ['Planner', 'Pair', 'Planner minus H (pp)'] + seat_columns, pair_rows
+    return ['Planner', 'Season', 'Pair', 'Planner minus H (pp)'] + seat_columns, pair_rows
 
 
 def styles_planner_pairs(columns, rows):
@@ -1295,6 +1346,511 @@ def styles_planner_pairs(columns, rows):
             row_styles[index] = f' style="background:rgba({color},{depth:.2f})"'
         styles.append(row_styles)
     return styles
+
+
+def sort_newest_season_first(columns, rows):
+    """Rows grouped by the columns before Season (each group where it first appears), and within a group the newest
+    season first; rows of one season keep their order."""
+    season_index = columns.index('Season')
+    group_order: dict = {}
+    for row in rows:
+        group_order.setdefault(tuple(row[:season_index]), len(group_order))
+
+    def season_start(row):
+        season = str(row[season_index])
+        return -int(season[:4]) if season[:4].isdigit() else 0
+
+    return sorted(rows, key=lambda row: (group_order[tuple(row[:season_index])], season_start(row)))
+
+
+# Draft order: snake vs third-round reversal
+FORMAT_NAMES = {'EC': 'Each Category', 'MC': 'Most Categories', 'Roto': 'Rotisserie'}
+
+
+# Draft order charts are drawn tall and narrow (width, height): the orders differ by tenths of a point, which a wide,
+# flat chart hides.
+DRAFT_ORDER_CHART_SIZE = (540, 420)
+
+
+def card_draft_order(columns, rows):
+    """Per format: by draft position, each order's H-score (and, head to head, real-week win rate) averaged over the
+    seasons; the sentence gives seat 1 minus seat 12 and the spread between the best and worst seat, per order."""
+    format_index, order_index = columns.index('Format'), columns.index('Order')
+    seat_columns = [name for name in columns if re.fullmatch(r'S\d+', name)]
+    orders = list(dict.fromkeys(row[order_index] for row in rows))
+    sentences, charts = [], []
+    for format_key in [key for key in FORMAT_NAMES if any(row[format_index] == key for row in rows)]:
+        format_rows = [row for row in rows if row[format_index] == format_key]
+        n_seasons = len({row[columns.index('Season')] for row in format_rows})
+
+        def by_seat(order, measure):
+            order_rows = [row for row in format_rows if row[order_index] == order]
+            if measure == 'h':
+                values = np.array([[read_leading_number(row[columns.index(name)]) for name in seat_columns]
+                                   for row in order_rows])
+            else:
+                values = np.array([[float(value) for value in row[columns.index('Every real win rate')].split()]
+                                   for row in order_rows])
+            return values.mean(axis=0), values.std(axis=0, ddof=1) / np.sqrt(len(values)) if len(values) > 1 \
+                else np.zeros(values.shape[1])
+
+        parts = []
+        for order in orders:
+            means, _ = by_seat(order, 'h')
+            parts.append(f'{escape(order)} seat 1 minus seat 12 <b>{means[0] - means[-1]:+.2f}</b>, best minus worst '
+                         f'seat {means.max() - means.min():.2f}')
+        sentences.append(f'{FORMAT_NAMES[format_key]} ({n_seasons} seasons): ' + '; '.join(parts) + '.')
+        has_real = all(row[columns.index('Every real win rate')] for row in format_rows)
+        panels = []
+        for measure, title in (('h', 'H-score'), ('real', 'Real weeks')):
+            if measure == 'real' and not has_real:
+                continue
+            series = []
+            for order in orders:
+                means, errors = by_seat(order, measure)
+                series.append(Series(order, list(means), list(2 * errors)))
+            panels.append(f'<div><h3>{title}</h3>' + render_chart(
+                [name[1:] for name in seat_columns], series, 'Win rate' if format_key != 'Roto' else 'League-win chance',
+                x_title='Seat (draft position)', kind='line', value_suffix='%', value_places=2,
+                height=DRAFT_ORDER_CHART_SIZE[1], width=DRAFT_ORDER_CHART_SIZE[0]) + '</div>')
+        # Two columns always, so a format with one chart (Rotisserie) keeps it half width rather than stretched.
+        charts.append(f'<h3>{FORMAT_NAMES[format_key]}</h3><div class="two-columns">{"".join(panels)}</div>')
+    return render_takeaway(' '.join(sentences) + ' All in H-score points.') + ''.join(charts)
+
+
+# Z-scores vs G-scores
+def card_z_versus_g(columns, rows):
+    """Per format: the G-score drafters' average win rate by the number of seats ranking by G-score (12 minus the Z
+    seats), by H-score and in real weeks. The Z drafters' average is not drawn: the twelve teams' win rates average
+    50%, so it follows from the G drafters'. Bars are two standard errors across drafts; 50% is even."""
+    format_index, count_index = columns.index('Format'), columns.index('Z drafters')
+    n_seats = 12
+
+    def summarize(format_rows, column, g_seats):
+        in_split = np.array([read_leading_number(row[columns.index(column)]) for row in format_rows
+                             if n_seats - int(row[count_index]) == g_seats])
+        return float(in_split.mean()), 2 * float(in_split.std(ddof=1) / np.sqrt(len(in_split)))
+
+    def chart(format_rows, g_counts, series_columns):
+        series = []
+        for label, column in series_columns:
+            means, errors = zip(*[summarize(format_rows, column, count) for count in g_counts])
+            series.append(Series(label, list(means), list(errors)))
+        return render_chart([str(count) for count in g_counts], series, 'Average win rate',
+                            x_title='Seats ranking by G-score (of 12)', kind='line',
+                            references=(ReferenceLine(50.0, 'even'),), value_suffix='%', value_places=2,
+                            height=DRAFT_ORDER_CHART_SIZE[1], width=DRAFT_ORDER_CHART_SIZE[0])
+
+    sentences, tops = [], []
+    for format_key in [key for key in FORMAT_NAMES if any(row[format_index] == key for row in rows)]:
+        format_rows = [row for row in rows if row[format_index] == format_key]
+        n_seasons = len({row[columns.index('Season')] for row in format_rows})
+        g_counts = sorted({n_seats - int(row[count_index]) for row in format_rows})
+        fewest, most = g_counts[0], g_counts[-1]
+        sentences.append(
+            f'{FORMAT_NAMES[format_key]} ({len(format_rows)} drafts, {n_seasons} seasons): the G-score drafters '
+            f'average <b>{summarize(format_rows, "G H-score", fewest)[0]:.2f}%</b> by H-score with {fewest} G seat'
+            f'{"" if fewest == 1 else "s"} and <b>{summarize(format_rows, "G H-score", most)[0]:.2f}%</b> with {most} '
+            f'({summarize(format_rows, "G real", fewest)[0]:.2f}% and {summarize(format_rows, "G real", most)[0]:.2f}% '
+            f'in real weeks).')
+        tops.append(f'<div><h3>{FORMAT_NAMES[format_key]}</h3>'
+                    + chart(format_rows, g_counts, (('H-score', 'G H-score'), ('Real weeks', 'G real'))) + '</div>')
+    top = ('<h3>The G-score drafters\' average win rate</h3>'
+           f'<div class="two-columns">{"".join(tops)}</div>')
+    return render_takeaway(' '.join(sentences)) + top
+
+
+def derive_z_versus_g_table(columns, rows):
+    """One row per format, season and split (G-score seats, 12 minus the Z seats): the drafts it averages, each group's
+    average H-score and real-week win rate, and the margin G minus Z by H-score. The stored rows are one per draft."""
+    count_index = columns.index('Z drafters')
+    groups: dict = {}
+    for row in rows:
+        key = (row[columns.index('Format')], row[columns.index('Season')], 12 - int(row[count_index]))
+        groups.setdefault(key, []).append(row)
+    shown = ['Format', 'Season', 'G seats', 'Drafts', 'G minus Z (H-score)', 'G H-score', 'Z H-score', 'G real',
+             'Z real']
+    table = []
+    for (format_key, season, g_seats), group in groups.items():
+        def average(column):
+            return float(np.mean([read_leading_number(row[columns.index(column)]) for row in group]))
+
+        table.append([format_key, season, g_seats, len(group), f'{average("G H-score") - average("Z H-score"):+.2f}',
+                      f'{average("G H-score"):.2f}', f'{average("Z H-score"):.2f}', f'{average("G real"):.2f}',
+                      f'{average("Z real"):.2f}'])
+    return shown, table
+
+
+# Pool-size calibration
+APP_PICK_POOL_SIZE = 25          # backend/api/schemas.py
+ROUND_AXIS_TITLES = {'Decision round': 'Round of the current pick', 'Later round': 'Round of the future pick'}
+
+
+def read_pool_sizes(columns):
+    """The grid pool sizes, from the error columns' names."""
+    return [int(column.split('=')[1]) for column in columns if column.startswith('MSE M=')]
+
+
+def pool_errors(columns, rows):
+    """(no-tilt mean square, mean squared error per grid M), pooled over these rows by their pair counts."""
+    pairs = np.array([float(row[columns.index('Pairs')]) for row in rows])
+    no_tilt = np.array([float(row[columns.index('No-tilt MS')]) for row in rows])
+    first = next(index for index, column in enumerate(columns) if column.startswith('MSE M='))
+    errors = np.array([[float(cell) for cell in row[first:]] for row in rows])
+    return float(pairs @ no_tilt / pairs.sum()), pairs @ errors / pairs.sum()
+
+
+def find_effective_pool_size(columns, rows):
+    """The grid M with the smallest pooled error, and the share explained there and at the app's M."""
+    pool_sizes = read_pool_sizes(columns)
+    no_tilt, errors = pool_errors(columns, rows)
+    best = int(np.argmin(errors))
+    return pool_sizes[best], 1 - errors[best] / no_tilt, 1 - errors[pool_sizes.index(APP_PICK_POOL_SIZE)] / no_tilt
+
+
+def summarize_pool_sizes(columns, rows):
+    """Per format, '<format> M = <effective> (<explained>; <at the app's M>)', every pair once."""
+    later = [row for row in rows if row[columns.index('Grouping')] == 'Later round']
+    format_index = columns.index('Format')
+    takeaways = []
+    for format_key in [key for key in FORMAT_NAMES if any(row[format_index] == key for row in later)]:
+        effective, explained_best, explained_app = find_effective_pool_size(
+            columns, [row for row in later if row[format_index] == format_key])
+        takeaways.append(f'{FORMAT_NAMES[format_key]} M = {effective} ({100 * explained_best:.1f}% explained; '
+                         f'{100 * explained_app:.1f}% at M = {APP_PICK_POOL_SIZE})')
+    return '; '.join(takeaways)
+
+
+def render_pool_size_charts(columns, rows):
+    """The effective M by point in the draft: by the round of the current pick (one M for all its remaining picks),
+    and by the round of a single future pick."""
+    format_index, round_index = columns.index('Format'), columns.index('Round')
+    formats = [key for key in FORMAT_NAMES if any(row[format_index] == key for row in rows)]
+
+    def by_round(grouping):
+        grouped = [row for row in rows if row[columns.index('Grouping')] == grouping]
+        rounds = sorted({int(row[round_index]) for row in grouped})
+        series = []
+        for format_key in formats:
+            values = []
+            for round_number in rounds:
+                round_rows = [row for row in grouped
+                              if row[format_index] == format_key and int(row[round_index]) == round_number]
+                values.append(find_effective_pool_size(columns, round_rows)[0] if round_rows else None)
+            series.append(Series(FORMAT_NAMES[format_key], values))
+        return render_chart([str(round_number) for round_number in rounds], series, 'Effective M',
+                            x_title=ROUND_AXIS_TITLES[grouping], kind='line', value_places=0, uses_log_scale=True,
+                            y_floor=1, y_ceiling=max(read_pool_sizes(columns)),
+                            references=(ReferenceLine(APP_PICK_POOL_SIZE, f'app {APP_PICK_POOL_SIZE}'),),
+                            height=DRAFT_ORDER_CHART_SIZE[1], width=DRAFT_ORDER_CHART_SIZE[0])
+
+    return ('<div class="two-columns">'
+            + '<div><h3>Effective M for all remaining draft picks</h3>' + by_round('Decision round') + '</div>'
+            + '<div><h3>Effective M for a single future pick</h3>' + by_round('Later round') + '</div></div>')
+
+
+def card_pool_size_calibration(columns, rows):
+    """Per field (H-scoring, then G-score), the pooled effective M per format and its charts by point in the draft."""
+    field_index, season_index = columns.index('Field'), columns.index('Season')
+    fields = list(dict.fromkeys(row[field_index] for row in rows))
+    lines = [f'{field} field: ' + summarize_pool_sizes(columns, [row for row in rows if row[field_index] == field])
+             for field in fields]
+    n_seasons = len({row[season_index] for row in rows})
+    text = (f'Effective pool size over {n_seasons} seasons. ' + '. '.join(lines)
+            + f'. The app uses M = {APP_PICK_POOL_SIZE}.')
+    return render_takeaway(text) + ''.join(
+        f'<h3>{escape(field)} field</h3>'
+        + render_pool_size_charts(columns, [row for row in rows if row[field_index] == field]) for field in fields)
+
+
+def derive_pool_size_table(columns, rows):
+    """Per field and season, each format's effective M (every pair) and the share explained there and at the app's
+    M."""
+    field_index, format_index, season_index = columns.index('Field'), columns.index('Format'), columns.index('Season')
+    later = [row for row in rows if row[columns.index('Grouping')] == 'Later round']
+    formats = [key for key in FORMAT_NAMES if any(row[format_index] == key for row in later)]
+    table_columns = ['Field', 'Season'] + [f'{key} {measure}' for key in formats
+                                           for measure in ('M', 'explained', f'explained at {APP_PICK_POOL_SIZE}')]
+    table_rows = []
+    for field, season in dict.fromkeys((row[field_index], row[season_index]) for row in later):
+        cells = [field, season]
+        for format_key in formats:
+            season_rows = [row for row in later if (row[field_index], row[format_index], row[season_index])
+                           == (field, format_key, season)]
+            if not season_rows:
+                cells += ['', '', '']
+                continue
+            effective, explained_best, explained_app = find_effective_pool_size(columns, season_rows)
+            cells += [str(effective), f'{100 * explained_best:.1f}%', f'{100 * explained_app:.1f}%']
+        table_rows.append(cells)
+    return table_columns, sort_newest_season_first(table_columns, table_rows)
+
+
+# Category weights by round
+WEIGHT_BIN_WIDTH = 10            # test_experiments.WEIGHT_BIN_WIDTH
+WEIGHT_HEATMAP_SIZE = (420, 250)
+# The darkest cell: this share of a round's weights in one bin. Shades follow the square root of the share, so the
+# punting tails (a few percent of a round) stay visible beside the neutral peak.
+WEIGHT_HEATMAP_FULL_SHARE = 0.4
+
+
+def render_weight_heatmap(rounds, shares, n_bins_shown):
+    """A heatmap of weights by round: round across, weight up (bins of WEIGHT_BIN_WIDTH), each cell shaded by the share
+    of that round's weights in its bin, a dashed line at neutral (100). shares: (bins, rounds)."""
+    width, height = WEIGHT_HEATMAP_SIZE
+    left, right, top, bottom = 44, 10, 10, 40
+    cell_width = (width - left - right) / len(rounds)
+    cell_height = (height - top - bottom) / n_bins_shown
+
+    def y_of(weight):
+        return top + (height - top - bottom) * (1 - weight / (WEIGHT_BIN_WIDTH * n_bins_shown))
+
+    parts = [f'<svg class="chart" viewBox="0 0 {width} {height}" role="img" aria-label="Weights by round">']
+    for column, round_number in enumerate(rounds):
+        for bin_index in range(n_bins_shown):
+            share = float(shares[bin_index, column])
+            if share <= 0:
+                continue
+            opacity = min(np.sqrt(share / WEIGHT_HEATMAP_FULL_SHARE), 1.0)
+            low = WEIGHT_BIN_WIDTH * bin_index
+            parts.append(f'<rect x="{left + column * cell_width:.1f}" y="{y_of(low + WEIGHT_BIN_WIDTH):.1f}" '
+                         f'width="{cell_width:.1f}" height="{cell_height:.1f}" '
+                         f'style="fill:rgb(var(--heat-rgb));fill-opacity:{opacity:.2f}">'
+                         f'<title>Round {round_number}, weight {low}-{low + WEIGHT_BIN_WIDTH}: '
+                         f'{100 * share:.1f}% of the round</title></rect>')
+    for tick in range(0, WEIGHT_BIN_WIDTH * n_bins_shown + 1, 50):
+        parts.append(f'<text x="{left - 6}" y="{y_of(tick) + 3.5:.1f}" text-anchor="end">{tick}</text>')
+    parts.append(f'<line class="reference" x1="{left}" x2="{width - right}" y1="{y_of(100):.1f}" y2="{y_of(100):.1f}"/>')
+    for column, round_number in enumerate(rounds):
+        parts.append(f'<text x="{left + (column + 0.5) * cell_width:.1f}" y="{height - bottom + 14}" '
+                     f'text-anchor="middle">{round_number}</text>')
+    parts.append(f'<text x="{left + (width - left - right) / 2:.1f}" y="{height - 8}" text-anchor="middle">Round</text>')
+    parts.append(f'<text x="12" y="{top + (height - top - bottom) / 2:.0f}" '
+                 f'transform="rotate(-90 12 {top + (height - top - bottom) / 2:.0f})" text-anchor="middle">Weight</text>')
+    return ''.join(parts) + '</svg>'
+
+
+def card_category_weights(columns, rows):
+    """Heatmaps of the weights by round: every category together, one per format; then per format a grid of one per
+    category."""
+    format_index, round_index, category_index = (columns.index('Format'), columns.index('Round'),
+                                                 columns.index('Category'))
+    counts_index = columns.index('Bin counts')
+    formats = [key for key in FORMAT_NAMES if any(row[format_index] == key for row in rows)]
+    categories = list(dict.fromkeys(row[category_index] for row in rows))
+    rounds = sorted({int(row[round_index]) for row in rows})
+    counts = {(row[format_index], int(row[round_index]), row[category_index]):
+              np.array([int(count) for count in row[counts_index].split()]) for row in rows}
+    n_bins_shown = 1 + max(int(np.flatnonzero(bin_counts).max()) for bin_counts in counts.values())
+
+    def heatmap(format_key, chosen_categories):
+        by_round = np.stack([np.sum([counts[(format_key, round_number, category)] for category in chosen_categories],
+                                    axis=0) for round_number in rounds], axis=1)
+        return render_weight_heatmap(rounds, by_round / by_round.sum(axis=0, keepdims=True), n_bins_shown)
+
+    overall = ('<h3>Every category</h3><div class="three-columns">'
+               + ''.join(f'<div><h3>{FORMAT_NAMES[format_key]}</h3>{heatmap(format_key, categories)}</div>'
+                         for format_key in formats) + '</div>')
+    by_category = ''.join(
+        f'<h3>{FORMAT_NAMES[format_key]}, by category</h3><div class="three-columns">'
+        + ''.join(f'<div><h3>{escape(category)}</h3>{heatmap(format_key, [category])}</div>' for category in categories)
+        + '</div>' for format_key in formats)
+    panels = overall + by_category
+    note = ('<div class="note">Each column is one round\'s weights; a cell\'s shade is the share of them in its '
+            f'bin of {WEIGHT_BIN_WIDTH} (square-root scale, darkest at {100 * WEIGHT_HEATMAP_FULL_SHARE:.0f}%). '
+            'The dashed line is neutral (100).</div>')
+    return note + panels
+
+
+def derive_category_weights_table(columns, rows):
+    """One row per format and category: the median weight in every round."""
+    rounds = sorted({int(row[1]) for row in rows})
+    cells = {(row[0], row[2], int(row[1])): row for row in rows}
+    table_rows = []
+    for format_key in dict.fromkeys(row[0] for row in rows):
+        for category in dict.fromkeys(row[2] for row in rows):
+            table_rows.append([format_key, category] + [cells[(format_key, category, round_number)][columns.index('Median')]
+                                                        for round_number in rounds])
+    return ['Format', 'Category'] + [f'Round {round_number}' for round_number in rounds], table_rows
+
+
+# Category weight correlations
+CATEGORY_ABBREVIATIONS = {'Field Goal %': 'FG%', 'Free Throw %': 'FT%', 'Threes': '3s', 'Points': 'PTS',
+                          'Rebounds': 'REB', 'Assists': 'AST', 'Steals': 'STL', 'Blocks': 'BLK', 'Turnovers': 'TO'}
+
+
+def render_correlation_matrix(categories, matrix):
+    """A correlation matrix as a heatmap table: blue for positive, orange for negative, deeper the larger."""
+    head = '<tr><th></th>' + ''.join(f'<th>{escape(CATEGORY_ABBREVIATIONS[category])}</th>'
+                                     for category in categories) + '</tr>'
+    body = []
+    for row_index, category in enumerate(categories):
+        cells = []
+        for column_index, value in enumerate(matrix[row_index]):
+            if row_index == column_index:
+                cells.append('<td></td>')
+                continue
+            colour = '--heat-rgb' if value >= 0 else '--diverge-negative-rgb'
+            cells.append(f'<td style="background:rgba(var({colour}),{0.6 * min(abs(value), 1.0):.2f})">'
+                         f'{value:+.2f}</td>')
+        body.append(f'<tr><th>{escape(CATEGORY_ABBREVIATIONS[category])}</th>{"".join(cells)}</tr>')
+    return f'<div class="table-wrap"><table class="heatmap">{head}{"".join(body)}</table></div>'
+
+
+def card_weight_correlations(columns, rows):
+    """Per format, the weights' correlation matrix beside the players'."""
+    format_index, matrix_index = columns.index('Format'), columns.index('Matrix')
+    categories = columns[columns.index('Category') + 1:]
+    panels = []
+    for format_key in [key for key in FORMAT_NAMES if any(row[format_index] == key for row in rows)]:
+        for matrix_name, heading in (('Weights', 'Weights'), ('Players', 'Players\' category scores')):
+            matrix = np.array([[float(value) for value in row[len(columns) - len(categories):]] for row in rows
+                               if row[format_index] == format_key and row[matrix_index] == matrix_name])
+            panels.append(f'<div><h3>{FORMAT_NAMES[format_key]}: {heading}</h3>'
+                          f'{render_correlation_matrix(categories, matrix)}</div>')
+    return f'<div class="two-columns">{"".join(panels)}</div>'
+
+
+# Best player-seasons
+# How many player-seasons the table shows, by Each Category H-score.
+BEST_SEASONS_SHOWN = 100
+BEST_SEASONS_RANKINGS = {'H-score, Each Category': 'EC', 'H-score, Half and Half': '50/50',
+                         'H-score, Most Categories': 'MC',
+                         'H-score, Rotisserie': 'Roto', 'G-score': 'G-score'}
+
+
+# The width a headshot is embedded at (it is drawn 40 pixels across).
+HEADSHOT_EMBED_WIDTH = 110
+
+
+def render_headshot(player_id: int) -> str:
+    """The player's NBA headshot, embedded in the page (backend.infra.headshot_cache: the app's fetcher and disk
+    cache), or an empty circle where the NBA has no image of him."""
+    import base64
+    import io
+    from PIL import Image
+    from backend.infra.headshot_cache import get_headshot
+    image = get_headshot(player_id)
+    if image is None:
+        return '<span class="headshot"></span>'
+    # Shrunk to twice the drawn size before embedding: a full 260 x 190 image per row would bloat the page.
+    picture = Image.open(io.BytesIO(image))
+    picture.thumbnail((HEADSHOT_EMBED_WIDTH, HEADSHOT_EMBED_WIDTH))
+    shrunk = io.BytesIO()
+    picture.save(shrunk, format='PNG', optimize=True)
+    return f'<img class="headshot" alt="" src="data:image/png;base64,{base64.b64encode(shrunk.getvalue()).decode()}">'
+
+
+def card_best_seasons(columns, rows):
+    """The best player-seasons by Each Category H-score: per ranking, each one's all-time rank, its value in
+    parentheses."""
+    ranks = {}
+    for ranking in BEST_SEASONS_RANKINGS:
+        ordered = sorted(rows, key=lambda row: -float(row[columns.index(ranking)]))
+        for rank, row in enumerate(ordered, start=1):
+            ranks[(id(row), ranking)] = rank
+    first = next(iter(BEST_SEASONS_RANKINGS))
+    shown = sorted(rows, key=lambda row: ranks[(id(row), first)])[:BEST_SEASONS_SHOWN]
+    head = ('<tr><th>Player</th><th>Season</th><th>Games</th>'
+            + ''.join(f'<th>{label}</th>' for label in BEST_SEASONS_RANKINGS.values()) + '</tr>')
+
+    def show_value(ranking, row):
+        value = float(row[columns.index(ranking)])
+        return f'{value:.2f}' if ranking == 'G-score' else f'{value:.2f}%'
+
+    body = ''.join(
+        f'<tr><td class="player-cell">{render_headshot(int(row[columns.index("Player id")]))}'
+        f'{escape(row[columns.index("Player")])}</td><td>{escape(row[columns.index("Season")])}</td>'
+        f'<td>{row[columns.index("Games")]}</td>'
+        + ''.join(f'<td>{ranks[(id(row), ranking)]} ({show_value(ranking, row)})</td>'
+                  for ranking in BEST_SEASONS_RANKINGS) + '</tr>'
+        for row in shown)
+    n_seasons = len({row[columns.index('Season')] for row in rows})
+    return (render_takeaway(f'The {BEST_SEASONS_SHOWN} best player-seasons of {n_seasons} seasons by Each Category '
+                            'H-score, with each one\'s all-time rank in every ranking.')
+            + f'<div class="table-wrap"><table>{head}{body}</table></div>')
+
+
+# Timing
+# The traced functions' colours: the same function the same colour in every chart.
+TIMING_PALETTE = ('#0072b2', '#e69f00', '#56b4e9', '#cc79a7', '#009e73', '#d55e00', '#f0e442', '#7a6fb0', '#9fbf3b',
+                  '#c4a35a', '#4f9da6', '#b85c8a')
+# A part narrower than this share of its request is drawn but not labelled.
+ICICLE_LABEL_SHARE = 0.06
+ICICLE_DEPTH_LIMIT = 9
+
+
+def build_timing_tree(rows, columns):
+    """{path tuple: mean ms} for one operation's rows."""
+    return {tuple(row[columns.index('Part')].split(' > ')): float(row[columns.index('Mean ms')]) for row in rows}
+
+
+def render_icicle(tree, colour_of):
+    """The operation as nested bars: the request on top, each traced function beneath its caller, its width its share
+    of the caller's time (what a caller spends outside the traced functions is the gap beside its children)."""
+    roots = [path for path in tree if len(path) == 1]
+    if len(roots) != 1:
+        raise ValueError(f'A timing tree needs one root; it has {len(roots)}.')
+    root = roots[0]
+    total = tree[root]
+
+    def render(path):
+        milliseconds = tree[path]
+        name = path[-1]
+        share = milliseconds / total
+        label = f'{escape(name)} \u00b7 {milliseconds:,.0f} ms' if share >= ICICLE_LABEL_SHARE else ''
+        children = sorted((child for child in tree if len(child) == len(path) + 1 and child[:-1] == path),
+                          key=lambda child: -tree[child])
+        inner = ''
+        if children and len(path) < ICICLE_DEPTH_LIMIT:
+            inner = '<div class="ice-children">' + ''.join(
+                f'<div class="ice-slot" style="flex-basis:{100 * tree[child] / milliseconds:.3f}%">'
+                f'{render(child)}</div>' for child in children) + '</div>'
+        return (f'<div class="ice-node"><div class="ice-bar" style="background:{colour_of(name)}" '
+                f'title="{escape(" > ".join(path))}: {milliseconds:,.1f} ms ({100 * share:.1f}%)">{label}</div>{inner}'
+                f'</div>')
+
+    return f'<div class="icicle">{render(root)}</div>'
+
+
+def make_timing_card(operations_title):
+    def card(columns, rows):
+        """Per format and operation, its request time and an icicle chart of where it goes."""
+        format_index, operation_index = columns.index('Format'), columns.index('Operation')
+        names = list(dict.fromkeys(row[columns.index('Part')].split(' > ')[-1] for row in rows))
+        colours = {name: TIMING_PALETTE[position % len(TIMING_PALETTE)] for position, name in enumerate(names)}
+        blocks, sentences = [], []
+        for format_key in [key for key in FORMAT_NAMES if any(row[format_index] == key for row in rows)]:
+            format_rows = [row for row in rows if row[format_index] == format_key]
+            parts = []
+            for operation in dict.fromkeys(row[operation_index] for row in format_rows):
+                tree = build_timing_tree([row for row in format_rows if row[operation_index] == operation], columns)
+                total = next(value for path, value in tree.items() if len(path) == 1)
+                samples = next(row[columns.index('Samples')] for row in format_rows if row[operation_index] == operation)
+                parts.append(f'{escape(operation.lower())} {total:,.0f} ms')
+                blocks.append(f'<h3>{FORMAT_NAMES[format_key]}: {escape(operation)} \u2014 {total:,.0f} ms on average '
+                              f'<span class="note">({samples} requests)</span></h3>'
+                              + render_icicle(tree, colours.__getitem__))
+            sentences.append(f'{FORMAT_NAMES[format_key]}: ' + ', '.join(parts) + '.')
+        return render_takeaway(' '.join(sentences)) + ''.join(blocks)
+    return card
+
+
+def make_timing_by_round_card(series_columns):
+    def card(columns, rows):
+        """Per format, the average time by round, one line per measured request."""
+        format_index = columns.index('Format')
+        panels = []
+        for format_key in [key for key in FORMAT_NAMES if any(row[format_index] == key for row in rows)]:
+            format_rows = sorted((row for row in rows if row[format_index] == format_key),
+                                 key=lambda row: int(row[columns.index('Round')]))
+            series = [Series(label, [read_leading_number(row[columns.index(column)]) for row in format_rows])
+                      for column, label in series_columns]
+            panels.append(f'<div><h3>{FORMAT_NAMES[format_key]}</h3>' + render_chart(
+                [str(row[columns.index('Round')]) for row in format_rows], series, 'Milliseconds', x_title='Round',
+                kind='line', value_places=0, height=300, width=375) + '</div>')
+        return f'<div class="three-columns">{"".join(panels)}</div>'
+    return card
 
 
 # Auction cash-share rules
@@ -1339,19 +1895,12 @@ def card_rules_head_to_head(columns, rows):
          judge(worst_gap, worst_error)),
     ])
 
-    groups = seasons + ['All']
-
-    def read_season(softness, season, name):
-        row = summaries[softness] if season == 'All' else by_season[(softness, season)]
-        return read_leading_number(row[columns.index(name)])
-
     gap_chart = render_chart(
-        [season[2:] if season != 'All' else season for season in groups],
-        [Series(f's = {softness}', [read_season(softness, season, 'Own view gap') for season in groups],
-                [2 * read_season(softness, season, 'Own view SE') for season in groups])
-         for softness in softnesses],
-        'Own-view H-score points, smooth - simple', x_title='Season', kind='bars', references=(ReferenceLine(0.0, 'no difference'),),
-        value_places=2, height=250)
+        [str(softness) for softness in softnesses],
+        [Series('Own-view gap', [read(softness, 'Own view gap') for softness in softnesses],
+                [2 * read(softness, 'Own view SE') for softness in softnesses])],
+        'Own-view H-score points, smooth - simple', x_title='Cash-share softness s', kind='bars',
+        references=(ReferenceLine(0.0, 'no difference'),), value_places=2, height=280, width=245)
 
     def spending_gap(softness, round_number):
         return (read(softness, f'Spent after round {round_number} (smooth)')
@@ -1363,16 +1912,16 @@ def card_rules_head_to_head(columns, rows):
         [Series(f's = {softness}', [spending_gap(softness, round_number) for round_number in rounds])
          for softness in softnesses],
         '$ spent so far, smooth - simple', x_title='Auction round', references=(ReferenceLine(0.0, 'even'),), value_places=1, height=280,
-        width=540)
+        width=490)
     unspent_chart = render_chart(
         [f's = {softness}' for softness in softnesses],
         [Series(label, [read(softness, f'Unspent ({label})') for softness in softnesses]) for label in RULE_LABELS],
-        '$ left per team', x_title='Cash-share softness', kind='bars', value_places=2, height=280, width=540)
+        '$ left per team', x_title='Cash-share softness', kind='bars', value_places=2, height=280, width=375)
     return (tiles
-            + '<h3>Does it win every season?</h3><div class="note">Own view, each season and pooled; whiskers are ±2 '
-              'standard errors across 40 pairs of auctions per season.</div>' + gap_chart
-            + '<div class="multiples"><div><h3>Where the money goes</h3><div class="note">How much more the smooth '
-              'drafters had spent by the end of each round (one sale per team).</div>' + spending_chart + '</div>'
+            + '<div class="three-columns narrow-first"><div><h3>The gap</h3><div class="note">Own view, pooled over the seasons; '
+              'whiskers are \u00b12 standard errors across pairs of auctions.</div>' + gap_chart + '</div>'
+            + '<div><h3>Where the money goes</h3><div class="note">How much more the smooth drafters had spent by the '
+              'end of each round (one sale per team).</div>' + spending_chart + '</div>'
             + '<div><h3>Money left at the end</h3><div class="note">Per team, in the same auctions.</div>'
             + unspent_chart + '</div></div>')
 
@@ -1522,6 +2071,110 @@ def styles_dollar_shape_table(columns, rows):
     return styles
 
 
+# The app's default SAVOR settings (parameters.yaml): the Gini heatmap outlines their cell.
+DEFAULT_REPLACEMENT_THRESHOLD, DEFAULT_SAVOR_NOISE = 2.0, 10.0
+
+
+def card_dollar_gini(columns, rows):
+    """A heatmap table: the replacement threshold (S_R) down, the SAVOR noise (S_sigma) across, each cell the Gini
+    coefficient of the drafted players' dollars averaged over the seasons, shaded from the lowest to the highest; the
+    app's default cell outlined."""
+    threshold_index, noise_index = columns.index('Replacement threshold'), columns.index('SAVOR noise')
+    gini_index = columns.index('Gini')
+    thresholds = sorted({float(row[threshold_index]) for row in rows})
+    noises = sorted({float(row[noise_index]) for row in rows})
+    n_seasons = len({row[columns.index('Season')] for row in rows})
+    cells = {(threshold, noise): float(np.mean([float(row[gini_index]) for row in rows
+                                                if float(row[threshold_index]) == threshold
+                                                and float(row[noise_index]) == noise]))
+             for threshold in thresholds for noise in noises}
+    low, high = min(cells.values()), max(cells.values())
+    head = ('<tr><th>S<sub>R</sub> \\ S<sub>\u03c3</sub></th>'
+            + ''.join(f'<th>{noise:g}</th>' for noise in noises) + '</tr>')
+    body = []
+    for threshold in thresholds:
+        tds = []
+        for noise in noises:
+            value = cells[(threshold, noise)]
+            depth = 0.08 + 0.72 * ((value - low) / (high - low) if high > low else 0.0)
+            outline = (';outline:2px solid var(--fg);outline-offset:-2px'
+                       if (threshold, noise) == (DEFAULT_REPLACEMENT_THRESHOLD, DEFAULT_SAVOR_NOISE) else '')
+            tds.append(f'<td style="background:rgba(var(--heat-rgb),{depth:.2f}){outline}">{value:.3f}</td>')
+        body.append(f'<tr><th>${threshold:g}</th>{"".join(tds)}</tr>')
+    default = cells[(DEFAULT_REPLACEMENT_THRESHOLD, DEFAULT_SAVOR_NOISE)]
+    text = (f'Gini coefficient of the drafted players\' dollars, averaged over {n_seasons} seasons: from '
+            f'<b>{low:.3f}</b> to <b>{high:.3f}</b> across the grid; the app\'s default (S<sub>R</sub> $2, '
+            f'S<sub>\u03c3</sub> 10) gives <b>{default:.3f}</b>.')
+    return (render_takeaway(text) + '<div class="table-wrap"><table class="heatmap">' + head + ''.join(body)
+            + '</table></div>')
+
+
+def card_dollar_gini_by_season(columns, rows):
+    """The Gini coefficient of the starting board's drafted dollars by season, one line per SAVOR setting."""
+    gini_columns = [name for name in columns if name.startswith('Gini, ')]
+    ordered = sorted(rows, key=lambda row: row[columns.index('Season')])
+    seasons = [row[columns.index('Season')] for row in ordered]
+    series = [Series(name.removeprefix('Gini, '), [float(row[columns.index(name)]) for row in ordered])
+              for name in gini_columns]
+    first, last = seasons[0], seasons[-1]
+    parts = [f'{escape(one.name)}: <b>{one.values[0]:.3f}</b> in {first}, <b>{one.values[-1]:.3f}</b> in {last} '
+             f'(from {min(one.values):.3f} to {max(one.values):.3f})' for one in series]
+    text = f'Gini coefficient of the drafted dollars over {len(seasons)} seasons. ' + '; '.join(parts) + '.'
+    return render_takeaway(text) + render_chart(
+        [season[2:] for season in seasons], series, 'Gini coefficient', x_title='Season', kind='line',
+        value_places=3, height=360)
+
+
+# How many player-seasons the all-time ranking shows.
+TOP_VALUES_SHOWN = 25
+
+
+def card_top_values(columns, rows):
+    """The all-time ranking of player-seasons by starting-board dollars, as a table (the season tables below hold every
+    season's top ten)."""
+    ordered = sorted(rows, key=lambda row: -float(row[columns.index('Dollars')]))[:TOP_VALUES_SHOWN]
+    body = ''.join(f'<tr><td>{rank}</td><td>{escape(row[columns.index("Player")])}</td>'
+                   f'<td>{escape(row[columns.index("Season")])}</td><td>${float(row[columns.index("Dollars")]):.1f}</td></tr>'
+                   for rank, row in enumerate(ordered, start=1))
+    n_seasons = len({row[columns.index('Season')] for row in rows})
+    return (render_takeaway(f'The {len(ordered)} most valuable player-seasons over {n_seasons} seasons, by dollars at '
+                            f'the start of an auction (12 teams x $200, Each Category, the app\'s defaults).')
+            + '<table><tr><th>Rank</th><th>Player</th><th>Season</th><th>Dollars</th></tr>' + body + '</table>')
+
+
+def card_dollar_curves(columns, rows):
+    """Two charts of dollars by draft rank, each curve a league size averaged over the seasons: one for the number of
+    teams (roster 13), one for the roster size (12 teams)."""
+    teams_index, roster_index = columns.index('Teams'), columns.index('Roster size')
+    curves = {}
+    for row in rows:
+        values = [float(value) for value in row[columns.index('Every dollar value')].split()]
+        curves.setdefault((int(row[teams_index]), int(row[roster_index])), []).append(values)
+    averaged = {key: np.mean(np.array(lists), axis=0) for key, lists in curves.items()}
+
+    def chart(keys, label_of):
+        longest = max(len(averaged[key]) for key in keys)
+        series = [Series(label_of(key), list(averaged[key]) + [None] * (longest - len(averaged[key]))) for key in keys]
+        return render_chart([str(rank) for rank in range(1, longest + 1)], series, 'Dollars',
+                            x_title='Draft rank (by value)', kind='line', value_places=1, show_points=False,
+                            height=DRAFT_ORDER_CHART_SIZE[1], width=DRAFT_ORDER_CHART_SIZE[0])
+
+    team_keys = sorted(key for key in averaged if key[1] == 13)
+    roster_keys = sorted(key for key in averaged if key[0] == 12)
+    n_seasons = len({row[columns.index('Season')] for row in rows})
+    top = {key: averaged[key][0] for key in averaged}
+    text = (f'Averaged over {n_seasons} seasons. The most valuable player costs '
+            + ', '.join(f'${top[key]:.0f} with {key[0]} teams' for key in team_keys)
+            + ' (13 players each); '
+            + ', '.join(f'${top[key]:.0f} with {key[1]} players' for key in roster_keys)
+            + ' (12 teams).')
+    return (render_takeaway(text) + '<div class="two-columns">'
+            + '<div><h3>By number of teams (13 players each)</h3>'
+            + chart(team_keys, lambda key: f'{key[0]} teams') + '</div>'
+            + '<div><h3>By roster size (12 teams)</h3>'
+            + chart(roster_keys, lambda key: f'{key[1]} players') + '</div></div>')
+
+
 def derive_dollar_shape_table(columns, rows):
     """The 3x3 grid over the seasons: replacement level down, SAVOR across. Each cell is the average player's dollars in
     the top 10% / middle 80% / bottom 10% of the drafted players: with both off in dollars, elsewhere their change
@@ -1637,6 +2290,8 @@ def card_app_loss(columns, rows):
 # How far below the best the app's seed's peak ends, in H-score points: the bins of the Peakedness chart for the seeds
 # that miss the best (whether a seed reaches it is the stored yes/no, judged before rounding).
 PEAK_SHORTFALL_EDGES = (0.05, 0.1, 0.5)
+# A gap below the best peak larger than this (H-score points) is an outlier, red in the Peakedness table.
+PEAK_GAP_OUTLIER = 0.5
 # Candidates with this many peaks or more share the last bar of the peaks chart.
 PEAK_COUNT_CAP = 10
 
@@ -1726,11 +2381,26 @@ SECTION_VIEWS: dict[str, SectionView] = {
     'Smooth vs simple scaling': SectionView(card=card_rules_head_to_head, derive_table=derive_rules_table,
                                             cell_styles=styles_rules_table),
     'Cash-share rules: builds (own view)': SectionView(card=card_rule_builds, wrap_columns=('Most common punts',)),
+    'Dollar shape: Gini by SAVOR settings': SectionView(card=card_dollar_gini, derive_table=lambda columns, rows: (columns, [])),
+    'Dollar inequality by season': SectionView(card=card_dollar_gini_by_season, sort_rows=sort_newest_season_first),
+    'Dollar curves by league size': SectionView(card=card_dollar_curves, derive_table=derive_table_without_lists,
+                                             sort_rows=sort_newest_season_first),
+    'Most valuable player-seasons': SectionView(card=card_top_values, sort_rows=sort_newest_season_first),
     'Dollar shape: replacement level and SAVOR': SectionView(card=card_dollar_shape,
                                                              derive_table=derive_dollar_shape_table,
                                                              cell_styles=styles_dollar_shape_table),
+    'H-scoring vs a G-score field (auction)': SectionView(
+        card=card_h_versus_g,
+        sort_rows=sort_newest_season_first,
+        cell_styles=make_rule_styles({'Mean H-score': rule_season_win_rate,
+                                      **{f'S{seat}': rule_seat_win_rate for seat in range(1, 13)}}),
+        formatters={'Mean H-score': format_percent, 'Mean real win rate': format_percent,
+                    **{f'S{seat}': format_percent for seat in range(1, 13)}},
+        derive_table=derive_table_without_lists,
+    ),
     'H-scoring vs a G-score field': SectionView(
         card=card_h_versus_g,
+        sort_rows=sort_newest_season_first,
         cell_styles=make_rule_styles({'Mean H-score': rule_season_win_rate,
                                       **{f'S{seat}': rule_seat_win_rate for seat in range(1, 13)}}),
         formatters={'Mean H-score': format_percent, 'Mean real win rate': format_percent,
@@ -1739,6 +2409,7 @@ SECTION_VIEWS: dict[str, SectionView] = {
     ),
     'Awareness (opponent model on vs off)': SectionView(
         card=card_awareness,
+        sort_rows=sort_newest_season_first,
         cell_styles=make_rule_styles({'Mean (pp)': rule_pooled_significance}),
         formatters={'Mean (pp)': lambda cell: format_percent(cell, signed=True), 'SE (pp)': format_percent,
                     **{f'S{seat}': (lambda cell: format_percent(cell, signed=True)) for seat in range(1, 13)}},
@@ -1807,7 +2478,33 @@ SECTION_VIEWS: dict[str, SectionView] = {
     ),
     'Where the app loses to the optimum': SectionView(card=card_loss, cell_styles=styles_loss),
     'App loss': SectionView(card=card_app_loss, cell_styles=styles_loss),
-    'Peakedness': SectionView(card=card_peakedness),
+    'Peakedness': SectionView(
+        card=card_peakedness,
+        # The outliers: a gap to a lower peak of more than PEAK_GAP_OUTLIER H-score points is red.
+        cell_styles=make_rule_styles({name: (lambda value, row, columns: BAD if value > PEAK_GAP_OUTLIER else '')
+                                      for name in ('Second peak (below best)', "App's seed's peak (below best)")}),
+    ),
+    'Draft order: snake vs third-round reversal': SectionView(card=card_draft_order, derive_table=derive_table_without_lists,
+                                                               sort_rows=sort_newest_season_first),
+    'Z-scores vs G-scores': SectionView(
+        card=card_z_versus_g,
+        derive_table=derive_z_versus_g_table,
+        sort_rows=sort_newest_season_first,
+        formatters={'G minus Z (H-score)': lambda cell: format_percent(cell, signed=True)},
+    ),
+    'Draft timing': SectionView(card=make_timing_card('draft'), derive_table=lambda columns, rows: (columns, [])),
+    'Draft timing by round': SectionView(card=make_timing_by_round_card(
+        (('First 100 ms', 'First 100 candidates'), ('Whole board ms', 'Whole board'))),
+        derive_table=lambda columns, rows: (columns, [])),
+    'Auction timing': SectionView(card=make_timing_card('auction'), derive_table=lambda columns, rows: (columns, [])),
+    'Auction timing by round': SectionView(card=make_timing_by_round_card(
+        (('Nomination ms', 'Nomination'), ('Table ms', 'Auction table'))),
+        derive_table=lambda columns, rows: (columns, [])),
+    'Pool-size calibration': SectionView(card=card_pool_size_calibration, derive_table=derive_pool_size_table),
+    'Category weights by round': SectionView(card=card_category_weights, derive_table=derive_category_weights_table),
+    'Category weight correlations': SectionView(card=card_weight_correlations, derive_table=lambda columns, rows: (columns, [])),
+    'Best player-seasons': SectionView(card=card_best_seasons, derive_table=lambda columns, rows: (columns, [])),
+    'Best player-seasons, pre-2000': SectionView(card=card_best_seasons, derive_table=lambda columns, rows: (columns, [])),
     'Planner vs H-scoring': SectionView(
         card=card_planner_drafts,
         cell_styles=styles_planner_pairs,
@@ -1889,7 +2586,13 @@ def render_section_body(data: dict) -> str:
         note = f'<div class="note">{escape(note_text)}</div>'
     details = (f'<div class="details"><b>Details</b>{render_explanation_html(data["details"])}</div>'
                if data.get('details') else '')
-    return card + details + note + render_table(columns, rows, view)
+    # A view whose card is the whole table (the Gini heatmap) derives no rows: no empty header under it.
+    table = render_table(columns, rows, view) if rows else ''
+    return card + details + note + table
+
+
+# Up to this many separately generated parts of a page are listed with their times; more are given as a span.
+GENERATION_TIMES_LISTED = 4
 
 
 def describe_generation(data: dict) -> str:
@@ -1897,17 +2600,23 @@ def describe_generation(data: dict) -> str:
     by_format = data.get('generated_by_format')
     if not by_format or len(set(by_format.values())) == 1:
         return f'generated {escape(data["generated"])}'
+    # A page merged by format and season has a time per (format, season): too many to list, so the span they cover.
+    if len(by_format) > GENERATION_TIMES_LISTED:
+        return f'generated {escape(min(by_format.values()))} to {escape(max(by_format.values()))}'
     return 'generated ' + ', '.join(f'{escape(format_key)} {escape(when)}' for format_key, when in by_format.items())
 
 
-def render_section_panel(data: dict, position: int, parts: list[dict]) -> str:
-    """One tab's panel: title, generation time, explanation, takeaway card, table; then each part (another stored
+def render_section_panel(data: dict
+                         , position: int
+                         , parts: list[dict]
+                         , heading: str) -> str:
+    """One tab's panel: heading, generation time, explanation, takeaway card, table; then each part (another stored
     section of the same experiment) under its own heading, with its explanation, card and table."""
     active = ' class="active"' if position == 0 else ''
     rendered_parts = ''.join(f'\n<h2 class="part">{escape(PART_HEADINGS[part["title"]])}</h2>\n'
                              f'{render_explanation_html(part["explanation"])}\n{render_section_body(part)}'
                              for part in parts)
-    return (f'<section id="tab-{position}"{active}>\n<h2>{escape(data["title"])}</h2>\n'
+    return (f'<section id="tab-{position}"{active}>\n<h2>{escape(heading)}</h2>\n'
             f'<div class="generated">{describe_generation(data)}</div>\n'
             f'{render_explanation_html(data["explanation"])}\n{render_section_body(data)}{rendered_parts}\n</section>')
 
@@ -1915,64 +2624,129 @@ def render_section_panel(data: dict, position: int, parts: list[dict]) -> str:
 # Stored sections that are parts of another section's page, not tabs of their own: {page: [part, ...]}. An experiment
 # that records two tables still has one page.
 SECTION_PARTS = {
+    'Category weights by round': ['Category weight correlations'],
     'Smooth vs simple scaling': ['Cash-share rules: builds (own view)'],
+    'Dollar shape: replacement level and SAVOR': ['Dollar shape: Gini by SAVOR settings'],
+    'Dollar inequality by season': ['Most valuable player-seasons'],
+    'Draft timing': ['Draft timing by round'],
+    'Auction timing': ['Auction timing by round'],
 }
-PART_HEADINGS = {'Cash-share rules: builds (own view)': 'Builds'}
+PART_HEADINGS = {'Category weight correlations': 'Correlations', 'Draft timing by round': 'By round', 'Auction timing by round': 'By round', 'Most valuable player-seasons': 'Most valuable player-seasons', 'Cash-share rules: builds (own view)': 'Builds', 'Dollar shape: Gini by SAVOR settings': 'Gini coefficient by SAVOR settings'}
 
 
-# The tab groups, in page order; a stored section in none of them is listed last under 'Other'.
+# The page's navigation, in page order: {group: {sub-section: [stored section title, ...]}}. A group is a top tab; its
+# row of page buttons is clustered by sub-section. A stored section in none of them is listed last under 'Other'.
 SECTION_GROUPS = {
-    # Does H-scoring win drafts?
-    'Draft performance': [
-        'H-scoring vs a G-score field',
-        'Awareness (opponent model on vs off)',
-        'Planner vs H-scoring',
-    ],
-    # Does self-play find an equilibrium?
-    'Self-play': [
-        'Self-play convergence',
-        'Self-play optimality',
-    ],
-    # Does the board move when nothing has really changed?
-    'Stability': [
-        'Serve stability',
-        'Draft pick stability',
-        'Auction pick stability',
-    ],
-    # Are the builds the app predicts and serves sensible?
-    'Served builds': [
-        'Punt diversity (top-12 anchors)',
-        'Rotisserie punting (hard <15% / soft 15-40% expected win rate)',
-    ],
-    # How far is the app's answer from the best build, on the app's actual objective?
-    'Gradient descent optimality': [
-        'App loss',
-        'Peakedness',
-    ],
-    # The same questions on a simplified objective, against a certified optimum.
-    'Simplified form with exact solution': [
-        'Where the app loses to the optimum',
-        'How single-peaked are H-scores',
-        'Conditioning around the optimum',
-        'Loop gain at the optimum',
-    ],
-    'Auctions': [
-        'Smooth vs simple scaling',
-        'Dollar shape: replacement level and SAVOR',
-    ],
+    # Does H-scoring win, and how fast is it?
+    'Performance': {
+        'Drafts': [
+            'H-scoring vs a G-score field',
+            'Awareness (opponent model on vs off)',
+            'Planner vs H-scoring',
+            'Draft order: snake vs third-round reversal',
+            'Z-scores vs G-scores',
+            'Draft timing',
+        ],
+        'Auctions': [
+            'H-scoring vs a G-score field (auction)',
+            'Smooth vs simple scaling',
+            'Auction timing',
+        ],
+    },
+    # Does the app find the best answer to its own objective?
+    'Optimization': {
+        'Self-play': [
+            'Self-play convergence',
+            'Self-play optimality',
+        ],
+        'Gradient descent': [
+            'App loss',
+            'Peakedness',
+        ],
+        'Simplified form': [
+            'Where the app loses to the optimum',
+            'How single-peaked are H-scores',
+            'Conditioning around the optimum',
+            'Loop gain at the optimum',
+        ],
+    },
+    # What does the app actually do?
+    'Behavior': {
+        'Stability': [
+            'Serve stability',
+            'Draft pick stability',
+            'Auction pick stability',
+        ],
+        'Builds': [
+            'Punt diversity (top-12 anchors)',
+            'Rotisserie punting (hard <15% / soft 15-40% expected win rate)',
+            'Category weights by round',
+            'Pool-size calibration',
+        ],
+        'History': [
+            'Best player-seasons',
+            'Best player-seasons, pre-2000',
+        ],
+        'Valuations': [
+            'Dollar shape: replacement level and SAVOR',
+            'Dollar inequality by season',
+            'Dollar curves by league size',
+        ],
+    },
+}
+
+# The title a page button and its panel show, where it is not the stored title: short, and parallel within its
+# sub-section (the stored titles name the results files, so they stay).
+DISPLAY_TITLES = {
+    'H-scoring vs a G-score field': 'vs a G-score field',
+    'Awareness (opponent model on vs off)': 'Opponent awareness',
+    'Draft order: snake vs third-round reversal': 'Snake vs third-round reversal',
+    'H-scoring vs a G-score field (auction)': 'vs a G-score field',
+    'Draft timing': 'Timing',
+    'Auction timing': 'Timing',
+    'Self-play convergence': 'Convergence',
+    'Self-play optimality': 'Optimality',
+    'App loss': 'Loss',
+    'Where the app loses to the optimum': 'Loss',
+    'How single-peaked are H-scores': 'Peakedness',
+    'Conditioning around the optimum': 'Conditioning',
+    'Loop gain at the optimum': 'Loop gain',
+    'Serve stability': 'Serve',
+    'Draft pick stability': 'Draft pick',
+    'Auction pick stability': 'Auction pick',
+    'Punt diversity (top-12 anchors)': 'Punt diversity',
+    'Rotisserie punting (hard <15% / soft 15-40% expected win rate)': 'Rotisserie punting',
+    'Dollar shape: replacement level and SAVOR': 'Dollar shape',
+    'Best player-seasons': 'Best players, 2000+',
+    'Best player-seasons, pre-2000': 'Best players, pre-2000',
+    'Dollar inequality by season': 'Dollar inequality',
+    'Dollar curves by league size': 'Dollar curves',
 }
 
 
-def group_sections(sections: list[dict]) -> list[tuple[str, list[dict]]]:
-    """The stored sections under their group names, in SECTION_GROUPS order."""
+# The rows each sub-section's page buttons are laid out in.
+TAB_CLUSTER_ROWS = 2
+
+
+def name_section(title: str) -> str:
+    """The title a page shows for a stored section."""
+    return DISPLAY_TITLES.get(title, title)
+
+
+def group_sections(sections: list[dict]) -> list[tuple[str, list[tuple[str, list[dict]]]]]:
+    """The stored sections under their groups and sub-sections, in SECTION_GROUPS order: [(group, [(sub-section,
+    [section, ...]), ...]), ...]. Sub-sections and groups with no stored section are left out."""
     by_title = {data['title']: data for data in sections}
     for part_titles in SECTION_PARTS.values():
         for title in part_titles:
             by_title.pop(title, None)
-    groups = [(name, [by_title.pop(title) for title in titles if title in by_title])
-              for name, titles in SECTION_GROUPS.items()]
-    groups.append(('Other', list(by_title.values())))
-    return [(name, members) for name, members in groups if members]
+    groups = []
+    for group, sub_sections in SECTION_GROUPS.items():
+        members = [(name, [by_title.pop(title) for title in titles if title in by_title])
+                   for name, titles in sub_sections.items()]
+        groups.append((group, [(name, sections_in) for name, sections_in in members if sections_in]))
+    groups.append(('Other', [('Other', list(by_title.values()))] if by_title else []))
+    return [(group, sub_sections) for group, sub_sections in groups if sub_sections]
 
 
 # The page's tab switching: a group tab shows its row of section tabs and the section last open in it.
@@ -1982,7 +2756,7 @@ function showSection(button) {
     node.classList.remove('active');
   });
   button.classList.add('active');
-  button.parentElement.dataset.lastTab = button.dataset.tab;
+  button.closest('.tab-buttons').dataset.lastTab = button.dataset.tab;
   document.getElementById('tab-' + button.dataset.tab).classList.add('active');
 }
 document.querySelectorAll('.tab-buttons button').forEach(function (button) {
@@ -2007,18 +2781,26 @@ def render_report_page(sections: list[dict], subtitle: str) -> str:
     """The whole page: a row of group tabs, under it the chosen group's section tabs, one panel per section."""
     group_buttons, section_rows, panels, position = [], [], [], 0
     by_title = {data['title']: data for data in sections}
-    for group_index, (group_name, members) in enumerate(group_sections(sections)):
+    for group_index, (group_name, sub_sections) in enumerate(group_sections(sections)):
         group_active = ' class="active"' if group_index == 0 else ''
         group_buttons.append(f'<button data-group="{group_index}"{group_active}>{escape(group_name)}</button>')
-        buttons = []
-        for data in members:
-            active = ' class="active"' if position == 0 else ''
-            buttons.append(f'<button data-tab="{position}"{active}>{escape(data["title"].split(" (")[0])}</button>')
-            parts = [by_title[title] for title in SECTION_PARTS.get(data['title'], []) if title in by_title]
-            panels.append(render_section_panel(data, position, parts))
-            position += 1
+        clusters = []
+        for sub_section, members in sub_sections:
+            buttons = []
+            for data in members:
+                active = ' class="active"' if position == 0 else ''
+                buttons.append(f'<button data-tab="{position}"{active}>{escape(name_section(data["title"]))}</button>')
+                parts = [by_title[title] for title in SECTION_PARTS.get(data['title'], []) if title in by_title]
+                panels.append(render_section_panel(data, position, parts,
+                                                   f'{sub_section}: {name_section(data["title"])}'))
+                position += 1
+            # Two rows per sub-section, so each reads as one block.
+            n_columns = -(-len(buttons) // TAB_CLUSTER_ROWS)
+            clusters.append(f'<div class="tab-cluster"><div class="tab-cluster-label">{escape(sub_section)}</div>'
+                            f'<div class="tab-cluster-buttons" style="grid-template-columns:repeat({n_columns}, '
+                            f'max-content)">{"".join(buttons)}</div></div>')
         row_class = 'tab-buttons active' if group_index == 0 else 'tab-buttons'
-        section_rows.append(f'<div class="{row_class}" data-group="{group_index}">{"".join(buttons)}</div>')
+        section_rows.append(f'<div class="{row_class}" data-group="{group_index}">{"".join(clusters)}</div>')
     newline = '\n'
     return (
         '<!DOCTYPE html>\n<html lang="en"><head><meta charset="utf-8">\n'

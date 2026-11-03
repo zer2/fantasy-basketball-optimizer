@@ -14,14 +14,20 @@ from backend.parameters import load_all_params
 SPORT = 'NBA'
 
 
+def load_season_weeks(season: str) -> pd.DataFrame:
+    """Every player's real weekly totals for the season, one row per player and week (a Snowflake query: load a
+    season once and pass it to every simulation of it)."""
+    return get_weekly_box_scores(season, load_all_params()[SPORT]).reset_index()
+
+
 def build_weekly_tensor(
-    season: str
+    season_weeks: pd.DataFrame
     , player_ids: list[int]
     , statistics: list[str]
 ) -> np.ndarray:
     """(player, week, statistic) real weekly totals over every week of the season, zero where a player has no
     games. A player with no games all season is all zeros."""
-    weekly = get_weekly_box_scores(season, load_all_params()[SPORT]).reset_index()
+    weekly = season_weeks
     weeks = sorted(weekly['WEEK'].unique())
     by_player_and_week = weekly.set_index(['NBA_PLAYER_ID', 'WEEK'])[statistics]
     full_index = pd.MultiIndex.from_product([player_ids, weeks], names=['NBA_PLAYER_ID', 'WEEK'])
@@ -45,14 +51,15 @@ def list_category_statistics(categories: list[str]) -> tuple[list[str], list[tup
 
 
 def simulate_real_win_rates(
-    season: str
+    season_weeks: pd.DataFrame
     , assignments: dict[str, list[int]]
     , team: str
     , categories: list[str]
     , n_simulations: int
     , seed: int
 ) -> dict[str, float]:
-    """`team`'s real win rates against every other team, from n_simulations random weeks per opponent.
+    """`team`'s real win rates against every other team, from n_simulations random weeks per opponent, drawn from
+    season_weeks (load_season_weeks).
 
     Returns {'category': the mean share of categories won, 'matchup': the share of matchups won (more than half the
     categories)}, each averaged over the opponents."""
@@ -61,7 +68,7 @@ def simulate_real_win_rates(
     negative = set(load_all_params()[SPORT]['negative-statistics'])
     player_ids = sorted({player_id for roster in assignments.values() for player_id in roster})
     row_of = {player_id: position for position, player_id in enumerate(player_ids)}
-    tensor = build_weekly_tensor(season, player_ids, statistics)
+    tensor = build_weekly_tensor(season_weeks, player_ids, statistics)
     n_weeks = tensor.shape[1]
     rng = np.random.default_rng(seed)
 
