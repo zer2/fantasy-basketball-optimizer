@@ -890,11 +890,18 @@ class HAgent:
                 (x_scores_available.iloc[:remaining_players] * self.v.T).sum(axis=1)
                 - replacement_value
             ).sum()
-            value_per_dollar = remaining_overall_value / total_cash
-            # Both in x-score units per category, and both worth exactly their totals in generic value: the
-            # cash term used to split value per dollar by a renormalised, Turnovers-negated v, which with
-            # Turnovers scored added up to (1 - 2 v_TO)(n - 2)/n of it -- about 0.6 for nine categories.
-            category_value_per_dollar     = value_per_dollar * self.category_value_direction
+            # Cash is worth the players it can still buy. Once every roster is full there are none: the money term
+            # is left out of the diffs (category_value_per_dollar None) rather than priced -- with every dollar
+            # spent, remaining value / remaining cash was 0/0 and made every finished team's H-score NaN.
+            if remaining_players > 0:
+                if total_cash <= 0:
+                    raise ValueError(f'The league has no cash left but {remaining_players} roster spots to fill.')
+                # Both in x-score units per category, and both worth exactly their totals in generic value: the
+                # cash term used to split value per dollar by a renormalised, Turnovers-negated v, which with
+                # Turnovers scored added up to (1 - 2 v_TO)(n - 2)/n of it -- about 0.6 for nine categories.
+                category_value_per_dollar = remaining_overall_value / total_cash * self.category_value_direction
+            else:
+                category_value_per_dollar = None
             replacement_value_by_category = replacement_value * self.category_value_direction
             # Rational-opponent modelling (auction), parallel to the draft. An EMPTY seat with a predicted
             # first buy is modelled as having ALREADY bought it: the anchor's real stats are priced into the
@@ -985,7 +992,8 @@ class HAgent:
                 # then the confidence-scaled punt tilt.
                 score_diff        = x_self_sum.reshape(1, -1) - anchor_stats
                 player_diff_total = len(my_players) * replacement_value_by_category.reshape(1, -1)
-                money_diff_total  = batch_cash.reshape(-1, 1) * np.asarray(category_value_per_dollar).reshape(1, -1)
+                money_diff_total  = (0.0 if category_value_per_dollar is None
+                                     else batch_cash.reshape(-1, 1) * np.asarray(category_value_per_dollar).reshape(1, -1))
                 tilt              = (self.n_picks - 1) * prior_confidence * anchor_tilts
                 columns           = score_diff - player_diff_total + money_diff_total - tilt
                 diff_means            = columns[:len(anchors)].T.reshape(1, self.n_categories, len(anchors))
@@ -1650,9 +1658,14 @@ class HAgent:
                                 , player_diff
                                 , category_value_per_dollar
                                 , replacement_value_by_category):
+        """The drafter's expected category diff against one seat: the players bought, less the roster-size difference
+        at replacement level, plus the cash difference at what cash still buys -- left out when
+        category_value_per_dollar is None (every roster full: cash buys nothing more)."""
         player_diff_total = (player_diff * replacement_value_by_category).reshape(1, self.n_categories, 1)
-        money_diff_total  = (money_diff * category_value_per_dollar).reshape(1, self.n_categories, 1)
-        return score_diff - player_diff_total + money_diff_total
+        diff = score_diff - player_diff_total
+        if category_value_per_dollar is None:
+            return diff
+        return diff + (money_diff * category_value_per_dollar).reshape(1, self.n_categories, 1)
 
     def get_diff_var(self, n_their_players):
         return self.n_picks * (2 + self.w * (self.n_picks - n_their_players) / self.n_picks)
