@@ -11,19 +11,26 @@ TESTING_FILES = Path(__file__).resolve().parents[1]
 REPO_ROOT = TESTING_FILES.parent
 
 
+def prepare_import_path() -> None:
+    """Puts the repository, testing_files and season_simulation on the import path (a spawned worker starts without
+    them), and quiets logging and the session settings the test client needs."""
+    os.environ.setdefault('SESSION_SECRET_KEY', 'experiment-only-session-secret')
+    os.environ.setdefault('RATE_LIMITS_ENABLED', 'false')
+    for path in (str(REPO_ROOT), str(TESTING_FILES), str(TESTING_FILES / 'season_simulation')):
+        if path not in sys.path:
+            sys.path.insert(0, path)
+    logging.disable(logging.CRITICAL)
+
+
 def build_league_session(
     objective: str
     , season: str
     , model_settings: dict
 ) -> tuple:
     """(test client, session id, session) for the backend tests' league (12 x 13) in this format and season, with these
-    model settings over the app's defaults."""
-    os.environ.setdefault('SESSION_SECRET_KEY', 'experiment-only-session-secret')
-    os.environ.setdefault('RATE_LIMITS_ENABLED', 'false')
-    for path in (str(REPO_ROOT), str(TESTING_FILES)):
-        if path not in sys.path:
-            sys.path.insert(0, path)
-    logging.disable(logging.CRITICAL)
+    model settings over the app's defaults. Also puts the repository, testing_files and season_simulation on the import
+    path, for the harnesses that run in spawned workers."""
+    prepare_import_path()
     from benchmark_helpers import client, _build_session_request
     from backend.state.session import get_session
     request = _build_session_request(objective=objective)

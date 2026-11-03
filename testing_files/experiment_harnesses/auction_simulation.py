@@ -346,11 +346,13 @@ def _run_rule_match_reporting_failure(job):
 
 
 def compute_code_fingerprint() -> str:
-    """A hash of everything an auction's outcome depends on -- the backend, parameters.yaml and this harness -- so a
-    resumed run never mixes auctions played by different code."""
+    """A hash of everything an auction's outcome depends on -- the backend, parameters.yaml, the stored coefficients
+    (each season's weekly variances) and this harness -- so a resumed run never mixes auctions played by different code
+    or data."""
     repository = Path(__file__).resolve().parents[2]
     digest = hashlib.sha256()
-    for path in sorted([*repository.glob('backend/**/*.py'), repository / 'parameters.yaml', Path(__file__).resolve()]):
+    for path in sorted([*repository.glob('backend/**/*.py'), repository / 'parameters.yaml',
+                        *repository.glob('coefficient_exploration_output/*.csv'), Path(__file__).resolve()]):
         digest.update(path.relative_to(repository).as_posix().encode())
         digest.update(path.read_bytes())
     return digest.hexdigest()[:16]

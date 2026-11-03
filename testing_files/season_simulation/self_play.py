@@ -106,26 +106,32 @@ def draft_and_score(field_session, deviator_session, seat: int, candidate_limit:
     return float(scores[scores.idxmax()])
 
 
+def list_snake_order(n_drafters: int
+                     , n_rounds: int) -> list[int]:
+    """The seat that picks at each pick of a snake draft: forward in the first round, then alternating."""
+    return [slot if pick_row % 2 == 0 else n_drafters - 1 - slot
+            for pick_row in range(n_rounds) for slot in range(n_drafters)]
+
+
 def draft_population(session_by_seat: dict
                      , n_drafters: int
-                     , n_picks: int
+                     , pick_order: list[int]
                      , candidate_limit: int) -> dict:
-    """Run one snake draft where every seat drafts with its OWN configured session (its own theta),
-    rather than a single field agent plus one deviator. session_by_seat maps a seat index to the session
-    that seat drafts with. Returns the completed assignments."""
+    """Run one draft where every seat drafts with its OWN configured session (its own theta), rather than a
+    single field agent plus one deviator, the seats picking in pick_order (one seat index per pick; see
+    list_snake_order). session_by_seat maps a seat index to the session that seat drafts with. Returns the
+    completed assignments."""
     team_names  = [f'Drafter {i + 1}' for i in range(n_drafters)]
     assignments = {name: [] for name in team_names}
     for session in {id(s): s for s in session_by_seat.values()}.values():   # Session is unhashable
         session.agent.reset_draft_state()   # fresh draft: no state leaks from a previous draft
 
-    for pick_row in range(n_picks):
-        for slot in range(n_drafters):
-            drafter_index = slot if pick_row % 2 == 0 else (n_drafters - 1 - slot)   # serpentine
-            drafter_name  = team_names[drafter_index]
-            session       = session_by_seat[drafter_index]
-            result        = rank_candidates(session, assignments, drafter_name, [], None, 0, candidate_limit)
-            assert result.candidates, f'no candidates for {drafter_name}, round {pick_row + 1}'
-            assignments[drafter_name].append(result.candidates[0].player_id)
+    for pick_number, drafter_index in enumerate(pick_order):
+        drafter_name  = team_names[drafter_index]
+        session       = session_by_seat[drafter_index]
+        result        = rank_candidates(session, assignments, drafter_name, [], None, 0, candidate_limit)
+        assert result.candidates, f'no candidates for {drafter_name}, pick {pick_number + 1}'
+        assignments[drafter_name].append(result.candidates[0].player_id)
     return assignments
 
 
@@ -187,7 +193,8 @@ def estimate_gradient_population(pool: list
             for seat in minus_seats:
                 session_by_seat[int(seat)] = pool[2 * i + 1]; seat_side[int(seat)] = (i, -1)
 
-        assignments = draft_population(session_by_seat, n_drafters, n_picks, candidate_limit)
+        assignments = draft_population(session_by_seat, n_drafters, list_snake_order(n_drafters, n_picks),
+                                       candidate_limit)
         team_scores = score_all_teams(pool[0], assignments, n_iterations)
         for seat, (i, sign) in seat_side.items():
             (plus_scores if sign > 0 else minus_scores)[i].append(team_scores[team_names[seat]])

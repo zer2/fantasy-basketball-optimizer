@@ -7,8 +7,8 @@ H-scoring's smooth model of future picks.
 One pair is two 12-team snake drafts on the same seats: six seats (chosen at random) draft with the planner and six by
 H-scoring, then the methods swap seats. Every completed roster is scored with the complete-team H-score against the
 actual field, and the pair's result is the planner seats' mean minus the H-scoring seats' mean, in percentage points,
-averaged over its two drafts. The league is the backend tests' (2024-25, 12 x 13, Each Category), beth = 0 as in every
-simulation.
+averaged over its two drafts. The league is the backend tests' (12 x 13, Each Category) in the season given, beth = 0 as
+in every simulation.
 
 A planner seat takes H-scoring's top TOP_CANDIDATES candidates, plans the rest of the team around each, and takes the
 candidate whose planned team scores highest. A candidate the planner cannot plan for is skipped; with none plannable (the
@@ -39,11 +39,11 @@ APP_EXAMPLE_TEAM = "app's example team"
 UNCONSTRAINED_PLANNER = 'unconstrained planner'
 VARIANTS = (APP_EXAMPLE_TEAM, UNCONSTRAINED_PLANNER)
 TOP_CANDIDATES = 40
-SEASON = '2024-25'
 
 
 def run_paired_drafts_in_parallel(
     variant: str
+    , season: str
     , n_pairs: int
     , n_workers: int
     , seed: int
@@ -53,9 +53,9 @@ def run_paired_drafts_in_parallel(
     are deterministic given the split, and a repeated split would repeat its pair's result exactly."""
     if variant not in VARIANTS:
         raise ValueError(f'Unknown variant {variant!r}; expected one of {VARIANTS}.')
-    n_drafters = _build_league_session().current_settings['n_drafters']
+    n_drafters = build_planner_league_session(season).current_settings['n_drafters']
     splits = draw_distinct_seat_splits(n_drafters, n_pairs, seed)
-    jobs = [(variant, splits[worker::n_workers]) for worker in range(n_workers) if splits[worker::n_workers]]
+    jobs = [(variant, season, splits[worker::n_workers]) for worker in range(n_workers) if splits[worker::n_workers]]
     with multiprocessing.get_context('spawn').Pool(len(jobs)) as pool:
         per_worker = pool.starmap(run_paired_drafts, jobs)
     return sorted((pair for pairs in per_worker for pair in pairs), key=lambda pair: splits.index(pair['split']))
@@ -82,12 +82,13 @@ def draw_distinct_seat_splits(
 
 def run_paired_drafts(
     variant: str
+    , season: str
     , splits: list[tuple[int, ...]]
 ) -> list[dict]:
     """One pair of the variant per seat split, in this process. Each pair record: the split, and for each of the two
     drafts the planner seats, every seat's complete-team H-score and the planner and H-scoring seat means (percentage
     points); and the pair difference."""
-    session = _build_league_session()
+    session = build_planner_league_session(season)
     n_drafters = session.current_settings['n_drafters']
     records = []
     for split in splits:
@@ -104,15 +105,15 @@ def run_paired_drafts(
                            'seat_scores': [100 * float(scores[team]) for team in team_names],
                            'planner_mean': planner_mean, 'h_scoring_mean': h_scoring_mean,
                            'seconds': time.perf_counter() - began})
-        records.append({'variant': variant, 'split': split, 'drafts': drafts,
+        records.append({'variant': variant, 'season': season, 'split': split, 'drafts': drafts,
                         'difference': float(np.mean([draft['planner_mean'] - draft['h_scoring_mean']
                                                      for draft in drafts]))})
     return records
 
 
-def _build_league_session():
-    """The backend tests' league, Each Category, beth = 0."""
-    return build_league_session('Each Category', SEASON, {'beth': 0})[2]
+def build_planner_league_session(season: str):
+    """The backend tests' league in this season, Each Category, beth = 0."""
+    return build_league_session('Each Category', season, {'beth': 0})[2]
 
 
 def _run_draft(session, variant: str, planner_seats: set[int]) -> dict[str, float]:
