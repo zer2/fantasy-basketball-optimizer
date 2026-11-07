@@ -319,6 +319,12 @@ test('season tools on a self-built roster dataset', async t => {
                 await page.locator('.season-tab-btn[data-tab="trading"]').click()
             }), oneSearch, 'switching during a search does not repeat its requests')
 
+            // A Player Stats change redraws the tab on screen, with no switching away and back (2026-11-07).
+            assert.ok(await countRequestsDuring(() => page.locator('#ps-w-darko').evaluate(slider => {
+                slider.value = '0.5'
+                slider.dispatchEvent(new Event('change', { bubbles: true }))
+            })) > 0, 'a weight change searches again on the tab on screen')
+
             // The rosters are an input: a swap between two teams searches; swapping back is already searched.
             async function pasteRosters(rosters) {
                 await openSeasonTab('rosters')
