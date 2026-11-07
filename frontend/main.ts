@@ -49,6 +49,16 @@ async function runModeEval(): Promise<void> {
     await runEvaluate()   // discard the autopilot-only top-pick return; runModeEval yields void
 }
 
+/** Re-lays out after a settings change. In Season Mode that redraws the tab on screen too: its results came from the old
+ *  settings, and the table-header rebuild before the change empties the shared candidate table, so the Waiver tab showed
+ *  headers over no rows until a dropdown was touched (2026-10-13). Entering Season Mode draws the tab already (the tab
+ *  is null until then). */
+function applyLayoutAfterSettingsChange(): void {
+    const seasonTabBeforeLayout = getActiveSeasonTab()
+    applyLayout()
+    if (seasonTabBeforeLayout !== null) redrawActiveSeasonTab()
+}
+
 /** One sidebar section's apply pipeline: abort any in-flight run for the section, rebuild
  *  the table header, patch the session from `fromStep`, then re-evaluate and re-layout —
  *  each post-patch step skipped once a newer run has superseded this one. Every section
@@ -69,14 +79,7 @@ function makeApplyChain(label: string) {
         return createOrPatchSession(fromStep, patch, signal)
             .then(() => { if (!signal.aborted && evaluate) return runModeEval() })
             .then(() => {
-                if (signal.aborted) return
-                const seasonTabBeforeLayout = getActiveSeasonTab()
-                applyLayout()
-                // In Season Mode a settings change redraws the tab on screen: its results came from the old settings,
-                // and the table-header rebuild above empties the shared candidate table, so the Waiver tab showed
-                // headers over no rows until a dropdown was touched (2026-10-13). Entering Season Mode draws the tab
-                // already (the tab is null until then).
-                if (seasonTabBeforeLayout !== null) redrawActiveSeasonTab()
+                if (!signal.aborted) applyLayoutAfterSettingsChange()
             })
             .catch(err => {
                 if (err.name === 'AbortError') return
@@ -317,7 +320,7 @@ const applyPlayerStats = async (signal?: AbortSignal, keepsPlayerPool = false) =
     buildTableHeader()
     createOrPatchSession(1, { data_source, injured_players }, signal)
         .then(() => { if (!signal || !signal.aborted) return runModeEval() })
-        .then(() => { if (!signal || !signal.aborted) applyLayout() })
+        .then(() => { if (!signal || !signal.aborted) applyLayoutAfterSettingsChange() })
         // A change that keeps the pool keeps the rosters -- if there are any: a connection whose session update failed
         // (no usable data source yet, 2026-11-06) left none, and this update is what finally gives the session its
         // league. Without the pull, "loading your league's rosters" stayed up with nothing running.
