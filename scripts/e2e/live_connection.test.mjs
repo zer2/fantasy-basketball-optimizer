@@ -157,18 +157,18 @@ test('coming back to the tab shows the board being brought up to date', async ()
         const indicatorStates = await page.evaluate(() => new Promise(resolve => {
             const indicator = document.getElementById('eval-indicator')
             const seen = []
-            new MutationObserver(() => seen.push(indicator.textContent)).observe(indicator, { childList: true, characterData: true, subtree: true })
+            new MutationObserver(() => seen.push(indicator.dataset.state)).observe(indicator, { attributes: true, attributeFilter: ['data-state'] })
             const setVisibility = state => {
                 Object.defineProperty(document, 'visibilityState', { value: state, configurable: true })
                 document.dispatchEvent(new Event('visibilitychange'))
             }
             setVisibility('hidden')
             setVisibility('visible')
-            const waitForSettled = () => seen.at(-1) === 'Updated' ? resolve(seen) : setTimeout(waitForSettled, 50)
+            const waitForSettled = () => seen.at(-1) === 'idle' ? resolve(seen) : setTimeout(waitForSettled, 50)
             setTimeout(waitForSettled, 50)
         }))
-        assert.equal(indicatorStates[0], 'Updating...', `the spinner must start first, saw ${JSON.stringify(indicatorStates)}`)
-        assert.equal(indicatorStates.at(-1), 'Updated')
+        assert.equal(indicatorStates[0], 'evaluating', `the work must be announced first, saw ${JSON.stringify(indicatorStates)}`)
+        assert.equal(indicatorStates.at(-1), 'idle')
         const evaluatesAfter = app.sessionRequestLog.filter(entry => entry.includes('/evaluate')).length
         assert.equal(evaluatesAfter, evaluatesBefore, 'an unchanged, current board is flashed, not re-evaluated')
         expectCleanSession(app, 'returned to the tab')
@@ -229,10 +229,10 @@ test('a hidden tab keeps following the draft, through the last pick', async () =
     }
 })
 
-test('Historical data stays available, and chosen, with a live platform', async () => {
-    // A league can be connected in a past season (ESPN keeps a league's id across seasons), and that season's own stats
-    // describe it. Historical used to be own-data only, switching the source to Projections on connecting (until
-    // 2026-10-21).
+test('choosing a live platform switches to Projections, and Historical stays available and can be chosen', async () => {
+    // A league is usually played now, so choosing one switches the source to Projections (the user, 2026-11-04). But a
+    // league can be connected in a past season (ESPN keeps a league's id across seasons), and that season's own stats
+    // describe it: Historical used to be own-data only (until 2026-10-21), and must stay choosable.
     const app = await launchAppPage()
     const { page } = app
     const dataSource = () => page.locator('[data-testid="ps-data-type-wrapper"] .cs-search-input').inputValue()
@@ -249,8 +249,11 @@ test('Historical data stays available, and chosen, with a live platform', async 
 
         await setSelect(page, 'ls-platform', 'Retrieve from Yahoo')
         await waitAppSettled(app, { timeout: 120000 })
-        assert.equal(await dataSource(), 'Historical', 'a live platform keeps the historical source')
+        assert.equal(await dataSource(), 'Projections', 'choosing a live platform switches to Projections')
         assert.deepEqual(await readDataSourceOptions(), ['Projections', 'Historical'])
+        await setSelect(page, 'ps-data-type', 'Historical')
+        await waitAppSettled(app, { timeout: 120000 })
+        assert.equal(await dataSource(), 'Historical', 'Historical can still be chosen with a live platform')
 
         await page.reload({ waitUntil: 'domcontentloaded' })
         await page.locator('#hscoretable .playerheaderdiv').first().waitFor({ timeout: 120000 })
@@ -461,6 +464,50 @@ for (const startMode of ['Season Mode', 'Draft Mode']) {
     })
 }
 
+test("a weight change that finally builds a connected session loads the league's rosters", async () => {
+    // Reloading with an expired upload as the only data source: the connection's session update fails (no usable data),
+    // and the session that eventually carries the league comes from moving a weight slider, which "keeps the pool" and
+    // so never pulled rosters. "Loading your league's rosters" stayed up with nothing running (2026-11-06).
+    const app = await launchAppPage()
+    const { page } = app
+    try {
+        await loadApp(app)
+        await setSelect(page, 'ls-mode', 'Season Mode')
+        await waitAppSettled(app, { timeout: 120000 })
+        await stubLivePlatform(page, { availableModes: ['Season Mode'] })
+        // The connection's update finds the session gone, and its replacement is refused.
+        let isConnectionRefused = true
+        await page.route(url => /^\/sessions(\/[^/]+)?$/.test(url.pathname), async route => {
+            const method = route.request().method()
+            if (isConnectionRefused && method === 'PATCH') {
+                return route.fulfill({ status: 404, contentType: 'application/json', body: '{"detail":"Session not found"}' })
+            }
+            if (isConnectionRefused && method === 'POST') {
+                isConnectionRefused = false
+                return route.fulfill({ status: 400, contentType: 'application/json', body: '{"detail":"No data source"}' })
+            }
+            return route.fallback()
+        })
+        await connectYahooLeague(app, '12345')
+        assert.equal(isConnectionRefused, false, 'the connection\'s update must have been refused')
+        assert.doesNotMatch(await page.locator('.entry-table').first().innerText(), /Joki/,
+                            'no rosters yet: the connection never reached a session')
+        drainSessionFailures(app)
+
+        await page.locator('#ps-w-darko').evaluate(slider => {
+            const details = slider.closest('details')
+            if (details && !details.open) details.open = true
+            slider.value = '0.5'
+            slider.dispatchEvent(new Event('change', { bubbles: true }))
+        })
+        await waitAppSettled(app, { timeout: 120000 })
+        assert.match(await page.locator('.entry-table').first().innerText(), /Joki/,
+                     'the grid must be filled from the platform\'s rosters')
+    } finally {
+        await app.close()
+    }
+})
+
 test("a Waiver tab drawn before the league's rosters arrive is redrawn when they do", async () => {
     // Season Mode opens on the Waiver tab, which drew while the rosters were still empty ("Fill out at least one full
     // team") and was never drawn again: the rosters' arrival redrew only the hidden Rosters grid (2026-10-13).
@@ -495,7 +542,7 @@ test("a Waiver tab drawn before the league's rosters arrive is redrawn when they
         await page.locator('#ls-yahoo-league-id').press('Enter')
         await page.waitForFunction(() => document.querySelector('#season-indicator')?.dataset.state === 'fetching',
                                    null, { timeout: 30000 })
-        assert.match(await page.locator('#season-indicator').innerText(), /Starting/)
+        await page.waitForFunction(() => document.querySelector('#season-indicator')?.textContent === 'Starting...')
         const tabText = await page.locator('#right-header').innerText()
         assert.doesNotMatch(tabText, /Fill out|Loading/, 'the tab says nothing while the rosters load')
         assert.equal(await page.locator('#hscoretable').isVisible(), false, 'no empty table while the rosters load')

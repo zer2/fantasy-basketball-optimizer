@@ -2393,13 +2393,13 @@ tr {
     flex-shrink: 0;
 }
 
-.eval-indicator[data-state="evaluating"]::before {
+.eval-indicator[data-shown-state="evaluating"]::before {
     border: 2px solid light-dark(#999999, #6666aa);
     border-top-color: transparent;
     animation: eval-spin 0.65s linear infinite;
 }
 
-.eval-indicator[data-state="fetching"]::before {
+.eval-indicator[data-shown-state="fetching"]::before {
     border: 2px solid light-dark(#aa8844, #997733);
     border-top-color: transparent;
     animation: eval-spin 0.65s linear infinite;

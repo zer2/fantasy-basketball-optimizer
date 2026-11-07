@@ -237,6 +237,110 @@ test('season tools on a self-built roster dataset', async t => {
             expectCleanSession(app, 'rosters kept through a redraw')
         })
 
+        await t.test('suggested trades are cached: asked for again only when the session or an input changes', async () => {
+            // Every visit to the Trading tab used to re-run the whole search (2026-11-06).
+            let suggestRequests = 0
+            const countSuggestRequest = request => { if (request.url().includes('/trade/suggest')) suggestRequests += 1 }
+            page.on('request', countSuggestRequest)
+            const rows = page.locator('[data-testid="trade-suggestions"] tbody tr')
+            const readRowCount = () => rows.count()
+            /** How many requests an action took, once the app has settled. */
+            async function countRequestsDuring(action) {
+                suggestRequests = 0
+                await action()
+                await waitAppSettled(app)
+                return suggestRequests
+            }
+            await openSeasonTab('trading')
+            await setSelect(page, 'trade-your-team', 'Team 1')
+            for (const id of ['ts-your-threshold', 'ts-their-threshold']) {
+                await page.locator(`#${id}`).fill('-100')
+                await page.locator(`#${id}`).blur()
+            }
+            await waitAppSettled(app)
+            const rowsFound = await readRowCount()
+            assert.ok(rowsFound > 0, 'the search finds trades')
+
+            // Back to the tab: nothing asked for, and the rows are there at once, not after a search.
+            assert.equal(await countRequestsDuring(async () => {
+                await page.locator('.season-tab-btn[data-tab="waiver"]').click()
+                await waitAppSettled(app)
+                await page.locator('.season-tab-btn[data-tab="trading"]').click()
+                assert.equal(await readRowCount(), rowsFound, 'the rows are drawn immediately')
+            }), 0, 'switching back asks for nothing')
+
+            // What the search boxes hold survives the switch.
+            await page.locator('#trade-team-search').fill('Team 3')
+            await openSeasonTab('waiver')
+            await openSeasonTab('trading')
+            assert.equal(await page.locator('#trade-team-search').inputValue(), 'Team 3', 'the search box is kept')
+            await page.locator('#trade-team-search').fill('')
+            await waitAppSettled(app)
+
+            // A threshold only filters.
+            assert.equal(await countRequestsDuring(async () => {
+                await page.locator('#ts-your-threshold').fill('-99')
+                await page.locator('#ts-your-threshold').blur()
+            }), 0, 'a threshold asks for nothing')
+
+            // Your team is an input; going back to one already searched asks for nothing.
+            assert.ok(await countRequestsDuring(() => setSelect(page, 'trade-your-team', 'Team 2')) > 0,
+                      'another team searches')
+            assert.equal(await countRequestsDuring(() => setSelect(page, 'trade-your-team', 'Team 1')), 0,
+                         'a team already searched asks for nothing')
+
+            // The position check is an input.
+            assert.ok(await countRequestsDuring(() => page.locator('#ts-check-positions').evaluate(toggle => toggle.click())) > 0,
+                      'the position check searches')
+            assert.equal(await countRequestsDuring(() => page.locator('#ts-check-positions').evaluate(toggle => toggle.click())), 0,
+                         'its earlier value is already searched')
+
+            // A session change rebuilds the model under the same session id: nothing found before it may be reused.
+            assert.ok(await countRequestsDuring(async () => {
+                await setObjectiveWeight(page, 0.5)
+                await waitAppSettled(app)
+                await openSeasonTab('waiver')
+                await openSeasonTab('trading')
+            }) > 0, 'a session change searches again')
+
+            // Leaving mid-search neither restarts it nor runs it twice: one visit's requests, however many visits.
+            const oneSearch = await countRequestsDuring(async () => {
+                await setObjectiveWeight(page, 0.25)
+                await waitAppSettled(app)
+                await openSeasonTab('waiver')
+                await openSeasonTab('trading')
+            })
+            assert.equal(await countRequestsDuring(async () => {
+                await setObjectiveWeight(page, 0)
+                await waitAppSettled(app)
+                await page.locator('.season-tab-btn[data-tab="waiver"]').click()
+                await page.locator('.season-tab-btn[data-tab="trading"]').click()
+                await page.locator('.season-tab-btn[data-tab="waiver"]').click()
+                await page.locator('.season-tab-btn[data-tab="trading"]').click()
+            }), oneSearch, 'switching during a search does not repeat its requests')
+
+            // The rosters are an input: a swap between two teams searches; swapping back is already searched.
+            async function pasteRosters(rosters) {
+                await openSeasonTab('rosters')
+                const pasteBlock = Array.from({ length: PICKS_PER_TEAM }, (_, row) =>
+                    rosters.map(roster => roster[row]).join('\t')).join('\n')
+                await page.evaluate(text => navigator.clipboard.writeText(text), pasteBlock)
+                await page.locator('[data-testid="sr-player-0-0-wrapper"]').click()
+                await page.keyboard.press('Control+v')
+                await waitAppSettled(app)
+                await openSeasonTab('trading')
+            }
+            await pasteRosters(teamRosters)   // the baseline: an earlier subtest edited a cell by hand
+            const swapped = teamRosters.map(roster => [...roster])
+            ;[swapped[0][0], swapped[1][0]] = [swapped[1][0], swapped[0][0]]
+            assert.ok(await countRequestsDuring(() => pasteRosters(swapped)) > 0, 'changed rosters search')
+            assert.equal(await countRequestsDuring(() => pasteRosters(teamRosters)), 0,
+                         'rosters already searched ask for nothing')
+
+            page.off('request', countSuggestRequest)
+            expectCleanSession(app, 'suggestion cache')
+        })
+
         await t.test('your team is remembered across the Waiver and Trading tabs', async () => {
             // The Waiver tab opened on the first team every time it was drawn, and the rosters arriving draw it: it
             // scored someone else's team (2026-10-13).
@@ -275,13 +379,50 @@ test('season tools on a self-built roster dataset', async t => {
             })
             await setSelect(page, 'waiver-team-select', 'Team 1')
             await page.waitForFunction(() => document.querySelector('#season-indicator')?.dataset.state === 'evaluating')
-            assert.match(await page.locator('#season-indicator').innerText(), /Updating/)
+            await page.waitForFunction(() => document.querySelector('#season-indicator')?.textContent === 'Updating...')
             releaseEvaluate()
             await waitAppSettled(app)
             await page.waitForFunction(() => document.querySelector('#season-indicator')?.dataset.state === 'idle')
             assert.equal(await readIndicatorState(), 'idle')
             await page.unroute(url => url.pathname.endsWith('/evaluate'))
             expectCleanSession(app, 'season indicator')
+        })
+
+        await t.test('neither short work nor the gaps in a series of requests flicker the indicator', async () => {
+            // Opening the Rosters tab sends one quick evaluate, which blinked "Updated" to "Updating..." and back.
+            const shownStates = await page.evaluate(async () => {
+                const { applyIndicatorState } = await import('/dist/api/session.js')
+                const indicator = document.getElementById('season-indicator')
+                const read = () => ({ state: indicator.dataset.state, label: indicator.textContent })
+                const wait = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds))
+                const seen = {}
+                applyIndicatorState('season-indicator', 'evaluating')
+                seen.atOnce = read()
+                await wait(50)
+                applyIndicatorState('season-indicator', 'idle')
+                await wait(300)
+                seen.afterShortWork = read()
+                applyIndicatorState('season-indicator', 'evaluating')
+                await wait(300)
+                seen.duringLongWork = read()
+                // A gap between two requests of a series does not show "Updated" either.
+                applyIndicatorState('season-indicator', 'idle')
+                seen.inTheGap = read()
+                await wait(50)
+                applyIndicatorState('season-indicator', 'evaluating')
+                await wait(300)
+                seen.afterTheGap = read()
+                applyIndicatorState('season-indicator', 'idle')
+                await wait(300)
+                seen.afterLongWork = read()
+                return seen
+            })
+            assert.deepEqual(shownStates.atOnce, { state: 'evaluating', label: 'Updated' }, 'the state is immediate, the label waits')
+            assert.deepEqual(shownStates.afterShortWork, { state: 'idle', label: 'Updated' }, 'short work never shows')
+            assert.deepEqual(shownStates.duringLongWork, { state: 'evaluating', label: 'Updating...' }, 'long work shows')
+            assert.deepEqual(shownStates.inTheGap, { state: 'idle', label: 'Updating...' }, 'a gap keeps the spinner')
+            assert.deepEqual(shownStates.afterTheGap, { state: 'evaluating', label: 'Updating...' }, 'work resumed')
+            assert.deepEqual(shownStates.afterLongWork, { state: 'idle', label: 'Updated' }, 'a real end shows')
         })
     } finally {
         await app.close()

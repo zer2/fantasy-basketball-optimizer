@@ -15,7 +15,7 @@ import { buildTable, resetTable, addBatch, showTableMessage, reserveTailSpace, c
 import { showFailureInTable } from '../table/failure_message.js'
 
 import {
-    startFreshSession, getSessionId, resetSession, setIndicatorState,
+    startFreshSession, getSessionId, markSessionChanged, replaceLostSession, setIndicatorState,
     withDisplayOwnership, withSessionRetry, waitForSessionCreationInFlight,
 } from './session.js'
 import { prefetchHeadshotsForDataSource } from '../player_display.js'
@@ -148,6 +148,7 @@ export async function createOrPatchSession(
         }
         try {
             const patchResp = await patchSession(getSessionId()!, { from_step: fromStep, ...patchBody }, signal)
+            markSessionChanged()
             basePlayersBySession.delete(getSessionId()!)
             latestFullTeamResult = null
             if (patchResp.steps_rerun.includes(4)) {
@@ -156,8 +157,7 @@ export async function createOrPatchSession(
             }
         } catch (err) {
             if (!(err instanceof HTTPError) || err.status !== 404) throw err
-            resetSession()
-            await startFreshSession(signal)
+            await replaceLostSession(signal)
         }
     })
 }

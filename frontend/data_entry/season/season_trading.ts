@@ -21,6 +21,7 @@ import {
 } from '../../setting_collection/trade_parameters.js'
 import { pref, savePref } from '../../preferences.js'
 import { runTradeAnalyze, runTradeSuggest } from '../../api/season_session.js'
+import { getSessionVersion } from '../../api/session.js'
 import type { TradeAnalyzeResponse, TradeSuggestion } from '../../api/client.js'
 
 // ─── Player id <-> multiselect value helpers ─────────────────────────────────
@@ -402,6 +403,64 @@ function readRememberedTradeSizes(tradeSizeLabels: string[]): string[] {
 // multiselect widgets' internal listeners bound to detached nodes.
 let tradingListenerController: AbortController | null = null
 
+// ─── Suggestion cache ────────────────────────────────────────────────────────
+
+/** One search for suggested trades, for one set of inputs (readSuggestionSearchKey): what it has found, and what it has
+ *  searched and is searching, so it can be shown again, or carried on, without asking the backend again. */
+interface SuggestionSearch {
+    rankedSuggestions:        TeamTradeSuggestion[]               // sorted by your score
+    fetchedTradeSizesByRound: Map<number, Set<string>>            // round -> trade sizes searched, every team
+    pendingRoundTradeSizes:   Set<string>                         // `${round}|${trade size}`
+    // Requests still running. "No promising trades found" waits for all of them: between two teams' batches nothing is
+    // pending, and the message showed after the first team that had none.
+    runningSearchCount:       number
+    // How many of the matching suggestions are drawn; "Show more" raises it. Back to one page whenever what matches
+    // changes (a threshold, a search box, the trade sizes).
+    suggestionRowsShown:      number
+}
+
+// The searches of the current session version, by the rest of their key: one for each of your teams looked at. Nothing
+// in them can outlive that version, so they are dropped together when it changes.
+const suggestionSearches = new Map<string, SuggestionSearch>()
+let suggestionSearchesVersion: number | null = null
+// The search on screen. One that is no longer it stops between bands; what it found stays valid for its key.
+let activeSuggestionSearch: SuggestionSearch | null = null
+// Redraws the suggestions of the latest render: a search outlives the render that started it.
+let redrawSuggestions: () => void = () => {}
+// What the search boxes hold, so they survive leaving the tab.
+let playerSearchText = ''
+let teamSearchText = ''
+
+/** Everything the backend's suggestions depend on, beside the session. Thresholds and trade sizes are not in it: every
+ *  search runs at the threshold floor and the display filters, and trade sizes are tracked within a search. */
+function readSuggestionSearchKey(
+    assignments: Record<string, number[]>
+    , yourTeam: string
+    , positionCheck: boolean
+): string {
+    return JSON.stringify({ assignments, yourTeam, positionCheck })
+}
+
+/** The search for this key at the current session version, started empty if there is none. */
+function findOrStartSuggestionSearch(key: string): SuggestionSearch {
+    if (suggestionSearchesVersion !== getSessionVersion()) {
+        suggestionSearches.clear()
+        suggestionSearchesVersion = getSessionVersion()
+    }
+    let search = suggestionSearches.get(key)
+    if (search === undefined) {
+        search = {
+            rankedSuggestions:        [],
+            fetchedTradeSizesByRound: new Map(),
+            pendingRoundTradeSizes:   new Set(),
+            runningSearchCount:       0,
+            suggestionRowsShown:      SUGGESTION_ROWS_PER_PAGE,
+        }
+        suggestionSearches.set(key, search)
+    }
+    return search
+}
+
 // ─── Main render ─────────────────────────────────────────────────────────────
 
 /** Renders the full Trading tab into the given container element. */
@@ -524,6 +583,8 @@ export function renderSeasonTrading(container: HTMLElement): void {
     }
     const searchInput     = makeSuggestionSearchInput('trade-suggestion-search', 'Find player')
     const teamSearchInput = makeSuggestionSearchInput('trade-team-search', 'Find team')
+    searchInput.value = playerSearchText
+    teamSearchInput.value = teamSearchText
     searchGroup.append(searchInput, teamSearchInput)
     comboRow.append(searchGroup)
 
@@ -602,22 +663,6 @@ export function renderSeasonTrading(container: HTMLElement): void {
     suggestResults.dataset.testid = 'trade-suggestions'
     container.append(suggestResults)
 
-    // ── Suggestion state ─────────────────────────────────────────────────────
-    // Every suggestion found so far, across teams and trade sizes, sorted by your score; the display filters it by the
-    // chosen trade sizes and the search. Each team's batch merges in as it arrives. A change that invalidates what
-    // was found (your team, a threshold, the position check) starts a new search generation: a response from an
-    // older one is dropped rather than mixed in.
-    let rankedSuggestions: TeamTradeSuggestion[] = []
-    const fetchedTradeSizesByRound = new Map<number, Set<string>>()   // round -> trade sizes searched, every team
-    const pendingRoundTradeSizes   = new Set<string>()                // `${round}|${trade size}`
-    let suggestionGeneration = 0
-    // How many of the matching suggestions are drawn; "Show more" raises it. Back to one page whenever what matches
-    // changes (a new search, a threshold, a search box, the trade sizes).
-    let suggestionRowsShown = SUGGESTION_ROWS_PER_PAGE
-    // Searches of the current generation still running. "No promising trades found" waits for all of them: between two
-    // teams' batches nothing is pending, and the message showed after the first team that had none.
-    let runningSearchCount = 0
-
     let currentSendSel:       MultiSelectWidget | null = null
     let currentReceiveSel:    MultiSelectWidget | null = null
     let currentUpdateResults: (() => void) | null      = null
@@ -645,26 +690,27 @@ export function renderSeasonTrading(container: HTMLElement): void {
         // Strictly above, as the backend filters.
         const yourThreshold  = readThreshold(yourThreshInput)
         const theirThreshold = readThreshold(theirThreshInput)
-        const shown = rankedSuggestions.filter(found =>
+        const search = activeSuggestionSearch!
+        const shown = search.rankedSuggestions.filter(found =>
             found.suggestion.your_score > yourThreshold
             && found.suggestion.their_score > theirThreshold
             && selected.includes(readTradeSizeLabel(found.suggestion))
             && isSuggestionMatchingSearch(found.suggestion, normalizedSearchText)
             && normalizeSearchText(found.team).includes(normalizedTeamSearchText))
         if (shown.length > 0) {
-            suggestResults.append(buildSuggestionTable(shown.slice(0, suggestionRowsShown), showSuggestedTrade))
-            if (shown.length > suggestionRowsShown) {
+            suggestResults.append(buildSuggestionTable(shown.slice(0, search.suggestionRowsShown), showSuggestedTrade))
+            if (shown.length > search.suggestionRowsShown) {
                 const moreButton = document.createElement('button')
                 moreButton.type = 'button'
                 moreButton.className = 'section-apply-btn trade-show-more-btn'
-                moreButton.textContent = `Show more (${suggestionRowsShown} of ${shown.length} shown)`
+                moreButton.textContent = `Show more (${search.suggestionRowsShown} of ${shown.length} shown)`
                 moreButton.addEventListener('click', () => {
-                    suggestionRowsShown += SUGGESTION_ROWS_PER_PAGE
+                    search.suggestionRowsShown += SUGGESTION_ROWS_PER_PAGE
                     refreshSuggestionDisplay()
                 })
                 suggestResults.append(moreButton)
             }
-        } else if (runningSearchCount === 0) {
+        } else if (search.runningSearchCount === 0) {
             const msg = document.createElement('div')
             msg.className = 'trade-suggestion-stub'
             msg.textContent = normalizedSearchText === '' && normalizedTeamSearchText === ''
@@ -677,72 +723,70 @@ export function renderSeasonTrading(container: HTMLElement): void {
     /** Searches every other team for the chosen trade sizes not yet searched (searchEveryTeam), counting the search
      *  as running until it ends. */
     async function fetchMissingSuggestions(): Promise<void> {
-        const generation = suggestionGeneration
-        runningSearchCount += 1
+        const search = activeSuggestionSearch!
+        search.runningSearchCount += 1
         try {
-            await searchEveryTeam(generation)
+            await searchEveryTeam(search)
         } finally {
-            if (generation === suggestionGeneration) {
-                runningSearchCount -= 1
-                refreshSuggestionDisplay()
-            }
+            search.runningSearchCount -= 1
+            redrawSuggestions()
         }
     }
 
     /** Searches in value-gap bands (TRADE_SEARCH_ROUNDS), the closest trades first. One request (one batch) per band,
-     *  covering every team, in turn: the backend runs one request per session at a time anyway, and in turn a newer
-     *  generation stops this one between bands. */
-    async function searchEveryTeam(generation: number): Promise<void> {
+     *  covering every team, in turn: the backend runs one request per session at a time anyway, and in turn a search
+     *  no longer on screen stops between bands. A band already searched, or being searched, is skipped, so a search
+     *  left running and one resumed beside it share the work. */
+    async function searchEveryTeam(search: SuggestionSearch): Promise<void> {
         const yourTeam = readYourTeam()
         // Always at the floor: the thresholds filter what this finds (refreshSuggestionDisplay).
         const your_differential_threshold  = TRADE_THRESHOLD_FLOOR_PERCENT / 100
         const their_differential_threshold = TRADE_THRESHOLD_FLOOR_PERCENT / 100
         const positionCheck = checkPositionsInput.checked
         const counterparties = readCounterparties()
-        refreshSuggestionDisplay()
+        redrawSuggestions()
         for (const [roundIndex, round] of TRADE_SEARCH_ROUNDS.entries()) {
-            if (generation !== suggestionGeneration) return
-            const fetched = fetchedTradeSizesByRound.get(roundIndex) ?? new Set<string>()
+            if (search !== activeSuggestionSearch) return
             const missing = comboSel.getSelected().filter(label =>
-                !fetched.has(label) && !pendingRoundTradeSizes.has(`${roundIndex}|${label}`))
+                !search.fetchedTradeSizesByRound.get(roundIndex)?.has(label)
+                && !search.pendingRoundTradeSizes.has(`${roundIndex}|${label}`))
             if (missing.length === 0) continue
             const comboParams = missing.map(label => {
                 const combo = DEFAULT_COMBOS.find(cp => `${cp.n_traded} for ${cp.n_received}` === label)
                 if (!combo) throw new Error(`Unknown trade size "${label}"`)
                 return { ...combo, threshold: round.threshold, searched_threshold: round.searchedThreshold }
             })
-            missing.forEach(label => pendingRoundTradeSizes.add(`${roundIndex}|${label}`))
+            missing.forEach(label => search.pendingRoundTradeSizes.add(`${roundIndex}|${label}`))
             let suggestions: TradeSuggestion[]
             try {
                 const response = await runTradeSuggest(assignments, yourTeam, counterparties, comboParams,
                     your_differential_threshold, their_differential_threshold, positionCheck)
                 suggestions = response.suggestions
             } catch (err) {
-                if (generation !== suggestionGeneration) return
-                missing.forEach(label => pendingRoundTradeSizes.delete(`${roundIndex}|${label}`))
+                missing.forEach(label => search.pendingRoundTradeSizes.delete(`${roundIndex}|${label}`))
                 console.error('Trade suggestions failed:', err)
                 continue
             }
-            if (generation !== suggestionGeneration) return
-            missing.forEach(label => pendingRoundTradeSizes.delete(`${roundIndex}|${label}`))
-            fetchedTradeSizesByRound.set(roundIndex, new Set([...fetched, ...missing]))
+            missing.forEach(label => search.pendingRoundTradeSizes.delete(`${roundIndex}|${label}`))
+            search.fetchedTradeSizesByRound.set(roundIndex,
+                new Set([...(search.fetchedTradeSizesByRound.get(roundIndex) ?? []), ...missing]))
             // The backend ranks a band across its teams already; sorted again here, the merge does not depend on it.
             const batch = suggestions
                 .map(suggestion => ({ team: suggestion.their_team, suggestion }))
                 .sort((a, b) => b.suggestion.your_score - a.suggestion.your_score)
-            rankedSuggestions = mergeSuggestionsByYourScore(rankedSuggestions, batch)
-            refreshSuggestionDisplay()
+            search.rankedSuggestions = mergeSuggestionsByYourScore(search.rankedSuggestions, batch)
+            redrawSuggestions()
         }
     }
 
-    function restartSuggestionSearch(): void {
+    /** Shows the search for the current inputs: from the cache where it has been run, carrying on with whatever it has
+     *  not yet searched. */
+    function showSuggestionsForCurrentInputs(): void {
         if (!document.contains(suggestResults)) return
-        suggestionGeneration += 1
-        suggestionRowsShown = SUGGESTION_ROWS_PER_PAGE
-        runningSearchCount = 0
-        rankedSuggestions = []
-        fetchedTradeSizesByRound.clear()
-        pendingRoundTradeSizes.clear()
+        activeSuggestionSearch = findOrStartSuggestionSearch(
+            readSuggestionSearchKey(assignments, readYourTeam(), checkPositionsInput.checked))
+        redrawSuggestions = refreshSuggestionDisplay
+        refreshSuggestionDisplay()
         fetchMissingSuggestions().catch(err => console.error('Trade suggestions failed:', err))
     }
 
@@ -865,29 +909,31 @@ export function renderSeasonTrading(container: HTMLElement): void {
     }
 
     rebuildInspection()
-    restartSuggestionSearch()
+    showSuggestionsForCurrentInputs()
 
     /** A threshold only filters the trades found (every search runs at the floor). One below the floor is raised to
      *  it: nothing below was searched. */
     function applyThresholdChange(input: HTMLInputElement, prefKey: string): void {
         if (parseFloat(input.value) < TRADE_THRESHOLD_FLOOR_PERCENT) input.value = String(TRADE_THRESHOLD_FLOOR_PERCENT)
         savePref(prefKey, parseFloat(input.value))
-        suggestionRowsShown = SUGGESTION_ROWS_PER_PAGE
+        activeSuggestionSearch!.suggestionRowsShown = SUGGESTION_ROWS_PER_PAGE
         refreshSuggestionDisplay()
     }
     yourThreshInput.addEventListener('change', () => applyThresholdChange(yourThreshInput, 'ts-your-threshold'))
     theirThreshInput.addEventListener('change', () => applyThresholdChange(theirThreshInput, 'ts-their-threshold'))
     checkPositionsInput.addEventListener('change', () => {
         savePref('ts-check-positions', checkPositionsInput.checked)
-        restartSuggestionSearch()
+        showSuggestionsForCurrentInputs()
     })
     comboSel.onChange(() => {
         savePref('ts-trade-sizes', comboSel.getSelected())
-        suggestionRowsShown = SUGGESTION_ROWS_PER_PAGE
+        activeSuggestionSearch!.suggestionRowsShown = SUGGESTION_ROWS_PER_PAGE
         fetchMissingSuggestions().catch(err => console.error('Trade suggestions failed:', err))
     })
     function applySearchChange(): void {
-        suggestionRowsShown = SUGGESTION_ROWS_PER_PAGE
+        playerSearchText = searchInput.value
+        teamSearchText = teamSearchInput.value
+        activeSuggestionSearch!.suggestionRowsShown = SUGGESTION_ROWS_PER_PAGE
         refreshSuggestionDisplay()
     }
     searchInput.addEventListener('input', applySearchChange, { signal: tradingListenerController.signal })
@@ -902,7 +948,7 @@ export function renderSeasonTrading(container: HTMLElement): void {
                                 options.includes(theirTeam) ? theirTeam : options[0])
         savePref('ts-their-team', theirTeamSel.getValue())
         rebuildInspection()
-        restartSuggestionSearch()
+        showSuggestionsForCurrentInputs()
     })
     // The team traded with only changes which trade is inspected: the suggestions already cover every team.
     theirTeamSel.element.addEventListener('change', () => {
