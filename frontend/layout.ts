@@ -233,7 +233,7 @@ export function getActiveSeasonTab(): string | null {
 /** Redraws the season tab on screen from the rosters as they now stand. For when the rosters change underneath it --
  *  a connected league's rosters arriving: showSeasonLayout redraws only the (hidden) Rosters grid, so a Waiver tab
  *  drawn before they arrived kept saying "Fill out at least one full team" over an empty table until it was clicked
- *  again. Not part of every layout pass, because drawing the Trading tab re-runs its trade suggestions. */
+ *  again. Not part of every layout pass: there is no need, and the tab's inputs are rebuilt each time it is drawn. */
 export function redrawActiveSeasonTab(): void {
     if (currentSeasonTab !== null && getLeagueSettings().mode === 'Season Mode') activateSeasonTab(currentSeasonTab)
 }

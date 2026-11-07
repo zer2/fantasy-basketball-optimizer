@@ -39,7 +39,21 @@ let currentIndicatorState: IndicatorState = 'fetching'
 // ─── Session ID ───────────────────────────────────────────────────────────────
 
 export function getSessionId(): string | null { return sessionId }
-export function resetSession(): void          { sessionId = null }
+export function resetSession(): void          { sessionId = null; markSessionChanged() }
+
+// Goes up whenever the session's contents may have changed: a new session, or a patch (which rebuilds the model under
+// the same session id, so the id alone cannot tell). What is computed from a session is valid only for its version.
+let sessionVersion = 0
+export function getSessionVersion(): number   { return sessionVersion }
+export function markSessionChanged(): void    { sessionVersion += 1 }
+
+// How long a change between "Updated" and working must hold before an indicator shows it, either way: work shorter than
+// this would only flicker, and so would the gap between the requests of a series (the trade search's bands). data-state
+// changes at once, as the truth about the work (what the e2e harness waits on); only what is shown (data-shown-state and
+// the label) waits.
+const INDICATOR_CHANGE_DELAY_MS = 200
+const BUSY_INDICATOR_STATES: IndicatorState[] = ['fetching', 'evaluating']
+const pendingShownStates = new WeakMap<HTMLElement, ReturnType<typeof setTimeout>>()
 
 /** Applies a state to any indicator element, looked up by ID. */
 export function applyIndicatorState(
@@ -56,6 +70,23 @@ export function applyIndicatorState(
         return
     }
     element.dataset.state = state
+    clearTimeout(pendingShownStates.get(element))
+    // Anything else shows at once: "Unconnected" must not linger over work that has begun, nor work over "Unconnected".
+    const isWorkStarting = BUSY_INDICATOR_STATES.includes(state) && element.dataset.shownState === 'idle'
+    const isWorkEnding = state === 'idle' && BUSY_INDICATOR_STATES.includes(element.dataset.shownState ?? '')
+    if (isWorkStarting || isWorkEnding) {
+        pendingShownStates.set(element, setTimeout(() => showIndicatorState(element, state), INDICATOR_CHANGE_DELAY_MS))
+    } else {
+        showIndicatorState(element, state)
+    }
+}
+
+/** What an indicator looks like: its label, and (through data-shown-state, in styles.css) its spinner. */
+function showIndicatorState(
+    element: HTMLElement
+    , state: IndicatorState
+): void {
+    element.dataset.shownState = state
     element.textContent = INDICATOR_LABELS[state]
 }
 
@@ -221,8 +252,21 @@ async function createSessionFromSidebar(signal?: AbortSignal): Promise<void> {
         return createSessionFromSidebar(signal)
     }
     sessionId = resp.session_id
+    markSessionChanged()
     syncCategoriesFromBackend(resp.categories)
     setGScores(resp.g_scores)
+}
+
+/** Fired (on document) when a session the server no longer has (expired, or the server restarted) has been replaced by
+ *  a fresh one. A connected league's Season Mode rosters were pulled into the old session, so main.ts pulls them again;
+ *  without that, "loading your league's rosters" stayed up after the replacement until a reload. */
+export const SESSION_REPLACED = 'session-replaced'
+
+/** Replaces a session the server answered 404 for with a fresh one from the sidebar, and announces it. */
+export async function replaceLostSession(signal?: AbortSignal): Promise<void> {
+    resetSession()
+    await startFreshSession(signal)
+    document.dispatchEvent(new Event(SESSION_REPLACED))
 }
 
 /**
@@ -238,8 +282,8 @@ export async function ensureSession(): Promise<void> {
 // ─── Indicator-aware debouncer ────────────────────────────────────────────────
 // Used by draft_board, auction_entry, and the player-stats sidebar so rapid
 // edits only trigger one backend call after `delayMs` of inactivity. Each fire()
-// also flips #eval-indicator to "evaluating" immediately, so the spinner appears
-// as soon as the user acts rather than after the debounce window expires.
+// also flips #eval-indicator to "evaluating" immediately, so the spinner's short delay (applyIndicatorState) runs
+// from when the user acts rather than from when the debounce window expires.
 
 export interface Debouncer {
     /** Schedule the callback; resets the timer on each call. */
@@ -297,7 +341,7 @@ export async function withSessionRetry<T>(
             return await fn()
         } catch (err) {
             if (attempt === 0 && err instanceof HTTPError && err.status === 404) {
-                resetSession()
+                await replaceLostSession()
                 continue
             }
             throw err

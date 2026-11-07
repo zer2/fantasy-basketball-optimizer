@@ -65,6 +65,11 @@ let inFlightBackendWork = 0
 /** Fired on document whenever the number of backend requests in flight changes; see countInFlightBackendWork. */
 export const BACKEND_WORK_CHANGED = 'backend-work-changed'
 
+/** Announced with every Season Mode roster pull: the ids of the players the platform has on its injured list
+ *  (detail: number[]; DraftStateResponse.injured_players). The injured / excluded list takes them in
+ *  (setting_collection/player_stats.ts). */
+export const PLATFORM_INJURED_PLAYERS_PULLED = 'platform-injured-players-pulled'
+
 /** Number of session or platform requests in flight, session builds included. */
 export function countInFlightBackendWork(): number {
     return inFlightBackendWork

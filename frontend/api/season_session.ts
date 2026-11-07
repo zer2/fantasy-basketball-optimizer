@@ -10,7 +10,7 @@ import {
     withDisplayOwnership, withSessionRetry,
 } from './session.js'
 import {
-    evaluate, candidatesToPlayerResults, analyzeTrade, suggestTrades, fetchDraftState, HTTPError, readErrorDetail,
+    evaluate, candidatesToPlayerResults, analyzeTrade, suggestTrades, fetchDraftState, HTTPError, PLATFORM_INJURED_PLAYERS_PULLED, readErrorDetail,
 } from './client.js'
 import type { TradeAnalyzeResponse, TradeSuggestResponse, TradeComboParam } from './client.js'
 
@@ -74,6 +74,7 @@ export async function refreshSeasonRostersFromPlatform(): Promise<void> {
             livePlatformRosters = state.player_assignments
             livePlatformUnmatchedNames = state.unmatched_player_names
             livePlatformEmptySlots = state.empty_slots
+            document.dispatchEvent(new CustomEvent(PLATFORM_INJURED_PLAYERS_PULLED, { detail: state.injured_players }))
         })
     } catch (error) {
         // The server's sentence, not the HTTP envelope around it.

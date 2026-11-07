@@ -1,10 +1,10 @@
 // Collects: data_source (type, blend_weights, custom_data_ids), injured_players
 // Mirrors player_stats_popover() in src/setting_collection/player_stats.py
 
-import { makeCustomSelect } from '../custom_select.js'
+import { makeCustomSelect, CustomSelect } from '../custom_select.js'
 import { makeWeightSlider, makeMultiSelectWidget, MultiSelectWidget } from '../helper_functions.js'
 import { getAllPlayerIdentities, REPLACEMENT_PLAYER_ID } from '../player_registry.js'
-import { uploadProjectionFile, getSeasons } from '../api/client.js'
+import { uploadProjectionFile, getSeasons, PLATFORM_INJURED_PLAYERS_PULLED } from '../api/client.js'
 import { DataSource } from '../types.js'
 import { pref, savePref } from '../preferences.js'
 
@@ -60,6 +60,36 @@ document.addEventListener('player-registry-updated', () => {
         .sort((left, right) => left.label.localeCompare(right.label))
     injuredPlayersWidget.setOptionsSilently(options)
 })
+
+// The ids the connected platform's last roster pull put on the injured list, so the next pull can take back those it no
+// longer lists (a player back from injury) without touching the ones picked by hand.
+let platformInjuredPlayerIds: string[] = []
+
+/** A roster pull's injured-list players join the injured / excluded list, replacing the previous pull's. A player the
+ *  platform could not match (the replacement id) excludes nobody and is left out. Changing the list fires the usual
+ *  change, which rebuilds the session; an unchanged list fires nothing, so the pull that follows that rebuild stops. */
+document.addEventListener(PLATFORM_INJURED_PLAYERS_PULLED, event => {
+    if (injuredPlayersWidget === null) return
+    const pulled = (event as CustomEvent<number[]>).detail
+        .filter(playerId => playerId !== REPLACEMENT_PLAYER_ID)
+        .map(String)
+    const handPicked = injuredPlayersWidget.getSelected().filter(value => !platformInjuredPlayerIds.includes(value))
+    const updated = [...new Set([...handPicked, ...pulled])]
+    platformInjuredPlayerIds = pulled
+    const current = injuredPlayersWidget.getSelected()
+    const isUnchanged = updated.length === current.length && updated.every(value => current.includes(value))
+    if (!isUnchanged) injuredPlayersWidget.setSelected(updated)
+})
+
+// The data source select, for switchToProjections.
+let dataTypeSelect: CustomSelect | null = null
+
+/** Sets the data source to Projections (a connected league is a current season, which projections describe). Fires the
+ *  section's change, rebuilding the session, only when the source was something else. */
+export function switchToProjections(): void {
+    if (dataTypeSelect === null) throw new Error('switchToProjections called before renderPlayerStats')
+    if (dataTypeSelect.getValue() !== PROJECTIONS_OPTION.value) dataTypeSelect.setValue(PROJECTIONS_OPTION.value)
+}
 
 const CUSTOM_UPLOADS_PREF = 'custom_uploads'
 const MAX_CUSTOM_UPLOADS = 5
@@ -154,6 +184,7 @@ export function renderPlayerStats(container: HTMLElement): void {
         pref('data_source_type', 'historical'),
     )
     typeSelect.element.addEventListener('change', () => savePref('data_source_type', typeSelect.getValue()))
+    dataTypeSelect = typeSelect
     container.append(typeSelect.element)
 
     // Projection blend weights section (only relevant for 'projections' type)

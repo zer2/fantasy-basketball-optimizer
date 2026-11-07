@@ -5,13 +5,13 @@
 // logic lives in api/session.ts, table/player_table.ts, and layout.ts.
 
 import { createSection, addApplyBtn, makeSidebarToggle, MOBILE_BREAKPOINT_PX } from './helper_functions.js'
-import { makeDebouncer, withDisplayOwnership } from './api/session.js'
+import { makeDebouncer, withDisplayOwnership, SESSION_REPLACED } from './api/session.js'
 import { setSportConfig } from './app_state.js'
 import {
     createOrPatchSession, runEvaluate, clearFullTeamResult, showDefaultRankings, SEASON_PLATFORM_CONNECTED,
     isConnectionWaitingForSlots,
 } from './api/draft_and_auction_session.js'
-import { runSeasonInit, refreshSeasonRostersFromPlatform, clearLivePlatformRosters } from './api/season_session.js'
+import { runSeasonInit, refreshSeasonRostersFromPlatform, clearLivePlatformRosters, getLivePlatformRosters } from './api/season_session.js'
 import { fetchConfig } from './api/client.js'
 import { fetchCurrentUser, setSignedInUser } from './api/auth.js'
 import { buildTableHeader } from './table/player_table.js'
@@ -33,7 +33,7 @@ import {
     renderFormatAndCategories, getScoringFormat, getMostCategoriesWeight, getTiebreakerCategory,
     getSelectedCategories, isCategorySelectionValid,
 } from './setting_collection/format_and_categories.js'
-import { renderPlayerStats, getPlayerStatsSettings, waitForSeasons } from './setting_collection/player_stats.js'
+import { renderPlayerStats, getPlayerStatsSettings, waitForSeasons, switchToProjections } from './setting_collection/player_stats.js'
 import { renderModelSettings, refreshFormatParameterControls, refreshAuctionParameterControls, getModelSettings } from './setting_collection/model_parameters.js'
 import { renderSlotCounts, getSlotCounts, isSlotCountsValid, revalidateSlotCounts } from './setting_collection/slot_counts.js'
 
@@ -192,6 +192,8 @@ function refreshSeasonRostersIfLive(): void {
 // Connecting in Season Mode changes neither the mode nor the platform, so the two listeners below never fired for
 // it and the grid stayed blank under the default team names until the user toggled one of them.
 document.addEventListener(SEASON_PLATFORM_CONNECTED, refreshSeasonRostersIfLive)
+// A lost session replaced by a fresh one has none of the league's rosters either.
+document.addEventListener(SESSION_REPLACED, refreshSeasonRostersIfLive)
 // One listener per select, with the steps in explicit order — the sequencing used to be
 // three separate listeners relying on registration order. Step 1's buildTableHeader (inside
 // the apply chain) must precede step 2's applyLayout, which reads hscoretable.style.width.
@@ -241,6 +243,8 @@ getPlatformSelectElement().addEventListener('change', () => {
             applyLeagueSettings(4, { league: { n_drafters, n_picks, cash_per_team }, slot_counts: getSlotCounts() })
         }
     } else {
+        // A league is played now: its stats are projections, not a past season's.
+        switchToProjections()
         syncForPlatformSwitch()
     }
     // 4. Season Mode: the tab on screen follows the platform too -- its rosters (or, a league's still loading, the
@@ -314,7 +318,14 @@ const applyPlayerStats = async (signal?: AbortSignal, keepsPlayerPool = false) =
     createOrPatchSession(1, { data_source, injured_players }, signal)
         .then(() => { if (!signal || !signal.aborted) return runModeEval() })
         .then(() => { if (!signal || !signal.aborted) applyLayout() })
-        .then(() => { if (!keepsPlayerPool && (!signal || !signal.aborted)) refreshSeasonRostersIfLive() })
+        // A change that keeps the pool keeps the rosters -- if there are any: a connection whose session update failed
+        // (no usable data source yet, 2026-11-06) left none, and this update is what finally gives the session its
+        // league. Without the pull, "loading your league's rosters" stayed up with nothing running.
+        .then(() => {
+            if ((!keepsPlayerPool || getLivePlatformRosters() === null) && (!signal || !signal.aborted)) {
+                refreshSeasonRostersIfLive()
+            }
+        })
         .catch(err => {
             if (err.name === 'AbortError') return
             console.error('Player stats apply failed:', err)
