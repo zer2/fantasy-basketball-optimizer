@@ -281,21 +281,29 @@ def get_darko_data(sport_params: dict) -> pd.DataFrame:
     """Fetch DARKO projections from Snowflake, scaled from per-100 to per-game.
     DARKO carries NBA_PLAYER_ID natively; position/minutes ride in from the ESPN table
     joined by id (its names resolved through the unified table)."""
+    # The VIEWs, not the tables: the tables keep every load ever made, and the views are the ones that
+    # narrow to the most recent. They were the same thing for as long as a table held a single
+    # load, which is why reading the table worked until a second one landed -- at which point every
+    # player carried in both loads resolved two rows here and the merge below multiplied him.
+    return convert_darko_to_per_game(query('DARKO_VIEW'), query('ESPN_PROJECTION_VIEW'), sport_params)
+
+
+def convert_darko_to_per_game(darko_rows: pd.DataFrame
+                              , espn_rows: pd.DataFrame
+                              , sport_params: dict) -> pd.DataFrame:
+    """DARKO's per-100 rates (DARKO_VIEW's columns) as per-game stats, with each player's position, minutes and games
+    from ESPN's projection (ESPN_PROJECTION_VIEW's columns), joined by resolved id. One load of each: get_darko_data
+    passes the latest; a past preseason's can be passed instead."""
     n_games = sport_params['n_games']
 
-    df = query('DARKO_VIEW')
-    df = df.rename(columns=sport_params['darko-renamer'])
+    df = darko_rows.rename(columns=sport_params['darko-renamer'])
     df = df.apply(pd.to_numeric, errors='ignore')
     df = _map_player_names(df, 'DARKO_NAME')
     df['player_id'] = df['NBA_PLAYER_ID'].astype('Int64')
     df = df.drop(columns=['NBA_PLAYER_ID']).sort_values('Player').fillna(0)
 
     # Position / minutes / games come from ESPN, joined by resolved id.
-    # The VIEW, not the table: the table keeps every load ever made, and the view is the one that
-    # narrows to the most recent. They were the same thing for as long as the table held a single
-    # load, which is why reading the table worked until a second one landed -- at which point every
-    # player carried in both loads resolved two rows here and the merge below multiplied him.
-    extra = query('ESPN_PROJECTION_VIEW')[['ESPN_NAME', 'MINUTES_PLAYED', 'GAMES_PLAYED', 'POSITION']]
+    extra = espn_rows[['ESPN_NAME', 'MINUTES_PLAYED', 'GAMES_PLAYED', 'POSITION']].copy()
     extra.columns = ['Player', 'Minutes', 'Games Played %', 'Position']
     extra['Games Played %'] = extra['Games Played %'].astype(float) / n_games
     extra = attach_player_ids_by_name(extra).dropna(subset=['player_id'])

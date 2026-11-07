@@ -51,13 +51,15 @@ def without_own_view_noise():
 
 
 def build_h_versus_g_auction_session(format_key: str
-                                     , season: str):
-    """An auction session on the season's actual stats with the settings above."""
+                                     , season: str
+                                     , opponent_model_confidence: float = 0.0):
+    """An auction session on the season's actual stats with the settings above, at this opponent-model confidence
+    (off unless an experiment turns it on; Rotisserie pins it on regardless)."""
     prepare_import_path()
     import benchmark_helpers
     from backend.state.session import get_session
     request = benchmark_helpers._build_session_request(objective=OBJECTIVES[format_key], cash_per_team=CASH_PER_TEAM)
-    request['model_settings'].update(AUCTION_SETTINGS)
+    request['model_settings'].update({**AUCTION_SETTINGS, 'opponent_model_confidence': opponent_model_confidence})
     request['data_source'] = {'type': 'historical', 'season': season}
     response = benchmark_helpers.client.post('/sessions', json=request)
     if response.status_code != 201:
@@ -116,15 +118,16 @@ def value_for_g_bidder(session
 
 def run_h_versus_g_auction(format_key: str
                            , season: str
-                           , h_seat: int) -> dict:
-    """One complete auction with the H-scoring autodrafter at board position h_seat. Returns its H-score and (head to
-    head) real-week win rate, in percent, and what it spent and kept."""
+                           , h_seat: int
+                           , opponent_model_confidence: float = 0.0) -> dict:
+    """One complete auction with the H-scoring autodrafter at board position h_seat, its opponent model at this
+    confidence. Returns its H-score and (head to head) real-week win rate, in percent, and what it spent and kept."""
     prepare_import_path()
     from simulate import _has_position_data
     from .auction_simulation import advance_nominator, name_auction_teams, run_bidding, score_final_teams
     from backend.services.auction_autodraft import select_autodrafter_nominee, value_player_for_team
     from backend.services.auction_pricing import compute_max_allowed_bids
-    session = build_h_versus_g_auction_session(format_key, season)
+    session = build_h_versus_g_auction_session(format_key, season, opponent_model_confidence)
     agent, settings = session.agent, session.current_settings
     teams = name_auction_teams(session)
     h_team = teams[h_seat]
@@ -170,7 +173,7 @@ def run_h_versus_g_auction(format_key: str
                                                   settings['categories'], REAL_MATCHUP_SIMULATIONS,
                                                   seed=h_seat)[REAL_MEASURES[format_key]]
     return {'format': format_key, 'season': season, 'h_seat': h_seat, 'h_score': h_score, 'real_rate': real_rate,
-            'cash_left': remaining_cash[h_team]}
+            'cash_left': remaining_cash[h_team], 'opponent_model_confidence': opponent_model_confidence}
 
 
 def _run_reporting_failure(*job) -> tuple:

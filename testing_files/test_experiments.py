@@ -39,6 +39,7 @@ from benchmark_helpers import client, _build_session_request
 from experiment_report_page import render_report_page
 from backend.state.session import get_session
 from backend.services.ranking import rank_candidates
+from experiment_harnesses.h_versus_g import draft_h_seat_rosters
 
 _RUN_SIMS  = bool(os.environ.get('RUN_EXPERIMENTS'))
 # 0 = every seat in the league (a full season's worth of draft positions).
@@ -58,8 +59,8 @@ def exclude_shortened_seasons(seasons):
 
 
 _ALL_SEASONS = '2021-22,2022-23,2023-24,2024-25,2025-26'
-_SEASONS = exclude_shortened_seasons(
-    (os.environ.get('EXPERIMENT_SEASONS') or (_ALL_SEASONS if _RUN_SIMS else '2024-25')).split(','))
+_REQUESTED_SEASONS = (os.environ.get('EXPERIMENT_SEASONS') or (_ALL_SEASONS if _RUN_SIMS else '2024-25')).split(',')
+_SEASONS = exclude_shortened_seasons(_REQUESTED_SEASONS)
 
 _FORMATS = {
     'EC':   'Each Category',
@@ -167,9 +168,11 @@ _SECTION_EXPLANATIONS = {
         "Would planning a concrete team beat H-scoring's smooth model of future picks? In pairs of 12-team snake "
         'drafts, six seats draft with the planner and six by H-scoring, then the seats swap.',
     'H-scoring vs a G-score field (auction)':
-        'Does H-scoring beat G-scores in an auction too? Complete 12-team auctions: one seat is the app\'s H-scoring '
-        'autodrafter, the other 11 bid by G-score dollar values. Each Category and Most Categories show the H seat\'s '
-        'win rate as its H-score expects it and in real weeks; Rotisserie its probability of winning the league.',
+        'The auction autodrafter can be used to simulate auctions, the same way drafts are simulated. Here one team is '
+        'the H-scoring autodrafter and the other 11 bid by G-score dollar values, in full 12-team auctions. For Each '
+        'Category and Most Categories, the charts show the H-scoring team\'s win rate according to its H-score, and '
+        'its win rate in simulated matchups using real weeks from that season. For Rotisserie, they show its '
+        'probability of winning the league.',
     'Draft timing':
         'Where does a draft\'s time go? Cold session builds and a whole 12-team draft through the app\'s own routes, '
         'every request broken down by the functions it spends its time in, averaged per request.',
@@ -194,6 +197,34 @@ _SECTION_EXPLANATIONS = {
     'Category weight correlations':
         'Which categories do the weights move together? The correlation between each pair of categories\' weights '
         'over every recorded pick, per format, beside the correlation between players\' category scores.',
+    'Flex regularization (lambda_p)':
+        'Does the flex regularization help? lambda_p pulls a team\'s flex-position shares toward uniform early in the '
+        'draft (the app uses 3, which pins them through about the first five picks). H vs G is drafted again with the '
+        'H seat at lambda_p 0 (no pull), 1, 2 and 3, every seat of every season, and each draft compared with the app\'s '
+        'for the same season and seat.\n'
+        'Note: this is evidence that the flex position adjustment is probably too strong. Left free (lambda_p 0), the '
+        'flex shares move the drafter to worse teams in every format; held toward uniform, the drafter does better.',
+    'Draft order on preseason projections':
+        'The same drafts with a preseason projection as the truth. A season\'s actual statistics know in hindsight who '
+        'the stars were, which may flatter the first seats; a projection is what a drafter saw before the season. Each '
+        'projection is drafted as a snake and with third-round reversal by twelve H-scoring seats, and every team is '
+        'scored on the same projection.',
+    'H-scoring vs a G-score field (off projections)':
+        'H vs G with nobody knowing the season in advance. One H-scoring seat and eleven G-score drafters all draft off '
+        'a 2025-26 preseason projection, and every team is then scored on what 2025-26 actually was. Each of the twelve '
+        'seats is the H seat once.',
+    'Draft order on preseason projections, scored on the season':
+        'The drafts on the 2025-26 preseason projection, their teams scored on what 2025-26 actually was: drafted '
+        'without hindsight, judged with it.',
+    'Awareness (opponent model on vs off, auction)':
+        'The same question as opponent awareness for drafts, asked of the auction autodrafter: does it help to model '
+        'what the other teams are building? Each auction is run twice, once with one team\'s opponent model on and '
+        'once with it off, against two kinds of field: H-scoring autodrafters with the opponent model off, and G-score '
+        'bidders. The numbers are that team\'s H-score with the model on minus with it off.',
+    'Greatest single games':
+        'The greatest single-game performances since 1984-85, by G-score: each game is scored with its season\'s G-score coefficients, worked out per game instead of per week.',
+    'Worst single games':
+        'The worst single-game performances since 1984-85, by G-score: each game is scored with its season\'s G-score coefficients, worked out per game instead of per week.',
     'Best player-seasons':
         'The best player-seasons since 2000, by first-pick H-score in Each Category, with each one\'s rank by Half and '
         'Half, Most Categories and Rotisserie H-score and by G-score.',
@@ -323,12 +354,18 @@ def _load_stored_sections(reports_dir):
 # format.
 _MERGE_KEYS = {'Planner vs H-scoring': ('Season',),
                'Best player-seasons': ('Season',),
+               'Greatest single games': ('Season',),
+               'Worst single games': ('Season',),
                'Best player-seasons, pre-2000': ('Season',),
                'Draft timing': ('Format',),
                'Dollar inequality by season': ('Season',),
                'Dollar curves by league size': ('Season',),
                'Most valuable player-seasons': ('Season',),
                'Draft order: snake vs third-round reversal': ('Format', 'Season'),
+               'Draft order on preseason projections': ('Format', 'Season'),
+               'Draft order on preseason projections, scored on the season': ('Format', 'Season'),
+               'Flex regularization (lambda_p)': ('Format', 'Season', 'lambda_p'),
+               'H-scoring vs a G-score field (off projections)': ('Format',),
                'Z-scores vs G-scores': ('Format', 'Season')}
 
 
@@ -523,15 +560,17 @@ _SECTION_DETAILS = {
         'largest Hessian eigenvalue checks the same thing directly (negative at a peak). Same candidates as the '
         'loss section. No regularization (lambda_c = lambda_p = 0).',
     'H-scoring vs a G-score field (auction)':
-        '- The H seat is the app\'s autodrafter: it nominates its best available player that fits its roster and '
-        'values players by its "Your $". A G-score bidder values a player at the auction table\'s G-score "Gnrc. $" '
-        '(the league\'s G-score dollars for the players still available, plus its own share of the cash it could not '
-        'otherwise use) and nominates its best G-score player that fits its roster. Both open at $1, and the bidding is '
-        'the browser\'s.\n'
-        '- S1-S12: the H seat\'s board position (nomination order). $200 a team.\n'
-        '- Everyone bids on the season\'s actual statistics: the autodrafter\'s own-view noise is off, SAVOR is off, '
-        'beth = 0 and psi = 0, and the H seat\'s opponent model is off head to head (Rotisserie pins it on), as in '
-        'the draft experiment. Real weeks as there.',
+        '- The H-scoring team is the app\'s autodrafter. It nominates the best available player that fits its roster, '
+        'and bids up to its "Your $" value for each player.\n'
+        '- The G-score teams value each player at the auction table\'s "Gnrc. $": G-score dollar values for the '
+        'players still available, plus their own share of any cash that would otherwise go unused. They nominate the '
+        'best available G-score player that fits their roster.\n'
+        '- Every nomination opens at $1, and bidding works the way it does in the app. Every team has $200.\n'
+        '- S1-S12 is the H-scoring team\'s place in the nomination order.\n'
+        '- Everyone bids on the season\'s actual statistics, so the autodrafter\'s noise and SAVOR are both turned off, '
+        'and beth and psi are both 0. The H-scoring team\'s opponent model is off for Each Category and Most '
+        'Categories (Rotisserie always has it on), matching the draft experiment. Real weeks are simulated the same '
+        'way as for drafts.',
     'Draft timing':
         '- Session build: a cold build (the agent and player-pool caches cleared; the season\'s data already in '
         'memory, so Snowflake\'s network time is not counted), three times.\n'
@@ -570,6 +609,67 @@ _SECTION_DETAILS = {
         '- Players: the correlation of the covariance the future-pick model uses (L: X-scores of the draftable pool, '
         'each position weighted by its share of the roster slots), averaged over the seasons.\n'
         '- Both in the categories\' scoring direction (a higher turnover score is fewer turnovers).',
+    'Flex regularization (lambda_p)':
+        '- The H vs G conventions: one H-scoring seat against eleven G-score drafters, beth = 0, opponent model off, '
+        'psi = 0.\n'
+        '- lambda_p: the peak strength of the L1 pull of the flex-position shares toward uniform, as a fraction of the '
+        'shares optimizer\'s step; 1 pins the shares while the schedule is at its peak, 0 turns the pull off.\n'
+        '- Every finished team is scored by one session at the app\'s lambda_p (a finished roster has no future picks '
+        'for it to shape), so the settings differ only in how the seat drafted.\n'
+        '- Difference: each draft minus the app\'s (lambda_p 3) for the same season and seat; SE over those pairs.',
+    'Draft order on preseason projections':
+        '- Projections: ESPN\'s preseason projections stored for 2025-26 (loaded 2025-09-23, 500 players) and 2026-27 '
+        '(2026-09-24, 347 players), uploaded as the session\'s only projection source.\n'
+        '- As the draft-order drafts: each seat its own session, opponent-model confidence 0.5 (Rotisserie 1), '
+        'beth = 0 and psi = 0 (the projection stands in for the truth).\n'
+        '- No real-week win rates: the truth here is the projection, not games played.',
+    'H-scoring vs a G-score field (off projections)':
+        '- Projections: ESPN\'s preseason projection (loaded 2025-09-23), and that blended 50/50 with DARKO\'s '
+        'preseason projection (dated 2025-07-04, as loaded the morning the season opened; its per-100 rates made '
+        'per-game with ESPN\'s minutes, as the app does). Each is uploaded as custom projection sources.\n'
+        '- Kyrie Irving is on the injured / excluded list: known before the season to miss all of it, though ESPN still '
+        'projected him for 43 games.\n'
+        '- Drafting: the app\'s settings but beth = 0 (no alternative projection is implied, so there is no projection '
+        'uncertainty to allow for) and the opponent model off as in H vs G. The G-score drafters rank by the '
+        'projection\'s G-scores.\n'
+        '- Distinct H teams: seats can draft the same team. Once the H seat\'s first target survives to its pick and every '
+        'later target is a player the G drafters rank low, its draft position stops mattering. The mean and its ± '
+        'are over the twelve seats, so they rest on fewer independent teams than twelve.\n'
+        '- One season: what decides it is largely which players met their projections. In a first run (beth = 3 '
+        'drafting; Each Category off ESPN) the G field\'s players played 10.4 games fewer than projected and the H '
+        'seat\'s 3.9: its build leaned on durable role players while the field took stars who missed time, and missed '
+        'games count as nothing (psi = 0).\n'
+        '- Scoring: the actual season at the H vs G conventions (beth = 0, psi = 0), and head to head in real weeks. '
+        'Projected H-score: the same team on the projection it was drafted from.',
+    'Draft order on preseason projections, scored on the season':
+        '- The teams of the draft-order drafts on ESPN\'s 2025-26 preseason projection (Kyrie Irving excluded), rebuilt '
+        'from their recorded picks.\n'
+        '- Scored as the historical draft-order drafts are: 2025-26 actual statistics, beth = 0, psi = 0, and head to '
+        'head the real-week win rate.\n'
+        '- One projected season only (2026-27 has not been played).',
+    'Awareness (opponent model on vs off, auction)':
+        '- H-scoring field: every team is an autodrafter with its own session. One team has the opponent model on (the '
+        'app\'s confidence, 0.5) and the other eleven have it off; the comparison is the same team in the auction where '
+        'all twelve have it off.\n'
+        '- G-score field: the H vs G auction, with the H-scoring team\'s opponent model on and then off.\n'
+        '- Everyone bids on the season\'s actual statistics, as in H vs G for auctions: the autodrafter\'s noise and '
+        'SAVOR are off, and beth and psi are 0. Every finished team is scored by one session with the opponent model '
+        'off, so both auctions are scored alike.\n'
+        '- Each Category and Most Categories only: Rotisserie always has the opponent model on.',
+    'Greatest single games':
+        '- Coefficients: the app\'s G-score coefficients for the season (mean of means, variance of means, mean '
+        'of variances), computed from one row per player per game instead of per week, with the same '
+        'representative players (the top 12 x 13 by G-score).\n'
+        '- Score: the app\'s G-score of the game in the nine standard categories, turnovers counting against it, '
+        'with the percentage categories\' volume correction, summed.\n'
+        '- Only games a player played (minutes above 0); every season from 1984-85, the shortened ones included.',
+    'Worst single games':
+        '- Coefficients: the app\'s G-score coefficients for the season (mean of means, variance of means, mean '
+        'of variances), computed from one row per player per game instead of per week, with the same '
+        'representative players (the top 12 x 13 by G-score).\n'
+        '- Score: the app\'s G-score of the game in the nine standard categories, turnovers counting against it, '
+        'with the percentage categories\' volume correction, summed.\n'
+        '- Only games a player played (minutes above 0); every season from 1984-85, the shortened ones included.',
     'Best player-seasons':
         '- H-score: each player\'s first-pick H-score on the neutral board of his season (12 teams x 13, the app\'s '
         'default settings but beth = 0, as the season\'s statistics are the truth). Rotisserie\'s is a league-win '
@@ -1114,44 +1214,10 @@ sims = pytest.mark.skipif(not _RUN_SIMS, reason='full-draft simulation; set RUN_
 def _draft_h_seat_in_g_field(h_session, seat, candidate_limit=40):
     """One snake draft: `seat` drafts with the H agent, everyone else picks by G-score ranking.
     Returns the H seat's final-roster H-score."""
-    assignments = _draft_h_seat_rosters(h_session, seat, candidate_limit)
+    assignments = draft_h_seat_rosters(h_session, seat, candidate_limit)
     scores = h_session.agent.get_h_scores(assignments, f'Drafter {seat + 1}',
                                           h_session.current_settings['n_iterations'])['Scores']
     return float(scores[scores.idxmax()])
-
-
-def _draft_h_seat_rosters(h_session, seat, candidate_limit=40):
-    """One snake draft: `seat` drafts with the H agent, everyone else picks by G-score ranking.
-    Returns every team's roster, {'Drafter i': [player id, ...]}."""
-    from simulate import _gscore_ranking, _pick_gscore_player, _has_position_data   # season_simulation
-
-    agent        = h_session.agent
-    agent.reset_draft_state()
-    n_drafters   = h_session.current_settings['n_drafters']
-    n_picks      = h_session.current_settings['n_picks']
-    teams        = [f'Drafter {i + 1}' for i in range(n_drafters)]
-    assignments  = {t: [] for t in teams}
-    g_ranking    = _gscore_ranking(h_session)
-    has_positions   = _has_position_data(h_session)
-    position_config = agent.position_config
-    positions_by_player = {player_id: identity.positions
-                           for player_id, identity in h_session.player_registry.items()}
-    drafted: set    = set()
-
-    for pick_row in range(n_picks):
-        for slot in range(n_drafters):
-            index = slot if pick_row % 2 == 0 else (n_drafters - 1 - slot)
-            team  = teams[index]
-            if index == seat:
-                result = rank_candidates(h_session, assignments, team, [], None, 0, candidate_limit)
-                chosen = result.candidates[0].player_id
-            else:
-                chosen = _pick_gscore_player(
-                    g_ranking, drafted, assignments[team], position_config, has_positions,
-                    positions_by_player)
-            assignments[team].append(chosen)
-            drafted.add(chosen)
-    return assignments
 
 
 AUCTION_H_VERSUS_G_SECTION = 'H-scoring vs a G-score field (auction)'
@@ -1182,6 +1248,38 @@ def test_h_scoring_beats_g_field_in_auctions(format_key):
     _record_row(AUCTION_H_VERSUS_G_SECTION, columns,
                 [format_key, f'ALL ({len(pooled)} auctions)', f'{np.mean(pooled):.1f}',
                  f'{np.mean(pooled_real):.1f}' if pooled_real else '—'] + ['—'] * n_seats + [''])
+    _fail_on_breaches([f'{failure["job"]} failed:\n{failure["traceback"]}' for failure in failures])
+
+
+AUCTION_AWARENESS_SECTION = 'Awareness (opponent model on vs off, auction)'
+# The auction experiments' seasons (as H vs G in auctions).
+_AUCTION_AWARENESS_SEASONS = ['2021-22', '2022-23', '2023-24', '2024-25', '2025-26']
+
+
+@sims
+@pytest.mark.parametrize('format_key', ['EC', 'MC'])
+def test_auction_awareness(format_key):
+    """The opponent model on vs off for the auction autodrafter, against an unaware H-scoring field and against a
+    G-score field: per season, each seat's H-score with it on minus with it off. Head to head only (Rotisserie pins
+    the model on). Measurements only, apart from every auction completing."""
+    from experiment_harnesses.auction_awareness import (G_FIELD, H_FIELD, compute_awareness_gains,
+                                                        measure_auction_awareness_in_parallel)
+    n_seats = _SIM_SEATS or 12
+    seasons = [season for season in _AUCTION_AWARENESS_SEASONS if season in _SEASONS]
+    results, failures = measure_auction_awareness_in_parallel(format_key, seasons, n_seats, _EXPERIMENT_WORKERS)
+    columns = ['Comparison', 'Format', 'Season', 'Mean (pp)', 'SE (pp)'] + _seat_columns(n_seats)
+    if not failures:
+        for field in (H_FIELD, G_FIELD):
+            pooled = []
+            for season in seasons:
+                gains = compute_awareness_gains(results, season, field, n_seats)
+                pooled.extend(gains)
+                _record_row(AUCTION_AWARENESS_SECTION, columns,
+                            [field, format_key, season, f'{np.mean(gains):+.2f}',
+                             f'{np.std(gains, ddof=1) / np.sqrt(len(gains)):.2f}'] + [f'{gain:+.2f}' for gain in gains])
+            _record_row(AUCTION_AWARENESS_SECTION, columns,
+                        [field, format_key, f'ALL ({len(pooled)} auctions)', f'{np.mean(pooled):+.2f}',
+                         f'{np.std(pooled, ddof=1) / np.sqrt(len(pooled)):.2f}'] + ['—'] * n_seats)
     _fail_on_breaches([f'{failure["job"]} failed:\n{failure["traceback"]}' for failure in failures])
 
 
@@ -1219,7 +1317,7 @@ def test_h_scoring_beats_g_field(format_key):
         season_weeks = load_season_weeks(season) if real_measure is not None else None
         scores, real_rates = [], []
         for seat in range(n_seats):
-            assignments = _draft_h_seat_rosters(session, seat)
+            assignments = draft_h_seat_rosters(session, seat)
             team = f'Drafter {seat + 1}'
             h_scores = session.agent.get_h_scores(assignments, team,
                                                   session.current_settings['n_iterations'])['Scores']
@@ -1846,8 +1944,49 @@ def test_draft_order_bias(format_key):
     _fail_on_breaches([f'{failure["job"]} failed:\n{failure["traceback"]}' for failure in failures])
 
 
+@sims
+@pytest.mark.parametrize('format_key', ['EC', 'MC', 'Roto'])
+def test_draft_order_on_projections(format_key):
+    """The draft-order drafts with a preseason projection as the ground truth: per projection, a snake and a
+    third-round-reversal draft of twelve H-scoring seats, each seat's H-score on the same projection. Measurements
+    only, apart from every draft completing."""
+    from experiment_harnesses.draft_order import ORDERS
+    from experiment_harnesses.projection_draft_order import PROJECTIONS, measure_projection_draft_orders_in_parallel
+    results, failures = measure_projection_draft_orders_in_parallel(format_key, _DRAFT_ORDER_WORKERS)
+    for result in sorted(results, key=lambda result: (list(PROJECTIONS).index(result['projection']),
+                                                      ORDERS.index(result['order']))):
+        scores = result['h_scores']
+        _record_row('Draft order on preseason projections',
+                    ['Format', 'Season', 'Order', 'Mean H-score'] + _seat_columns(len(scores)) + ['Every real win rate'],
+                    [format_key, result['projection'], result['order'], f'{np.mean(scores):.2f}']
+                    + [f'{score:.2f}' for score in scores] + [''])
+    save_draft_picks(results, PROJECTION_DRAFT_PICKS_PATH)
+    _fail_on_breaches([f'{failure["job"]} failed:\n{failure["traceback"]}' for failure in failures])
+
+
+@sims
+@pytest.mark.parametrize('format_key', ['EC', 'MC', 'Roto'])
+def test_projection_draft_order_on_played_season(format_key):
+    """The drafts on a preseason projection whose season has been played (PROJECTION_DRAFT_PICKS_PATH), their teams
+    scored on that season's actual statistics and, head to head, its real weeks. Measurements only."""
+    from experiment_harnesses.draft_order import ORDERS
+    from experiment_harnesses.pick_model_calibration import read_draft_picks
+    from experiment_harnesses.projection_draft_order import score_drafts_on_played_season
+    results = score_drafts_on_played_season(format_key, read_draft_picks(PROJECTION_DRAFT_PICKS_PATH))
+    for result in sorted(results, key=lambda result: (result['season'], ORDERS.index(result['order']))):
+        scores = result['h_scores']
+        _record_row('Draft order on preseason projections, scored on the season',
+                    ['Format', 'Season', 'Order', 'Mean H-score'] + _seat_columns(len(scores)) + ['Every real win rate'],
+                    [format_key, result['season'], result['order'], f'{np.mean(scores):.2f}']
+                    + [f'{score:.2f}' for score in scores]
+                    + [' '.join(f'{rate:.2f}' for rate in result['real_rates'] or [])])
+
+
 # Every pick of the draft-order drafts: the raw data of the pool-size calibration and weight-evolution analyses.
 DRAFT_PICKS_PATH = Path(__file__).resolve().parent / 'experiment_results' / 'draft_order_picks.jsonl'
+# Every pick of the drafts on preseason projections ('season' is the projection's label): their teams can be scored on
+# what the season actually was.
+PROJECTION_DRAFT_PICKS_PATH = Path(__file__).resolve().parent / 'experiment_results' / 'projection_draft_order_picks.jsonl'
 
 
 def save_draft_picks(results
@@ -1865,6 +2004,75 @@ def save_draft_picks(results
             key: result[key] for key in ('format', 'season', 'order', 'categories', 'value_direction', 'picks')}
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text('\n'.join(json.dumps(draft) for draft in lines.values()) + '\n', encoding='utf-8')
+
+
+# ── H vs G off projections ────────────────────────────────────────────────────
+
+OFF_PROJECTIONS_SECTION = 'H-scoring vs a G-score field (off projections)'
+
+
+@sims
+@pytest.mark.parametrize('format_key', ['EC', 'MC', 'Roto'])
+def test_h_versus_g_off_projections(format_key):
+    """H vs G drafted off the 2025-26 preseason projections and scored on the actual season: per projection, every
+    seat's actual H-score, (head to head) real-week win rate and projected H-score. A drafted player the actual season
+    has no statistics for is a failure to look at, not something to score around."""
+    from experiment_harnesses.h_versus_g_off_projections import PROJECTION_BLENDS, measure_off_projections_in_parallel
+    records, failures = measure_off_projections_in_parallel(format_key, _EXPERIMENT_WORKERS)
+    columns = ['Format', 'Projection', 'Distinct H teams', 'Mean H-score', 'Mean real win rate', 'Mean projected H-score',
+               'Every H-score', 'Every real win rate', 'Every projected H-score']
+    absences = []
+    for projection in PROJECTION_BLENDS:
+        seats = sorted((record for record in records if record['projection'] == projection), key=lambda record: record['seat'])
+        if not seats:
+            continue
+        absences += [f'{format_key} {projection} seat {seat["seat"]}: {seat["absent"]}' for seat in seats if seat['absent']]
+        if any(seat['absent'] for seat in seats):
+            continue
+        real_rates = [seat['real_rate'] for seat in seats if 'real_rate' in seat]
+        _record_row(OFF_PROJECTIONS_SECTION, columns,
+                    [format_key, projection, len({seat['h_team'] for seat in seats}),
+                     f'{np.mean([seat["h_score"] for seat in seats]):.2f}',
+                     f'{np.mean(real_rates):.2f}' if real_rates else '—',
+                     f'{np.mean([seat["projected_h_score"] for seat in seats]):.2f}',
+                     ' '.join(f'{seat["h_score"]:.2f}' for seat in seats),
+                     ' '.join(f'{rate:.2f}' for rate in real_rates),
+                     ' '.join(f'{seat["projected_h_score"]:.2f}' for seat in seats)])
+    _fail_on_breaches([f'{failure["job"]} failed:\n{failure["traceback"]}' for failure in failures]
+                      + [f'Drafted players with no actual statistics: {absence}' for absence in absences])
+
+
+# ── Flex regularization ───────────────────────────────────────────────────────
+
+FLEX_SECTION = 'Flex regularization (lambda_p)'
+
+
+@sims
+@pytest.mark.parametrize('format_key', ['EC', 'MC', 'Roto'])
+def test_flex_regularization(format_key):
+    """H vs G with the H seat at several lambda_p (the pull of the flex-position shares toward uniform): per season and
+    lambda_p, every seat's H-score and (head to head) real-week win rate. Measurements only, apart from every season
+    completing."""
+    from experiment_harnesses.h_versus_g import FLEX_LAMBDA_P_VALUES, measure_flex_regularization_in_parallel
+    # EXPERIMENT_FLEX_LAMBDA_P measures only some of the values (comma-separated); the page merges by lambda_p.
+    lambda_p_values = (tuple(float(value) for value in os.environ['EXPERIMENT_FLEX_LAMBDA_P'].split(','))
+                       if 'EXPERIMENT_FLEX_LAMBDA_P' in os.environ else FLEX_LAMBDA_P_VALUES)
+    records, failures = measure_flex_regularization_in_parallel(format_key, _SEASONS, lambda_p_values,
+                                                                _EXPERIMENT_WORKERS)
+    columns = ['Format', 'Season', 'lambda_p', 'Mean H-score', 'Mean real win rate', 'Every H-score', 'Every real win rate']
+    for season in _SEASONS:
+        for lambda_p in sorted({record['lambda_p'] for record in records}):
+            drafts = sorted((record for record in records if (record['season'], record['lambda_p']) == (season, lambda_p)),
+                            key=lambda record: record['seat'])
+            if not drafts:
+                continue
+            real_rates = [draft['real_rate'] for draft in drafts if draft['real_rate'] is not None]
+            _record_row(FLEX_SECTION, columns,
+                        [format_key, season, f'{lambda_p:g}', f'{np.mean([draft["h_score"] for draft in drafts]):.2f}',
+                         f'{np.mean(real_rates):.2f}' if real_rates else '—',
+                         ' '.join(f'{draft["h_score"]:.2f}' for draft in drafts),
+                         ' '.join(f'{rate:.2f}' for rate in real_rates)])
+    _fail_on_breaches([f'{failure["job"]} failed:\n{failure["traceback"]}' for failure in failures])
 
 
 # ── Z-scores vs G-scores ──────────────────────────────────────────────────────
@@ -2050,6 +2258,41 @@ def test_best_player_seasons(section):
             _record_row(section, columns,
                         [season, player, names[player], int(games[player])]
                         + [f'{values[ranking][player]:.2f}' for ranking in columns[4:]])
+
+
+# ── Single games ──────────────────────────────────────────────────────────────
+
+GREATEST_GAMES_SECTION = 'Greatest single games'
+WORST_GAMES_SECTION = 'Worst single games'
+# Each season records this many of its best and of its worst games: enough that the all-time lists the pages show are
+# exact.
+_GAMES_PER_SEASON = 100
+_GAME_COLUMNS = ['Season', 'Date', 'Player id', 'Player', 'Minutes', 'Points', 'Rebounds', 'Assists', 'Steals',
+                 'Blocks', 'Threes', 'Turnovers', 'Field Goals Made', 'Field Goal Attempts', 'Free Throws Made',
+                 'Free Throw Attempts', 'G-score', 'Modern G-score']
+
+
+@sims
+def test_single_game_g_scores():
+    """Per season, its best and its worst games by single-game G-score (the season's G-score coefficients at game
+    scale, over the nine standard categories). Measurements only."""
+    from experiment_harnesses.game_scores import MODERN_SEASON, compute_game_coefficients, score_season_games
+    modern_coefficients = compute_game_coefficients(MODERN_SEASON)
+    # The shortened seasons too: they are left out elsewhere because a season's games played is a share of 82, which
+    # a single game does not use.
+    for season in _REQUESTED_SEASONS:
+        games = score_season_games(season, modern_coefficients)
+        # A season's best (worst) games by either score, so both all-time rankings are exact.
+        best = games.loc[games.nlargest(_GAMES_PER_SEASON, 'G-score').index.union(
+            games.nlargest(_GAMES_PER_SEASON, 'Modern G-score').index)]
+        worst = games.loc[games.nsmallest(_GAMES_PER_SEASON, 'G-score').index.union(
+            games.nsmallest(_GAMES_PER_SEASON, 'Modern G-score').index)]
+        for section, chosen in ((GREATEST_GAMES_SECTION, best), (WORST_GAMES_SECTION, worst)):
+            for (player, _), game in chosen.iterrows():
+                _record_row(section, _GAME_COLUMNS,
+                            [season, str(game['GAME_DATE'])[:10], player, game['Name'], f'{float(game["MINUTES_PLAYED"]):.0f}']
+                            + [int(game[column]) for column in _GAME_COLUMNS[5:-2]]
+                            + [f'{game["G-score"]:.2f}', f'{game["Modern G-score"]:.2f}'])
 
 
 # ── Timing ────────────────────────────────────────────────────────────────────
