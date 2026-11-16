@@ -1305,3 +1305,28 @@ def test_a_stronger_lambda_keeps_early_category_weights_nearer_neutral():
     assert firm < gentle - 1.0, (
         f'a 50x stronger pull should hold weights visibly nearer neutral, got {firm:.2f} vs {gentle:.2f}'
     )
+
+
+def test_evaluate_counts_a_rostered_player_the_data_source_lacks_as_replacement():
+    """A rostered player with no row in the data source (an upload of only the top players, say) is replacement level,
+    as an unscorable one is, rather than a 400 that leaves a Season Mode league's waiver and trading tools unusable."""
+    session_response = client.post('/sessions', json=_build_default_session_request())
+    assert session_response.status_code == 201
+    session_id = session_response.json()['session_id']
+    pool = get_session(session_id).agent.x_scores.index
+    absent_player_id = max(int(player_id) for player_id in pool) + 1
+
+    n_drafters         = _load_params()['NBA']['options']['n_drafters']['default']
+    player_assignments = {f'Team {i + 1}': [] for i in range(n_drafters)}
+    player_assignments['Team 1'] = [absent_player_id]
+    player_assignments['Team 2'] = [int(pool[0])]
+    evaluate_response  = client.post(
+        f'/sessions/{session_id}/evaluate'
+        , json={
+            'player_assignments': player_assignments
+            , 'my_team_id': 'Team 1'
+        }
+    )
+    assert evaluate_response.status_code == 200, evaluate_response.text
+    candidate_ids = {candidate['player_id'] for candidate in evaluate_response.json()['candidates']}
+    assert int(pool[0]) not in candidate_ids

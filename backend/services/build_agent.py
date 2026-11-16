@@ -517,15 +517,18 @@ def count_unscorable_players_as_replacement(
     session: Session
     , player_assignments: dict[str, list[int]]
 ) -> dict[str, list[int]]:
-    """A board with every unscorable rostered player (see list_unscorable_player_ids) counted as RP.
+    """A board with every unscorable rostered player counted as RP: those missing a value a category
+    needs (see list_unscorable_player_ids), and those the data source has no row for at all (an
+    uploaded file of only the top players, say).
 
-    They are real players the league's categories cannot score, which is exactly what RP stands
-    for. Rejecting the board instead would stop a live draft dead the moment anyone drafted one --
-    an ESPN-only rookie in a 3P% league, say -- with no way for the user to fix it."""
+    They are real players the app cannot score, which is exactly what RP stands for. Rejecting the
+    board instead would stop a live draft dead the moment anyone drafted one -- an ESPN-only rookie
+    in a 3P% league, say -- and leave a Season Mode league unusable under a short data file, with no
+    way for the user to fix either but changing the data."""
     unscorable = set(list_unscorable_player_ids(session))
-    if not unscorable:
-        return player_assignments
-    return {team: [RP_PLAYER_ID if player_id in unscorable else player_id for player_id in roster]
+    pool = session.agent.x_scores.index
+    return {team: [RP_PLAYER_ID if player_id in unscorable or player_id not in pool else player_id
+                   for player_id in roster]
             for team, roster in player_assignments.items()}
 
 

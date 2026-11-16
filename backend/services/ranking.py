@@ -46,25 +46,6 @@ def split_off_bench(
     return active, benched
 
 
-def check_rostered_players_in_pool(
-    session: Session
-    , player_assignments: dict[str, list[int]]
-) -> None:
-    """Every rostered player must exist in the pool under exactly the identity the board holds. A stale board
-    (identities changed by a data-source switch) would otherwise crash on a KeyError deep inside the H-score math.
-    Unknown ids resolve to names via the registry where possible, so the message stays actionable."""
-    missing_players = sorted({player_id for team_players in player_assignments.values() for player_id in team_players
-                              if player_id not in session.agent.x_scores.index})
-    if missing_players:
-        missing_display = [session.player_registry[p].name if p in session.player_registry else str(p)
-                           for p in missing_players]
-        raise UnknownRosterPlayersError(
-            'These rostered players are not in the current player pool: '
-            + ', '.join(missing_display)
-            + '. The data-source change altered the pool; clear the board or restore the previous sources.'
-        )
-
-
 def compute_original_savor_dollars(
     baseline_scores: pd.Series
     , n_drafters: int
@@ -250,7 +231,8 @@ def rank_candidates(
     """
     board_key = make_candidate_strategy_key(
         player_assignments, my_team_id, exclusion_list, remaining_cash, forced_category_weights)
-    # A rostered player the league's categories cannot score is replacement level, not an error.
+    # A rostered player the app cannot score (a category's value missing, or no row in the data source) is
+    # replacement level, not an error.
     player_assignments = count_unscorable_players_as_replacement(session, player_assignments)
     info           = session.agent.info
     h_agent              = session.agent
@@ -259,18 +241,12 @@ def rank_candidates(
     n_iterations   = current_settings['n_iterations']
     player_registry = session.player_registry
 
-    # Every rostered player must exist in the pool under exactly the identity the board
-    # holds. A stale board (identities changed by a data-source switch) would otherwise
-    # crash on a KeyError deep inside the H-score math. Unknown ids resolve to names via
-    # the registry where possible, so the message stays actionable.
     if my_team_id not in player_assignments:
         raise UnknownTeamError(
             f'The team being evaluated for, {my_team_id!r}, is not on this board. '
             f'The board has: {", ".join(sorted(player_assignments))}. '
             f'Reselect your team, or reconnect the league if its teams have changed.'
         )
-
-    check_rostered_players_in_pool(session, player_assignments)
 
     # Perma-bench: each team's picks past its active slots are bench, not scored (split_off_bench); they stay
     # unavailable as candidates, since they are on a roster all the same. Auction pricing still needs the
@@ -1057,21 +1033,12 @@ def make_slot_names(position_config: PositionConfig) -> list[str]:
 
 # ── errors ────────────────────────────────────────────────────────────────────
 
-class UnknownRosterPlayersError(ValueError):
-    """A rostered player is not in the current player pool.
-
-    Happens when a data-source change alters player identities (or removes players)
-    after a board was built against the previous pool. Surfaced as a 400 so the
-    user gets an actionable message instead of a KeyError-turned-500.
-    """
-
-
 class UnknownTeamError(ValueError):
     """The team being evaluated for is not one of the teams on the board.
 
     Happens when the seat and the board come from different identity sets -- connecting a live
     platform replaces the generic team names with the league's own, and a seat still pointing at
     'Team 1' is evaluated against a board keyed by the platform's names. Surfaced as a 400 for
-    the same reason as the sibling above: the alternative is a KeyError several frames deep in
+    the same reason: the alternative is a KeyError several frames deep in
     the H-score solve, reported as 'Evaluation failed.' with nothing in it to act on.
     """
