@@ -158,16 +158,13 @@ def process_player_data(player_stats_v2: pd.DataFrame
     x_scores = games_played_adjustment(x_scores, replacement_games_rate, representative_player_set,
                                         sport_params, categories, zero_player_x, v=v)
 
-    x_scores.loc[RP_PLAYER_ID, :] = -1
-    g_scores.loc[RP_PLAYER_ID, :] = -1
-
     # A tiebreaker category is worth (1 + most_categories_weight) of an ordinary one: twice in the
     # majority half of the objective, once in the per-category half. G-scores are the pipeline's
     # statement of what a player is WORTH, so that belongs here — a shot-blocker really is more
     # valuable when blocks settle tied matchups, and nothing downstream knew it.
     #
-    # Applied to the finished table, so every row scales together (the replacement sentinel
-    # included: missing a doubled category costs double too), and before the Total below, so the
+    # Applied to the finished table, so every row scales together (the replacement player, added
+    # below through v_original, carries it too), and before the Total below, so the
     # ranking carries it. That ranking is load-bearing rather than cosmetic — the agent orders its
     # X-scores by G-total, which decides the draftable pool, the position means and covariance
     # drawn from it, and the anchors the opponent field is built out of. The field therefore ends
@@ -187,6 +184,21 @@ def process_player_data(player_stats_v2: pd.DataFrame
     g_scores.insert(loc=0, column='Total', value=g_scores.sum(axis=1))
     g_scores.sort_values('Total', ascending=False, inplace=True)
     x_scores = x_scores.loc[g_scores.index]
+
+    # The replacement player: a rostered player the app cannot score (unmatched on a platform, missing a category's
+    # value, or absent from the data source) stands for replacement level, as the auction prices it: the generic value
+    # of the first player past the draftable set, spread over the categories (compute_replacement_x_scores). His
+    # G-scores follow by the x -> g conversion, v_original, which already carries the tiebreaker's factor. He goes last
+    # in the order, never at his total's rank: the order is read by position (the draftable pool, the position means
+    # and covariance, the agent's top-_LEVEL_ZERO_POOL pre-filter), and he is no one to draft or to describe the pool
+    # with.
+    if len(x_scores) <= n_players:
+        raise ValueError(f'The player pool has {len(x_scores)} players, too few to reach past the {n_players} a '
+                         f'league of {n_drafters} teams with {n_active} active slots each drafts.')
+    replacement_x_scores = compute_replacement_x_scores(x_scores, n_players, v, sport_params['negative-statistics'])
+    x_scores.loc[RP_PLAYER_ID] = replacement_x_scores
+    replacement_g_scores = replacement_x_scores * v_original[categories]
+    g_scores.loc[RP_PLAYER_ID] = pd.concat([pd.Series({'Total': replacement_g_scores.sum()}), replacement_g_scores])
 
     volume_units = calculate_volume_units(player_stats_v2, coefficients, sport_params, ratio_stats)
     volume_units = volume_units.reindex(x_scores.index)
@@ -623,6 +635,25 @@ def _list_counting_stats(sport_params: dict, categories: list[str]) -> list[str]
 def _list_ratio_stats(sport_params: dict, categories: list[str]) -> list[str]:
     """Return ratio statistics from sport_params that are in the active categories."""
     return [c for c in sport_params['ratio-statistics'] if c in categories]
+
+
+def compute_replacement_value(x_scores_in_value_order: pd.DataFrame
+                              , n_rostered: int
+                              , v) -> float:
+    """Replacement level in generic value: the X-scores, weighted by v, of the first player past the n_rostered best
+    (x_scores_in_value_order is best first). The auction prices cash against it, and the replacement player is built
+    from it (compute_replacement_x_scores)."""
+    return float((x_scores_in_value_order.iloc[n_rostered].to_numpy() * np.asarray(v).reshape(-1)).sum())
+
+
+def compute_replacement_x_scores(x_scores_in_value_order: pd.DataFrame
+                                 , n_rostered: int
+                                 , v: pd.Series
+                                 , negative_statistics: list[str]) -> pd.Series:
+    """The replacement player's X-scores: replacement level's generic value (compute_replacement_value) spread over the
+    categories as a unit of value is (get_category_value_direction)."""
+    return (compute_replacement_value(x_scores_in_value_order, n_rostered, v)
+            * get_category_value_direction(v, negative_statistics))
 
 
 def get_category_value_direction(v: pd.Series
