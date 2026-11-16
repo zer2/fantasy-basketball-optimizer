@@ -195,6 +195,7 @@ def process_player_data(player_stats_v2: pd.DataFrame
     if len(x_scores) <= n_players:
         raise ValueError(f'The player pool has {len(x_scores)} players, too few to reach past the {n_players} a '
                          f'league of {n_drafters} teams with {n_active} active slots each drafts.')
+    # v here is HAgent.v exactly, tiebreaker factor included, so this is the auction's replacement level.
     replacement_x_scores = compute_replacement_x_scores(x_scores, n_players, v, sport_params['negative-statistics'])
     x_scores.loc[RP_PLAYER_ID] = replacement_x_scores
     replacement_g_scores = replacement_x_scores * v_original[categories]

@@ -73,28 +73,33 @@ _TEAM_2 = [
 # same day with get_category_value_direction, which computes the replacement split in a different
 # operation order: identical in exact arithmetic, ~1e-16 apart in floating point, and self-play
 # amplifies that into a new hash (and 0.3 of an H-score in the 16-category draft golden).
+#
+# Regenerated 2026-11-15 for the replacement player at replacement level (as the auction prices it) instead of -1s.
+# Neither board holds him; the hashes move because he is now added after the G-total sort rather than before, which
+# reorders players the unstable sort holds tied. Checked on Each Category / empty: H-scores identical for all 576
+# candidates, the only payload change two players tied at ranks 259 and 261 swapping places.
 _GOLDEN = {
-    ('Each Category',  'empty'): 'c7b371b21706dda1f191d1c087dfdda8b293a6bb2f6e44026d239ad870546611',
-    ('Each Category',  'mid'):   '7c3b5680f50cee29b9f9fb92eca3da31a55e2a2f20f6ec29b674e1779b655495',
-    ('Half and Half',  'empty'): '4390066c2811f195f18a83c07375563560ad29877b3c3c6458e2a3b7e9251e81',
-    ('Half and Half',  'mid'):   '1251b1cfb0b806b2ab23a55a0f7209220e3659dd1aaf3f08df700ddbc0b45112',
-    ('Most Categories','empty'): '9a10cd484aab38f9467f6e6c81524153d2ca1ae56ea2832244f01669259019cc',
-    ('Most Categories','mid'):   'f9d39db74797bf1ffbfc8a1f726a6e9b0b9da056835c6fd7f608fe0eb9a132bc',
+    ('Each Category',  'empty'): 'a63822d9d78f6a964b1698a7d4cfca5e9149631e5e642e7b17b16437fede032e',
+    ('Each Category',  'mid'):   '06191cc33475abb5383c58d84fb8f89c16b558d7caeeeb286e6e8b6d7fdec958',
+    ('Half and Half',  'empty'): 'dd99aa40ba418ba2d26d4affb2e127ec666c56edec052ea29010477403b61457',
+    ('Half and Half',  'mid'):   '9881cf7f787a4632d51566de8d8166f771e0152a599ded8d40e3a1d0a822e5d8',
+    ('Most Categories','empty'): '1bb601a948ea5c66b54cde49bc93bef718f6d3ab84d4308f91423a46b163e143',
+    ('Most Categories','mid'):   'af6c0839832be1e7d7954b7aa02191a8e7cb31ed942ea3b43916a22cb1572074',
 
     # Eight categories (turnovers dropped), which is what a tiebreaker needs: a matchup that can
     # end level. Each objective appears with and without one named, so a change to the weighted
     # win-count DP, to what a category is worth in v, or to the G-score ranking the board is drawn
     # from has to show up here rather than only in a league nobody tested.
-    ('8cat Each Category',   'empty'): '5dc196d2bfc6df292b5f145f103fd1255d96b24b0a7eb924b9134719061bd604',
-    ('8cat Each Category',   'mid'):   '278ab952d025a2041a1bb966b99d63518d26c00d1be1c1955e80085ed2272379',
-    ('8cat Most Categories', 'empty'): '514a98f768fd45b86a2885de046f75f6f8f336ca4d7a8192edad2624a301143e',
-    ('8cat Most Categories', 'mid'):   'a04ee89ce5633a681cc4bd63f891f2c992de76a40b01e7b0f3ca57b5991e203f',
-    ('8cat MC + Points',     'empty'): 'c13b88dac88b803eaf69b1b40e201794cc784a7c49930f90d78fe09c4fe0c739',
-    ('8cat MC + Points',     'mid'):   '88b1dafbda4151fbf47462342366197c029cfbcfd2f03d8e2d1c3876e4ec6f84',
-    ('8cat Half and Half',   'empty'): 'e4582b76ae467499b4a3a70d287346cdd8f2bc9a4ed54e1160187556e6428e41',
-    ('8cat Half and Half',   'mid'):   '85e7605de350c9c79440d4d247168379c2decee7957d000f29d4b9d9eaf1c11e',
-    ('8cat Half + Points',   'empty'): 'fb9afbb70b04488d2684a73d978e785249caeaf4899def6944c32b2dd32e9ef0',
-    ('8cat Half + Points',   'mid'):   '26658c83fcb51ca9e952a1c6b03d36594a4c3b85a12a181cbf5548cdb3869e3f',
+    ('8cat Each Category',   'empty'): '67b25cccb83277f5b7680d9c7be7d32add5183c64d2b6047819c9cee116765e5',
+    ('8cat Each Category',   'mid'):   '5bf11e3ba497a07b8263bd775546edae144e30bc8945cd6d441b70cda10aee47',
+    ('8cat Most Categories', 'empty'): '3086578e80f876afb00f02a538058c8626de3c3591136564277112438cb7b560',
+    ('8cat Most Categories', 'mid'):   '01297c6e0874dd73bce3b3eb0c0a83c418eff45e51571e998314fecfadb8ea3f',
+    ('8cat MC + Points',     'empty'): '89d5c2ad355acfd59c1f1ab694802fb66afc75f3cb3e13713d746c914a5d5a8c',
+    ('8cat MC + Points',     'mid'):   '35d379bddac52910064be10a6f1e6c6b9a631b20ff3c45e8f1b9152332952067',
+    ('8cat Half and Half',   'empty'): 'd2fdd2e753872a91e6ea6000d061a2a9dbb48e9a2dc38b933681006b877efba4',
+    ('8cat Half and Half',   'mid'):   '5f1ada7658c4044845cdbff81d43ef29ce44f7b791915bd46acbbeb8e6d00918',
+    ('8cat Half + Points',   'empty'): 'ffad856c9cea5f98de7214b4d4a3f127bebc40e9bec61d48f6d96f80cf22283a',
+    ('8cat Half + Points',   'mid'):   '7628067dfd35bab706fd99172577a3054f0f30be01733b899e6654c0f6058d40',
 }
 
 

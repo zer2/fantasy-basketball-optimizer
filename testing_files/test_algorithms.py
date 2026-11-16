@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient
 from scipy.stats import norm
 
 from backend.main import app
+from backend.player_identity import RP_PLAYER_ID
 from backend.state.session import get_session
 from backend.math.algorithm_agents import HAgent
 from backend.math.algorithm_helpers import (
@@ -522,7 +523,10 @@ def test_a_tiebreaker_raises_its_category_in_the_g_scores():
 
     plain_scores = get_session(without.json()['session_id']).agent.info['G-scores']
     tiebreaker_scores = get_session(with_tiebreaker.json()['session_id']).agent.info['G-scores']
-    shared = plain_scores.index.intersection(tiebreaker_scores.index)
+    # Real players only. The replacement player is not a stat line but replacement level's value spread evenly over the
+    # categories (process_player_data.compute_replacement_x_scores), so a tiebreaker reshapes his scores rather than
+    # doubling one of them.
+    shared = plain_scores.index.intersection(tiebreaker_scores.index).drop(RP_PLAYER_ID)
 
     ratio = (tiebreaker_scores.loc[shared, 'Blocks'] / plain_scores.loc[shared, 'Blocks']).dropna()
     assert np.allclose(ratio, 2.0), 'Blocks is worth double when it settles tied matchups'
