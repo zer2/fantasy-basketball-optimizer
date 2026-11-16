@@ -35,7 +35,7 @@ from backend.state.session import Session
 from backend.math.algorithm_helpers import auction_value_adjuster
 from backend.player_identity import FULL_ROSTER_SCORE_PLAYER_ID, RP_PLAYER_ID
 from backend.services.build_agent import count_unscorable_players_as_replacement
-from backend.services.ranking import UnknownTeamError, check_rostered_players_in_pool, split_off_bench
+from backend.services.ranking import UnknownTeamError, split_off_bench
 from backend.services.auction_pricing import (
     APP_CASH_SHARE_RULE, compute_max_allowed_bids, compute_unusable_cash_shares,
     sum_spendable_league_cash,
@@ -276,11 +276,10 @@ def solve_team_h_scores(
     , candidate_subset: Optional[list[int]]
 ) -> tuple[pd.Series, pd.Series]:
     """The team's raw H-scores and roster fit for the available players (all of them, or `candidate_subset`), from
-    the same solve rank_candidates runs for the H-score table: unscorable players counted as replacement, the board
-    checked against the pool, perma-bench players set aside and excluded."""
+    the same solve rank_candidates runs for the H-score table: unscorable players (those the data source lacks among
+    them) counted as replacement, perma-bench players set aside and excluded."""
     agent = session.agent
     board = count_unscorable_players_as_replacement(session, player_assignments)
-    check_rostered_players_in_pool(session, board)
     active_board, benched_players = split_off_bench(board, agent.n_picks)
     # The whole pool is named rather than left as None: on an empty board None returns the stored noise-free
     # result, and the team's own view of the players has to apply from the first nomination.

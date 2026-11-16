@@ -18,8 +18,9 @@ Reserved ids (NBA ids are positive, so none of these can collide with a real pla
   - FULL_ROSTER_SCORE_PLAYER_ID (0): the single team-score row a full-roster evaluate
     returns. Not a player and has no registry entry — clients read only its scores.
   - RP_PLAYER_ID (-1): ONE stand-in for "a replacement-level player". It is not a player
-    from any projection: the pipeline injects it (scores of -1 everywhere), and the live
-    platform integrations map any rostered player they cannot match to it.
+    from any projection: the pipeline injects it (at replacement level as the auction prices
+    it: see process_player_data.compute_replacement_x_scores), and the live platform
+    integrations map any rostered player they cannot match to it.
   - synthetic ids (-2, -3, ...): REAL players from a projection source -- with their own
     stats -- whose name matches no spelling UNIFIED_PLAYER_TABLE knows. Each distinct
     unmatched name gets its own id, handed out at runtime. The player is KEPT, because

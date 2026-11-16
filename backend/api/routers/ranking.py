@@ -10,7 +10,7 @@ from backend.api.helpers import fail, require_session
 from backend.state.session import Session
 from backend.infra.rate_limit import enforce_rate_limit, COMPUTE_POLICY
 from backend.math.algorithm_agents import ForcedWeightsInfeasibleError
-from backend.services.ranking import rank_candidates, UnknownRosterPlayersError, UnknownTeamError
+from backend.services.ranking import rank_candidates, UnknownTeamError
 from backend.services.hypothetical_team import build_hypothetical_team, StaleBoardError
 from backend.services.auction_autodraft import nominate_auction_player, value_auction_player
 from backend.infra.server_timing import begin_timing, server_timing_header
@@ -64,7 +64,7 @@ def rank_candidates_route(req: EvaluateRequest, response: Response,
                 candidate_limit    = req.candidate_limit,
                 forced_category_weights = req.forced_category_weights,
             )
-    except (UnknownRosterPlayersError, UnknownTeamError, ForcedWeightsInfeasibleError) as exc:
+    except (UnknownTeamError, ForcedWeightsInfeasibleError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception:
         raise fail(500, 'Evaluation failed.')
@@ -122,7 +122,7 @@ def nominate_auction_player_route(req: AuctionNominationRequest, response: Respo
                 opening_bid         = req.opening_bid,
                 valuation_team_ids  = req.valuation_team_ids,
             )
-    except (UnknownRosterPlayersError, UnknownTeamError, ForcedWeightsInfeasibleError, ValueError) as exc:
+    except (UnknownTeamError, ForcedWeightsInfeasibleError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
         logging.getLogger('fbbo').error('Auction nomination failed: %s', exc, exc_info=True)
@@ -154,7 +154,7 @@ def value_auction_player_route(req: AuctionValuationRequest, response: Response,
                 player_id          = req.player_id,
                 valuation_team_ids = req.valuation_team_ids,
             )
-    except (UnknownRosterPlayersError, UnknownTeamError, ForcedWeightsInfeasibleError, ValueError) as exc:
+    except (UnknownTeamError, ForcedWeightsInfeasibleError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
         logging.getLogger('fbbo').error('Auction valuation failed: %s', exc, exc_info=True)

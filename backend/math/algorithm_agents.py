@@ -220,7 +220,9 @@ from backend.math.algorithm_helpers import (
 )
 
 
-from backend.math.process_player_data import get_category_value_direction, scale_tiebreaker_value
+from backend.math.process_player_data import (
+    compute_replacement_value, get_category_value_direction, scale_tiebreaker_value,
+)
 
 
 from backend.math.position_optimization import (
@@ -246,6 +248,21 @@ from backend.player_identity import RP_PLAYER_ID
 # a near-empty roster padded with a low-volume generic level, a future descent that tilts volume
 # hard -- can drive V_team to zero or below and turn the win probability into nonsense.
 _MINIMUM_TEAM_VOLUME_FRACTION = 0.25
+
+
+def order_players_by_g_total(
+    x_scores: pd.DataFrame
+    , g_scores: pd.DataFrame
+) -> pd.DataFrame:
+    """X-scores in G-total order, best first, with the replacement player last whatever his total.
+
+    The order is read by position -- the draftable pool, the top-_LEVEL_ZERO_POOL pre-filter -- and the replacement
+    player is no one to draft. His scores are those of the players just past the draftable set, so at his total's rank
+    he would sit inside those slices in a small league."""
+    order = [player for player in g_scores.sum(axis=1).sort_values(ascending=False).index if player != RP_PLAYER_ID]
+    if RP_PLAYER_ID in x_scores.index:
+        order.append(RP_PLAYER_ID)
+    return x_scores.loc[order]
 
 
 class HAgent:
@@ -521,9 +538,7 @@ class HAgent:
         self._unconstrained_run = False
 
         if scoring_format == 'Rotisserie':
-            self.x_scores = x_scores.loc[
-                info['G-scores'].sum(axis=1).sort_values(ascending=False).index
-            ]
+            self.x_scores = order_players_by_g_total(x_scores, info['G-scores'])
             v = np.sqrt(mov / (mov + vom))
 
             # ── max_info (replaces get_max_info()) ────────────────────────────
@@ -536,9 +551,7 @@ class HAgent:
                 self.max_var = 2.0 / (self.n_drafters - 1)
 
         else:
-            self.x_scores = x_scores.loc[
-                info['G-scores'].sum(axis=1).sort_values(ascending=False).index
-            ]
+            self.x_scores = order_players_by_g_total(x_scores, info['G-scores'])
             v = np.sqrt(mov / (mov + vom))
 
         # Volume-aware percentage categories (percentage_volume_plan.md). A percentage category is won on
@@ -883,9 +896,7 @@ class HAgent:
             total_cash = sum(cash_remaining_per_team.values())
             remaining_players = self.n_drafters * self.n_picks - len(players_chosen)
 
-            replacement_value = (
-                x_scores_available.iloc[remaining_players] * self.v.T.reshape(self.n_categories)
-            ).sum()
+            replacement_value = compute_replacement_value(x_scores_available, remaining_players, self.v)
             remaining_overall_value = (
                 (x_scores_available.iloc[:remaining_players] * self.v.T).sum(axis=1)
                 - replacement_value

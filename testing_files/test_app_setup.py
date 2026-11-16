@@ -875,7 +875,7 @@ def test_new_data_source_added_mid_draft_keeps_the_board_valid():
     string-identity era the upload's position strings renamed its players and every
     subsequent evaluate crashed on the board's now-unknown names; ids make that
     structurally impossible, and this guards the flow end-to-end. The reverse case — a
-    drafted player genuinely leaving the pool — must be a 400 naming them, never a 500."""
+    drafted player genuinely leaving the pool — counts him as replacement level, never a 500."""
     request = _build_default_session_request()
     request['data_source'] = {
         'type': 'projections',
@@ -936,38 +936,13 @@ def test_new_data_source_added_mid_draft_keeps_the_board_valid():
     assert evaluate_response.status_code == 200, \
         f'the board drafted before the source change must still evaluate: {evaluate_response.text}'
 
-    # A drafted player genuinely leaving the pool (here: marked injured) is a clear,
-    # named 400 — not a KeyError 500 from deep inside the H-score math.
-    dropped_name = registry_by_id[drafted_ids[0]]['name']
+    # A drafted player genuinely leaving the pool (here: marked injured) is replacement level
+    # (count_unscorable_players_as_replacement) -- not a KeyError 500 from deep inside the H-score math.
     patch_response = client.patch(f'/sessions/{session_id}',
                                   json={'from_step': 2, 'injured_players': [drafted_ids[0]]})
     assert patch_response.status_code == 200, patch_response.text
     evaluate_response = evaluate_board()
-    assert evaluate_response.status_code == 400, evaluate_response.text
-    detail = evaluate_response.json()['detail']
-    assert dropped_name in detail, 'the error should name the vanished player'
-    assert 'player pool' in detail, 'the error should explain the cause'
-
-
-def test_evaluate_rejects_rostered_players_missing_from_pool():
-    """A board whose players no longer exist in the pool (e.g. a stale board after a
-    data-source switch) must get a clear 400, not a KeyError 500."""
-    session_response = client.post('/sessions', json=_build_default_session_request())
-    assert session_response.status_code == 201
-    session_id = session_response.json()['session_id']
-
-    n_drafters = _load_params()['NBA']['options']['n_drafters']['default']
-    player_assignments = {f'Team {i + 1}': [] for i in range(n_drafters)}
-    player_assignments['Team 1'] = [999999999]   # no such player id in any pool
-
-    evaluate_response = client.post(
-        f'/sessions/{session_id}/evaluate'
-        , json={'player_assignments': player_assignments, 'my_team_id': 'Team 1'}
-    )
-    assert evaluate_response.status_code == 400, evaluate_response.text
-    detail = evaluate_response.json()['detail']
-    assert '999999999' in detail, 'the error should identify the missing player'
-    assert 'player pool' in detail, 'the error should explain the cause'
+    assert evaluate_response.status_code == 200, evaluate_response.text
 
 
 def test_category_value_direction_is_one_unit_of_value():
@@ -1305,3 +1280,28 @@ def test_a_stronger_lambda_keeps_early_category_weights_nearer_neutral():
     assert firm < gentle - 1.0, (
         f'a 50x stronger pull should hold weights visibly nearer neutral, got {firm:.2f} vs {gentle:.2f}'
     )
+
+
+def test_evaluate_counts_a_rostered_player_the_data_source_lacks_as_replacement():
+    """A rostered player with no row in the data source (an upload of only the top players, say) is replacement level,
+    as an unscorable one is, rather than a 400 that leaves a Season Mode league's waiver and trading tools unusable."""
+    session_response = client.post('/sessions', json=_build_default_session_request())
+    assert session_response.status_code == 201
+    session_id = session_response.json()['session_id']
+    pool = get_session(session_id).agent.x_scores.index
+    absent_player_id = max(int(player_id) for player_id in pool) + 1
+
+    n_drafters         = _load_params()['NBA']['options']['n_drafters']['default']
+    player_assignments = {f'Team {i + 1}': [] for i in range(n_drafters)}
+    player_assignments['Team 1'] = [absent_player_id]
+    player_assignments['Team 2'] = [int(pool[0])]
+    evaluate_response  = client.post(
+        f'/sessions/{session_id}/evaluate'
+        , json={
+            'player_assignments': player_assignments
+            , 'my_team_id': 'Team 1'
+        }
+    )
+    assert evaluate_response.status_code == 200, evaluate_response.text
+    candidate_ids = {candidate['player_id'] for candidate in evaluate_response.json()['candidates']}
+    assert int(pool[0]) not in candidate_ids

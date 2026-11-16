@@ -471,9 +471,6 @@ position data is absent.
 
 **Errors:**
 - `400` — `remaining_cash` present on a non-auction session, or missing on an auction session
-- `400` — a rostered player in `player_assignments` is not in the current player pool
-  (a data-source change altered player identities after the board was built); the
-  message names the missing players
 - `404` — session not found or expired
 
 ---

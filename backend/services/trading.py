@@ -46,6 +46,13 @@ def run_trade_analyze(
         names = ', '.join(session.player_registry[player_id].name for player_id in sorted(unscorable_in_trade))
         return TradeAnalyzeResponse(
             error=f'No projection covers every category for {names}, so a trade involving them cannot be scored.')
+    # Players the data source has no row for (an upload of only the top players, say) are not in the registry either,
+    # so only their ids can be named.
+    missing_in_trade = [player_id for player_id in my_trade + their_trade if player_id not in session.agent.x_scores.index]
+    if missing_in_trade:
+        return TradeAnalyzeResponse(
+            error=f'The current data source has no projection for players {", ".join(map(str, missing_in_trade))}, '
+                  'so a trade involving them cannot be scored.')
     player_assignments = count_unscorable_players_as_replacement(session, player_assignments)
 
     n_iterations = session.current_settings['n_iterations']
