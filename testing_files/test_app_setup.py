@@ -691,6 +691,36 @@ def test_percentage_without_attempts_narrows_out_instead_of_failing():
     assert 'Points' in categories, 'the countable categories are unaffected'
 
 
+def test_session_from_an_upload_listing_a_player_twice_names_the_file_and_the_player():
+    """A player on two rows of one file would count twice in the blend, so the build is refused. The refusal is shown
+    in every view, so it must be a sentence the user can act on: the file by the name they gave it, not its data_id,
+    and the player by name, not id. Two spellings of one player are the same mistake and are named as such."""
+    header = 'Rank,Name,Value,g,p/g,r/g,a/g,s/g,b/g,to/g,3/g,fg%,fga/g,ft%,fta/g'
+    stat_line = '9.9,70,20.0,8.0,4.0,1.0,1.0,2.0,2.0,0.5,15.0,0.8,5.0'
+    for listed_names, expected_detail in [
+        (['Nikola Jokić', 'Luka Dončić', 'Nikola Jokić'],
+         'duplicated.csv lists Nikola Jokić on 2 rows. Remove the extra rows and upload the file again.'),
+        (['Nikola Jokić', 'Luka Dončić', 'Nikola Jokic'],
+         'duplicated.csv lists Nikola Jokić and Nikola Jokic (the same player). '
+         'Remove the extra rows and upload the file again.'),
+    ]:
+        csv_bytes = '\n'.join([header] + [f'{index + 1},{name},{stat_line}' for index, name in enumerate(listed_names)])
+        upload_response = client.post('/data/upload',
+                                      files={'file': ('duplicated.csv', csv_bytes.encode(), 'text/csv')})
+        assert upload_response.status_code == 200, upload_response.text
+        data_id = upload_response.json()['data_id']
+
+        session_request = _build_default_session_request()
+        session_request['data_source'] = {
+            'type': 'projections',
+            'blend_weights': {'DARKO': 0.0, 'ESPN': 1.0, data_id: 1.0},
+            'custom_data_ids': [data_id],
+        }
+        create_response = client.post('/sessions', json=session_request)
+        assert create_response.status_code == 400, create_response.text
+        assert create_response.json()['detail'] == expected_detail
+
+
 def test_parse_projection_upload_tolerates_files_missing_categories():
     """A source that pairs each projection set with a league exports only that league's
     active categories, so a file may legitimately lack e.g. Turnovers or the free-throw
@@ -751,6 +781,7 @@ def test_uploads_survive_restarts_and_stay_alive_while_in_use():
     assert rehydrated is not None, 'an upload must survive a process restart'
     assert rehydrated['bytes'] == csv_bytes, 'the rehydrated file must be byte-identical'
     assert rehydrated['n_players'] == response.json()['n_players'], 'its metadata must survive too'
+    assert rehydrated['file_name'] == 'projections.csv', 'errors about the file name it, so the name must survive too'
 
     # The TTL is idle time, not age: an upload still in use never expires. Backdate the
     # entry to just inside the window, read it, and confirm the clock restarted.

@@ -40,9 +40,16 @@ _UPLOAD_DISK_DIR = (
 )
 
 
-def store_upload(data_id: str, csv_bytes: bytes, n_players: int) -> None:
+def store_upload(
+    data_id: str
+    , csv_bytes: bytes
+    , file_name: str
+    , n_players: int
+) -> None:
     entry = {
         'bytes':         csv_bytes,
+        # The name the user knows the file by: an error about its contents names the file, not the data_id.
+        'file_name':     file_name,
         'n_players':     n_players,
         'last_accessed': time.time(),
     }
@@ -77,6 +84,7 @@ def _write_upload_to_disk(data_id: str, entry: dict) -> None:
     csv_path, meta_path = _upload_paths(data_id)
     csv_path.write_bytes(entry['bytes'])
     meta_path.write_text(json.dumps({
+        'file_name':     entry['file_name'],
         'n_players':     entry['n_players'],
         'last_accessed': entry['last_accessed'],
     }), encoding='utf-8')
@@ -105,7 +113,8 @@ def get_upload(data_id: str) -> Optional[dict]:
 def _read_upload_from_disk(data_id: str) -> Optional[dict]:
     """Rehydrate an upload the current process never saw (restart, or another instance).
     Returns None when either file is missing or unreadable — treated exactly like an
-    upload that was never stored."""
+    upload that was never stored. That includes an upload stored before file names were kept
+    (2026-11-16): the frontend reports it expired and the file is uploaded again."""
     csv_path, meta_path = _upload_paths(data_id)
     if not (csv_path.exists() and meta_path.exists()):
         return None
@@ -113,6 +122,7 @@ def _read_upload_from_disk(data_id: str) -> Optional[dict]:
         metadata = json.loads(meta_path.read_text(encoding='utf-8'))
         return {
             'bytes':         csv_path.read_bytes(),
+            'file_name':     metadata['file_name'],
             'n_players':     metadata['n_players'],
             'last_accessed': float(metadata['last_accessed']),
         }

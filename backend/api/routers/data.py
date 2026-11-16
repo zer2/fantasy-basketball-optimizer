@@ -39,7 +39,7 @@ async def upload_projection_route(
         raise HTTPException(status_code=400, detail=f'Could not parse file: {exc}')
 
     data_id = uuid.uuid4().hex[:8]
-    store_upload(data_id, csv_bytes, len(df))
+    store_upload(data_id, csv_bytes, file_name=file.filename, n_players=len(df))
 
     return UploadResponse(
         data_id=data_id,

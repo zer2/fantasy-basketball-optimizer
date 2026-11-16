@@ -358,6 +358,25 @@ def attach_player_ids_by_name(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def describe_players_listed_twice(named_rows: pd.DataFrame) -> list[str]:
+    """One phrase per player a name-keyed source lists on more than one row, in the source's own spellings:
+    'Jayden Quaintance on 2 rows', or 'Moussa Diabaté and Moussa Diabate (the same player)' when the rows spell
+    them differently. A player is an NBA id where the name resolves to one, and the exact spelling where it does
+    not -- the same grouping the blend's synthetic ids give unresolved names. Empty when every player has one row."""
+    resolved = attach_player_ids_by_name(named_rows[['Player']])
+    player_keys = resolved['player_id'].astype('object').fillna('name:' + resolved['Player'])
+    descriptions = []
+    for _, spellings in resolved['Player'].groupby(player_keys, sort=False):
+        if len(spellings) < 2:
+            continue
+        distinct_spellings = list(dict.fromkeys(spellings))
+        if len(distinct_spellings) == 1:
+            descriptions.append(f'{distinct_spellings[0]} on {len(spellings)} rows')
+        else:
+            descriptions.append(f"{' and '.join(distinct_spellings)} (the same player)")
+    return descriptions
+
+
 def get_player_name_resolvers() -> tuple[dict[str, int], dict[str, int]]:
     """Every known spelling of every player -> NBA player id, from PLAYER_NAME_RESOLVER_VIEW: exactly as
     spelled, and with accents stripped.

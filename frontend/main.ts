@@ -84,6 +84,10 @@ function makeApplyChain(label: string) {
             .catch(err => {
                 if (err.name === 'AbortError') return
                 console.error(`${label} failed:`, err)
+                // The sidebar changed whether or not the session took it, so the screen follows it: a switch into
+                // Season Mode that failed used to leave the Draft layout up under a Season Mode sidebar. Laid out
+                // first, so the failure lands where the new layout shows it (the banner, where the table is hidden).
+                applyLayoutAfterSettingsChange()
                 showFailureInTable(err)
             })
     }

@@ -15,7 +15,7 @@ import { buildTable, resetTable, addBatch, showTableMessage, reserveTailSpace, c
 import { showFailureInTable } from '../table/failure_message.js'
 
 import {
-    startFreshSession, getSessionId, markSessionChanged, replaceLostSession, setIndicatorState,
+    startFreshSession, getSessionId, resetSession, markSessionChanged, replaceLostSession, setIndicatorState,
     withDisplayOwnership, withSessionRetry, waitForSessionCreationInFlight,
 } from './session.js'
 import { prefetchHeadshotsForDataSource } from '../player_display.js'
@@ -156,6 +156,15 @@ export async function createOrPatchSession(
                 setGScores(freshGScores)
             }
         } catch (err) {
+            if (err instanceof HTTPError && (err.status === 400 || err.status === 422)) {
+                // The server refused the change (an upload that lists a player twice, every blend weight at zero, an
+                // impossible setting) and kept the session as it was, so the sidebar no longer describes it. Kept, the
+                // next mode switch or tab evaluated the OLD pool and drew it as current, erasing the refusal. Forgotten,
+                // every later action builds a session from the sidebar, meets the same refusal and shows it, in every
+                // view, until the sidebar is fixed.
+                resetSession()
+                throw err
+            }
             if (!(err instanceof HTTPError) || err.status !== 404) throw err
             await replaceLostSession(signal)
         }

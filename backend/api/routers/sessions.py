@@ -11,6 +11,8 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+import pandas as pd
+
 from fastapi import APIRouter, HTTPException, Depends, status, Response
 
 from backend.infra.auth import current_user_key_optional
@@ -22,6 +24,7 @@ from backend.services.session_management import build_session, apply_patch
 from backend.services.build_agent import clear_v0_cache, clear_agent_cache, derive_effective_objective, InsufficientPlayerPoolError
 from backend.services.projection_parsing import parse_projection_upload
 from backend.state.upload_store import get_upload
+from backend.data_retrieval import describe_players_listed_twice
 from backend.api.schemas import (
     SessionRequest, SessionResponse, PlayerGScore, PlayerRegistryEntry,
     PatchRequest, PatchResponse, GScoresResponse,
@@ -45,7 +48,7 @@ def create_session_route(req: SessionRequest, user_key: Optional[str] = Depends(
     sport_params = all_params[req.league.sport]
     source_type = req.data_source.type
     if source_type == 'csv':
-        csv_bytes = _resolve_csv(req.data_source.custom_data_ids)
+        csv_bytes = _resolve_csv(req.data_source.custom_data_ids, sport_params)
         uploaded_dfs = None
     elif source_type == 'projections':
         csv_bytes = None
@@ -95,7 +98,7 @@ def patch_session_route(req: PatchRequest, session: Session = Depends(require_se
     if req.data_source is not None and req.data_source.custom_data_ids is not None:
         sport_params = load_all_params()[session.current_settings['sport']]
         if req.data_source.type == 'csv':
-            csv_bytes = _resolve_csv(req.data_source.custom_data_ids)
+            csv_bytes = _resolve_csv(req.data_source.custom_data_ids, sport_params)
         elif req.data_source.type == 'projections':
             uploaded_dfs = _resolve_uploaded_dfs(req.data_source.custom_data_ids, sport_params)
 
@@ -234,10 +237,15 @@ def _build_patch(req: PatchRequest) -> dict:
     return patch
 
 
-def _resolve_csv(custom_data_ids: Optional[list[str]]) -> Optional[bytes]:
+def _resolve_csv(
+    custom_data_ids: Optional[list[str]]
+    , sport_params: dict
+) -> Optional[bytes]:
     """Return csv_bytes for the first custom data_id ('csv' source; format auto-detected later)."""
     for data_id in custom_data_ids or []:
-        return _require_upload(data_id)['bytes']
+        upload = _require_upload(data_id)
+        _check_upload_lists_each_player_once(parse_projection_upload(upload['bytes'], sport_params), upload['file_name'])
+        return upload['bytes']
     return None
 
 
@@ -246,8 +254,29 @@ def _resolve_uploaded_dfs(custom_data_ids: Optional[list[str]], sport_params: di
     is the upload's identity throughout the blend — it keys the blend weights too."""
     result = {}
     for data_id in custom_data_ids or []:
-        result[data_id] = parse_projection_upload(_require_upload(data_id)['bytes'], sport_params)
+        upload = _require_upload(data_id)
+        parsed_upload = parse_projection_upload(upload['bytes'], sport_params)
+        _check_upload_lists_each_player_once(parsed_upload, upload['file_name'])
+        result[data_id] = parsed_upload
     return result
+
+
+def _check_upload_lists_each_player_once(
+    parsed_upload: pd.DataFrame
+    , file_name: str
+) -> None:
+    """A 400 naming the file and the players when an upload lists a player on more than one row.
+
+    The blend refuses such a file too (a player twice would count twice), but by then it knows the file only by its
+    data_id and the player only by id. Checked here, where the file's name is known, so the message is one the user
+    can act on; it is the session build's error, so every view that shows a failed build shows it."""
+    repeated_players = describe_players_listed_twice(parsed_upload.reset_index())
+    if repeated_players:
+        raise HTTPException(
+            status_code=400,
+            detail=f"{file_name} lists {'; '.join(repeated_players)}. "
+                   f'Remove the extra rows and upload the file again.',
+        )
 
 
 def _require_upload(data_id: str) -> dict:
