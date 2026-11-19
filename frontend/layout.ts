@@ -388,14 +388,22 @@ function activateAuctionTab(tabId: string): void {
  *  an empty team however many players the seat actually holds.
  */
 function currentSeatRoster(mode: string): number[] {
-    const seat = getCurrentSeat() ?? ''
+    const seat = getCurrentSeat()
+    // No seat: a live platform not yet connected, which has no board and no team to show.
+    if (seat === null) return []
+    let player_assignments: Record<string, number[]>
     if (getLeagueSettings().platform !== 'Enter your own data') {
         // Null until the first poll lands, which reads as an empty team — the same thing an
         // un-started manual board shows.
-        return getLivePlayerAssignments()?.[seat] ?? []
+        const livePlayerAssignments = getLivePlayerAssignments()
+        if (livePlayerAssignments === null) return []
+        player_assignments = livePlayerAssignments
+    } else {
+        player_assignments = (mode === 'Auction Mode' ? getAuctionState() : getDraftState()).player_assignments
     }
-    const { player_assignments } = mode === 'Auction Mode' ? getAuctionState() : getDraftState()
-    return player_assignments[seat] ?? []
+    const roster = player_assignments[seat]
+    if (roster === undefined) throw new Error(`The board has no team ${seat}, the selected seat`)
+    return roster
 }
 
 function refreshDraftGScore(): void {

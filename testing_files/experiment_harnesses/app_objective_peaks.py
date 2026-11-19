@@ -32,6 +32,7 @@ ASSUMPTIONS
     never reaches the opponent model's nested solves.
 """
 
+from backend.services.session_management import list_session_teams
 from __future__ import annotations
 
 import numpy as np
@@ -51,7 +52,7 @@ def build_format_board(objective: str
     1, this objective at the app's own settings (no overrides). n_rounds = 0 is the empty board: the first pick, against
     the predicted field."""
     _, _, session = build_league_session(objective, season, {})
-    teams = session.current_settings['team_names']
+    teams = [team.team_id for team in list_session_teams(session)]
     ranked = [int(player) for player in session.agent.default_h_scores.index]
     board = {team: [] for team in teams}
     for pick, team in enumerate(((teams + teams[::-1]) * n_rounds)[:len(teams) * n_rounds]):

@@ -22,6 +22,7 @@ from backend.api.helpers import (
 from backend.api.schemas import (
     YahooAuthUrlResponse, YahooTokenRequest, EspnCredentialsRequest, EspnLeagueSeasonsResponse,
     LeaguesResponse, DivisionsResponse, PlatformConfigRequest, ConnectResponse, DraftStateResponse,
+    TeamRegistryEntry,
 )
 
 router = APIRouter()
@@ -99,8 +100,8 @@ def connect_platform_route(platform: str, req: PlatformConfigRequest, user_key: 
     except Exception:
         raise fail(502, 'Failed to connect to the platform league.')
     return ConnectResponse(
-        team_names       = shape.team_names,
-        n_drafters       = shape.n_drafters,
+        teams            = [TeamRegistryEntry(team_id=team.team_id, name=team.name) for team in shape.teams],
+        n_drafters       = len(shape.teams),
         n_picks          = shape.n_picks,
         available_modes  = integration.available_modes,
         is_auction_draft = shape.is_auction_draft,
@@ -142,6 +143,12 @@ def get_draft_state_route(mode: str, session: Session = Depends(require_session)
     except Exception:
         raise fail(502, 'Failed to fetch the live draft state.')
 
+    # Every team-keyed field lists exactly the league's teams, so the frontend indexes each one by team id without a
+    # fallback: a team missing from the rosters showed as a column of undefined slots, without an error (2026-11-18).
+    team_ids = [team.team_id for team in config.teams]
+    if set(selections.player_assignments) != set(team_ids):
+        raise fail(502, f'{config.platform} returned rosters for teams {sorted(selections.player_assignments)}, '
+                        f'but the league was connected with teams {sorted(team_ids)}; connect the league again.')
     # Auction selections carry per-player costs; turn them into per-team remaining cash.
     if selections.costs is None:
         remaining_cash = None
@@ -159,8 +166,9 @@ def get_draft_state_route(mode: str, session: Session = Depends(require_session)
     return DraftStateResponse(
         player_assignments     = player_assignments,
         injured_players        = selections.injured_players,
-        unmatched_player_names = selections.unmatched_player_names,
-        empty_slots            = empty_slots,
+        # A team with no unmatched players or no empty slots is listed with none, rather than left out.
+        unmatched_player_names = {team_id: selections.unmatched_player_names.get(team_id, {}) for team_id in team_ids},
+        empty_slots            = {team_id: empty_slots.get(team_id, []) for team_id in team_ids},
         status                 = selections.status,
         remaining_cash         = remaining_cash,
     )

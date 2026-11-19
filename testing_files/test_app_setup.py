@@ -393,7 +393,7 @@ def test_downstream_cache_keys_are_the_pool_not_its_settings():
 
     def settings_with(blend_weights):
         return {'sport': 'NBA', 'data_source_type': 'projections', 'custom_data_ids': None,
-                'blend_weights': blend_weights, 'team_names': ['Team 1'], 'upsilon': 0.5}
+                'blend_weights': blend_weights, 'upsilon': 0.5}
 
     for build_key in (_build_pipeline_cache_key, _agent_cache_key):
         assert build_key(settings_with({'ESPN': 1.0}), 'pool-a')             == build_key(settings_with({'ESPN': 0.5, 'DARKO': 0.5}), 'pool-a'),             f'{build_key.__name__}: any settings that built this pool share its entry'

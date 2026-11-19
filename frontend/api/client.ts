@@ -2,6 +2,7 @@
 // HTTP client for the Fantasy Basketball Optimizer backend.
 // All fetch calls go through this module; callers receive typed results.
 
+import type { TeamRegistryEntry } from '../team_registry.js'
 import { PlayerResult, PlayerGScore, SessionRequest, SportConfig, Roster, HypotheticalTeam, BoardRequest } from '../types.js'
 import { setPlayerRegistry } from '../player_registry.js'
 
@@ -477,7 +478,8 @@ export interface PlatformDivision {
 }
 
 export interface PlatformConnectResponse {
-    team_names: string[]
+    /** Every seat, in the platform's order: each team under its platform id (team_registry). */
+    teams: TeamRegistryEntry[]
     n_drafters: number
     n_picks: number
     available_modes: string[]

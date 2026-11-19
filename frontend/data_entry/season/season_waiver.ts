@@ -7,7 +7,7 @@
 import { makeCustomSelect } from '../../custom_select.js'
 import { readRequiredIntInput } from '../../helper_functions.js'
 import { readRosterAssignments, readEmptyRostersMessage, listMovablePlayers } from './season_helpers.js'
-import { getTeamIdentitiesFromSidebar } from '../../setting_collection/league_settings.js'
+import { getTeamEntry, listTeamIds } from '../../team_registry.js'
 import { getPlayerResultsById } from '../../app_state.js'
 import { buildPlayerOption } from '../../player_display.js'
 import { runWaiverEvaluate } from '../../api/season_session.js'
@@ -52,11 +52,10 @@ export function renderWaiverControls(container: HTMLElement): void {
     waiverListenerController?.abort()
     waiverListenerController = new AbortController()
 
-    const teamNames   = getTeamIdentitiesFromSidebar()
-    const assignments = readRosterAssignments()
+    const teamIds     = listTeamIds()
+    const assignments = readRosterAssignments()   // every team, keyed by id
     const nPicks      = readRequiredIntInput('ls-n-picks')
-    // assignments[t] can be undefined for team names beyond nDrafters, hence the optional chain
-    const fullTeams   = teamNames.filter(t => (assignments[t]?.length ?? 0) >= nPicks)
+    const fullTeams   = teamIds.filter(teamId => assignments[teamId].length >= nPicks)
 
     // The candidate table is this tab's results; with no team to score it would show headers over nothing. The table
     // is set either way here, since the Draft and Auction team-statistics tabs hide it.
@@ -93,7 +92,7 @@ export function renderWaiverControls(container: HTMLElement): void {
     const initialTeam = savedTeam !== null && fullTeams.includes(savedTeam) ? savedTeam : fullTeams[0]
     const teamSel = makeCustomSelect(
         'waiver-team-select',
-        fullTeams.map(n => ({ value: n, label: n })),
+        fullTeams.map(teamId => ({ value: teamId, label: getTeamEntry(teamId).name })),
         initialTeam,
         undefined,
         waiverListenerController.signal,

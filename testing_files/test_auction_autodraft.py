@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 
 from benchmark_helpers import client, _build_session_request
+from backend.services.session_management import list_session_teams
 from backend.state.session import get_session
 from backend.services import auction_autodraft
 from backend.services.auction_autodraft import (
@@ -29,7 +30,7 @@ def auction_session():
 
 
 def _empty_board(session):
-    teams = session.current_settings['team_names']
+    teams = [team.team_id for team in list_session_teams(session)]
     return {team: [] for team in teams}, {team: float(CASH) for team in teams}
 
 
@@ -176,7 +177,7 @@ def test_each_autodrafter_sees_the_players_through_its_own_noise(auction_session
     on every call for the same agent; and the agent's own X-scores untouched by a solve."""
     session = auction_session
     session.auction_team_x_scores.clear()
-    teams = session.current_settings['team_names']
+    teams = [team.team_id for team in list_session_teams(session)]
     agent_x_scores = session.agent.x_scores.copy()
     first, second = read_team_x_scores(session, teams[0]), read_team_x_scores(session, teams[1])
     first_noise = (first - agent_x_scores).drop(index=-1, errors='ignore').to_numpy()
@@ -184,7 +185,9 @@ def test_each_autodrafter_sees_the_players_through_its_own_noise(auction_session
     standard_deviations = compute_noise_standard_deviations(session).drop(index=-1, errors='ignore')
     standardized = first_noise / standard_deviations.to_numpy()[:, np.newaxis]
     assert np.std(standardized) == pytest.approx(1.0, rel=0.05), 'each player at his own standard deviation'
-    assert abs(np.corrcoef(first_noise.ravel(), second_noise.ravel())[0, 1]) < 0.05, 'independent between teams'
+    # Across all 66 pairs of 12 teams the correlation's 95th percentile is about 0.048 and its maximum 0.069
+    # (2026-11-18), so 0.05 failed about one seed in 20; 0.1 still catches noise shared between teams.
+    assert abs(np.corrcoef(first_noise.ravel(), second_noise.ravel())[0, 1]) < 0.1, 'independent between teams'
     if -1 in agent_x_scores.index:
         assert (first.loc[-1] == agent_x_scores.loc[-1]).all(), 'the replacement player is not a player'
     assert read_team_x_scores(session, teams[0]) is first, 'drawn once per agent'

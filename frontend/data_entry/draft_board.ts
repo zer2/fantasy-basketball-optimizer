@@ -11,12 +11,12 @@ import { runEvaluate, clearFullTeamResult } from '../api/draft_and_auction_sessi
 import { setAutopilotOn, setAutopilotOff } from '../api/session.js'
 import { getDrafterMethod } from './drafter_methods.js'
 import { makeAutodraftToggle } from './autodraft_toggle.js'
-import { getTeamLabel, defaultTeamLabel, makeTeamLabelInput, TEAM_LABELS_CHANGED } from './team_labels.js'
+import { getTeamLabel, makeTeamLabelInput, TEAM_LABELS_CHANGED } from './team_labels.js'
 import { setSeatSelectorVisible } from '../seat_selector.js'
-import { getTeamIdentitiesFromSidebar } from '../setting_collection/league_settings.js'
+import { listTeamIds } from '../team_registry.js'
 import {
     DraftConfig,
-    getPickRow, getPickDrafter, getDrafted, getTeamIdentitiesFromBoard, getNDrafters, getNPicks, getConfigKey,
+    getPickRow, getPickDrafter, getDrafted, getTeamIdsFromBoard, getNDrafters, getNPicks, getConfigKey,
     getBoardGeneration,
     resetDraftState, applyDraftConfig,
     recordDraftPick, clearDraftPick, clearAllDraftPicks,
@@ -162,7 +162,9 @@ async function fireAutopilotPicks(container: HTMLElement): Promise<void> {
             if (getDrafterMethod(getPickDrafter()) === 'Manual input') break
 
             clearFullTeamResult()
-            setCurrentSeat(getTeamIdentitiesFromBoard()[getPickDrafter()] ?? defaultTeamLabel(getPickDrafter()))
+            const drafterTeamId = getTeamIdsFromBoard()[getPickDrafter()]
+            if (drafterTeamId === undefined) throw new Error(`Drafter ${getPickDrafter() + 1} has no team on the board`)
+            setCurrentSeat(drafterTeamId)
             // Autopilot only needs the top pick: score just the first batch and render nothing. Use the
             // value this evaluate returns — not a shared global — so a competing evaluate that aborts
             // this one yields null (stop cleanly) instead of a stale pick from a previous drafter.
@@ -463,8 +465,8 @@ function readDraftConfig(): DraftConfig {
     const nPicks             = readRequiredIntInput('ls-n-picks')
     const dataSource         = (document.getElementById('ps-data-type') as HTMLInputElement).value
     const thirdRoundReversal = (document.getElementById('ls-third-round-reversal') as HTMLInputElement).checked
-    const teamNames = getTeamIdentitiesFromSidebar()
-    // teamNames are excluded from the key: identities are constant "Team N" (so they never
+    const teamIds = listTeamIds()
+    // teamIds are excluded from the key: own-data ids are constant "seat-N" (so they never
     // trigger a reset), and editable display labels are presentation-only — a rename must not
     // reset the draft or rebuild the header. n_drafters covers any change in team count.
     // thirdRoundReversal is also excluded: toggling it must not reset the board — the setting
@@ -472,7 +474,7 @@ function readDraftConfig(): DraftConfig {
     return {
         nDrafters
         , nPicks
-        , teamNames
+        , teamIds
         , thirdRoundReversal
         , key: `${nDrafters}:${nPicks}:${dataSource}`
     }

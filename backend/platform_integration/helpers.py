@@ -1,7 +1,6 @@
 """
-Shared, framework-agnostic helpers used across platform integrations:
-team-name deduplication, the roster-DataFrame → assignments converter, and the
-platform player → session player lookup.
+Shared, framework-agnostic helpers used across platform integrations: the platform player →
+session player lookup, and filling a short season roster's empty slots.
 
 Pure functions only (no network / no Streamlit): callers pass in any data fetched
 from external services, which keeps these unit-testable.
@@ -16,29 +15,6 @@ import pandas as pd
 
 from backend.data_retrieval import strip_accents
 from backend.player_identity import RP_PLAYER_ID
-
-
-def deduplicate_team_names(team_pairs: list[tuple[str, str]]) -> dict[str, str]:
-    """Build a {team_name: team_id} map, disambiguating duplicate display names
-    with ' 2', ' 3', ...
-
-    Dedupes on the NAME, working from raw (name, id) pairs before they collapse
-    into a dict. The Streamlit Fantrax path instead built {name: id} first (losing
-    duplicate-named teams in the comprehension) and ran its dedup helper on the
-    ids, so duplicate names silently dropped a team. Shared by every platform
-    (Yahoo needs the same dedup).
-    """
-    teams_dict: dict[str, str] = {}
-    used_names: list[str] = []
-    for name, team_id in team_pairs:
-        unique_name = name
-        counter = 1
-        while unique_name in used_names:
-            counter += 1
-            unique_name = f'{name} {counter}'
-        used_names.append(unique_name)
-        teams_dict[unique_name] = team_id
-    return teams_dict
 
 
 @dataclass(frozen=True)

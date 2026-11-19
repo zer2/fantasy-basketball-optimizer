@@ -174,7 +174,6 @@ def _build_current_settings(req: SessionRequest) -> dict:
         'categories':       categories,
         'slot_counts':      req.slot_counts,
         'injured_players':  req.injured_players,
-        'team_names':       [f'Drafter {i + 1}' for i in range(n)],
         # model parameters
         'pick_pool_size':   p.pick_pool_size,
         'beth':             p.beth,

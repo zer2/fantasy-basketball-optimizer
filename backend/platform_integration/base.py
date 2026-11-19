@@ -18,21 +18,18 @@ from dataclasses import dataclass
 from typing import Optional
 
 from backend.platform_integration.helpers import PlatformPlayerLookup
+from backend.team_identity import TeamIdentity
 
 
 @dataclass
 class LeagueShape:
     """League metadata needed to configure a session, fetched before any roster
     data and therefore without requiring session.agent.info."""
-    # Every seat in the league, occupied or not: one name per drafter. A draft room that is
-    # still filling has fewer joined teams than seats, and the app needs an identity for each
-    # (the seat selector, the board columns and evaluate's my_team_id all index by it).
-    team_names: list[str]
-    n_drafters: int
+    # Every seat in the league, occupied or not, in the platform's order (team_identity): each joined team under its
+    # platform id, and a seat nobody has taken under "empty-N". The seat selector, the board columns and every
+    # team-keyed field index by these ids; the drafter count is their number.
+    teams:      list[TeamIdentity]
     n_picks:    int
-    # ONLY the teams that have actually joined. This is the name <-> platform-id map every
-    # roster call goes through, so an unoccupied seat must not appear in it: it has no id.
-    teams_dict: dict[str, str]   # team_name -> platform team_id
     # True for an auction league, False for a snake draft, None when the platform does not say.
     # None is a real third state, not a default standing in for False: it means "do not judge the
     # user's chosen mode against this", which is what platforms that never report it need.
@@ -49,12 +46,10 @@ class PlatformConfig:
     platform:           str
     league_id:          str
     division_id:        Optional[str]
-    teams_dict:         dict[str, str]   # joined teams only: team_name -> platform team_id
     player_name_column: str
-    # Every seat, in draft order — the joined teams plus placeholders for the ones still open.
-    # Boards are seeded from this so a seat that nobody has taken yet is still a team with an
-    # empty roster rather than missing from the league entirely.
-    seat_names:         list[str]
+    # Every seat, as LeagueShape.teams. Boards are seeded from these, so a seat nobody has taken yet is still a team
+    # with an empty roster rather than missing from the league.
+    teams:              list[TeamIdentity]
 
 
 @dataclass
@@ -62,7 +57,7 @@ class PlatformSelections:
     """Current selections pulled from a platform — draft board, season rosters, or
     auction.
 
-    `player_assignments` maps each team to its list of player ids (the shape /evaluate
+    Every field is keyed by team id (team_identity). `player_assignments` maps each team to its list of player ids (the shape /evaluate
     expects). `injured_players` lists the ids of players the platform flags as out
     (Season Mode only); empty otherwise. `unmatched_player_names` names the rostered players the session could not
     match, which player_assignments carries as RP_PLAYER_ID: unmatched_player_names[team][i] is the platform's name for
@@ -70,11 +65,11 @@ class PlatformSelections:
     board read by id). `costs` is populated only for auctions: costs[team][i] is the price paid for
     player_assignments[team][i].
     """
-    player_assignments:     dict[str, list[int]]
+    player_assignments:     dict[str, list[int]]           # team id -> player ids
     status:                 str
     injured_players:        list[int]
-    unmatched_player_names: dict[str, dict[int, str]]
-    costs:                  Optional[dict[str, list[float]]] = None
+    unmatched_player_names: dict[str, dict[int, str]]      # team id -> {roster position: the platform's name}
+    costs:                  Optional[dict[str, list[float]]] = None   # team id -> prices
 
 
 class PlatformIntegration(abc.ABC):
@@ -113,7 +108,7 @@ class PlatformIntegration(abc.ABC):
         , league_id: str
         , division_id: Optional[str]
     ) -> LeagueShape:
-        """Fetch team names, drafter count, and pick count for the league/division."""
+        """Fetch the teams (with their ids), and the pick count, for the league/division."""
 
     @abc.abstractmethod
     def get_draft_results(

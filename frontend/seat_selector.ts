@@ -1,23 +1,22 @@
 // seat_selector.ts
 // The "Select team" control above the H-score table: which seat the app evaluates for.
-// This module owns the widget — how it is built, how team identities map onto display
-// labels, and how its option set stays consistent with the current identities. What the
+// This module owns the widget — how it is built, how team ids map onto display labels, and
+// how its option set stays consistent with the league's teams (team_registry). What the
 // app DOES about a seat change (evaluate, re-layout) is orchestration and lives in main.ts,
 // which attaches its own listener to the element this module renders.
 
 import { makeCustomSelect } from './custom_select.js'
 import { getCurrentSeat, setCurrentSeat } from './app_state.js'
 import { getTeamLabel, defaultTeamLabel } from './data_entry/team_labels.js'
-import { getTeamIdentitiesFromSidebar } from './setting_collection/league_settings.js'
+import { getAllTeamIdentities, type TeamRegistryEntry } from './team_registry.js'
 
 let seatSelect: ReturnType<typeof makeCustomSelect> | null = null
 
-// Seat selector option from a team identity: the value is always the identity ("Team N" for own
-// data; the real name for a live platform). For own-data identities we show the editable display
-// label; a live-platform name (which differs from the "Team N" default) is shown as-is.
-function buildSeatOption(identityName: string, index: number): { value: string; label: string } {
-    const label = identityName === defaultTeamLabel(index) ? getTeamLabel(index) : identityName
-    return { value: identityName, label }
+// Seat selector option from a team: the value is always the team id. An own-data team (named "Team N") shows its
+// editable display label; a live platform's team shows its own name as-is.
+function buildSeatOption(team: TeamRegistryEntry, index: number): { value: string; label: string } {
+    const label = team.name === defaultTeamLabel(index) ? getTeamLabel(index) : team.name
+    return { value: team.team_id, label }
 }
 
 function requireSeatSelect(): ReturnType<typeof makeCustomSelect> {
@@ -30,10 +29,10 @@ function requireSeatSelect(): ReturnType<typeof makeCustomSelect> {
  *  element so the caller can attach its seat-change listener. */
 export function renderSeatSelector(): HTMLElement {
     const seatSelectorContainer = document.getElementById('seat-selector-container') as HTMLElement
-    const initialTeamNames = getTeamIdentitiesFromSidebar()
+    const initialTeams = getAllTeamIdentities()
     seatSelect = makeCustomSelect(
         'seat-select',
-        initialTeamNames.map(buildSeatOption),
+        initialTeams.map(buildSeatOption),
     )
     seatSelect.element.style.flex = '1'
 
@@ -55,31 +54,32 @@ export function renderSeatSelector(): HTMLElement {
     // this listener registers first, the seat is already consistent when any reaction reads it.
     seatSelect.element.addEventListener('change', () => setCurrentSeat(requireSeatSelect().getValue() ?? null))
 
-    if (initialTeamNames.length > 0) {
-        setCurrentSeat(initialTeamNames[0])
-        seatSelect.setValue(initialTeamNames[0])
+    if (initialTeams.length > 0) {
+        setCurrentSeat(initialTeams[0].team_id)
+        seatSelect.setValue(initialTeams[0].team_id)
     }
     return seatSelect.element
 }
 
-/** Rebuilds the option list from the current identities and labels, preserving the selected
+/** Rebuilds the option list from the league's teams and labels, preserving the selected
  *  seat by value. A null seat adopts the first team — in app state and the control together.
  *  Never dispatches a change event: each caller knows whether the moment warrants an
- *  evaluate, so the reaction is theirs. Returns the adopted identity, or null when the
+ *  evaluate, so the reaction is theirs. Returns the adopted team id, or null when the
  *  existing selection survived. */
 export function refreshSeatOptions(): string | null {
-    const names = getTeamIdentitiesFromSidebar()
+    const teams = getAllTeamIdentities()
+    const teamIds = teams.map(team => team.team_id)
     // A seat is kept across a refresh only while it is still one of the teams. Connecting a
-    // live platform replaces the generic identities with the league's own, and a seat left
-    // pointing at 'Team 1' is not merely stale: it is sent as my_team_id on every evaluate,
-    // against a board keyed by the platform's names, where no such team exists. Identities are
+    // live platform replaces the own-data seats with the league's teams, and a seat left
+    // pointing at 'seat-1' is not merely stale: it is sent as my_team_id on every evaluate,
+    // against a board keyed by the platform's team ids, where no such team exists. Ids are
     // compared, not labels -- a relabel changes what a team is called, never which team it is.
     const seat = getCurrentSeat()
-    const keptSeat = seat !== null && names.includes(seat) ? seat : null
-    requireSeatSelect().setOptions(names.map(buildSeatOption), keptSeat ?? names[0])
-    if (keptSeat === null && names.length > 0) {
-        setCurrentSeat(names[0])
-        return names[0]
+    const keptSeat = seat !== null && teamIds.includes(seat) ? seat : null
+    requireSeatSelect().setOptions(teams.map(buildSeatOption), keptSeat ?? teamIds[0])
+    if (keptSeat === null && teamIds.length > 0) {
+        setCurrentSeat(teamIds[0])
+        return teamIds[0]
     }
     return null
 }

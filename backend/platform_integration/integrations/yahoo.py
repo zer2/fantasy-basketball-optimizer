@@ -46,7 +46,8 @@ from backend.platform_integration.base import (
 from backend.infra.secret_config import get_secret
 from yfpy.exceptions import YahooFantasySportsDataNotFound
 
-from backend.platform_integration.helpers import PlatformPlayerLookup, deduplicate_team_names
+from backend.platform_integration.helpers import PlatformPlayerLookup
+from backend.team_identity import make_platform_team_identities
 from backend.player_identity import RP_PLAYER_ID
 
 
@@ -358,12 +359,12 @@ class YahooIntegration(PlatformIntegration):
         return []
 
     def _fetch_team_pairs(self, league_id: str) -> list[tuple[str, str]]:
-        """Raw (team_name, team_id) pairs for the league."""
+        """(Yahoo team id, name) for every team that has joined the league, in Yahoo's order."""
         query = self._make_query(league_id)
         teams = query.get_league_teams()
         if isinstance(teams, dict):
             teams = list(teams.values())
-        return [(team.name.decode('UTF-8'), str(team.team_id)) for team in teams]
+        return [(str(team.team_id), team.name.decode('UTF-8')) for team in teams]
 
     def _read_league_settings(self, league_id: str):
         """The league's own settings object, or None when Yahoo will not give it up.
@@ -462,20 +463,17 @@ class YahooIntegration(PlatformIntegration):
         , league_id: str
         , division_id: Optional[str]
     ) -> LeagueShape:
-        """The league's seats, drafter count and roster size (_read_roster_size).
+        """The league's seats and roster size (_read_roster_size).
 
-        team_names covers EVERY seat, padding the joined teams with placeholders; teams_dict
-        keeps only the teams that exist on Yahoo's side, since it is the platform-id map.
+        The teams cover EVERY seat: the joined teams under their Yahoo ids, then "empty-N" for each seat nobody has
+        taken (team_identity), which Yahoo does not list.
         """
-        teams_dict = deduplicate_team_names(self._fetch_team_pairs(league_id))
-        joined_names = list(teams_dict.keys())
+        team_pairs = self._fetch_team_pairs(league_id)
         settings   = self._read_league_settings(league_id)
-        n_drafters = self._read_seat_count(settings, len(joined_names))
+        n_seats    = self._read_seat_count(settings, len(team_pairs))
         return LeagueShape(
-            team_names        = _pad_with_open_seats(joined_names, n_drafters),
-            n_drafters        = n_drafters,
+            teams             = make_platform_team_identities(team_pairs, n_seats),
             n_picks           = self._read_roster_size(settings, league_id),
-            teams_dict        = teams_dict,
             is_auction_draft  = self._read_is_auction(settings),
             slot_counts       = self._read_slot_counts(settings, league_id),
         )
@@ -500,23 +498,28 @@ class YahooIntegration(PlatformIntegration):
     ) -> PlatformSelections:
         query = self._make_query(config.league_id)
         injured_players: list[int] = []
-        # Every seat starts empty; the joined teams then fill theirs. A season league is always
-        # full, so this differs from teams_dict only in the half-filled draft-room case.
-        player_assignments: dict[str, list[int]] = {seat: [] for seat in config.seat_names}
         roster_by_team_id = self._read_all_rosters(query)
+        team_ids = {team.team_id for team in config.teams}
+        joined_since_connect = sorted(set(roster_by_team_id) - team_ids)
+        if joined_since_connect:
+            raise LookupError(f'Yahoo league {config.league_id} has teams it did not have when it was connected (ids '
+                              f'{joined_since_connect}): connect the league again to read its current teams.')
 
+        # Every seat starts empty; the teams Yahoo lists then fill theirs. A season league is always full, so a seat
+        # stays empty only in a half-filled draft room ("empty-N", which Yahoo does not list).
+        player_assignments: dict[str, list[int]] = {team.team_id: [] for team in config.teams}
         unmatched_player_names: dict[str, dict[int, str]] = {}
-        for team_name, team_id in config.teams_dict.items():
+        for team_id, roster in roster_by_team_id.items():
             players: list[int] = []
-            for yahoo_player_id, position, player_name in roster_by_team_id[str(team_id)]:
+            for yahoo_player_id, position, player_name in roster:
                 canonical = player_id_lookup.resolve_player_id(yahoo_player_id, player_name)
                 if position in _INJURED_POSITIONS:
                     injured_players.append(canonical)
                     continue
                 if canonical == RP_PLAYER_ID:
-                    unmatched_player_names.setdefault(team_name, {})[len(players)] = player_name
+                    unmatched_player_names.setdefault(team_id, {})[len(players)] = player_name
                 players.append(canonical)
-            player_assignments[team_name] = players
+            player_assignments[team_id] = players
 
         return PlatformSelections(
             player_assignments     = player_assignments,
@@ -573,11 +576,11 @@ class YahooIntegration(PlatformIntegration):
         auction league).
         """
         return PlatformSelections(
-            player_assignments     = {seat: [] for seat in config.seat_names},
+            player_assignments     = {team.team_id: [] for team in config.teams},
             status                 = status,
             injured_players        = [],
             unmatched_player_names = {},
-            costs                  = {seat: [] for seat in config.seat_names} if with_costs else None,
+            costs                  = {team.team_id: [] for team in config.teams} if with_costs else None,
         )
 
     @staticmethod
@@ -654,31 +657,29 @@ class YahooIntegration(PlatformIntegration):
         , config: PlatformConfig
         , player_id_lookup: PlatformPlayerLookup
     ) -> tuple[dict[str, list[int]], dict[str, list]]:
-        """Group draft/auction picks into ({team: [player, ...]}, {team: [cost, ...]}).
+        """Group draft/auction picks into ({team id: [player, ...]}, {team id: [cost, ...]}).
 
-        cost entries are None for a draft and floats for an auction; the caller passes
-        costs through only for auctions. Yahoo keys are 'game.player.<id>' /
-        'game.l.<league>.t.<team>'; we take the trailing id. Unknown teams fall back to
-        'Drafter <id>' (mirrors Streamlit).
+        cost entries are None for a draft and floats for an auction; the caller passes costs through only for
+        auctions. Yahoo keys are 'game.player.<id>' / 'game.l.<league>.t.<team>'; we take the trailing id. Seeded from
+        every seat, so an unfilled seat is a drafter with an empty roster, not a team missing from the league. A pick
+        by a team the league did not have when it was connected (a seat taken since) fails: it has no seat on the
+        board until the league is connected again.
         """
-        team_name_by_id = {team_id: team_name for team_name, team_id in config.teams_dict.items()}
-        # Seeded from the SEATS, not the joined teams: an unfilled seat is a drafter with an empty
-        # roster, not a team missing from the league. Picks are still keyed back to real names
-        # through teams_dict, so a seat that filled after connect lands under the 'Drafter <id>'
-        # fallback below until the next connect picks up its name.
-        player_assignments: dict[str, list[int]] = {seat: [] for seat in config.seat_names}
-        costs: dict[str, list] = {seat: [] for seat in config.seat_names}
+        player_assignments: dict[str, list[int]] = {team.team_id: [] for team in config.teams}
+        costs: dict[str, list] = {team.team_id: [] for team in config.teams}
 
         for draft_obj in draft_results:
             if not draft_obj.player_key:
                 continue
             player_id = int(draft_obj.player_key.split('.')[-1])
             team_id = draft_obj.team_key.split('.')[-1]
-            team_name = team_name_by_id.get(team_id, f'Drafter {team_id}')
+            if team_id not in player_assignments:
+                raise LookupError(f'Yahoo league {config.league_id} has a pick by team {team_id}, which had not joined '
+                                  f'when the league was connected: connect the league again to read its teams.')
             # A draft result names no player, only his key: the lookup has no name to fall back on.
-            player_assignments.setdefault(team_name, []).append(player_id_lookup.resolve_player_id(player_id, None))
+            player_assignments[team_id].append(player_id_lookup.resolve_player_id(player_id, None))
             raw_cost = getattr(draft_obj, 'cost', None)
-            costs.setdefault(team_name, []).append(float(raw_cost) if raw_cost is not None else None)
+            costs[team_id].append(float(raw_cost) if raw_cost is not None else None)
 
         return player_assignments, costs
 
@@ -706,23 +707,3 @@ def _read_corroborating_endpoints(access_token: str) -> dict[str, str]:
         except requests.RequestException as request_error:
             statuses[label] = f'{type(request_error).__name__}'
     return statuses
-
-
-def _pad_with_open_seats(joined_names: list[str], n_drafters: int) -> list[str]:
-    """One name per seat: the teams that have joined, then a placeholder for each empty seat.
-
-    Yahoo names unclaimed teams "Team N", so these are deliberately worded differently — a
-    placeholder here means "nobody has taken this seat yet", and it is replaced by the real name
-    on the next connect once someone does.
-    """
-    seats = list(joined_names)
-    taken = set(seats)
-    for seat_number in range(len(seats) + 1, n_drafters + 1):
-        label = f'Open seat {seat_number}'
-        collision = 2
-        while label in taken:
-            label = f'Open seat {seat_number} ({collision})'
-            collision += 1
-        seats.append(label)
-        taken.add(label)
-    return seats

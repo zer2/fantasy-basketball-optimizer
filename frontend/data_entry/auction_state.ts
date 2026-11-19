@@ -10,7 +10,7 @@ export interface AuctionConfig {
     nDrafters:   number
     nPicks:      number
     cashPerTeam: number
-    teamNames:   string[]
+    teamIds:   string[]
     key:         string
 }
 
@@ -18,7 +18,7 @@ export interface AuctionConfig {
 
 let picks:     (AuctionPick | null)[][] = []   // [row][drafter]
 let history:   [number, number, number][] = [] // undo stack: [row, drafter, nominator]
-let teamNames: string[]
+let teamIds: string[]
 let nDrafters:   number
 let nPicks:      number
 let cashPerTeam: number
@@ -29,7 +29,7 @@ let nominatorIndex = 0
 
 export function getPicks():       (AuctionPick | null)[][] { return picks       }
 export function getHistory():     [number, number, number][] { return history     }
-export function getTeamIdentitiesFromBoard():   string[]                 { return teamNames   }
+export function getTeamIdsFromBoard():   string[]                 { return teamIds   }
 export function getNDrafters():   number                   { return nDrafters   }
 export function getNPicks():      number                   { return nPicks      }
 export function getCashPerTeam(): number                   { return cashPerTeam }
@@ -72,7 +72,7 @@ export function applyAuctionConfig(cfg: AuctionConfig): void {
     picks          = Array.from({ length: cfg.nPicks }, () => Array(cfg.nDrafters).fill(null))
     history        = []
     nominatorIndex = 0
-    teamNames      = cfg.teamNames
+    teamIds      = cfg.teamIds
     nDrafters      = cfg.nDrafters
     nPicks         = cfg.nPicks
     cashPerTeam    = cfg.cashPerTeam
@@ -124,11 +124,12 @@ export function getAuctionState(): {
     const player_assignments: Record<string, number[]> = {}
     const remaining_cash:     Record<string, number>   = {}
     for (let d = 0; d < nDrafters; d++) {
-        const name      = teamNames[d] ?? `Team ${d + 1}`
+        const teamId    = teamIds[d]
+        if (teamId === undefined) throw new Error(`Drafter ${d + 1} of ${nDrafters} has no team on the board`)
         const teamPicks = picks.map(row => row[d]).filter(Boolean) as AuctionPick[]
-        player_assignments[name] = teamPicks.map(p => p.playerId)
-        const spent              = teamPicks.reduce((sum, p) => sum + p.cost, 0)
-        remaining_cash[name]     = cashPerTeam - spent
+        player_assignments[teamId] = teamPicks.map(p => p.playerId)
+        const spent                = teamPicks.reduce((sum, p) => sum + p.cost, 0)
+        remaining_cash[teamId]     = cashPerTeam - spent
     }
     return { player_assignments, remaining_cash }
 }

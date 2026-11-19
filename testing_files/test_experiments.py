@@ -37,6 +37,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / 'season_simulation'))
 
 from benchmark_helpers import client, _build_session_request
 from experiment_report_page import render_report_page
+from backend.services.session_management import list_session_teams
 from backend.state.session import get_session
 from backend.services.ranking import rank_candidates
 from experiment_harnesses.h_versus_g import draft_h_seat_rosters
@@ -947,7 +948,7 @@ def test_early_pick_stability(sessions, format_key, auction):
     for season in _SEASONS:
         session = sessions(format_key, auction, season)
         agent   = session.agent
-        teams   = session.current_settings['team_names']
+        teams   = [team.team_id for team in list_session_teams(session)]
         cash    = {t: 200.0 for t in teams} if auction else None
 
         agent.reset_draft_state()

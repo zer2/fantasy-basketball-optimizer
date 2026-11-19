@@ -1,5 +1,5 @@
 // Collects: sport, platform, mode, n_drafters, n_picks,
-//           cash_per_team (Auction Mode only), third_round_reversal, team_names, my_team_id
+//           cash_per_team (Auction Mode only), third_round_reversal, and the league's teams (team_registry)
 // Mirrors league_settings_popover() in src/setting_collection/league_settings.py
 
 import { makeCustomSelect } from '../custom_select.js'
@@ -10,7 +10,7 @@ import { connectPlatform } from '../api/client.js'
 import { makeConnectors, connectorPlatforms } from '../platforms/registry.js'
 import { PlatformConnector, ConnectStatus, PLATFORM_LEAGUE_CHOSEN } from '../platforms/connector.js'
 import { isSignedIn, makeSignInPrompt } from '../api/auth.js'
-import { defaultTeamLabel } from '../data_entry/team_labels.js'
+import { makeOwnDataTeams, setTeamRegistry } from '../team_registry.js'
 import { showLeaguePositionStructure, showManualPositionStructure } from './slot_counts.js'
 
 const DRAFT_MODE_OPTIONS = ['Draft Mode', 'Auction Mode', 'Season Mode'] as const
@@ -205,24 +205,19 @@ export function renderLeagueSettings(container: HTMLElement): void {
     trrCheckbox.checked = pref('third_round_reversal', false)
     trrCheckbox.addEventListener('change', () => savePref('third_round_reversal', trrCheckbox.checked))
 
-    // ── Team identities (hidden; "Team 1".."Team N", derived from drafter count) ──────
-    // Team *identity* is fixed "Team N" and drives all logic (my_team_id, draft/auction
-    // state, evaluate). The hidden #ls-team-names textarea keeps it in the DOM so existing
-    // readers (draft_board, auction, main.ts seat selector) work unchanged. Editable display
-    // labels live separately (team_labels.ts) and are shown/edited in the draft headers.
-    const hiddenNamesTextarea = document.createElement('textarea')
-    hiddenNamesTextarea.id = 'ls-team-names'
-    hiddenNamesTextarea.style.display = 'none'
-    container.append(hiddenNamesTextarea)
+    // ── The league's teams (team_registry) ──────────────────────────────────────
+    // Own data: "seat-1".."seat-N" for the current drafter count; a connected league: its own teams, installed on
+    // connect. Team ids drive all logic (my_team_id, draft/auction state, evaluate); names and the editable display
+    // labels (team_labels.ts) are only shown.
     container.append(trrToggle)
 
-    /** Reset #ls-team-names to "Team 1".."Team N" for the current drafter count, then notify
-     *  readers (the seat selector rebuilds its options from getTeamIdentitiesFromSidebar + getTeamLabel). */
+    /** Installs the own-data seats for the current drafter count (setTeamRegistry announces TEAM_REGISTRY_CHANGED, on
+     *  which the seat selector rebuilds). A drafter count mid-edit (empty, or not a positive number) installs nothing:
+     *  the input's own validation reports it, and the seats follow once it is valid. */
     function refreshTeamIdentities(): void {
         const nDrafters = parseInt(nDraftersInput.value)
         if (isNaN(nDrafters) || nDrafters <= 0) return
-        hiddenNamesTextarea.value = Array.from({ length: nDrafters }, (_, i) => defaultTeamLabel(i)).join('\n')
-        hiddenNamesTextarea.dispatchEvent(new Event('input', { bubbles: true }))
+        setTeamRegistry(makeOwnDataTeams(nDrafters))
     }
     refreshTeamIdentities()
     nDraftersInput.addEventListener('change', refreshTeamIdentities)
@@ -362,9 +357,9 @@ export function renderLeagueSettings(container: HTMLElement): void {
                 if (!resp.available_modes.includes(modeSelect.getValue())) {
                     modeSelect.setValue(resp.available_modes[0])
                 }
-                // Set n_drafters / n_picks directly — NOT via a change event, which
-                // would reset the team-name rows — and drive the seat selector via
-                // the hidden textarea's input event (main.ts repopulates it).
+                // Set n_drafters / n_picks directly — NOT via a change event, which would install the own-data
+                // seats over the league's teams — and install the league's teams below (main.ts rebuilds the seat
+                // selector on TEAM_REGISTRY_CHANGED).
                 nDraftersInput.value = String(resp.n_drafters)
                 nPicksInput.value    = String(resp.n_picks)
                 // Setting .value fires no change event, so neither the position structure nor
@@ -376,8 +371,7 @@ export function renderLeagueSettings(container: HTMLElement): void {
                 // does not fit the picks: the connection's session update waits for a valid one
                 // (draft_and_auction_session).
                 showLeaguePositionStructure(connector.platform, selection.league_id, resp.slot_counts, resp.n_picks)
-                hiddenNamesTextarea.value = resp.team_names.join('\n')
-                hiddenNamesTextarea.dispatchEvent(new Event('input', { bubbles: true }))
+                setTeamRegistry(resp.teams)
                 // Enables the live-layout Refresh Analysis button, for as long as the controls
                 // still describe this league in this mode.
                 connectedTo = describeSelection()
@@ -448,11 +442,6 @@ export function getMode(): DraftMode {
     return (document.getElementById('ls-mode') as HTMLInputElement).value as DraftMode
 }
 
-export function getTeamIdentitiesFromSidebar(): string[] {
-    return (document.getElementById('ls-team-names') as HTMLTextAreaElement)
-        .value.split('\n').map(s => s.trim()).filter(Boolean)
-}
-
 /**
  * Reads all League Settings values from the DOM and returns them as a plain object.
  */
@@ -464,7 +453,6 @@ export function getLeagueSettings(): {
     n_picks: number
     cash_per_team: number
     third_round_reversal: boolean
-    team_names: string[]
 } {
     const mode = getMode()
     return {
@@ -475,7 +463,6 @@ export function getLeagueSettings(): {
         n_picks:              readRequiredIntInput('ls-n-picks'),
         cash_per_team:        readRequiredIntInput('ls-cash-per-team'),
         third_round_reversal: (document.getElementById('ls-third-round-reversal') as HTMLInputElement).checked,
-        team_names:           getTeamIdentitiesFromSidebar(),
     }
 }
 
