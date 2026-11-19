@@ -7,7 +7,7 @@
 export interface DraftConfig {
     nDrafters:           number
     nPicks:              number
-    teamNames:           string[]
+    teamIds:           string[]
     thirdRoundReversal:  boolean
     key:                 string
 }
@@ -17,7 +17,7 @@ export interface DraftConfig {
 let pickRow     = 0
 let pickDrafter = 0
 let drafted: (number | null)[][] = []   // [row][drafter] player id, null = not yet picked
-let teamNames:          string[]
+let teamIds:          string[]
 let nDrafters:          number
 let nPicks:             number
 let thirdRoundReversal: boolean
@@ -33,7 +33,7 @@ let boardGeneration = 0
 export function getPickRow():     number              { return pickRow     }
 export function getPickDrafter(): number              { return pickDrafter }
 export function getDrafted():     (number | null)[][] { return drafted     }
-export function getTeamIdentitiesFromBoard():   string[]            { return teamNames   }
+export function getTeamIdsFromBoard():   string[]            { return teamIds   }
 export function getNDrafters(): number { return nDrafters }
 export function getNPicks():    number { return nPicks    }
 export function getConfigKey():   string              { return configKey   }
@@ -56,7 +56,7 @@ export function applyDraftConfig(cfg: DraftConfig): void {
     pickDrafter = 0
     boardGeneration += 1
     drafted     = Array.from({ length: cfg.nPicks }, () => Array(cfg.nDrafters).fill(null))
-    teamNames          = cfg.teamNames
+    teamIds          = cfg.teamIds
     nDrafters          = cfg.nDrafters
     nPicks             = cfg.nPicks
     thirdRoundReversal = cfg.thirdRoundReversal
@@ -151,8 +151,9 @@ export function goBackDraftPick(): void {
 export function getDraftState(): { player_assignments: Record<string, number[]> } {
     const player_assignments: Record<string, number[]> = {}
     for (let d = 0; d < nDrafters; d++) {
-        const name = teamNames[d] ?? `Team ${d + 1}`
-        player_assignments[name] = drafted
+        const teamId = teamIds[d]
+        if (teamId === undefined) throw new Error(`Drafter ${d + 1} of ${nDrafters} has no team on the board`)
+        player_assignments[teamId] = drafted
             .map(row => row[d])
             .filter(playerId => playerId !== null) as number[]
     }

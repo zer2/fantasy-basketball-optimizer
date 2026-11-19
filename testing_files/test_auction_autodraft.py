@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 
 from benchmark_helpers import client, _build_session_request
+from backend.services.session_management import list_session_teams
 from backend.state.session import get_session
 from backend.services import auction_autodraft
 from backend.services.auction_autodraft import (
@@ -29,7 +30,7 @@ def auction_session():
 
 
 def _empty_board(session):
-    teams = session.current_settings['team_names']
+    teams = [team.team_id for team in list_session_teams(session)]
     return {team: [] for team in teams}, {team: float(CASH) for team in teams}
 
 
@@ -176,7 +177,7 @@ def test_each_autodrafter_sees_the_players_through_its_own_noise(auction_session
     on every call for the same agent; and the agent's own X-scores untouched by a solve."""
     session = auction_session
     session.auction_team_x_scores.clear()
-    teams = session.current_settings['team_names']
+    teams = [team.team_id for team in list_session_teams(session)]
     agent_x_scores = session.agent.x_scores.copy()
     first, second = read_team_x_scores(session, teams[0]), read_team_x_scores(session, teams[1])
     first_noise = (first - agent_x_scores).drop(index=-1, errors='ignore').to_numpy()

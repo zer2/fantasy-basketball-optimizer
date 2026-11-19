@@ -4,6 +4,7 @@
 import pandas as pd
 import pytest
 
+from backend.team_identity import TeamIdentity
 from backend.data_retrieval import strip_accents
 from backend.player_identity import RP_PLAYER_ID, make_player_identity
 from backend.platform_integration.base import PlatformConfig
@@ -136,21 +137,19 @@ def test_espn_get_draft_results_robust_team_lookup(monkeypatch):
 
     lookup = _sample_lookup()
 
-    # Test with string team IDs, int team IDs, and renamed teams
     config = PlatformConfig(
         platform='Retrieve from ESPN',
         league_id='fba:99999::2024',
         division_id=None,
-        teams_dict={'Dallas Mavericks': '1', 'Denver Nuggets': 2},
         player_name_column='ESPN_NAME',
-        seat_names=['Dallas Mavericks', 'Denver Nuggets'],
+        teams=[TeamIdentity('1', 'Dallas Mavericks'), TeamIdentity('2', 'Denver Nuggets')],
     )
 
     state = integration.get_draft_results(config, 'Season Mode', lookup)
 
     # An injury status alone keeps a player on the roster; the IR slot moves him to the injured list (as Yahoo's IL).
-    assert state.player_assignments['Dallas Mavericks'] == [_DONCIC_ID, _WASHINGTON_ID]
-    assert state.player_assignments['Denver Nuggets'] == [_JOKIC_ID]
+    assert state.player_assignments['1'] == [_DONCIC_ID, _WASHINGTON_ID]
+    assert state.player_assignments['2'] == [_JOKIC_ID]
     assert state.injured_players == [_CLAXTON_ID]
 
 
@@ -175,8 +174,7 @@ def test_espn_league_shape_reads_the_roster_from_the_settings(monkeypatch):
     monkeypatch.setattr(integration, '_make_league', lambda league_id: mock_league)
 
     shape = integration.fetch_league_shape('fba:123::2024', None)
-    assert shape.n_drafters == 2
-    assert shape.team_names == ['Team A', 'Team B']
+    assert shape.teams == [TeamIdentity('1', 'Team A'), TeamIdentity('2', 'Team B')]
     assert shape.slot_counts == {'PG': 1, 'SG': 1, 'SF': 1, 'PF': 1, 'C': 2, 'G': 1, 'F': 1, 'Util': 6}
     assert shape.n_picks == 14
     assert shape.is_auction_draft is False
@@ -258,11 +256,10 @@ def test_an_unmatched_espn_player_keeps_his_place_and_his_name(monkeypatch):
         _MockPlayer('Another Stranger', lineup_slot='IR'), _MockPlayer('P.J. Washington')])])
     monkeypatch.setattr(integration, '_make_league', lambda league_id: mock_league)
     config = PlatformConfig(platform='Retrieve from ESPN', league_id='fba:1::2024', division_id=None,
-                            teams_dict={'Dallas Mavericks': '1'}, player_name_column='ESPN_NAME',
-                            seat_names=['Dallas Mavericks'])
+                            player_name_column='ESPN_NAME', teams=[TeamIdentity('1', 'Dallas Mavericks')])
     state = integration.get_draft_results(config, 'Season Mode', _sample_lookup())
-    assert state.player_assignments['Dallas Mavericks'] == [_DONCIC_ID, RP_PLAYER_ID, _WASHINGTON_ID]
-    assert state.unmatched_player_names == {'Dallas Mavericks': {1: 'Nobody Anyone Knows'}}
+    assert state.player_assignments['1'] == [_DONCIC_ID, RP_PLAYER_ID, _WASHINGTON_ID]
+    assert state.unmatched_player_names == {'1': {1: 'Nobody Anyone Knows'}}
     assert state.injured_players == [_CLAXTON_ID], 'an unmatched player on IR is nobody to put on the injured list'
 
 

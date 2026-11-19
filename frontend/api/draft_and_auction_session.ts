@@ -10,7 +10,7 @@ import {
 import { getActiveSlotCount, getSlotCounts, isSlotCountsValid } from '../setting_collection/slot_counts.js'
 import { getDraftState } from '../data_entry/draft_state.js'
 import { getAuctionState } from '../data_entry/auction_state.js'
-import { defaultTeamLabel } from '../data_entry/team_labels.js'
+import { listTeamIds, makeOwnDataTeams } from '../team_registry.js'
 import { buildTable, resetTable, addBatch, showTableMessage, reserveTailSpace, clearTailSpace } from '../table/player_table.js'
 import { showFailureInTable } from '../table/failure_message.js'
 
@@ -97,19 +97,19 @@ export function getFullTeamResult(): { h_score: number; win_rates: number[] } | 
 
 /** Per-team full budgets — the remaining cash of an auction board with no picks. Auction sessions
  *  require remaining_cash on every evaluate, including the empty-board base evaluation. */
-function buildFullBudgets(teamNames: string[]): Record<string, number> {
+function buildFullBudgets(teamIds: string[]): Record<string, number> {
     const { cash_per_team } = getLeagueSettings()
-    return Object.fromEntries(teamNames.map(name => [name, cash_per_team]))
+    return Object.fromEntries(teamIds.map(teamId => [teamId, cash_per_team]))
 }
 
-/** The evaluate request for an empty board: generic team names, no picks, evaluated from the
+/** The evaluate request for an empty board: generic own-data seats, no picks, evaluated from the
  *  first seat. An auction session requires remaining_cash on every evaluate — with no picks
  *  made, every team still holds its full budget. */
 function buildEmptyBoardEvaluateRequest(mode: string): Parameters<typeof evaluate>[1] {
     const { n_drafters } = getLeagueSettings()
-    const genericTeams = Array.from({ length: n_drafters }, (_, index) => defaultTeamLabel(index))
+    const genericTeams = makeOwnDataTeams(n_drafters).map(team => team.team_id)
     const request: Parameters<typeof evaluate>[1] = {
-        player_assignments: Object.fromEntries(genericTeams.map(name => [name, []])),
+        player_assignments: Object.fromEntries(genericTeams.map(teamId => [teamId, []])),
         my_team_id: genericTeams[0],
     }
     if (mode === 'Auction Mode') request.remaining_cash = buildFullBudgets(genericTeams)
@@ -313,7 +313,9 @@ async function evaluateSeat(seat: string, forAutopilot = false): Promise<number 
 
             // Full once the ACTIVE slots are filled: picks past them are perma-bench, which the backend does not
             // score (services/ranking.split_off_bench), so there is nothing left to rank for.
-            const myTeamSize = (evalReq.player_assignments[seat] ?? []).length
+            const myTeam = evalReq.player_assignments[seat]
+            if (myTeam === undefined) throw new Error(`The board has no team ${seat} to evaluate for`)
+            const myTeamSize = myTeam.length
             if (myTeamSize >= getActiveSlotCount()) {
                 latestFullTeamResult = null
                 const fullTeamResp = await evaluate(getSessionId()!, evalReq, signal)
@@ -406,8 +408,8 @@ async function evaluateSeat(seat: string, forAutopilot = false): Promise<number 
 export async function runEvaluate(options: { forAutopilot?: boolean } = {}): Promise<number | null> {
     const forAutopilot = options.forAutopilot ?? false
     // No explicit seat selected falls back to the first team; an empty league is a bug, not a default.
-    const seat = getCurrentSeat() ?? getLeagueSettings().team_names[0]
-    if (seat === undefined) throw new Error('runEvaluate: no seat selected and league has no team names')
+    const seat = getCurrentSeat() ?? listTeamIds()[0]
+    if (seat === undefined) throw new Error('runEvaluate: no seat selected and the league has no teams')
     const topPick = await evaluateSeat(seat, forAutopilot)
     if (forAutopilot) return topPick   // autopilot needs only the top candidate; nothing is shown
     const mode = getMode()

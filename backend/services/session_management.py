@@ -16,12 +16,22 @@ from backend.services.build_agent import POOL_SOURCE_SETTINGS, build_agent, load
 from backend.data_retrieval import get_player_name_resolvers, get_unified_player_table
 from backend.platform_integration.base import PlatformConfig
 from backend.platform_integration.helpers import build_platform_player_id_lookup
+from backend.team_identity import TeamIdentity, make_own_data_team_identities
 
 
 # How many previously built pipelines each session keeps (the current one is not counted).
 # Sized for the toggling-a-setting-back-and-forth pattern, small because each entry holds
 # the agent and every pipeline intermediate.
 _PIPELINE_CACHE_ENTRIES = 4
+
+
+def list_session_teams(session: Session) -> list[TeamIdentity]:
+    """The session's teams, in seat order: a connected league's as the platform listed them when connected, else the
+    user's own seats for the current drafter count. Derived rather than stored, so a patch to the drafter count
+    cannot leave a stale list behind."""
+    if session.platform_config is not None:
+        return session.platform_config.teams
+    return make_own_data_team_identities(session.current_settings['n_drafters'])
 
 
 def build_session(
@@ -41,7 +51,6 @@ def build_session(
     session.current_settings = current_settings
     if platform_config is not None:
         session.platform_config = platform_config
-        session.current_settings['team_names'] = list(platform_config.teams_dict.keys())
     try:
         build_agent(session, from_step=1, csv_bytes=csv_bytes, uploaded_dfs=uploaded_dfs)
         if session.platform_config is not None:
@@ -101,7 +110,6 @@ def apply_patch(
 
     if platform_config is not None:
         session.platform_config = platform_config
-        session.current_settings['team_names'] = list(platform_config.teams_dict.keys())
         # The lookup goes on beside the config, before the rebuild below, not after it. The draft-state poll
         # does not take the session lock (a poll should not wait out a rebuild), so it can run between
         # here and the end of this call -- and a config without its lookup there crashed the poll (502,

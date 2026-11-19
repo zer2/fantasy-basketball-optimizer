@@ -12,9 +12,10 @@ import {
 import { isMobileViewport, readRequiredIntInput } from '../../helper_functions.js'
 import { getTeamLabel, makeTeamLabelInput } from '../team_labels.js'
 import { getSelectedCategories } from '../../setting_collection/format_and_categories.js'
-import { getLeagueSettings, getTeamIdentitiesFromSidebar } from '../../setting_collection/league_settings.js'
+import { getLeagueSettings } from '../../setting_collection/league_settings.js'
+import { getTeamEntry, listTeamIds } from '../../team_registry.js'
 import {
-    evaluateTeamHScore, getLivePlatformEmptySlots, getLivePlatformRosters, getLivePlatformUnmatchedNames,
+    evaluateTeamHScore, getLivePlatformRoster,
 } from '../../api/season_session.js'
 import { makeSpacerTh } from '../../table/table_helpers.js'
 import {
@@ -44,7 +45,10 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
 
     const nDrafters = readRequiredIntInput('ls-n-drafters')
     const nPicks    = readRequiredIntInput('ls-n-picks')
-    const teamNames = getTeamIdentitiesFromSidebar()
+    const teamIds   = listTeamIds()
+    if (teamIds.length !== nDrafters) {
+        throw new Error(`The league has ${teamIds.length} teams but the sidebar says ${nDrafters} drafters`)
+    }
     // Option order follows playerResults (G-rank descending), so the dropdowns list the
     // best players first; labels come from the registry.
     const playerOptions = playerResults.map(p => ({
@@ -56,9 +60,8 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
     // Live platform → prefill the grid from the platform's rosters (blank until the
     // async poll populates the cache); own data → whatever the grid held before this redraw.
     const isLivePlatform = getLeagueSettings().platform !== 'Enter your own data'
-    const platformRosters = isLivePlatform ? getLivePlatformRosters() : null
-    const platformUnmatchedNames = isLivePlatform ? getLivePlatformUnmatchedNames() : null
-    const platformEmptySlots = isLivePlatform ? getLivePlatformEmptySlots() : null
+    // Each team's roster from the platform, or null for every team before the rosters arrive (and for own data).
+    const platformRosterByTeam = teamIds.map(teamId => isLivePlatform ? getLivePlatformRoster(teamId) : null)
     const enteredPlayerIdsByCell = isLivePlatform ? null : readEnteredPlayerIdsByCell()
     const poolPlayerIds = new Set(playerResults.map(p => String(p.player_id)))
 
@@ -80,12 +83,12 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
     pickTh.textContent = 'Pick'
     pickTh.style.width = '48px'
     hrow.append(pickTh)
-    teamNames.forEach((name, d) => {
+    teamIds.forEach((teamId, d) => {
         const th = document.createElement('th')
         // Own data → editable display label ("Team N" by default); live platform → the real
-        // team name (identity), shown read-only since it comes from the platform.
+        // team name, shown read-only since it comes from the platform.
         if (isLivePlatform) {
-            th.textContent = name
+            th.textContent = getTeamEntry(teamId).name
         } else {
             th.className = 'team-header-cell'
             const headerWrap = document.createElement('div')
@@ -115,9 +118,12 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
             // shown by the platform's name with a marker (an empty cell hid him, and the team then fell short of a full
             // roster and out of the Waiver and Trading tabs, 2026-10-20).
             // A slot the platform left empty holds the replacement player too, so the team is full; it says so.
-            const prefillPlayerId = isLivePlatform ? platformRosters?.[teamNames[d]]?.[r] : undefined
-            const isEmptySlot = platformEmptySlots?.[teamNames[d]]?.includes(r) ?? false
-            const unmatchedName = platformUnmatchedNames?.[teamNames[d]]?.[String(r)] ?? 'Unmatched player'
+            // A roster shorter than the grid leaves the rest of the column blank (prefillPlayerId undefined).
+            const platformRoster = platformRosterByTeam[d]
+            const prefillPlayerId = platformRoster?.roster[r]
+            const isEmptySlot = platformRoster?.emptySlots.includes(r) ?? false
+            // Fantrax names no rostered player (it reads rosters by scorer id), so an unmatched one there has no name.
+            const unmatchedName = platformRoster?.unmatchedNames[String(r)] ?? 'Unmatched player'
             const unmatchedOption = prefillPlayerId === REPLACEMENT_PLAYER_ID
                 ? [{ value: String(REPLACEMENT_PLAYER_ID)
                    , label: isEmptySlot ? 'Empty slot' : unmatchedName
@@ -313,11 +319,12 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
     // while it was being read (an evaluate landing, a connected league's rosters arriving). A remembered team this league
     // does not have falls back to the first.
     const savedInspectedTeam = pref<string | null>('season-inspected-team', null)
-    const initialInspectedTeam = savedInspectedTeam !== null && teamNames.includes(savedInspectedTeam)
-        ? savedInspectedTeam : teamNames[0]
+    const initialInspectedTeam = savedInspectedTeam !== null && teamIds.includes(savedInspectedTeam)
+        ? savedInspectedTeam : teamIds[0]
     const teamSel = makeCustomSelect(
         'sr-team-select',
-        teamNames.map((name, index) => ({ value: name, label: isLivePlatform ? name : getTeamLabel(index) })),
+        teamIds.map((teamId, index) => ({
+            value: teamId, label: isLivePlatform ? getTeamEntry(teamId).name : getTeamLabel(index) })),
         initialInspectedTeam,
         undefined,
         rosterListenerController.signal,
@@ -331,9 +338,9 @@ export function renderSeasonRosters(leftEl: HTMLElement, rightEl: HTMLElement): 
 
     function rebuildInspector(): void {
         const selectedTeam = teamSel.getValue()
-        const teamIdx = teamNames.indexOf(selectedTeam)
-        if (teamIdx < 0) { tableContainer.innerHTML = ''; return }
-        buildTeamGScoreTable(teamIdx, selects, nPicks, teamNames, tableContainer)
+        const teamIdx = teamIds.indexOf(selectedTeam)
+        if (teamIdx < 0) throw new Error(`The inspected team ${selectedTeam} is not one of the league's teams`)
+        buildTeamGScoreTable(teamIdx, selects, nPicks, teamIds, tableContainer)
     }
 
     // Rebuild when the team selector changes
@@ -364,7 +371,7 @@ async function buildTeamGScoreTable(
     teamIdx: number
     , selects: CustomSelect[][]
     , nPicks: number
-    , teamNames: string[]
+    , teamIds: string[]
     , container: HTMLElement
 ): Promise<void> {
     container.innerHTML = ''
@@ -374,15 +381,16 @@ async function buildTeamGScoreTable(
     // platform's name for an unmatched player, or an empty slot
     const rows: GScoreRowData[] = []
     const replacementLabelHtmlByRow = new Map<number, string>()
-    const platformUnmatchedNames = getLivePlatformUnmatchedNames()?.[teamNames[teamIdx]]
-    const platformEmptySlots = getLivePlatformEmptySlots()?.[teamNames[teamIdx]]
+    const isLivePlatform = getLeagueSettings().platform !== 'Enter your own data'
+    const platformRoster = isLivePlatform ? getLivePlatformRoster(teamIds[teamIdx]) : null
     for (let r = 0; r < nPicks; r++) {
         const playerId = readSelectedPlayerId(selects[r][teamIdx])
         if (playerId === null) continue
         if (playerId === REPLACEMENT_PLAYER_ID) {
-            replacementLabelHtmlByRow.set(rows.length, platformEmptySlots?.includes(r)
+            // Fantrax names no rostered player, so an unmatched one there has no name.
+            replacementLabelHtmlByRow.set(rows.length, platformRoster?.emptySlots.includes(r)
                 ? buildEmptySlotDisplayHtml()
-                : buildUnmatchedPlayerDisplayHtml(platformUnmatchedNames?.[String(r)] ?? 'Unmatched player'))
+                : buildUnmatchedPlayerDisplayHtml(platformRoster?.unmatchedNames[String(r)] ?? 'Unmatched player'))
         }
         rows.push(getGScoreRowOrThrow(playerId))
     }
@@ -424,10 +432,10 @@ async function buildTeamGScoreTable(
 
     if (rows.length < nPicks) return
 
-    const nDrafters = teamNames.length
+    const nDrafters = teamIds.length
     const playerAssignments: Record<string, number[]> = {}
     for (let d = 0; d < nDrafters; d++) {
-        const team = teamNames[d]
+        const team = teamIds[d]
         const players: number[] = []
         for (let r = 0; r < nPicks; r++) {
             const playerId = readSelectedPlayerId(selects[r][d])
@@ -436,8 +444,7 @@ async function buildTeamGScoreTable(
         playerAssignments[team] = players
     }
 
-    const teamName = teamNames[teamIdx]
-    const result = await evaluateTeamHScore(playerAssignments, teamName)
+    const result = await evaluateTeamHScore(playerAssignments, teamIds[teamIdx])
     if (!result) return
 
     // This panel's H-table keeps the colgroup-derived widths but not the 100% stretch —

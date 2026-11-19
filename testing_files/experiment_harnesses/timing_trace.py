@@ -15,6 +15,7 @@ What is measured, per format, on one season's historical stats:
     valuation), and after each round of sales the first team's full evaluate (its auction table).
 """
 
+from backend.services.session_management import list_session_teams
 from __future__ import annotations
 
 import functools
@@ -154,7 +155,7 @@ def time_draft(format_key: str
     with CallTracer(list_traced_functions()) as tracer:
         builds, session_id = time_session_builds(tracer, format_key, season, False)
         session = get_session(session_id)
-        teams = session.current_settings['team_names']
+        teams = [team.team_id for team in list_session_teams(session)]
         n_picks = session.current_settings['n_picks']
         assignments = {team: [] for team in teams}
         picks, boards = [], []

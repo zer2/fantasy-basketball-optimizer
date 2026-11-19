@@ -10,7 +10,7 @@ import {
     makeMultiSelectWidget, MultiSelectWidget, makeNumberInput, makeSidebarToggle, readRequiredIntInput, normalizeSearchText,
 } from '../../helper_functions.js'
 import { readRosterAssignments, readEmptyRostersMessage, listMovablePlayers } from './season_helpers.js'
-import { getTeamIdentitiesFromSidebar } from '../../setting_collection/league_settings.js'
+import { getTeamEntry, listTeamIds } from '../../team_registry.js'
 import { getGScoreById } from '../../app_state.js'
 import { getRegistryEntry } from '../../player_registry.js'
 import { buildPlayerOption, buildMinimalPlayerDisplayHtml } from '../../player_display.js'
@@ -350,7 +350,7 @@ function buildSuggestionTable(
 
         const teamCell = tr.insertCell()
         teamCell.className = 'trade-suggestion-team-cell'
-        teamCell.textContent = team
+        teamCell.textContent = getTeamEntry(team).name
         teamCell.style.textAlign = 'left'
 
         const sendCell = tr.insertCell()
@@ -362,7 +362,7 @@ function buildSuggestionTable(
         receiveCell.className = 'trade-suggestion-players'
         const teamLine = document.createElement('div')
         teamLine.className = 'trade-suggestion-team-line'
-        teamLine.textContent = `from ${team}`
+        teamLine.textContent = `from ${getTeamEntry(team).name}`
         receiveCell.append(teamLine)
         receiveCell.insertAdjacentHTML('beforeend', suggestion.receive.map(buildMinimalPlayerDisplayHtml).join(''))
         receiveCell.style.textAlign = 'left'
@@ -470,11 +470,11 @@ export function renderSeasonTrading(container: HTMLElement): void {
 
     container.innerHTML = ''
 
-    const teamNames   = getTeamIdentitiesFromSidebar()
-    const assignments = readRosterAssignments()
+    const teamIds     = listTeamIds()
+    const assignments = readRosterAssignments()   // every team, keyed by id
 
     const nPicks = readRequiredIntInput('ls-n-picks')
-    const fullTeams = teamNames.filter(t => (assignments[t]?.length ?? 0) >= nPicks)
+    const fullTeams = teamIds.filter(teamId => assignments[teamId].length >= nPicks)
 
     if (fullTeams.length < 2) {
         // Nothing while a connected league's rosters are pending: the indicator beside the tabs says so.
@@ -505,7 +505,7 @@ export function renderSeasonTrading(container: HTMLElement): void {
     const initialYourTeam = savedYourTeam !== null && fullTeams.includes(savedYourTeam) ? savedYourTeam : fullTeams[0]
     const yourTeamSel = makeCustomSelect(
         'trade-your-team',
-        fullTeams.map(n => ({ value: n, label: n })),
+        fullTeams.map(teamId => ({ value: teamId, label: getTeamEntry(teamId).name })),
         initialYourTeam,
         undefined,
         tradingListenerController.signal,
@@ -536,7 +536,7 @@ export function renderSeasonTrading(container: HTMLElement): void {
         ? savedTheirTeam : counterpartyOptions[0]
     const theirTeamSel = makeCustomSelect(
         'trade-their-team',
-        counterpartyOptions.map(n => ({ value: n, label: n })),
+        counterpartyOptions.map(teamId => ({ value: teamId, label: getTeamEntry(teamId).name })),
         initialTheirTeam,
         undefined,
         tradingListenerController.signal,
@@ -696,7 +696,7 @@ export function renderSeasonTrading(container: HTMLElement): void {
             && found.suggestion.their_score > theirThreshold
             && selected.includes(readTradeSizeLabel(found.suggestion))
             && isSuggestionMatchingSearch(found.suggestion, normalizedSearchText)
-            && normalizeSearchText(found.team).includes(normalizedTeamSearchText))
+            && normalizeSearchText(getTeamEntry(found.team).name).includes(normalizedTeamSearchText))
         if (shown.length > 0) {
             suggestResults.append(buildSuggestionTable(shown.slice(0, search.suggestionRowsShown), showSuggestedTrade))
             if (shown.length > search.suggestionRowsShown) {
@@ -944,7 +944,7 @@ export function renderSeasonTrading(container: HTMLElement): void {
         // Keep the counterparty when it is still a valid one (anyone but your new team).
         const options = fullTeams.filter(n => n !== yourTeam)
         const theirTeam = theirTeamSel.getValue()
-        theirTeamSel.setOptions(options.map(n => ({ value: n, label: n })),
+        theirTeamSel.setOptions(options.map(teamId => ({ value: teamId, label: getTeamEntry(teamId).name })),
                                 options.includes(theirTeam) ? theirTeam : options[0])
         savePref('ts-their-team', theirTeamSel.getValue())
         rebuildInspection()

@@ -29,6 +29,7 @@ import {
     getModeSelectElement, getPlatformSelectElement,
 } from './setting_collection/league_settings.js'
 import { TEAM_LABELS_CHANGED } from './data_entry/team_labels.js'
+import { TEAM_REGISTRY_CHANGED } from './team_registry.js'
 import {
     renderFormatAndCategories, getScoringFormat, getMostCategoriesWeight, getTiebreakerCategory,
     getSelectedCategories, isCategorySelectionValid,
@@ -272,18 +273,18 @@ for (const id of ['ls-n-drafters', 'ls-n-picks', 'ls-cash-per-team']) {
     })
 }
 
-// Team identities (#ls-team-names) only change when the drafter count changes (own data) or a
+// The league's teams (team_registry) only change when the drafter count changes (own data) or a
 // live platform connects — both already drive a layout re-render elsewhere — so this handler
-// keeps the seat-selector options in sync with the identity set. When a null seat adopts the
+// keeps the seat-selector options in sync with the teams. When a null seat adopts the
 // first new team, that adoption is a real seat change and runs the same flow a manual
 // selection would.
-document.getElementById('ls-team-names')!.addEventListener('input', () => {
+document.addEventListener(TEAM_REGISTRY_CHANGED, () => {
     if (refreshSeatOptions() === null) return
     // With a live platform the identities come FROM the league, so this fires as a step of
     // CONNECTING — and the connect flow runs its own evaluate once the session has been patched
     // with the platform config that evaluate depends on. Evaluating here too raced it, and lost
     // in the worst way: this one runs first, while the connection is not yet recorded (it is
-    // recorded on the line after the names are written), so it took the not-connected branch and
+    // recorded on the line after the teams are installed), so it took the not-connected branch and
     // painted default rankings, leaving the real evaluate to be aborted. That is the "first
     // Connect does nothing, second one works" behaviour — by the second click the seat is
     // already one of the league's teams, so nothing changes here and only the real evaluate runs.

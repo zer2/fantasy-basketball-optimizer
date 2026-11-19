@@ -13,6 +13,7 @@ agent's stored board and field state -- so they rerun unchanged when the self-pl
     other.
 """
 
+from backend.services.session_management import list_session_teams
 from dataclasses import dataclass
 
 import numpy as np
@@ -74,7 +75,7 @@ def measure_best_response_shortfalls(session, top_count, iterations) -> list:
     """For each of the top_count served players: its served H-score and win rates, and the best H-score any long
     descent (iterations) reaches against the same field, from the served build and from every exploring start."""
     agent = session.agent
-    teams = session.current_settings['team_names']
+    teams = [team.team_id for team in list_session_teams(session)]
     empty_board = {team: [] for team in teams}
     rates = agent._default_result['Rates']
     checks = []

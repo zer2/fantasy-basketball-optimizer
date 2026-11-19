@@ -10,12 +10,13 @@ from yfpy.models import League
 from yfpy.query import YahooFantasySportsQuery
 
 from backend.platform_integration.helpers import (
-    PlatformPlayerLookup, deduplicate_team_names, build_platform_player_id_lookup, fill_empty_slots_with_replacement,
+    PlatformPlayerLookup, build_platform_player_id_lookup, fill_empty_slots_with_replacement,
 )
 from backend.platform_integration.integrations.fantrax import (
     FantraxIntegration, to_unified_fantrax_id,
 )
-from backend.platform_integration.integrations.yahoo import YahooIntegration, _pad_with_open_seats
+from backend.platform_integration.integrations.yahoo import YahooIntegration
+from backend.team_identity import TeamIdentity, make_platform_team_identities
 from backend.platform_integration.integrations.espn import ESPNIntegration
 from backend.platform_integration.base import PlatformConfig
 from backend.player_identity import RP_PLAYER_ID, make_player_identity
@@ -86,7 +87,7 @@ def test_connect_patch_sets_the_lookup_before_the_rebuild(monkeypatch):
         player_registry=_player_registry(),
     )
     config = PlatformConfig(platform='Retrieve from Fantrax', league_id='L', division_id=None,
-                            teams_dict={'Ann': '1'}, player_name_column='FANTRAX_ID', seat_names=['Ann'])
+                            player_name_column='FANTRAX_ID', teams=[TeamIdentity('1', 'Ann')])
 
     session_management.apply_patch(session, patch={}, from_step=4, platform_config=config,
                                    csv_bytes=None, uploaded_dfs=None)
@@ -97,19 +98,17 @@ def test_connect_patch_sets_the_lookup_before_the_rebuild(monkeypatch):
     assert session.platform_player_id_lookup.resolve_player_id('j01', None) == _JOKIC_ID
 
 
-# ── Team-name dedup (the Fantrax bug fix) ─────────────────────────────────────
+# ── Team identities ───────────────────────────────────────────────────────────
 
-def test_deduplicate_team_names_disambiguates():
-    pairs = [('Team A', '1'), ('Team B', '2'), ('Team A', '3')]
-    assert deduplicate_team_names(pairs) == {'Team A': '1', 'Team B': '2', 'Team A 2': '3'}
+def test_platform_teams_keep_every_team_under_its_own_id():
+    """Teams are keyed by id, so two teams sharing a name (or a name with a trailing space) stay two teams."""
+    teams = make_platform_team_identities([('1', 'Dup'), ('2', 'Dup'), ('3', 'Bane Bros ')], 3)
+    assert teams == [TeamIdentity('1', 'Dup'), TeamIdentity('2', 'Dup'), TeamIdentity('3', 'Bane Bros ')]
 
 
-def test_deduplicate_team_names_preserves_every_team():
-    # Three teams share a display name — none should be lost (the bug being fixed).
-    pairs = [('Dup', 'a'), ('Dup', 'b'), ('Dup', 'c')]
-    result = deduplicate_team_names(pairs)
-    assert list(result.values()) == ['a', 'b', 'c']
-    assert set(result.keys()) == {'Dup', 'Dup 2', 'Dup 3'}
+def test_platform_teams_reject_a_repeated_id():
+    with pytest.raises(ValueError, match='more than once'):
+        make_platform_team_identities([('1', 'A'), ('1', 'B')], 2)
 
 
 # ── Fantrax draft/roster fetch (mocked API + unified table) ───────────────────
@@ -162,16 +161,15 @@ def test_get_draft_results_maps_ids_and_excludes_injured_in_season(monkeypatch):
     integration = _fantrax_with_fake_api(monkeypatch, roster_rows)
     config = PlatformConfig(
         platform='Retrieve from Fantrax', league_id='LID', division_id=None,
-        teams_dict={'Team One': 't1', 'Team Two': 't2'},
         player_name_column='FANTRAX_ID',
-        seat_names=['Team One', 'Team Two'],
+        teams=[TeamIdentity('t1', 'Team One'), TeamIdentity('t2', 'Team Two')],
     )
     state = integration.get_draft_results(config, 'Season Mode', _PLAYER_ID_LOOKUP)
 
     assert state.injured_players == [_ADEBAYO_ID]
     assert state.player_assignments == {
-        'Team One': [_JOKIC_ID],
-        'Team Two': [_HARDEN_ID],
+        't1': [_JOKIC_ID],
+        't2': [_HARDEN_ID],
     }
 
 
@@ -180,13 +178,12 @@ def test_get_draft_results_keeps_injured_in_draft_mode(monkeypatch):
     integration = _fantrax_with_fake_api(monkeypatch, roster_rows)
     config = PlatformConfig(
         platform='Retrieve from Fantrax', league_id='LID', division_id=None,
-        teams_dict={'T': 't1'}, player_name_column='FANTRAX_ID',
-        seat_names=['T'],
+        player_name_column='FANTRAX_ID', teams=[TeamIdentity('t1', 'T')],
     )
     state = integration.get_draft_results(config, 'Draft Mode', _PLAYER_ID_LOOKUP)
 
     assert state.injured_players == []
-    assert state.player_assignments == {'T': [_ADEBAYO_ID]}
+    assert state.player_assignments == {'t1': [_ADEBAYO_ID]}
 
 
 # ── Yahoo draft/auction parsing (pure logic, no yfpy) ─────────────────────────
@@ -201,9 +198,8 @@ class _FakeDraftObj:
 def test_yahoo_assignments_from_draft_groups_by_team_with_costs():
     config = PlatformConfig(
         platform='Retrieve from Yahoo', league_id='123', division_id=None,
-        teams_dict={'Team One': '1', 'Team Two': '2'},
         player_name_column='YAHOO_PLAYER_ID',
-        seat_names=['Team One', 'Team Two'],
+        teams=[TeamIdentity('1', 'Team One'), TeamIdentity('2', 'Team Two')],
     )
     player_id_lookup = _lookup_by_key({100: _JOKIC_ID, 200: _HARDEN_ID})
     draft = [
@@ -213,8 +209,8 @@ def test_yahoo_assignments_from_draft_groups_by_team_with_costs():
     ]
     assignments, costs = YahooIntegration()._assignments_from_draft(draft, config, player_id_lookup)
 
-    assert assignments == {'Team One': [_JOKIC_ID, RP_PLAYER_ID], 'Team Two': [_HARDEN_ID]}
-    assert costs == {'Team One': [50.0, 5.0], 'Team Two': [30.0]}
+    assert assignments == {'1': [_JOKIC_ID, RP_PLAYER_ID], '2': [_HARDEN_ID]}
+    assert costs == {'1': [50.0, 5.0], '2': [30.0]}
 
 
 class _FakeDraftResultsQuery:
@@ -229,9 +225,8 @@ class _FakeDraftResultsQuery:
 def _two_team_config():
     return PlatformConfig(
         platform='Retrieve from Yahoo', league_id='123', division_id=None,
-        teams_dict={'Team One': '1', 'Team Two': '2'},
         player_name_column='YAHOO_PLAYER_ID',
-        seat_names=['Team One', 'Team Two'],
+        teams=[TeamIdentity('1', 'Team One'), TeamIdentity('2', 'Team Two')],
     )
 
 
@@ -247,11 +242,11 @@ def test_yahoo_reads_a_single_draft_result(monkeypatch, mode):
     lookup = _lookup_by_key({100: _JOKIC_ID})
     if mode == 'Auction Mode':
         selections = integration.get_auction_results(_two_team_config(), mode, lookup)
-        assert selections.costs == {'Team One': [50.0], 'Team Two': []}
+        assert selections.costs == {'1': [50.0], '2': []}
     else:
         selections = integration.get_draft_results(_two_team_config(), mode, lookup)
     assert selections.status == 'Success'
-    assert selections.player_assignments == {'Team One': [_JOKIC_ID], 'Team Two': []}
+    assert selections.player_assignments == {'1': [_JOKIC_ID], '2': []}
 
 
 def test_yahoo_reads_several_draft_results_as_before(monkeypatch):
@@ -260,7 +255,7 @@ def test_yahoo_reads_several_draft_results_as_before(monkeypatch):
                _FakeDraftObj('nba.p.200', 'nba.l.123.t.2', cost=30)]
     monkeypatch.setattr(integration, '_make_query', lambda league_id: _FakeDraftResultsQuery(several))
     selections = integration.get_auction_results(_two_team_config(), 'Auction Mode', _lookup_by_key({100: _JOKIC_ID, 200: _HARDEN_ID}))
-    assert selections.player_assignments == {'Team One': [_JOKIC_ID], 'Team Two': [_HARDEN_ID]}
+    assert selections.player_assignments == {'1': [_JOKIC_ID], '2': [_HARDEN_ID]}
 
 
 class _FakeAllRostersQuery:
@@ -303,7 +298,7 @@ def test_yahoo_season_rosters_come_from_one_request(monkeypatch):
     monkeypatch.setattr(integration, '_make_query', lambda league_id: fake)
     lookup = _lookup_by_key({100: _JOKIC_ID, 200: _HARDEN_ID, 300: _ADEBAYO_ID})
     state = integration.get_draft_results(_two_team_config(), 'Season Mode', lookup)
-    assert state.player_assignments == {'Team One': [_JOKIC_ID, RP_PLAYER_ID], 'Team Two': [_HARDEN_ID]}
+    assert state.player_assignments == {'1': [_JOKIC_ID, RP_PLAYER_ID], '2': [_HARDEN_ID]}
     assert state.injured_players == [_ADEBAYO_ID]
     assert len(fake.requests) == 1 and fake.requests[0].endswith('/league/478.l.123/teams/roster')
 
@@ -314,7 +309,7 @@ def test_yahoo_season_roster_of_a_team_with_no_players(monkeypatch):
     monkeypatch.setattr(integration, '_make_query',
                         lambda league_id: _FakeAllRostersQuery(_fake_yahoo_teams([(1, [(100, 'PG')]), (2, [])])))
     assert integration.get_draft_results(_two_team_config(), 'Season Mode', _lookup_by_key({100: _JOKIC_ID})).player_assignments \
-        == {'Team One': [_JOKIC_ID], 'Team Two': []}
+        == {'1': [_JOKIC_ID], '2': []}
 
 
 def _yahoo_settings_with_positions(positions):
@@ -336,20 +331,15 @@ def test_yahoo_position_the_app_cannot_seat_fails_the_connection():
         YahooIntegration._read_slot_counts(_yahoo_settings_with_positions([('PG', 1), ('SF/PF', 1)]), '1')
 
 
-def test_yahoo_open_seats_pad_the_joined_teams():
-    """A room that is still filling still has every one of its seats."""
-    assert _pad_with_open_seats(['Zach', 'Burak'], 5) == [
-        'Zach', 'Burak', 'Open seat 3', 'Open seat 4', 'Open seat 5']
-    # Nothing to pad once the room is full, and never fewer seats than teams.
-    assert _pad_with_open_seats(['Zach', 'Burak'], 2) == ['Zach', 'Burak']
-    assert _pad_with_open_seats(['Zach', 'Burak'], 1) == ['Zach', 'Burak']
-
-
-def test_yahoo_open_seat_label_never_collides_with_a_real_team_name():
-    """Someone calling their team 'Open seat 3' must not merge two seats into one."""
-    seats = _pad_with_open_seats(['Open seat 3'], 3)
-    assert seats == ['Open seat 3', 'Open seat 2', 'Open seat 3 (2)']
-    assert len(set(seats)) == 3
+def test_yahoo_open_seats_get_empty_ids_after_the_joined_teams():
+    """A room that is still filling still has every one of its seats; the ones nobody has taken are "empty-N"."""
+    assert make_platform_team_identities([('1', 'Zach'), ('2', 'Burak')], 4) == [
+        TeamIdentity('1', 'Zach'), TeamIdentity('2', 'Burak'),
+        TeamIdentity('empty-1', 'Open seat 1'), TeamIdentity('empty-2', 'Open seat 2')]
+    assert make_platform_team_identities([('1', 'Zach'), ('2', 'Burak')], 2) == [
+        TeamIdentity('1', 'Zach'), TeamIdentity('2', 'Burak')]
+    with pytest.raises(ValueError, match='teams for a league of 1 seats'):
+        make_platform_team_identities([('1', 'Zach'), ('2', 'Burak')], 1)
 
 
 def test_yahoo_unfilled_seats_appear_on_the_board_with_empty_rosters():
@@ -360,14 +350,25 @@ def test_yahoo_unfilled_seats_appear_on_the_board_with_empty_rosters():
     """
     config = PlatformConfig(
         platform='Retrieve from Yahoo', league_id='123', division_id=None,
-        teams_dict={'Team One': '1'},
         player_name_column='YAHOO_PLAYER_ID',
-        seat_names=['Team One', 'Open seat 2', 'Open seat 3'],
+        teams=make_platform_team_identities([('1', 'Team One')], 3),
     )
     draft = [_FakeDraftObj('nba.p.100', 'nba.l.123.t.1')]
     assignments, _ = YahooIntegration()._assignments_from_draft(draft, config, _lookup_by_key({100: _JOKIC_ID}))
 
-    assert assignments == {'Team One': [_JOKIC_ID], 'Open seat 2': [], 'Open seat 3': []}
+    assert assignments == {'1': [_JOKIC_ID], 'empty-1': [], 'empty-2': []}
+
+
+def test_yahoo_a_pick_by_a_team_that_joined_after_connecting_fails():
+    """A team the board has no seat for cannot be placed; it used to land silently under 'Drafter <id>'."""
+    config = PlatformConfig(
+        platform='Retrieve from Yahoo', league_id='123', division_id=None,
+        player_name_column='YAHOO_PLAYER_ID',
+        teams=make_platform_team_identities([('1', 'Team One')], 2),
+    )
+    draft = [_FakeDraftObj('nba.p.100', 'nba.l.123.t.2')]
+    with pytest.raises(LookupError, match='connect the league again'):
+        YahooIntegration()._assignments_from_draft(draft, config, _lookup_by_key({100: _JOKIC_ID}))
 
 
 def test_yahoo_build_auth_url():
@@ -512,8 +513,8 @@ def test_yahoo_season_rosters_fall_back_to_the_players_name(monkeypatch):
     monkeypatch.setattr(integration, '_make_query', lambda league_id: fake)
     lookup = PlatformPlayerLookup({100: _JOKIC_ID}, {'Player 777': _HARDEN_ID}, {})
     state = integration.get_draft_results(_two_team_config(), 'Season Mode', lookup)
-    assert state.player_assignments['Team One'] == [_JOKIC_ID, _HARDEN_ID, RP_PLAYER_ID]
-    assert state.unmatched_player_names == {'Team One': {2: 'Player 999'}}, 'the unmatched player is named in place'
+    assert state.player_assignments['1'] == [_JOKIC_ID, _HARDEN_ID, RP_PLAYER_ID]
+    assert state.unmatched_player_names == {'1': {2: 'Player 999'}}, 'the unmatched player is named in place'
 
 
 def test_espn_get_draft_results_maps_rosters(monkeypatch):
@@ -525,17 +526,43 @@ def test_espn_get_draft_results_maps_rosters(monkeypatch):
     monkeypatch.setattr(integration, '_make_league', lambda league_id: fake)
     config = PlatformConfig(
         platform='Retrieve from ESPN', league_id='abc:1::2024', division_id=None,
-        teams_dict={'Team One': '1', 'Team Two': '2'},
         player_name_column='ESPN_NAME',
-        seat_names=['Team One', 'Team Two'],
+        teams=[TeamIdentity('1', 'Team One'), TeamIdentity('2', 'Team Two')],
     )
     player_id_lookup = _lookup_by_key({'Nikola Jokic': _JOKIC_ID, 'James Harden': _HARDEN_ID})
     state = integration.get_draft_results(config, 'Season Mode', player_id_lookup)
 
     assert state.player_assignments == {
-        'Team One': [_JOKIC_ID],
-        'Team Two': [_HARDEN_ID, RP_PLAYER_ID],
+        '1': [_JOKIC_ID],
+        '2': [_HARDEN_ID, RP_PLAYER_ID],
     }
+
+
+def test_espn_team_names_play_no_part_in_reading_rosters(monkeypatch):
+    """Two teams whose ESPN names end in a space lost their whole rosters when rosters were keyed by name
+    (2026-11-18). Keyed by ESPN's team id, the name is never looked up."""
+    integration = ESPNIntegration(s2='x', swid='y')
+    fake = _FakeEspnLeague([_FakeEspnTeam(8, "I'm Harden the club ", ['James Harden'])])
+    monkeypatch.setattr(integration, '_make_league', lambda league_id: fake)
+    config = PlatformConfig(
+        platform='Retrieve from ESPN', league_id='abc:1::2024', division_id=None,
+        player_name_column='ESPN_NAME', teams=[TeamIdentity('8', "I'm Harden the club ")],
+    )
+    state = integration.get_draft_results(config, 'Season Mode', _lookup_by_key({'James Harden': _HARDEN_ID}))
+    assert state.player_assignments == {'8': [_HARDEN_ID]}
+
+
+def test_espn_a_team_that_left_the_league_fails(monkeypatch):
+    """A connected team ESPN no longer lists has no roster to read; it used to be matched to another by position."""
+    integration = ESPNIntegration(s2='x', swid='y')
+    fake = _FakeEspnLeague([_FakeEspnTeam(2, 'Team Two', ['James Harden'])])
+    monkeypatch.setattr(integration, '_make_league', lambda league_id: fake)
+    config = PlatformConfig(
+        platform='Retrieve from ESPN', league_id='abc:1::2024', division_id=None,
+        player_name_column='ESPN_NAME', teams=[TeamIdentity('1', 'Team One')],
+    )
+    with pytest.raises(LookupError, match='no longer lists'):
+        integration.get_draft_results(config, 'Season Mode', _lookup_by_key({'James Harden': _HARDEN_ID}))
 
 
 def test_a_short_season_roster_is_filled_with_replacement_players():

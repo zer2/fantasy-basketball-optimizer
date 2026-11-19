@@ -39,7 +39,8 @@ from espn_api.wbasketball import League as WNBALeague
 from backend.platform_integration.base import (
     PlatformIntegration, LeagueShape, PlatformConfig, PlatformSelections,
 )
-from backend.platform_integration.helpers import PlatformPlayerLookup, deduplicate_team_names
+from backend.platform_integration.helpers import PlatformPlayerLookup
+from backend.team_identity import make_platform_team_identities
 from backend.player_identity import RP_PLAYER_ID
 
 
@@ -212,7 +213,8 @@ class ESPNIntegration(PlatformIntegration):
         return result
 
     def _team_pairs(self, league: League) -> list[tuple[str, str]]:
-        return [(team.team_name, str(team.team_id)) for team in league.teams]
+        """(ESPN team id, name) for every team, in ESPN's order."""
+        return [(str(team.team_id), team.team_name) for team in league.teams]
 
     @staticmethod
     def _read_slot_counts(league_settings: dict, league_id: str) -> dict[str, int]:
@@ -244,15 +246,13 @@ class ESPNIntegration(PlatformIntegration):
         slots and bench, IR left out (_read_slot_counts). Before this the roster size was the longest current roster,
         which counts players on IR and is 0 before the draft."""
         league = self._make_league(league_id)
-        teams_dict = deduplicate_team_names(self._team_pairs(league))
+        team_pairs = self._team_pairs(league)
         league_settings = league.espn_request.get_league()['settings']
         slot_counts = self._read_slot_counts(league_settings, league_id)
         draft_type = league_settings['draftSettings']['type']
         return LeagueShape(
-            team_names       = list(teams_dict.keys()),
-            n_drafters       = len(teams_dict),
+            teams            = make_platform_team_identities(team_pairs, len(team_pairs)),
             n_picks          = sum(slot_counts.values()),
-            teams_dict       = teams_dict,
             is_auction_draft = draft_type == 'AUCTION',
             slot_counts      = slot_counts,
         )
@@ -269,49 +269,35 @@ class ESPNIntegration(PlatformIntegration):
         fallback (PlatformPlayerLookup) tries the same name against every spelling the session knows."""
 
         league = self._make_league(config.league_id)
-        team_by_id = {}
-        team_by_name = {}
-        for team in league.teams:
-            team_by_id[str(team.team_id)] = team
-            team_by_id[team.team_id] = team
-            team_by_name[team.team_name] = team
-            team_by_name[team.team_name.strip()] = team
+        espn_team_by_id = {str(team.team_id): team for team in league.teams}
 
         player_assignments: dict[str, list[int]] = {}
         injured_players: list[int] = []
         unmatched_player_names: dict[str, dict[int, str]] = {}
 
-        team_list = list(league.teams)
-        for i, (team_name, team_id) in enumerate(config.teams_dict.items()):
-            team = (
-                team_by_id.get(str(team_id))
-                or team_by_id.get(team_id)
-                or team_by_name.get(team_name)
-                or team_by_name.get(team_name.strip())
-            )
-            # Fallback by positional index if ID and name both failed to match. Whole ESPN teams have been seen to go
-            # unmatched, for a reason not yet understood; the warning names the case so it can be found.
-            if team is None and i < len(team_list):
-                team = team_list[i]
-                logger.warning('ESPN: team %r (id %r) matched no team by id or name; using ESPN team %d, %r (id %r), '
-                               'by position', team_name, team_id, i, team.team_name, team.team_id)
+        for team_identity in config.teams:
+            # Every team was listed by ESPN when the league was connected; one ESPN no longer lists has left the league
+            # since, and its roster cannot be read until the league is connected again.
+            if team_identity.team_id not in espn_team_by_id:
+                raise LookupError(f'ESPN no longer lists team {team_identity.name!r} (id {team_identity.team_id}) in '
+                                  f'league {config.league_id}: connect the league again to read its current teams.')
+            espn_team = espn_team_by_id[team_identity.team_id]
 
             # A player in the IR slot is on the injured list and off the roster, as Yahoo's IL (the roster size leaves
             # IR out). An injury status alone is not: it marks a player still in the lineup -- day-to-day included --
             # and once put 2-8 players per team on the injured list (league 1801165221, 2026-10-20).
             roster = []
-            if team is not None and getattr(team, 'roster', None):
-                for player in team.roster:
-                    p_id = player_id_lookup.resolve_player_id(player.name, player.name)
-                    if player.lineupSlot == _ESPN_INJURED_SLOT_NAME:
-                        if p_id != RP_PLAYER_ID:
-                            injured_players.append(p_id)
-                        continue
-                    if p_id == RP_PLAYER_ID:
-                        unmatched_player_names.setdefault(team_name, {})[len(roster)] = player.name
-                    roster.append(p_id)
+            for player in espn_team.roster:
+                p_id = player_id_lookup.resolve_player_id(player.name, player.name)
+                if player.lineupSlot == _ESPN_INJURED_SLOT_NAME:
+                    if p_id != RP_PLAYER_ID:
+                        injured_players.append(p_id)
+                    continue
+                if p_id == RP_PLAYER_ID:
+                    unmatched_player_names.setdefault(team_identity.team_id, {})[len(roster)] = player.name
+                roster.append(p_id)
 
-            player_assignments[team_name] = roster
+            player_assignments[team_identity.team_id] = roster
 
         return PlatformSelections(
             player_assignments     = player_assignments,

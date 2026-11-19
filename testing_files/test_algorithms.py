@@ -15,6 +15,7 @@ import yaml
 from fastapi.testclient import TestClient
 from scipy.stats import norm
 
+from backend.services.session_management import list_session_teams
 from backend.main import app
 from backend.player_identity import RP_PLAYER_ID
 from backend.state.session import get_session
@@ -768,7 +769,7 @@ def test_self_play_field_matches_the_app_field(auction, scoring_format):
     assert response.status_code == 201, response.text
     session_id = response.json()['session_id']
     agent = get_session(session_id).agent
-    teams = get_session(session_id).current_settings['team_names']
+    teams = [team.team_id for team in list_session_teams(get_session(session_id))]
     empty = {team: [] for team in teams}
     drafter = teams[0]
     cash = {team: 200.0 for team in teams} if auction else None

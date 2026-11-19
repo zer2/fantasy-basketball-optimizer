@@ -38,21 +38,27 @@ export function getLivePlatformRosters(): Record<string, number[]> | null {
     return livePlatformRosters
 }
 
-/** The platform's name for each rostered player the session could not match, as team -> {roster position: name}
- *  (see DraftStateResponse); null alongside getLivePlatformRosters. */
-export function getLivePlatformUnmatchedNames(): Record<string, Record<string, string>> | null {
-    return livePlatformUnmatchedNames
-}
-
-/** The roster positions that were empty on the platform and hold the replacement player, as team -> positions (see
- *  DraftStateResponse); null alongside getLivePlatformRosters. */
-export function getLivePlatformEmptySlots(): Record<string, number[]> | null {
-    return livePlatformEmptySlots
-}
-
 /** Why the last pull of the platform's rosters failed, or null when it did not (or none has run). */
 export function getLivePlatformRosterError(): string | null {
     return livePlatformRosterError
+}
+
+/** One team's roster from the connected league, by team id, or null before the league's rosters have arrived. The
+ *  draft-state response lists every team of the league in every field (platforms.get_draft_state_route), so a team
+ *  missing from it is a contract violation, and throws: it once showed as a column of undefined slots. */
+export function getLivePlatformRoster(teamId: string): {
+    roster: number[]
+    unmatchedNames: Record<string, string>
+    emptySlots: number[]
+} | null {
+    if (livePlatformRosters === null) return null
+    const roster = livePlatformRosters[teamId]
+    const unmatchedNames = livePlatformUnmatchedNames?.[teamId]
+    const emptySlots = livePlatformEmptySlots?.[teamId]
+    if (roster === undefined || unmatchedNames === undefined || emptySlots === undefined) {
+        throw new Error(`The connected league's rosters have no team ${teamId}`)
+    }
+    return { roster, unmatchedNames, emptySlots }
 }
 
 export function clearLivePlatformRosters(): void {

@@ -6,14 +6,14 @@ import { makeCustomSelect } from '../custom_select.js'
 import { readRequiredIntInput, buildBoardTableShell } from '../helper_functions.js'
 import { getPlayerResults } from '../app_state.js'
 import { buildPlayerOption, makeMinimalPlayerDisplay } from '../player_display.js'
-import { getTeamIdentitiesFromSidebar } from '../setting_collection/league_settings.js'
+import { listTeamIds } from '../team_registry.js'
 import { makeDebouncer } from '../api/session.js'
 import { runEvaluate } from '../api/draft_and_auction_session.js'
 import { getTeamLabel, makeTeamLabelInput, TEAM_LABELS_CHANGED } from './team_labels.js'
 import { makeAutodraftToggle } from './autodraft_toggle.js'
 import {
     AuctionConfig,
-    getPicks, getTeamIdentitiesFromBoard, getNDrafters, getNPicks, getCashPerTeam, getConfigKey, getHistory,
+    getPicks, getTeamIdsFromBoard, getNDrafters, getNPicks, getCashPerTeam, getConfigKey, getHistory,
     resetAuctionState, applyAuctionConfig,
     recordAuctionPick, undoLastAuctionPick, clearAllAuctionPicks,
     getNominatorIndex, isAuctionComplete,
@@ -184,10 +184,10 @@ function buildPickControl(container: HTMLElement): HTMLElement {
     row.append(playerCol)
 
     // Drafter dropdown — before cost so the cap makes sense visually; full teams excluded.
-    // Option value is the team identity ("Team N", mapped back via indexOf on lock-in); the
-    // shown label is the editable display label.
-    const listAvailableTeamOptions = () => [{ value: '', label: '' }, ...getTeamIdentitiesFromBoard()
-        .map((name, index) => ({ value: name, label: getTeamLabel(index), index }))
+    // Option value is the team id (mapped back via indexOf on lock-in); the shown label is the
+    // editable display label.
+    const listAvailableTeamOptions = () => [{ value: '', label: '' }, ...getTeamIdsFromBoard()
+        .map((teamId, index) => ({ value: teamId, label: getTeamLabel(index), index }))
         .filter(({ index }) => currentPicks.some(pickRow => pickRow[index] === null))
         .map(({ value, label }) => ({ value, label }))]
     const teamSel = makeCustomSelect(
@@ -222,7 +222,7 @@ function buildPickControl(container: HTMLElement): HTMLElement {
     function updateCostMax(): void {
         const team = teamSel.getValue()
         if (team) {
-            const drafterIndex = getTeamIdentitiesFromBoard().indexOf(team)
+            const drafterIndex = getTeamIdsFromBoard().indexOf(team)
             costInput.max = String(maxBidForDrafter(drafterIndex))
         } else {
             costInput.removeAttribute('max')
@@ -238,7 +238,7 @@ function buildPickControl(container: HTMLElement): HTMLElement {
     btns.className = 'pick-control-buttons'
 
     if (!done) {
-        const anyAutodrafters = getTeamIdentitiesFromBoard().some((_, i) => isAuctionAutodrafter(i))
+        const anyAutodrafters = getTeamIdsFromBoard().some((_, i) => isAuctionAutodrafter(i))
 
         if (anyAutodrafters) {
             const nominateBtn = document.createElement('button')
@@ -270,7 +270,7 @@ function buildPickControl(container: HTMLElement): HTMLElement {
             if (Number.isNaN(chosenPlayerId)) throw new Error(`Auction pick select carried a non-numeric value: "${chosen}"`)
             const team = teamSel.getValue()
             if (!team) return
-            const drafterIndex = getTeamIdentitiesFromBoard().indexOf(team)
+            const drafterIndex = getTeamIdsFromBoard().indexOf(team)
             const cost = parseFloat(costInput.value)
             if (isNaN(cost) || cost <= 0) return
             const spent = sumSpentByDrafter(getPicks(), drafterIndex)
@@ -627,12 +627,12 @@ function readAuctionConfig(): AuctionConfig {
     const nPicks      = readRequiredIntInput('ls-n-picks')
     const cashPerTeam = readRequiredIntInput('ls-cash-per-team')
     const dataSource  = (document.getElementById('ps-data-type') as HTMLInputElement).value
-    const teamNames   = getTeamIdentitiesFromSidebar()
+    const teamIds     = listTeamIds()
     return {
         nDrafters
         , nPicks
         , cashPerTeam
-        , teamNames
-        , key: `${nDrafters}:${nPicks}:${cashPerTeam}:${dataSource}:${teamNames.join(',')}`
+        , teamIds
+        , key: `${nDrafters}:${nPicks}:${cashPerTeam}:${dataSource}:${teamIds.join(',')}`
     }
 }

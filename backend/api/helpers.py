@@ -92,9 +92,8 @@ def resolve_platform_config(
         platform           = platform,
         league_id          = platform_config_request.league_id,
         division_id        = platform_config_request.division_id,
-        teams_dict         = shape.teams_dict,
         player_name_column = integration.player_name_column,
-        seat_names         = shape.team_names,
+        teams              = shape.teams,
     )
 
 

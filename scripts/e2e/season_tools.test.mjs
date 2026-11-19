@@ -157,11 +157,11 @@ test('season tools on a self-built roster dataset', async t => {
             await waitAppSettled(app)
             const rows = page.locator('[data-testid="trade-suggestions"] tbody tr')
             const teams = await rows.evaluateAll(trs => [...new Set(trs.map(tr => tr.dataset.team))].sort())
-            assert.deepEqual(teams, ['Team 2', 'Team 3'], 'suggestions come from every other team')
+            assert.deepEqual(teams, ['seat-2', 'seat-3'], 'suggestions come from every other team')
             const yourScores = await rows.evaluateAll(trs => trs.map(tr => parseFloat(tr.cells[3].textContent)))
             assert.deepEqual(yourScores, [...yourScores].sort((a, b) => b - a), 'merged batches stay ranked by your score')
 
-            const otherTeam = (await page.locator('input#trade-their-team').inputValue()) === 'Team 2' ? 'Team 3' : 'Team 2'
+            const otherTeam = (await page.locator('input#trade-their-team').inputValue()) === 'seat-2' ? 'seat-3' : 'seat-2'
             await page.locator(`[data-testid="trade-suggestions"] tbody tr[data-team="${otherTeam}"]`).first().click()
             await waitAppSettled(app)
                         assert.equal(await page.locator('input#trade-their-team').inputValue(), otherTeam,
@@ -178,7 +178,7 @@ test('season tools on a self-built roster dataset', async t => {
             await page.locator('#trade-suggestion-search').fill('')
 
             await page.locator('#trade-team-search').fill('team 3')
-            assert.deepEqual(await rows.evaluateAll(trs => [...new Set(trs.map(tr => tr.dataset.team))]), ['Team 3'],
+            assert.deepEqual(await rows.evaluateAll(trs => [...new Set(trs.map(tr => tr.dataset.team))]), ['seat-3'],
                              'the team search keeps only trades with that team')
             await page.locator('#trade-team-search').fill('')
             for (const id of ['ts-your-threshold', 'ts-their-threshold']) {
@@ -355,9 +355,9 @@ test('season tools on a self-built roster dataset', async t => {
             await setSelect(page, 'waiver-team-select', 'Team 2')
             await waitAppSettled(app)
             await openSeasonTab('trading')
-            assert.match(await readChosenTeam('trade-your-team'), /Team 2/, 'Trading opens on the team chosen in Waiver')
+            assert.match(await readChosenTeam('trade-your-team'), /^seat-2$/, 'Trading opens on the team chosen in Waiver')
             await openSeasonTab('waiver')
-            assert.match(await readChosenTeam('waiver-team-select'), /Team 2/, 'Waiver keeps it when drawn again')
+            assert.match(await readChosenTeam('waiver-team-select'), /^seat-2$/, 'Waiver keeps it when drawn again')
             expectCleanSession(app, 'remembered team')
         })
 
@@ -370,7 +370,7 @@ test('season tools on a self-built roster dataset', async t => {
             await waitAppSettled(app)
             await openSeasonTab('waiver')
             await openSeasonTab('rosters')
-            assert.match(await readInspectedTeam(), /Team 3/, 'the inspector keeps the chosen team through a redraw')
+            assert.match(await readInspectedTeam(), /^seat-3$/, 'the inspector keeps the chosen team through a redraw')
             expectCleanSession(app, 'inspected team kept')
         })
 

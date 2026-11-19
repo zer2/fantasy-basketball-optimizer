@@ -15,7 +15,7 @@ import {
     getNominatorIndex,
     isAuctionComplete,
     getAuctionState,
-    getTeamIdentitiesFromBoard,
+    getTeamIdsFromBoard,
     getNDrafters,
 } from './auction_state.js'
 
@@ -67,14 +67,14 @@ export function isAuctionAutodrafter(drafterIndex: number): boolean {
 
 /** The board index of the user's seat, or -1 while no seat is selected. Used only to word turn prompts. */
 export function getCurrentSeatIndex(): number {
-    const seatName = getCurrentSeat()
-    return seatName === null ? -1 : getTeamIdentitiesFromBoard().indexOf(seatName)
+    const seatTeamId = getCurrentSeat()
+    return seatTeamId === null ? -1 : getTeamIdsFromBoard().indexOf(seatTeamId)
 }
 
 /** Whether the drafter is an autodrafter still waiting for its valuation of the player up for bid. */
 export function isAwaitingValuation(drafterIndex: number): boolean {
     if (!pendingNomination || !isAuctionAutodrafter(drafterIndex)) return false
-    return !(readTeamIdentity(drafterIndex) in pendingNomination.valuations)
+    return !(readTeamId(drafterIndex) in pendingNomination.valuations)
 }
 
 // ─── Lifecycle ────────────────────────────────────────────────────────────────
@@ -153,14 +153,14 @@ function requireSessionId(): string {
     return sessionId
 }
 
-function readTeamIdentity(drafterIndex: number): string {
-    const identity = getTeamIdentitiesFromBoard()[drafterIndex]
-    if (identity === undefined) throw new Error(`Drafter ${drafterIndex} has no team on the board.`)
-    return identity
+function readTeamId(drafterIndex: number): string {
+    const teamId = getTeamIdsFromBoard()[drafterIndex]
+    if (teamId === undefined) throw new Error(`Drafter ${drafterIndex} has no team on the board.`)
+    return teamId
 }
 
 function listAutodrafterTeamIds(): string[] {
-    return getTeamIdentitiesFromBoard().filter((_, index) => isAuctionAutodrafter(index))
+    return getTeamIdsFromBoard().filter((_, index) => isAuctionAutodrafter(index))
 }
 
 // ─── Bidding ──────────────────────────────────────────────────────────────────
@@ -172,7 +172,7 @@ function buildPendingNomination(
     const nDrafters = getNDrafters()
     const maxAllowedBids: Record<number, number> = {}
     for (let drafterIndex = 0; drafterIndex < nDrafters; drafterIndex++) {
-        const team = readTeamIdentity(drafterIndex)
+        const team = readTeamId(drafterIndex)
         if (!(team in result.max_allowed_bids)) throw new Error(`The nomination carried no maximum bid for ${team}.`)
         maxAllowedBids[drafterIndex] = result.max_allowed_bids[team]
     }
@@ -191,7 +191,7 @@ function buildPendingNomination(
         valuations:      { ...result.valuations },
         maxAllowedBids,
         turnIndex:       (nominatorIndex + 1) % nDrafters,
-        bidHistory:      [{ team: readTeamIdentity(nominatorIndex), bid: result.opening_bid, action: 'nominate' }],
+        bidHistory:      [{ team: readTeamId(nominatorIndex), bid: result.opening_bid, action: 'nominate' }],
         lastBids:        { [nominatorIndex]: result.opening_bid },
     }
     settleAutodrafterBidding(nomination)
@@ -221,10 +221,10 @@ function settleAutodrafterBidding(nomination: PendingNomination): void {
             && isAuctionAutodrafter(drafterIndex)
             // A team switched to autodraft while this nomination was being requested has no valuation yet;
             // the regular bidding fetches it when its turn comes.
-            && readTeamIdentity(drafterIndex) in nomination.valuations
+            && readTeamId(drafterIndex) in nomination.valuations
         if (!isSettling) continue
 
-        const team = readTeamIdentity(drafterIndex)
+        const team = readTeamId(drafterIndex)
         const nextBid = nomination.currentBid + 1
         if (nextBid <= nomination.valuations[team] && nextBid <= nomination.maxAllowedBids[drafterIndex]) {
             nomination.currentBid = nextBid
@@ -260,7 +260,7 @@ function advanceAutobidders(nomination: PendingNomination): BiddingOutcome {
         }
         if (drafterIndex === nomination.highBidderIndex) return 'complete'
 
-        const team = readTeamIdentity(drafterIndex)
+        const team = readTeamId(drafterIndex)
         const nextBid = nomination.currentBid + 1
         const canAffordNextBid = nextBid <= nomination.maxAllowedBids[drafterIndex]
         if (!isAuctionAutodrafter(drafterIndex) && canAffordNextBid) return 'manual-turn'
@@ -284,7 +284,7 @@ function advanceAutobidders(nomination: PendingNomination): BiddingOutcome {
 function awardNomination(nomination: PendingNomination): void {
     const recorded = recordAuctionPick(nomination.playerId, nomination.currentBid, nomination.highBidderIndex)
     if (!recorded) {
-        throw new Error(`${nomination.playerName} could not be awarded to ${readTeamIdentity(nomination.highBidderIndex)}`
+        throw new Error(`${nomination.playerName} could not be awarded to ${readTeamId(nomination.highBidderIndex)}`
                         + ': that team has no empty roster slot.')
     }
     if (pendingNomination === nomination) pendingNomination = null
@@ -307,7 +307,7 @@ function continueNomination(nomination: PendingNomination): void {
 
 /** Fetches valuations for autodrafters that have none for the player up for bid, then resumes bidding. */
 async function fetchMissingValuations(nomination: PendingNomination): Promise<void> {
-    const missingTeams = getTeamIdentitiesFromBoard().filter((team, index) =>
+    const missingTeams = getTeamIdsFromBoard().filter((team, index) =>
         isAuctionAutodrafter(index) && !(team in nomination.valuations) && !valuationRequestsInFlight.has(team))
     if (missingTeams.length === 0) return
     missingTeams.forEach(team => valuationRequestsInFlight.add(team))
@@ -353,7 +353,7 @@ async function runAuctionAutopilot(): Promise<void> {
 
             const result = await withSessionRetry(() => nominateAuctionPlayer(requireSessionId(), {
                 ...getAuctionState(),
-                nominator_id:        readTeamIdentity(nominatorIndex),
+                nominator_id:        readTeamId(nominatorIndex),
                 nominated_player_id: null,
                 opening_bid:         null,
                 valuation_team_ids:  listAutodrafterTeamIds(),
@@ -396,16 +396,16 @@ export function submitManualBid(
     try {
         const nomination = pendingNomination
         if (!nomination) throw new Error('There is no player up for bid.')
-        if (drafterIndex !== nomination.turnIndex) throw new Error(`It is not ${readTeamIdentity(drafterIndex)}'s turn to bid.`)
-        if (drafterIndex === nomination.highBidderIndex) throw new Error(`${readTeamIdentity(drafterIndex)} already holds the high bid.`)
+        if (drafterIndex !== nomination.turnIndex) throw new Error(`It is not ${readTeamId(drafterIndex)}'s turn to bid.`)
+        if (drafterIndex === nomination.highBidderIndex) throw new Error(`${readTeamId(drafterIndex)} already holds the high bid.`)
         if (!Number.isInteger(bid) || bid <= nomination.currentBid) {
             throw new Error(`A bid must be a whole number of dollars above the current $${nomination.currentBid}.`)
         }
         if (bid > nomination.maxAllowedBids[drafterIndex]) {
-            throw new Error(`$${bid} is above ${readTeamIdentity(drafterIndex)}'s maximum allowable bid of `
+            throw new Error(`$${bid} is above ${readTeamId(drafterIndex)}'s maximum allowable bid of `
                             + `$${nomination.maxAllowedBids[drafterIndex]}.`)
         }
-        const team = readTeamIdentity(drafterIndex)
+        const team = readTeamId(drafterIndex)
         nomination.currentBid = bid
         nomination.highBidderIndex = drafterIndex
         nomination.lastBids[drafterIndex] = bid
@@ -422,12 +422,12 @@ export function passManualBid(drafterIndex: number): void {
     try {
         const nomination = pendingNomination
         if (!nomination) throw new Error('There is no player up for bid.')
-        if (drafterIndex !== nomination.turnIndex) throw new Error(`It is not ${readTeamIdentity(drafterIndex)}'s turn.`)
+        if (drafterIndex !== nomination.turnIndex) throw new Error(`It is not ${readTeamId(drafterIndex)}'s turn.`)
         if (drafterIndex === nomination.highBidderIndex) {
-            throw new Error(`${readTeamIdentity(drafterIndex)} holds the high bid and cannot pass.`)
+            throw new Error(`${readTeamId(drafterIndex)} holds the high bid and cannot pass.`)
         }
         nomination.activeBidders.delete(drafterIndex)
-        nomination.bidHistory.push({ team: readTeamIdentity(drafterIndex), bid: nomination.currentBid, action: 'pass' })
+        nomination.bidHistory.push({ team: readTeamId(drafterIndex), bid: nomination.currentBid, action: 'pass' })
         nomination.turnIndex = (drafterIndex + 1) % getNDrafters()
         continueNomination(nomination)
     } catch (error) {
@@ -447,14 +447,14 @@ export async function nominateManually(
         }
         const nominatorIndex = getNominatorIndex()
         if (isAuctionAutodrafter(nominatorIndex)) {
-            throw new Error(`${readTeamIdentity(nominatorIndex)} is an autodrafter and nominates on its own.`)
+            throw new Error(`${readTeamId(nominatorIndex)} is an autodrafter and nominates on its own.`)
         }
         nominationRequestInFlight = true
         notifyAuctionAutodraftChanged()
         const generation = boardGeneration
         const result = await withSessionRetry(() => nominateAuctionPlayer(requireSessionId(), {
             ...getAuctionState(),
-            nominator_id:        readTeamIdentity(nominatorIndex),
+            nominator_id:        readTeamId(nominatorIndex),
             nominated_player_id: playerId,
             opening_bid:         openingBid,
             valuation_team_ids:  listAutodrafterTeamIds(),

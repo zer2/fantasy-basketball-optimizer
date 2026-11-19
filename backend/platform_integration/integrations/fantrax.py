@@ -25,7 +25,8 @@ logger = logging.getLogger('fbbo')
 from backend.platform_integration.base import (
     PlatformIntegration, LeagueShape, PlatformConfig, PlatformSelections,
 )
-from backend.platform_integration.helpers import PlatformPlayerLookup, deduplicate_team_names
+from backend.platform_integration.helpers import PlatformPlayerLookup
+from backend.team_identity import make_platform_team_identities
 from backend.player_identity import RP_PLAYER_ID
 
 
@@ -104,20 +105,15 @@ class FantraxIntegration(PlatformIntegration):
         , league_id: str
         , division_id: Optional[str]
     ) -> LeagueShape:
-        """Return the league's team names, drafter count, and pick count.
+        """Return the league's teams under their Fantrax ids, and the pick count.
 
         `division_id` is accepted and ignored — see list_divisions.
         """
         info = self.fetch_from_beta_api('getLeagueInfo', league_id)
-        teams_dict = deduplicate_team_names([
-            (team['name'], team['id']) for team in info['teamInfo'].values()
-        ])
-        team_names = list(teams_dict.keys())
+        team_pairs = [(team['id'], team['name']) for team in info['teamInfo'].values()]
         return LeagueShape(
-            team_names       = team_names,
-            n_drafters       = len(team_names),
+            teams            = make_platform_team_identities(team_pairs, len(team_pairs)),
             n_picks          = self._roster_slot_count(info),
-            teams_dict       = teams_dict,
             is_auction_draft = self._is_auction_draft(info),
         )
 
@@ -164,11 +160,11 @@ class FantraxIntegration(PlatformIntegration):
         unmatched_count = 0
 
         player_assignments: dict[str, list[int]] = {}
-        for team_name, team_id in config.teams_dict.items():
+        for team in config.teams:
             roster: list[int] = []
             # A team with no entry has not drafted yet, which is the normal state of a draft
             # room that is still filling — not an error.
-            items = rosters_by_team_id.get(team_id, {}).get('rosterItems', [])
+            items = rosters_by_team_id.get(team.team_id, {}).get('rosterItems', [])
             unreadable, matched = [], 0
             for item in items:
                 scorer_id = read_roster_field(item, _PLAYER_ID_FIELDS, 'player id')
@@ -191,13 +187,13 @@ class FantraxIntegration(PlatformIntegration):
             if items and matched == 0:
                 raise ValueError(
                     f'No player id found in any of the {len(items)} Fantrax roster entries '
-                    f'for {team_name}. '
+                    f'for {team.name}. '
                     f'Tried {_PLAYER_ID_FIELDS}; the entries carry {unreadable[0]}. '
                     f'The Beta API shape has changed.')
             if unreadable:
                 logger.warning('Fantrax: skipped %d roster entry/entries with no player id for %s',
-                               len(unreadable), team_name)
-            player_assignments[team_name] = roster
+                               len(unreadable), team.name)
+            player_assignments[team.team_id] = roster
 
         if unmatched_count:
             logger.warning('Fantrax roster mapping: %d player(s) fell back to RP', unmatched_count)

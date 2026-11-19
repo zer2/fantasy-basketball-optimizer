@@ -367,9 +367,9 @@ agent_cache_misses = 0
 
 
 # Settings no pipeline step reads, so keying on them would only ever cost a needless rebuild:
-# team_names is cosmetic, and allow_force_weighting is applied per-evaluate to the built agent
+# allow_force_weighting is applied per-evaluate to the built agent
 # (see services/ranking.py) because the pins deliberately do not enter the field build.
-_CACHE_KEY_IGNORED = ('team_names', 'allow_force_weighting')
+_CACHE_KEY_IGNORED = ('allow_force_weighting',)
 
 
 def clear_agent_cache() -> None:

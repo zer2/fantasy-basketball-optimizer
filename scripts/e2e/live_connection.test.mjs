@@ -16,7 +16,13 @@ import {
     readDropdownOptionLabels, APP,
 } from './helpers.mjs'
 
-const LEAGUE_TEAMS = ['Ann', 'Bob', 'Cat', 'Dan']
+// Ids unlike the names, so a lookup by name would find nothing; Ann's name ends in a space, as two ESPN teams' did when
+// a lookup by trimmed name lost their whole rosters without an error (2026-11-18).
+const LEAGUE_TEAMS = [
+    { team_id: '11', name: 'Ann ' }, { team_id: '12', name: 'Bob' }, { team_id: '13', name: 'Cat' },
+    { team_id: '14', name: 'Dan' },
+]
+const [ANN, BOB, CAT, DAN] = LEAGUE_TEAMS.map(team => team.team_id)
 const ALL_MODES = ['Draft Mode', 'Auction Mode', 'Season Mode']
 const JOKIC_ID = 203999
 
@@ -25,11 +31,11 @@ const JOKIC_ID = 203999
  *  which a test can change to stand in for picks being made on the platform; `configuredSlotCounts` collects the
  *  slot_counts of every session update that carried the connection. */
 async function stubLivePlatform(page, { availableModes, picksPerTeam = 13, slotCounts = null }) {
-    const platformBoard = { assignments: { Ann: [JOKIC_ID], Bob: [], Cat: [], Dan: [] }, configuredSlotCounts: [] }
+    const platformBoard = { assignments: { [ANN]: [JOKIC_ID], [BOB]: [], [CAT]: [], [DAN]: [] }, configuredSlotCounts: [] }
     const connectedSessions = new Set()
     await page.route(url => url.pathname.endsWith('/connect'), route => route.fulfill({
         status: 200, contentType: 'application/json',
-        body: JSON.stringify({ team_names: LEAGUE_TEAMS, n_drafters: LEAGUE_TEAMS.length, n_picks: picksPerTeam,
+        body: JSON.stringify({ teams: LEAGUE_TEAMS, n_drafters: LEAGUE_TEAMS.length, n_picks: picksPerTeam,
                                available_modes: availableModes, is_auction_draft: false, slot_counts: slotCounts }),
     }))
     await page.route(url => /^\/sessions(\/[^/]+)?$/.test(url.pathname), async route => {
@@ -55,7 +61,10 @@ async function stubLivePlatform(page, { availableModes, picksPerTeam = 13, slotC
         }
         return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
             player_assignments: platformBoard.assignments,
-            injured_players: [], unmatched_player_names: {}, empty_slots: {}, status: 'Success',
+            // The backend lists every team in every team-keyed field (platforms.get_draft_state_route).
+            injured_players: [], status: 'Success',
+            unmatched_player_names: Object.fromEntries(Object.keys(platformBoard.assignments).map(team => [team, {}])),
+            empty_slots: Object.fromEntries(Object.keys(platformBoard.assignments).map(team => [team, []])),
             remaining_cash: null,
         }) })
     })
@@ -197,7 +206,7 @@ test('a hidden tab keeps following the draft, through the last pick', async () =
                      203497, 1630166, 1628404, 1629614]
     const lastPicks = [1642273, 1631217, 1630174, 1629029]
     const boardWith = picksMade => Object.fromEntries(LEAGUE_TEAMS.map((team, index) => [
-        team, [...players.slice(index * 12, index * 12 + 12), ...(index < picksMade ? [lastPicks[index]] : [])]]))
+        team.team_id, [...players.slice(index * 12, index * 12 + 12), ...(index < picksMade ? [lastPicks[index]] : [])]]))
     try {
         await loadApp(app)
         // The stub's rosters are current players (2025 rookies among them), who are in the projections pool only.
@@ -306,8 +315,8 @@ test('a connected draft is followed without clicking Refresh', async t => {
             await page.locator('#hscoretable .playerpopup.popup-open').first().waitFor({ timeout: 10000 })
 
             const pickEvaluated = page.waitForRequest(request => request.url().endsWith('/evaluate')
-                && request.postDataJSON().player_assignments.Bob?.includes(1628389), { timeout: 15000 })
-            platformBoard.assignments = { Ann: [JOKIC_ID], Bob: [1628389], Cat: [], Dan: [] }   // Bob takes Adebayo
+                && request.postDataJSON().player_assignments[BOB].includes(1628389), { timeout: 15000 })
+            platformBoard.assignments = { [ANN]: [JOKIC_ID], [BOB]: [1628389], [CAT]: [], [DAN]: [] }   // Bob takes Adebayo
             // Waits for the evaluate that carries the pick: the table empties for a moment while an earlier evaluate
             // redraws it, which satisfied "Adebayo is gone" before the pick was even polled, and the pick's evaluate
             // then landed in the next step's quiet window.
@@ -400,11 +409,11 @@ test('before the first pick the board is polled slowly, and at full speed once a
     try {
         await loadApp(app)
         const platformBoard = await stubLivePlatform(page, { availableModes: ALL_MODES })
-        platformBoard.assignments = { Ann: [], Bob: [], Cat: [], Dan: [] }
+        platformBoard.assignments = { [ANN]: [], [BOB]: [], [CAT]: [], [DAN]: [] }
         await connectYahooLeague(app, '12345')
         assert.ok(await pollsDuring(12000) <= 2, 'an empty board is polled about every 10 seconds')
 
-        platformBoard.assignments = { Ann: [JOKIC_ID], Bob: [], Cat: [], Dan: [] }
+        platformBoard.assignments = { [ANN]: [JOKIC_ID], [BOB]: [], [CAT]: [], [DAN]: [] }
         await page.waitForTimeout(11000)   // the slow poll picks up the first pick
         await waitAppSettled(app, { timeout: 120000 })
         assert.ok(await pollsDuring(5000) >= 3, 'after the first pick the board is polled every second')
@@ -425,7 +434,7 @@ test('when the platform stops reporting a finished draft, its results stay up', 
         await connectYahooLeague(app, '12345')
         const resultsBefore = await page.locator('#hscoretable .overallhscore').allInnerTexts()
 
-        platformBoard.assignments = { Ann: [], Bob: [], Cat: [], Dan: [] }
+        platformBoard.assignments = { [ANN]: [], [BOB]: [], [CAT]: [], [DAN]: [] }
         await page.waitForTimeout(5000)
         assert.deepEqual(await page.locator('#hscoretable .overallhscore').allInnerTexts(), resultsBefore,
                          'the final results must stay up')
@@ -454,7 +463,7 @@ for (const startMode of ['Season Mode', 'Draft Mode']) {
             await connectYahooLeague(app, '12345')
 
             const headers = await page.locator('.entry-table thead th').allInnerTexts()
-            assert.deepEqual(headers.slice(1), LEAGUE_TEAMS, 'the grid must show the league\'s own teams')
+            assert.deepEqual(headers.slice(1), LEAGUE_TEAMS.map(team => team.name), 'the grid must show the league\'s own teams')
             assert.match(await page.locator('.entry-table').first().innerText(), /Joki/,
                          'the grid must be filled from the platform\'s rosters')
             expectCleanSession(app, 'Season Mode connect')
@@ -527,7 +536,7 @@ test("a Waiver tab drawn before the league's rosters arrive is redrawn when they
         await waitAppSettled(app, { timeout: 120000 })
         const platformBoard = await stubLivePlatform(page, { availableModes: ['Season Mode'] })
         platformBoard.assignments = Object.fromEntries(LEAGUE_TEAMS.map((team, index) =>
-            [team, players.slice(index * 13, index * 13 + 13)]))
+            [team.team_id, players.slice(index * 13, index * 13 + 13)]))
         // Hold the league's rosters: while they load, the indicator beside the tabs says "Starting...", the tab says
         // nothing (no request to fill rosters in, 2026-10-13, and no loading line of its own, 2026-10-28), and the empty
         // table stays hidden.
@@ -625,7 +634,7 @@ test("the league's position structure is a default: edits survive a reconnect un
         const changedSlots = { ...leagueSlots, C: 2, Util: 3 }
         await page.route(url => url.pathname.endsWith('/connect'), route => route.fulfill({
             status: 200, contentType: 'application/json',
-            body: JSON.stringify({ team_names: LEAGUE_TEAMS, n_drafters: LEAGUE_TEAMS.length, n_picks: 11,
+            body: JSON.stringify({ teams: LEAGUE_TEAMS, n_drafters: LEAGUE_TEAMS.length, n_picks: 11,
                                    available_modes: ALL_MODES, is_auction_draft: false, slot_counts: changedSlots }),
         }))
         await page.reload({ waitUntil: 'domcontentloaded' })

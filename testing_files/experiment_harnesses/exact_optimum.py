@@ -34,6 +34,7 @@ import numpy as np
 from scipy.optimize import minimize
 from scipy.special import ndtr
 
+from backend.services.session_management import list_session_teams
 from backend.math.truncated_max_pick_model import (
     _evaluate_expected_max_score, _score_value_geometry, compute_expected_pick_tilt_jacobian,
 )
@@ -405,7 +406,7 @@ def build_board_session(season: str, n_rounds: int) -> tuple:
     app and they solve the same problem."""
     from .league_sessions import build_league_session
     client, session_id, session = build_league_session('Each Category', season, UNREGULARIZED_SETTINGS)
-    teams = session.current_settings['team_names']
+    teams = [team.team_id for team in list_session_teams(session)]
     ranked = [int(player) for player in session.agent.default_h_scores.index]
     board = {team: [] for team in teams}
     for pick, team in enumerate(((teams + teams[::-1]) * n_rounds)[:len(teams) * n_rounds]):
